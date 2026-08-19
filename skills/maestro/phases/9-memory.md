@@ -8,6 +8,9 @@ The прогон ends. What it worked out does not have to. This phase is the on
 thing standing between a finished project and a next session that starts by
 rediscovering why a boundary is where it is.
 
+No mode and no depth changes this phase. What was learned is what was learned,
+and nobody is asked about it.
+
 ## What You Are Given
 
 | Run | Read | The question it answers |

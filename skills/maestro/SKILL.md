@@ -85,6 +85,16 @@ against the user's own reference.
 A new capability always attaches to a parent требование. Depth buys thoroughness
 beneath the бриф; it never buys a direction away from it.
 
+**A dial may be changed mid-прогон, at a phase boundary and never inside one.**
+The new value applies to phases not yet started; phases already passed are not
+re-run, because a прогон does not go backwards when the user changes their mind
+about how much to be asked. Switching to a mode with more gates adds them for
+what is left; switching to one with fewer never removes a gate that has already
+passed. Record the change in `dialChanges[]` with the phase it took effect at, so
+the отчёт can say which parts of the прогон were produced under which settings.
+The reasoning is in [`phases/0-dials.md`](phases/0-dials.md); what is above is
+what you do.
+
 No dial removes a gate below, and no dial removes a safety rule. The mode matrix
 changes who is asked and when — never what is checked.
 

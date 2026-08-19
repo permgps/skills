@@ -9,6 +9,10 @@ are exactly three doors into it:
 | Ревью | `repair` — the review found a blocking finding | the таск is committed, and the finding names what it contradicts |
 | Приёмка | `done`, and G4 disagreed about a `R##` it carries | the build is finished and the disagreement is against the манифест |
 
+No mode and no depth changes anything here: a таск that failed failed under
+whatever dials the прогон is running, and the two answers this phase chooses
+between are the same two in every column.
+
 `S5` holds here with no softening. You decide what to try again and you write
 down what was learned; **an executor writes every line of the code**, including
 the one-line fix that looks too small to hand over. That fix is exactly where

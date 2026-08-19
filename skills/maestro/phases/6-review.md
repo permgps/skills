@@ -86,6 +86,13 @@ finding out of it, discard the code, and record that the brief was exceeded.
 Applying it would put project code in your hands — which is the one thing this
 phase and the previous one agree about.
 
+## The Dials Here
+
+**No mode changes this phase, and no depth does either.** A review measures one
+таск against the task file its executor was handed. That file was written under
+whatever mode and depth the прогон is running, and the measurement against it is
+the same in every one of them.
+
 ## Gates
 
 **None.** G4 runs after приёмка and asks a different question against a

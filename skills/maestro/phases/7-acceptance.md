@@ -115,6 +115,19 @@ Disagreements section rather than tucked into a list at the end.
 run or found something blocking, and the build in front of the reader is not the
 build the прогон would accept. Stop and say which таск.
 
+## The Dials Here
+
+**No mode changes this phase.** The отчёт is written in all four columns, and
+Assumptions is a section of it in all four — `full` changes how much lands there,
+never whether the section exists.
+
+**No depth changes what G4 checks.** The манифест is the same document at every
+depth: it is the user's own words numbered, and depth decided only how far
+beneath them the прогон worked. A `strict` run is checked against the same
+требования as a `deep` one, and a reader told the depth would start grading the
+build against how thorough it was expected to be rather than against what was
+asked.
+
 ## Gates
 
 **G4**, and it is the last one.

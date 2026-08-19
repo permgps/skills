@@ -7,6 +7,10 @@ written its отчёт. If the dial is off, this file is not opened at all.
 манифест cannot hold: whether it looks and feels like the thing they pointed at.
 That standard is in `reference.md`, and nowhere else.
 
+The finish dial is the only dial that reaches this file — it decides whether the
+file is opened at all. Once it is, mode and depth change nothing: доводка asks
+the user nothing and approves nothing with them.
+
 ## Steps
 
 ### 1. Check that there is a standard to compare against

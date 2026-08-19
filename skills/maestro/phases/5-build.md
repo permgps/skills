@@ -106,6 +106,20 @@ thing this phase may not do.
 that sends its executor looking for the specification is a task file that did not
 carry what it needed, and that is worth knowing before the next таск repeats it.
 
+## The Dials Here
+
+**No mode changes this phase.** All four columns of the mode matrix say the same
+thing about Разработка, and the reason is that nothing here is a question of
+preference: what gets built was settled at G3, and how it gets built is not the
+user's to be asked about.
+
+**No depth changes it either, and this is where that is worth saying.** An
+executor does not deepen its таск because the прогон is `deep`, and does not trim
+it because the прогон is `strict`. Depth is a decision about scope, scope was
+decided in the specification, and a таск file is the whole of what its executor
+is measured against. A build that re-applied the depth dial would be adding work
+no требование carries and no gate is looking at.
+
 ## Gates
 
 **None.** Разработка is the second stage with no gate after it, and the only one

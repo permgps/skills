@@ -98,6 +98,14 @@ Every таск gets an entry in `tasks[]` with its id, title, `requirementIds`, 
 
 `manual` and `interview` differ in exactly two places, and this is the second.
 
+**Depth has already been spent, and the cut does not spend it again.** `strict`,
+`normal` and `deep` decided how far beneath the бриф `spec.md` reaches; by the
+time you are cutting, that decision is in the document in front of you. A `deep`
+прогон produces more таски because the specification grew, never because the same
+work was cut finer — splitting one таск in three to look thorough costs three
+contexts and three reviews to build what one executor would have finished in one
+pass.
+
 ## Gates
 
 **G3 runs after this phase.** It passes when the map between требования and таски

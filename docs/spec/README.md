@@ -58,14 +58,17 @@ manifest whose numbering shifts cannot be checked against anything.
 | `vocabulary.md` | Stage labels | `Stage id`, `Label` |
 | `vocabulary.md` | Banned synonyms | `Banned`, `Use instead` |
 | `phases.md` | Phases | `Id`, `Name`, `Stage`, `Reads`, `Produces` |
+| `phases.md` | Mode Matrix | `Phase`, then one column per mode defined in `dials.md` |
+| `dials.md` | Modes | `Mode`, `Human gates` |
 | `gates.md` | Gates | `Gate`, `After phase`, `Pass condition` |
 | `artifacts.md` | Run artifacts | `Artifact`, `Writer`, `Readers`, `Mutable` |
 | `state-contract.md` | State fields | `Field`, `Type`, `Written in`, `Read by` |
 
 The validator enforces that gates point at phases that exist, that every
 artifact has exactly one writer, that every state field is produced and consumed,
-that the stage sets in `phases.md` and `vocabulary.md` are identical, and that no
-banned synonym appears in any defined label.
+that the stage sets in `phases.md` and `vocabulary.md` are identical, that the
+mode matrix has one row per stage and one column per mode with no cell left
+empty, and that no banned synonym appears in any defined label.
 
 ## Running The Checks
 

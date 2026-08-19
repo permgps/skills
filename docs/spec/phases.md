@@ -511,6 +511,16 @@ there, by a reader that never saw any of this.
 
 Two cells are all that separate `interview` from `manual`: spec and plan.
 
+**`auto` means the phase does not wait for approval — not that it says
+nothing.** Preflight asks about a dirty working tree and about an English name
+for the run; the manifest phase shows the numbered манифест and asks whether
+anything was missed. Both ask in `semi`, `interview` and `manual`, and both stop
+asking in `full` while still saying what they decided. A cell of this table is
+about a human *gate*: a point where the прогон waits. It is not a promise of
+silence, and `S4` in [`safety.md`](safety.md) asks about consequence in every
+column including the first.
+
+
 The acceptance row does not vary either, and it used to: the отчёт was described
 as carrying Assumptions only in `full`. It carries that section in every mode.
 `S3` sends an invented fact there whoever was asked, and the briefing writes

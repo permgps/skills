@@ -210,6 +210,55 @@ export async function checkSpec(specDir: string): Promise<Violation[]> {
     log.info('labels', 'stage labels checked', { stages: stageIds.size, labels: labelled.size });
   }
 
+  // --- the mode matrix covers every stage in every mode --------------------
+  // Parity between the modes is the kind of claim a reader confirms by scanning
+  // and a document loses one row at a time. The columns come from dials.md so
+  // that adding a mode is a change to one table rather than to two.
+  const modeTable = findTable(tablesOf('dials.md'), ['Mode', 'Human gates']);
+  if (!modeTable) {
+    add('modes', 'dials.md', 0, 'no table with columns Mode and Human gates');
+  } else {
+    const modes = modeTable.rows.map(row => cleanCell(row['Mode'])).filter(Boolean);
+    const matrix = findTable(tablesOf('phases.md'), ['Phase']);
+    if (!matrix) {
+      add('modes', 'phases.md', 0, 'no mode matrix: no table with a Phase column');
+    } else {
+      const columns = matrix.columns.slice(1);
+      // When the column set disagrees with dials.md, every cell lookup below
+      // would miss and report the same defect once per row. One defect, one
+      // finding: the columns are wrong, and the cells cannot be read until they
+      // are fixed.
+      const columnsAgree = columns.join('|') === modes.join('|');
+      if (!columnsAgree) {
+        add('modes', 'phases.md', matrix.line,
+          `mode matrix columns are "${columns.join(', ')}"; dials.md defines "${modes.join(', ')}"`);
+      }
+      const rowed = new Set<string>();
+      for (const row of matrix.rows) {
+        const stage = cleanCell(row['Phase']);
+        rowed.add(stage);
+        if (!stageIds.has(stage)) {
+          add('modes', 'phases.md', row.__line,
+            `mode matrix has a row for "${stage}", which is not a stage in phases.md`);
+          continue;
+        }
+        for (const mode of columnsAgree ? modes : []) {
+          if (cleanCell(row[mode]) === '') {
+            add('modes', 'phases.md', row.__line,
+              `stage "${stage}" records no behavior for mode "${mode}"`);
+          }
+        }
+      }
+      for (const stage of stageIds) {
+        if (!rowed.has(stage)) {
+          add('modes', 'phases.md', matrix.line,
+            `stage "${stage}" has no row in the mode matrix`);
+        }
+      }
+      log.info('modes', 'mode matrix checked', { rows: matrix.rows.length, modes: modes.length });
+    }
+  }
+
   // --- no banned synonym survives inside a defined label -------------------
   const bannedTable = findTable(tablesOf('vocabulary.md'), ['Banned', 'Use instead']);
   if (!bannedTable) {

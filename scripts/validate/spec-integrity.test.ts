@@ -28,6 +28,11 @@ const BASELINE: Record<string, string> = {
 | preflight | Preflight | yes | arguments | state |
 | build | Build | yes | tasks | code |
 | memory | Memory | no | code | memory file |
+
+| Phase | full | semi |
+|---|---|---|
+| preflight | auto | auto |
+| build | auto | auto |
 `,
   'gates.md': `# Gates
 
@@ -51,7 +56,10 @@ Index.
 `,
   'dials.md': `# Dials
 
-Modes and depths.
+| Mode | Human gates |
+|---|---|
+| \`full\` | none |
+| \`semi\` | genuine forks only |
 `,
   'dashboard.md': `# Dashboard
 
@@ -206,4 +214,89 @@ test('several missing documents are all reported', async () => {
     violations.map(v => v.file).sort(),
     ['dials.md', 'safety.md'],
   );
+});
+
+test('a stage missing from the mode matrix is reported', async () => {
+  const violations = await violationsFor({
+    'phases.md': `# Phases
+
+| Id | Name | Stage | Reads | Produces |
+|---|---|---|---|---|
+| preflight | Preflight | yes | arguments | state |
+| build | Build | yes | tasks | code |
+
+| Phase | full | semi |
+|---|---|---|
+| preflight | auto | auto |
+`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'modes');
+  assert.match(violations[0]?.message ?? '', /stage "build" has no row/);
+});
+
+test('a mode matrix row naming something that is not a stage is reported', async () => {
+  const violations = await violationsFor({
+    'phases.md': `# Phases
+
+| Id | Name | Stage | Reads | Produces |
+|---|---|---|---|---|
+| preflight | Preflight | yes | arguments | state |
+| build | Build | yes | tasks | code |
+| memory | Memory | no | code | memory file |
+
+| Phase | full | semi |
+|---|---|---|
+| preflight | auto | auto |
+| build | auto | auto |
+| memory | auto | auto |
+`,
+  });
+  assert.equal(violations.length, 1);
+  assert.match(violations[0]?.message ?? '', /row for "memory", which is not a stage/);
+});
+
+test('a mode column the dials do not define is reported', async () => {
+  const violations = await violationsFor({
+    'phases.md': `# Phases
+
+| Id | Name | Stage | Reads | Produces |
+|---|---|---|---|---|
+| preflight | Preflight | yes | arguments | state |
+| build | Build | yes | tasks | code |
+
+| Phase | full | halfway |
+|---|---|---|
+| preflight | auto | auto |
+| build | auto | auto |
+`,
+  });
+  assert.equal(violations.length, 1);
+  assert.match(violations[0]?.message ?? '', /columns are "full, halfway"/);
+});
+
+test('an empty cell in the mode matrix is reported', async () => {
+  const violations = await violationsFor({
+    'phases.md': `# Phases
+
+| Id | Name | Stage | Reads | Produces |
+|---|---|---|---|---|
+| preflight | Preflight | yes | arguments | state |
+| build | Build | yes | tasks | code |
+
+| Phase | full | semi |
+|---|---|---|
+| preflight | auto |  |
+| build | auto | auto |
+`,
+  });
+  assert.equal(violations.length, 1);
+  assert.match(violations[0]?.message ?? '', /stage "preflight" records no behavior for mode "semi"/);
+});
+
+test('dials with no mode table is reported', async () => {
+  const violations = await violationsFor({ 'dials.md': '# Dials\n\nModes and depths.\n' });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.file, 'dials.md');
+  assert.match(violations[0]?.message ?? '', /no table with columns Mode and Human gates/);
 });
