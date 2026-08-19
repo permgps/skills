@@ -82,7 +82,9 @@ Everything typed after `/maestro` splits into four parts: the mode, the depth,
 the finish, and the бриф. Bare words, no dashes. **Anything not recognised as a
 dial is бриф text** — a word the user meant literally is never stolen by a dial.
 
-**Mode** — how much is asked of the user. Default `semi`.
+**Mode** — how much is asked of the user. Built-in default `semi`; a project
+pins its own in `.maestro/config.json`, and the first прогон in a project asks
+which one. An argument always wins over a pinned mode, for that прогон.
 
 | Mode | Human gates |
 |---|---|

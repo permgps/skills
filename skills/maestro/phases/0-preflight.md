@@ -77,6 +77,29 @@ The slug names the run's directory and appears in every artifact path.
 Create the directory and nothing inside it yet. The manifest phase writes the
 first two files.
 
+### 3b. Write the project config, if the dials phase produced a decision
+
+Only on a first прогон — the dials phase asked, and handed back the mode to pin
+or `null`. Write `.maestro/config.json`:
+
+```json
+{
+  "configVersion": 1,
+  "mode": "full"
+}
+```
+
+Whole file, once, `null` included. Nothing else in it.
+
+**Before the run state, and never conditional on it.** A prior write is a prior
+promise: the question was answered, and a прогон that then failed on something
+unrelated would otherwise ask it again next time — which is the one thing this
+file exists to prevent.
+
+**Never rewrite a file that is already there.** It holds the user's answer, and
+the only thing that changes it afterwards is the user editing it. A прогон that
+found no file, asked, and wrote one is the whole of this step.
+
 ### 4. Write the first state
 
 Write `.maestro/state.js` through the state writer. It carries:

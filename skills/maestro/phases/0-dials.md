@@ -14,7 +14,7 @@ literally is never taken as a dial.
 
 ## Modes
 
-Default: `semi`.
+Built-in default: `semi`. A project may pin its own — see below.
 
 | Mode | Russian triggers | English triggers | Human gates |
 |---|---|---|---|
@@ -50,6 +50,51 @@ Default: off.
 `polish` asks nothing and approves nothing with the user. It changes no mode
 cell.
 
+## The Project's Default Mode
+
+Read `.maestro/config.json` before resolving, if it is there.
+
+```json
+{ "configVersion": 1, "mode": "full" }
+```
+
+The mode comes from the first of these that supplies one:
+
+1. a mode token in the arguments,
+2. `mode` in the file, when it is one of the four,
+3. `semi`.
+
+Ignore the file if it will not parse or carries a `mode` outside the set:
+continue on `semi` and say in the announcement that it was unreadable. Ignore
+keys you do not recognise — a later version may pin more than the mode. A
+setting never stops a прогон.
+
+### When The File Is Not There
+
+This is the first прогон in this project. Ask once, before anything else runs.
+
+**If the arguments named no mode**, show all four and let the user choose. Mark
+`semi` so a user who does not care can take it without reading the rest:
+
+| Mode | You are asked | The прогон decides |
+|---|---|---|
+| `full` | nothing | every fork, on its own |
+| `semi` — built-in default | at a genuine fork, and only there | the rest |
+| `interview` | every question the брифинг opens | nothing about the бриф |
+| `manual` | the same, and you approve the spec and the plan | nothing before you have seen it |
+
+**If the arguments named a mode**, ask one question instead: pin it as this
+project's default?
+
+**Ask this in `full` as well.** It is the one question that mode does not
+remove. `full` frees the user from questions about what is being built; this one
+is about the tool, and it is asked once in a project's lifetime rather than once
+a прогон.
+
+Either answer produces a file: the chosen mode, or `"mode": null` for a user who
+declined. **You do not write it here** — hand the decision to preflight, which
+creates everything under `.maestro/`.
+
 ## Resolution
 
 1. Scan the arguments left to right for dial tokens.
@@ -61,7 +106,8 @@ cell.
      which was meant;
    - in `full` — the first token wins, and say so in the announcement, because
      that mode may not ask.
-4. Unset dials take their defaults.
+4. An unset depth or finish takes its default. An unset mode comes from *The
+   Project's Default Mode* above.
 5. A trigger phrase inside a longer sentence of бриф text does **not** set a
    dial. Dials are typed as bare words; they are not detected by meaning.
 
@@ -73,6 +119,9 @@ After resolution and before the manifest phase, state in one block:
 - the depth,
 - whether доводка is on,
 - the one consequence the user is most likely to be surprised by.
+- where the mode came from, whenever it was not typed: the path of the config
+  file, or the built-in default. An argument that overrode a pinned mode is
+  said to hold for this прогон only.
 
 Use these:
 
@@ -101,6 +150,7 @@ not a question. Do not wait for a reply.
 
 - `mode`, `depth` and `polish`, resolved.
 - The announcement text, composed and ready.
+- The config decision, when this is a first прогон: the mode to pin, or `null`.
 
 The announcement is **shown by preflight**, once the run state exists — a dial
 announced before there is a run to announce it for is a promise with nothing
