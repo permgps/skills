@@ -11,8 +11,11 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "spec": "node scripts/validate/spec-integrity.ts docs/spec",
+    "bundle": "node scripts/validate/bundle-integrity.ts skills/maestro",
     "test": "node --test 'scripts/**/*.test.ts'",
-    "check": "npm run typecheck && npm run spec && npm run test"
+    "check": "npm run typecheck && npm run spec && npm run bundle && npm run test",
+    "link": "node scripts/package/link-local.ts link",
+    "unlink": "node scripts/package/link-local.ts unlink"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

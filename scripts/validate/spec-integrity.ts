@@ -7,6 +7,9 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { createLogger } from '../shared/log.ts';
+import { formatViolation, type Violation } from '../shared/violation.ts';
+
+export type { Violation };
 
 const log = createLogger('spec-integrity');
 
@@ -41,12 +44,6 @@ export interface Table {
   line: number;
 }
 
-export interface Violation {
-  check: string;
-  file: string;
-  line: number;
-  message: string;
-}
 
 /** Split a markdown table row on pipes that are not backslash-escaped. */
 function splitRow(line: string): string[] {
@@ -262,9 +259,7 @@ async function main(): Promise<number> {
   }
 
   for (const violation of violations) {
-    process.stdout.write(
-      `${violation.file}:${violation.line}  [${violation.check}] ${violation.message}\n`,
-    );
+    process.stdout.write(formatViolation(violation));
   }
   process.stdout.write(`spec-integrity: ${violations.length} violation(s)\n`);
   return 1;
