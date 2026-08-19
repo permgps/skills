@@ -13,7 +13,7 @@ right thing was built.
 | briefing | Briefing | yes | `manifest.md` | `answers.md`, `reference.md` |
 | spec | Specification | yes | `manifest.md`, `answers.md` | `spec.md` |
 | plan | Plan | yes | `spec.md` | `tasks/`, `interfaces.md` |
-| build | Build | yes | `tasks/`, `interfaces.md` | project code, `discovered-interfaces.md` |
+| build | Build | yes | `tasks/`, `interfaces.md` | project code, `discovered-interfaces.md`, a handoff where one was needed |
 | review | Review | yes | `tasks/`, project code | `reviews/` |
 | acceptance | Acceptance | yes | `manifest.md`, project code | `report.md` |
 | memory | Memory | no | project code, `spec.md` | project memory file, decision records |
@@ -90,6 +90,12 @@ on exists.
 The wave is recomputed after each таск returns, not planned once at the start. A
 таск that finishes early releases whatever it was blocking, and the next wave
 forms around what is actually done rather than around what was expected to be.
+
+The *Wave width* column above is a consequence of the cut, not a ceiling on it.
+It says how wide the waves of a well-cut plan of that size tend to be; it does
+not cap what this rule computes. A plan whose graph allows eight таски at once
+runs eight — and if that is wrong, it is wrong in the cut, where it can still be
+fixed against the требования.
 
 ### Isolation
 
