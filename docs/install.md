@@ -11,10 +11,14 @@ install time.
 - **To develop it:** Node.js 22.18 or newer, because the repository's own scripts
   are TypeScript executed by Node's native type stripping.
 
-**Run Maestro inside a git repository.** It works without one and says so, but
-the final отчёт is checked against what actually reached version control, and
-outside a repository that check silently has nothing to read. `git init` in the
-project directory before the first прогон is the whole of it.
+**Run Maestro inside a git repository, and initialise it before you start the
+agent session.** It works without one and says so, but two things depend on it.
+The final отчёт is checked against what actually reached version control, and
+outside a repository that check has nothing to read. And a host decides whether
+it is inside a repository when its session starts: a `git init` run afterwards
+leaves it unable to raise a worktree for the rest of that session, so every wave
+of the прогон narrows to one таск. Both are announced rather than silent, and
+both are avoided by running `git init` first.
 
 `python3` is used for one thing: mirroring the run state into the dashboard and
 serving it on the loopback interface so the page stays live inside an in-app
@@ -171,6 +175,7 @@ npm run check     # everything below, in this order
 | `npm run spec` | the behavior specification does not contradict itself |
 | `npm run bundle` | frontmatter, link targets, no cross-phase links, no orphaned phase |
 | `npm run state` | `docs/spec/state-contract.md` and `scripts/state/contract.ts` still agree |
+| `npm run hosts` | every host capability that degrades is probed in preflight and spent in a phase |
 | `npm run test` | the checkers' own tests |
 
 `npm run metrics -- <run-dir>` measures a finished run. It is not part of

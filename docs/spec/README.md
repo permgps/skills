@@ -81,6 +81,8 @@ node scripts/validate/bundle-integrity.ts skills/maestro   # the skill bundle's 
 node scripts/validate/dashboard-integrity.ts \
   skills/maestro/assets/dashboard.html docs/spec           # the dashboard asset
 node scripts/validate/state-matches-spec.ts docs/spec  # the contract vs its code
+node scripts/validate/host-degradation.ts \
+  docs/spec skills/maestro                               # host degradations vs the bundle
 node --test 'scripts/**/*.test.ts'                     # the checkers themselves
 
 LOG_LEVEL=DEBUG node scripts/validate/spec-integrity.ts docs/spec
@@ -95,6 +97,21 @@ defaults to both paths above. It proves the page is self-contained and that the
 labels, stage order and gate map it copies still match `vocabulary.md`,
 `phases.md` and `gates.md` — the page holds those copies because the state
 stores ids and labels are resolved at render time, and an unchecked copy drifts.
+
+`host-degradation` takes the same two paths and proves that a capability
+[`hosts.md`](hosts.md) marks as degrading has both of its halves inside the
+bundle: preflight establishes it by trying it, and the phase that spends it says
+what its absence costs. The first end-to-end прогон is why the check exists —
+the rule for a missing worktree lived only in `references/hosts.md`, which is
+opened only on a host the прогон was not running on, so the wave that lost its
+isolation had nothing to read. The two halves are marked in the phase files with
+`<!-- maestro:probes:<capability> -->` and `<!-- maestro:degrades:<capability> -->`,
+and a capability the specification calls a stop condition may not carry the
+second one. It also holds the bundle's own `references/hosts.md` against this
+document: every degrading capability owes a cost row there, each row names the
+capability it is the runtime half of, and a row that stops the прогон where the
+specification says it narrows — or the reverse — is the same defect seen from
+the reference side.
 
 Pass a directory to the validator to check a different tree; it defaults to
 `docs/spec`. `LOG_LEVEL` accepts `DEBUG`, `INFO`, `WARN`, `ERROR` and defaults to
