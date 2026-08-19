@@ -14,6 +14,7 @@ project that was built, not with Maestro.
 │   ├── interfaces.md
 │   ├── discovered-interfaces.md
 │   ├── tasks/NN-<slug>.md
+│   ├── tasks/NN-<slug>-handoff.md
 │   ├── reviews/NN-<slug>.md
 │   └── report.md
 ├── state.js
@@ -37,6 +38,7 @@ actually built.
 | `interfaces.md` | plan | build, review | no |
 | `discovered-interfaces.md` | build | build, review, memory | append-only |
 | `tasks/NN-<slug>.md` | plan | build, review, G3 | no |
+| `tasks/NN-<slug>-handoff.md` | build | build, review | no |
 | `reviews/NN-<slug>.md` | review | repair, acceptance | append-only |
 | `report.md` | acceptance | the user | no |
 | `state.js` | preflight | dashboard | yes |
@@ -47,6 +49,14 @@ more naturally. `interfaces.md` holds the boundaries the plan derived from the
 spec; `discovered-interfaces.md` holds what finished таски actually built. One
 file written by two phases has no owner, and the first disagreement between them
 is unattributable.
+
+A handoff exists only for a таск that ran out of context before it was done. It
+is written by the orchestrator from what the executor returned — the executor's
+keyboard reaches project code and nothing else — and it holds what is finished,
+what is not, and what the next executor needs in order to continue the same
+таск. **Its absence is the normal case.** A run where every таск has one is a run
+whose plan cut таски too large, and the handoff is the symptom rather than the
+remedy.
 
 Requirement **statuses are not in `manifest.md`.** The manifest holds requirement
 text, written once; the statuses live in the run state, whose writer is the

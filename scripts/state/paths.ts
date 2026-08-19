@@ -85,6 +85,9 @@ export function forRun(slug: string) {
     tasksDir: (): string => inside('tasks'),
     task: (index: number, name: string): string =>
       inside('tasks', `${toIndex(index)}-${toSlug(name)}.md`),
+    /** Only for a таск that ran out of context. Beside its task file, never elsewhere. */
+    handoff: (index: number, name: string): string =>
+      inside('tasks', `${toIndex(index)}-${toSlug(name)}-handoff.md`),
     reviewsDir: (): string => inside('reviews'),
     review: (index: number, name: string): string =>
       inside('reviews', `${toIndex(index)}-${toSlug(name)}.md`),
@@ -93,6 +96,21 @@ export function forRun(slug: string) {
 }
 
 export type RunPaths = ReturnType<typeof forRun>;
+
+/**
+ * The isolation directory for one таск of a parallel wave — a sibling of the
+ * project, not a path inside it. **This is the one builder here that leaves the
+ * run root on purpose**, so it does not go through `within`: a worktree inside
+ * `.maestro/` would put the project's code inside the run's record.
+ *
+ * The name is derived rather than stored. A path written into the run state is a
+ * second source of truth, and a прогон that died mid-wave leaves it pointing at
+ * a directory that may no longer exist; computing the same name again finds
+ * whatever is actually there.
+ */
+export function worktree(project: string, slug: string, index: number): string {
+  return path.join('..', `${toSlug(project)}-maestro-${toSlug(slug)}-${toIndex(index)}`);
+}
 
 /** Convenience for the common case: the paths of the run a state describes. */
 export const forState = (state: RunState): RunPaths => forRun(state.slug);

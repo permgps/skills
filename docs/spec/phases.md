@@ -77,6 +77,60 @@ executor is handed is a таск. A plan with zero таски would make G3 vacu
 exactly when there is nothing else checking that the spec reached anyone, so the
 smallest plan is one таск rather than an exemption from the gate.
 
+## Execution
+
+The granularity table above names a wave width and never says what a wave is.
+
+**A wave is the set of таски that can run at the same time**: every id in their
+`blockedBy` has finished, and no two of them own the same file. Both halves are
+required. The dependency graph alone would let two таски edit one module from
+opposite ends, and file ownership alone would start a таск before what it builds
+on exists.
+
+The wave is recomputed after each таск returns, not planned once at the start. A
+таск that finishes early releases whatever it was blocking, and the next wave
+forms around what is actually done rather than around what was expected to be.
+
+### Isolation
+
+**A wave wider than one таск runs with each таск in its own git worktree.** A
+wave of one does not: it has no second writer to be protected from, and a tiny
+project is one таск carrying the whole spec, which would then pay a merge for
+nothing. Isolation is a property of the wave, not of the таск.
+
+Each worktree is merged back when its таск finishes, and the next wave starts
+only from the merged result. **A merge conflict between two таски of one wave is
+a defect in the cut, not a merge to be resolved** — it is the file-ownership rule
+being contradicted after the fact. It is reported against the plan, because
+resolving it means deciding what the project's code should say, and that is the
+one thing the orchestrator does not do ([`safety.md`](safety.md), `S5`).
+
+### Commits
+
+**One commit per finished таск.** A прогон survives a compaction, a crash and a
+closed laptop by what is committed, and a commit per wave loses everything in a
+wave that fails halfway. The per-таск history is also what the review phase
+reads: a diff belonging to one таск can be judged against that таск's file, and
+a wave-sized diff cannot be split back apart afterwards.
+
+### Handoff
+
+A таск that runs out of context before it is done leaves
+`tasks/NN-<slug>-handoff.md` — what is finished, what is not, and what the next
+executor needs — and the same таск is handed over again with that file added to
+what it is given. **This is the only case where one таск is handed over twice.**
+
+The handoff exists for surprises. A plan that produces one per таск cut its
+таски too large, and the granularity rules above are what to fix, not the
+handoff.
+
+### A таск That Does Not Come Back Done
+
+It goes to the repair phase. Until that phase's rules exist, **the прогон stops
+and says which таск and why.** A build that retries a таск by rules nobody wrote
+produces a second failure that looks like the first, and the run has no record of
+which attempt built what.
+
 ## Mode Matrix
 
 | Phase | full | semi | interview | manual |
