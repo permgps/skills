@@ -40,7 +40,7 @@ anything other than done, or by failing its review.
 Dial resolution has its own file, [`phases/0-dials.md`](phases/0-dials.md), read
 at the start of Preflight before anything else.
 
-Neither of those two has a rules file in this bundle yet, and neither does
+Neither Memory nor Repair has a rules file in this bundle yet, and neither does
 доводка. **When you reach a phase whose file does not exist, stop and say so.**
 Do not improvise it from the sentence that names it or from a row of the table
 above: what is written down anywhere here is what a phase produces, never how,
@@ -98,9 +98,10 @@ fails is not a warning: the phase is redone.**
 | G4 | acceptance | The build is checked against `manifest.md` with `spec.md` withheld, and every disagreement is reported |
 
 At G4 the reader has `manifest.md` and the running build, and does **not** have
-`spec.md`, the plan, the task files, or the review notes. The withholding is the
-mechanism: a reader who has seen the specification will confirm the
-specification, not the бриф.
+`spec.md`, the plan, the task files, the review notes, or `brief.md`. The
+withholding is the mechanism: a reader who has seen the specification confirms
+the specification, and a reader holding the бриф beside the манифест answers
+from the looser of the two exactly where they disagree.
 
 A failed gate returns control to the phase it follows, which runs again with the
 gate's findings as input. A gate may fail twice on the same finding; on the third
@@ -108,6 +109,11 @@ failure the run stops and reports what cannot be satisfied rather than looping.
 **A gate is never passed with notes** — findings are acted on, or recorded as an
 explicit deferral against a requirement id, which itself changes that
 requirement's status.
+
+**G4 is the exception to the first sentence.** Приёмка re-run against the same
+манифест and the same build finds the same thing, so a failed G4 does not send
+its phase back. The отчёт is written anyway — it is the record of what
+disagreed — and the прогон stops and names the требования.
 
 ## The Safety Rules
 

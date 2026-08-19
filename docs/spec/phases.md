@@ -314,9 +314,15 @@ back, so the прогон stops and names the требования.
 | plan | auto, notify only | auto, interruptible | auto, interruptible | discussed, waits for approval |
 | build | auto | auto | auto | auto |
 | review | auto | auto | auto | auto |
-| acceptance | отчёт with Assumptions | отчёт | отчёт | отчёт |
+| acceptance | отчёт | отчёт | отчёт | отчёт |
 
 Two cells are all that separate `interview` from `manual`: spec and plan.
+
+The acceptance row does not vary either, and it used to: the отчёт was described
+as carrying Assumptions only in `full`. It carries that section in every mode.
+`S3` sends an invented fact there whoever was asked, and the briefing writes
+into it whenever it decides a wording instead of raising it. What `full` changes
+is how much lands there — not whether the section exists.
 
 No cell in this table removes a gate from `gates.md` or a rule from
 `safety.md`. Those run identically in all four columns, because they are checks
