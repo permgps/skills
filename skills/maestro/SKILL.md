@@ -55,6 +55,27 @@ After a compaction, re-read **the state, not the rules**: the run state,
 Re-opening earlier phase files to recover the thread spends context on rules
 already executed, and the thread was never in them.
 
+## The Dashboard
+
+Raised in preflight and never opened a second time. What it needs from you for
+the rest of the прогон is one line, run **after every write to `state.js`** —
+stage transitions, task transitions, gate results alike:
+
+```bash
+python3 .maestro/sync.py
+```
+
+It mirrors the state into the page so the прогон is visible even where the page
+cannot load a file beside it, checks that `state.js` is readable by the tool
+that measures a finished run, and brings back a server that died since the last
+update. The screen follows on its own within seconds, wherever it is open.
+
+**This is here rather than in the phase files because every phase writes state.**
+A rule copied into nine files is nine rules that drift apart, and this one is
+performed dozens of times in a run. Skipping it degrades rather than breaks: a
+page served over http still updates from `state.js`; what goes stale is what
+someone sees when they open the page with no server behind it.
+
 ## The Dials
 
 Everything typed after `/maestro` splits into four parts: the mode, the depth,

@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""Mirror the run state into the dashboard, and keep it reachable.
+
+Run it after every write to `state.js`:
+
+    python3 .maestro/sync.py
+
+It does four things, in this order, and reports what it did:
+
+1.  **Checks that `state.js` parses as JSON.** The page is happy with any valid
+    JavaScript, so a hand-written object literal with bare keys renders exactly
+    as well as a strict one — and then `scripts/metrics/measure.ts`, which goes
+    through `JSON.parse`, cannot read the прогон at all. The dashboard is the
+    forgiving consumer and the metrics tool is the strict one; without this
+    check the difference surfaces after the run, when the file is finished and
+    nothing can be re-measured.
+2.  **Copies the state into the page's snapshot.** The copy is the same text
+    under a different name, so the snapshot cannot say something the file does
+    not — it is equal to the file or older than it, never in disagreement.
+3.  **Puts `index.html` beside the page**, because a viewer can be handed an
+    origin with no path, and a directory listing is what it shows otherwise.
+4.  **Raises a static server** over this directory, bound to the loopback
+    interface, if one is not already answering for it — and prints the address.
+
+Failing to raise a server is not an error. The page carries its snapshot, so a
+run without a server shows the truth and stops ticking; that is worth one line
+of output, not a stopped прогон.
+
+Nothing in this file is checked by `npm run check`: `bundle-integrity.ts` walks
+`.md` and this is the only executable in the bundle. Change it with that in
+mind — the first thing to break here breaks silently.
+"""
+
+import json
+import os
+import re
+import socket
+import subprocess
+import sys
+
+DIR = os.path.dirname(os.path.abspath(__file__))
+STATE = os.path.join(DIR, 'state.js')
+PAGE = os.path.join(DIR, 'dashboard.html')
+INDEX = os.path.join(DIR, 'index.html')
+SERVE = os.path.join(DIR, 'serve.json')
+
+ASSIGNMENT = 'globalThis.MAESTRO_STATE ='
+SNAPSHOT_RE = re.compile(
+    r'(/\*\s*maestro:snapshot:start\s*\*/)(.*?)(/\*\s*maestro:snapshot:end\s*\*/)',
+    re.DOTALL)
+
+DEBUG = os.environ.get('MAESTRO_SYNC_DEBUG') == '1'
+
+
+def debug(message):
+    if DEBUG:
+        print('debug: ' + message, file=sys.stderr)
+
+
+def literal(source):
+    """The object literal out of state.js, exactly as the page would see it."""
+    start = source.find(ASSIGNMENT)
+    if start == -1:
+        raise ValueError('no "%s" assignment' % ASSIGNMENT)
+    body = source[start + len(ASSIGNMENT):].strip()
+    end = body.rfind('}')
+    if end == -1:
+        raise ValueError('the assignment carries no object literal')
+    return body[:end + 1]
+
+
+def mirror(text):
+    """Write the literal into the page's snapshot block. Returns True if it moved."""
+    page = open(PAGE, encoding='utf-8').read()
+    if not SNAPSHOT_RE.search(page):
+        raise ValueError('dashboard.html has no maestro:snapshot markers')
+
+    body = '\nglobalThis.MAESTRO_SNAPSHOT = %s;\n' % text
+    updated = SNAPSHOT_RE.sub(lambda m: m.group(1) + body + m.group(3), page, count=1)
+    if updated == page:
+        return False
+    open(PAGE, 'w', encoding='utf-8').write(updated)
+    return True
+
+
+def place_index():
+    """`/` must be the dashboard. A link, never a copy — a copy is a second page that ages."""
+    if os.path.lexists(INDEX):
+        return False
+    try:
+        os.symlink('dashboard.html', INDEX)
+        return True
+    except OSError as error:
+        debug('symlink refused (%s); the pane must be pointed at /dashboard.html' % error)
+        return False
+
+
+def running_for_this_directory():
+    """The recorded port, if the process behind it is still serving *this* run."""
+    try:
+        record = json.load(open(SERVE, encoding='utf-8'))
+        pid, port = int(record['pid']), int(record['port'])
+    except Exception:
+        return None
+
+    try:
+        command = subprocess.run(['ps', '-p', str(pid), '-o', 'command='],
+                                 capture_output=True, text=True, timeout=5).stdout
+    except Exception:
+        return None
+
+    # The directory has to match. A pid file that only says "a server is up"
+    # is how one project ends up pointed at another project's dashboard.
+    if DIR in command and 'http.server' in command:
+        return port
+    return None
+
+
+def free(port):
+    with socket.socket() as probe:
+        try:
+            probe.bind(('127.0.0.1', port))
+            return True
+        except OSError:
+            return False
+
+
+def pick_port():
+    """Prefer the port already handed to the user, so a copied link keeps working."""
+    try:
+        remembered = int(json.load(open(SERVE, encoding='utf-8'))['port'])
+        if free(remembered):
+            return remembered
+    except Exception:
+        pass
+    with socket.socket() as probe:
+        probe.bind(('127.0.0.1', 0))
+        return probe.getsockname()[1]
+
+
+def serve():
+    """Raise a server for this directory, detached, on the loopback only."""
+    port = pick_port()
+    try:
+        process = subprocess.Popen(
+            [sys.executable, '-m', 'http.server', str(port),
+             '--bind', '127.0.0.1', '--directory', DIR],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            start_new_session=True)
+    except Exception as error:
+        debug('server refused to start: %s' % error)
+        return None
+
+    json.dump({'pid': process.pid, 'port': port}, open(SERVE, 'w', encoding='utf-8'))
+    return port
+
+
+def main():
+    if not os.path.exists(STATE):
+        print('sync: no state.js beside this script — nothing to mirror yet')
+        return 2
+
+    source = open(STATE, encoding='utf-8').read()
+    try:
+        text = literal(source)
+    except ValueError as error:
+        print('sync: %s — the page reads this file, so the прогон is now invisible' % error)
+        return 1
+
+    mirrored = mirror(text)
+    linked = place_index()
+
+    port = running_for_this_directory()
+    reused = port is not None
+    if port is None:
+        port = serve()
+
+    if port is None:
+        print('sync: no server — open %s directly; it shows the snapshot and will not tick' % PAGE)
+    else:
+        print('http://localhost:%d/dashboard.html' % port)
+    debug('mirrored=%s linked=%s port=%s reused=%s' % (mirrored, linked, port, reused))
+
+    # Last, and deliberately after the address: the page works either way, and
+    # this is about the tool that reads the run when it is over.
+    try:
+        json.loads(text)
+    except ValueError as error:
+        print('sync: state.js is valid JavaScript but not valid JSON (%s).' % error)
+        print('      The dashboard renders it; scripts/metrics/measure.ts cannot read it.')
+        print('      Quote every key and use JSON values — the writer emits JSON.stringify output.')
+        return 1
+
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

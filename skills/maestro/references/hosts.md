@@ -14,6 +14,7 @@ Answer these five, by observation rather than by belief about the product:
 | Can you create a git worktree? | shell access plus a git repository |
 | Can you commit? | the same |
 | Can you write outside `.maestro/`? | the project code has to reach disk somehow |
+| Can the user watch the прогон change? | the page is on screen **and** a stage clock moved after a state write |
 
 If you cannot answer one of them, it is a **no** for this прогон. A capability
 assumed and then missing halfway through a wave is worse than one that was never
@@ -28,6 +29,7 @@ counted on: half the таски are in worktrees nobody can merge.
 | worktrees | every wave is one таск wide. Same consequence as no fan-out, arrived at from the other side |
 | commits | the прогон runs. Say in the announcement that it cannot commit, and tell the review phase it will be reading the working tree rather than one таск's diff |
 | writing project files | **stop.** There is nowhere to build |
+| a page that follows the state | the прогон runs and the отчёт is unaffected. Say the view is a still picture, name the file, and stop promising a live one |
 
 Two of those are stops and they are not negotiable. The rest narrow the wave,
 which a tiny project's plan does anyway.
@@ -45,6 +47,11 @@ is that nobody later mistakes a host limitation for a decision the прогон 
 ## What Not To Do
 
 - **Do not infer a capability from the host's name.** Try the thing.
+- **Do not read "the page appeared" as "the dashboard works".** Those are two
+  claims and only the second one is worth anything. A viewer that inlines the
+  page renders it perfectly and leaves it unable to load the state beside it, so
+  the failure looks like a working dashboard describing an empty прогон. The
+  check is that a clock moved, not that a window opened.
 - **Do not skip a reader because fan-out is missing.** Sequential is slower, not
   weaker; the withholding is what makes the reading worth anything, and that
   survives.
