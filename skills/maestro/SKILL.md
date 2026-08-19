@@ -26,7 +26,7 @@ right thing was built.
 |---|---|---|---|
 | 0 | Preflight | [`phases/0-preflight.md`](phases/0-preflight.md) | resolved dials, run state, dashboard |
 | 1 | Manifest | [`phases/1-manifest.md`](phases/1-manifest.md) | `brief.md`, `manifest.md` |
-| 2 | Briefing | not yet written | `answers.md`, `reference.md` |
+| 2 | Briefing | [`phases/2-briefing.md`](phases/2-briefing.md) | `answers.md`, `reference.md` |
 | 3 | Specification | not yet written | `spec.md` |
 | 4 | Plan | not yet written | `tasks/`, `interfaces.md` |
 | 5 | Build | not yet written | project code, `discovered-interfaces.md` |

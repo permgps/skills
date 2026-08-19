@@ -16,6 +16,7 @@ const log = createLogger('bundle-integrity');
 
 const REQUIRED_KEYS = ['name', 'description', 'argument-hint'];
 const PHASES_DIR = 'phases';
+const PROMPTS_DIR = 'prompts';
 
 export interface Frontmatter {
   keys: Map<string, string>;
@@ -85,8 +86,8 @@ const exists = async (target: string): Promise<boolean> => {
   }
 };
 
-/** Every markdown file under `phases/`, relative to the bundle root. */
-async function listPhaseFiles(bundleDir: string): Promise<string[]> {
+/** Every markdown file under one of the bundle's directories, relative to its root. */
+async function listMarkdown(bundleDir: string, directory: string): Promise<string[]> {
   const found: string[] = [];
 
   const walk = async (relative: string): Promise<void> => {
@@ -98,7 +99,7 @@ async function listPhaseFiles(bundleDir: string): Promise<string[]> {
     }
   };
 
-  if (await exists(path.join(bundleDir, PHASES_DIR))) await walk(PHASES_DIR);
+  if (await exists(path.join(bundleDir, directory))) await walk(directory);
   return found;
 }
 
@@ -141,21 +142,26 @@ export async function checkBundle(bundleDir: string): Promise<Violation[]> {
   }
 
   // --- links resolve, everywhere in the bundle ------------------------------
-  const phaseFiles = await listPhaseFiles(bundleDir);
+  const phaseFiles = await listMarkdown(bundleDir, PHASES_DIR);
+  const promptFiles = await listMarkdown(bundleDir, PROMPTS_DIR);
   log.debug('phases', 'phase files found', { count: phaseFiles.length, files: phaseFiles });
+  log.debug('prompts', 'prompt files found', { count: promptFiles.length, files: promptFiles });
 
   const documents: Array<{ file: string; body: string }> = [
     { file: 'SKILL.md', body: skill },
   ];
-  for (const file of phaseFiles) {
+  for (const file of [...phaseFiles, ...promptFiles]) {
     documents.push({ file, body: await readFile(path.join(bundleDir, file), 'utf8') });
   }
 
   let linkCount = 0;
   const linkedFromSkill = new Set<string>();
+  const linkedAnywhere = new Set<string>();
 
   for (const { file, body } of documents) {
     const fromDir = path.dirname(file);
+    const fromPrompt = file.startsWith(`${PROMPTS_DIR}${path.sep}`);
+
     for (const link of findRelativeLinks(body)) {
       linkCount += 1;
       const resolved = path.normalize(path.join(fromDir, link.target));
@@ -169,27 +175,39 @@ export async function checkBundle(bundleDir: string): Promise<Violation[]> {
         continue;
       }
       if (file === 'SKILL.md') linkedFromSkill.add(resolved);
+      linkedAnywhere.add(resolved);
 
-      // --- a phase never reaches another phase -------------------------------
+      // --- nothing but SKILL.md reaches into phases/ -------------------------
       const insidePhases = resolved.startsWith(`${PHASES_DIR}${path.sep}`);
       if (file !== 'SKILL.md' && insidePhases && resolved !== file) {
-        add('cross-phase', file, link.line,
-          `phase file links to "${link.target}" — hoist the shared rule into SKILL.md `
-          + 'or give it its own file each phase opens deliberately');
+        add('cross-phase', file, link.line, fromPrompt
+          ? `prompt links to "${link.target}" — a subagent brief that reaches a phase's `
+            + 'rules stops being an independent brief'
+          : `phase file links to "${link.target}" — hoist the shared rule into SKILL.md `
+            + 'or give it its own file each phase opens deliberately');
       }
     }
   }
   log.info('links', 'links checked', { count: linkCount, documents: documents.length });
 
-  // --- nothing under phases/ is orphaned ------------------------------------
+  // --- nothing under phases/ or prompts/ is orphaned ------------------------
   for (const file of phaseFiles) {
     if (!linkedFromSkill.has(file)) {
       add('reachability', file, 0, `phase file is not linked from SKILL.md`);
     }
   }
-  log.info('reachability', 'phase files checked', {
+  // A prompt is opened by whichever phase hands it over, so any document in the
+  // bundle may be the one that reaches it.
+  for (const file of promptFiles) {
+    if (!linkedAnywhere.has(file)) {
+      add('reachability', file, 0, 'prompt file is not linked from anywhere in the bundle');
+    }
+  }
+  log.info('reachability', 'phase and prompt files checked', {
     phases: phaseFiles.length,
-    linked: linkedFromSkill.size,
+    linkedPhases: phaseFiles.filter(file => linkedFromSkill.has(file)).length,
+    prompts: promptFiles.length,
+    linkedPrompts: promptFiles.filter(file => linkedAnywhere.has(file)).length,
   });
 
   return violations;

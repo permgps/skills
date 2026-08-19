@@ -214,3 +214,69 @@ test('every violation in one bundle is reported, not just the first', async () =
     ['cross-phase', 'links', 'reachability'],
   );
 });
+
+// --- prompts: subagent briefs, reachable from the phase that hands them over --
+
+test('a prompt linked from a phase file is valid', async () => {
+  const violations = await violationsFor({
+    'phases/1-manifest.md': `# Manifest\n\nHand over [the reader](../prompts/reader.md).\n`,
+    'prompts/reader.md': `# Reader\n\nYou have the brief and nothing else.\n`,
+  });
+  assert.deepEqual(violations, []);
+});
+
+test('a prompt nobody links to is reported', async () => {
+  const violations = await violationsFor({
+    'prompts/reader.md': `# Reader\n\nOrphan.\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'reachability');
+  assert.equal(violations[0]?.file, 'prompts/reader.md');
+  assert.match(violations[0]?.message ?? '', /not linked from anywhere/);
+});
+
+test('a prompt may be reached from SKILL.md as well as from a phase', async () => {
+  const violations = await violationsFor({
+    'SKILL.md': `${FRONTMATTER}\n# Maestro\n\n[reader](prompts/reader.md)\n`,
+    'phases/0-preflight.md': null,
+    'phases/1-manifest.md': null,
+    'references/state.md': null,
+    'prompts/reader.md': `# Reader\n\nBrief.\n`,
+  });
+  assert.deepEqual(violations, []);
+});
+
+test('a dead link inside a prompt is reported — prompts are checked, not trusted', async () => {
+  const violations = await violationsFor({
+    'phases/1-manifest.md': `# Manifest\n\nHand over [the reader](../prompts/reader.md).\n`,
+    'prompts/reader.md': `# Reader\n\nSee [gone](../references/gone.md).\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'links');
+  assert.equal(violations[0]?.file, 'prompts/reader.md');
+});
+
+test('a prompt linking into phases/ is reported with its own reason', async () => {
+  const violations = await violationsFor({
+    'phases/1-manifest.md': `# Manifest\n\nHand over [the reader](../prompts/reader.md).\n`,
+    'prompts/reader.md': `# Reader\n\nFirst read [manifest](../phases/1-manifest.md).\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'cross-phase');
+  assert.equal(violations[0]?.file, 'prompts/reader.md');
+  assert.match(violations[0]?.message ?? '', /stops being an independent brief/);
+});
+
+test('a prompt escaping the bundle is reported', async () => {
+  const violations = await violationsFor({
+    'phases/1-manifest.md': `# Manifest\n\nHand over [the reader](../prompts/reader.md).\n`,
+    'prompts/reader.md': `# Reader\n\nSee [outside](../../secrets.md).\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'links');
+  assert.match(violations[0]?.message ?? '', /escapes the bundle/);
+});
+
+test('a bundle with no prompts directory is valid', async () => {
+  assert.deepEqual(await violationsFor({}), []);
+});
