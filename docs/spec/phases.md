@@ -61,8 +61,9 @@ Three rules decide the cut, and they outrank the table:
 1. **A таск is one executor's whole job.** If it needs a second context to
    finish, it was too big; the handoff exists for surprises, not for planning.
 2. **A таск owns its files.** Two таски that edit the same file are one таск, or
-   they are sequenced. Parallel width is bounded by file ownership, not by the
-   number of executors available.
+   they are sequenced. That ownership is the таск's **zone**, and it is what
+   splits a dependency layer into waves that can actually run together. Parallel
+   width is bounded by file ownership, not by the number of executors available.
 3. **A таск traces to at least one требование**, and every in-spec требование
    reaches at least one таск. That is half of G3, and it is what stops the cut
    from drifting into work nobody asked for.
@@ -93,9 +94,21 @@ required. The dependency graph alone would let two таски edit one module fr
 opposite ends, and file ownership alone would start a таск before what it builds
 on exists.
 
-The wave is recomputed after each таск returns, not planned once at the start. A
-таск that finishes early releases whatever it was blocking, and the next wave
-forms around what is actually done rather than around what was expected to be.
+**The wave number is a layer of the plan, assigned once and never renumbered.**
+It is `1 + max(wave of its blockers)`, then split by file ownership: two таски of
+one wave whose files overlap are separated, and the later one moves down. The
+plan phase computes it when the таски are cut, and it is written into the run
+state with them.
+
+What the build recomputes is the *frontier*, not the number. A таск is launched
+as soon as every id in its `blockedBy` has finished, even while a wave-mate is
+still running — a таск that finishes early releases whatever it was blocking, and
+waiting for its whole layer to land buys nothing.
+
+The two were the same rule until the dashboard needed to group the build by wave
+and found that a recomputed wave gives a таск no number until it starts. A number
+rewritten mid-прогон also moves rows between groups on screen, which a user with
+no way to know the numbers changed reads as the прогон losing its own plan.
 
 The *Wave width* column above is a consequence of the cut, not a ceiling on it.
 It says how wide the waves of a well-cut plan of that size tend to be; it does

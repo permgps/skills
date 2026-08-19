@@ -17,16 +17,37 @@ source of truth about a run, and the second one is silently wrong.
 
 ![The dashboard during the build stage](assets/dashboard-running.png)
 
-The stage timeline is the run: eight stages in order, the current one marked.
+The page opens with one bar: how much of the прогон is behind you. It is
+weighted by how long each stage takes rather than counting stages equally, and
+inside разработки it is subdivided by finished таски — so it creeps with the
+work instead of standing still for an hour and then jumping.
+
+Beneath it are eight cards. Four of them answer «где мы» — покрытие брифа, этап
+сейчас, прошло времени, осталось — and four answer «что осталось закрыть» —
+таски, долг, тесты, требования. Every one of those numbers is computed from the
+run state at render time; none is stored.
+
+**Осталось is a range and refuses to be sharper.** It is the median of finished
+таски measured along the remaining critical path, and below two finished таски
+it says *рано считать* rather than guessing.
+
+The stage timeline is the run: eight stages in order, the current one marked,
+each with the one-phrase note the phase left and its own duration.
 Every visible word comes from `docs/spec/vocabulary.md` — the state stores ids
 and the page resolves them at render time, so a wording change never requires a
 state migration. Those words are Russian, because the interface is: the
 screenshots show `Разработка` where this page says the build stage, and the
 mapping between the two is the vocabulary file.
 
-The task table shows what is happening now, including what each task is waiting
-for. Two tasks running at once is a wave, and the wave is recomputed after each
-task returns rather than planned once at the start.
+The build block shows what is happening now, grouped by wave. A wave is one
+layer of the plan — `1 + max(wave of its blockers)`, then split so that no two
+таски in a wave write the same files — and it is numbered once, when the таски
+are cut. The build still launches anything whose blockers are done; what it does
+not do is renumber, because rows jumping between groups read as a lost plan.
+
+The «N тасков параллельно» on a wave is read from the clocks rather than from
+the size of the wave. A layer says what *may* run together; only the timestamps
+say what did.
 
 Requirement coverage is counted rather than claimed: every task carries the
 requirement ids it traces to, which is what G3 checks in both directions.
@@ -54,7 +75,7 @@ mkdir -p /tmp/shot && cp skills/maestro/assets/dashboard.html /tmp/shot/
 cp docs/assets/state-finished.fixture.js /tmp/shot/state.js
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   --headless --disable-gpu --hide-scrollbars --allow-file-access-from-files \
-  --virtual-time-budget=4000 --window-size=1280,1240 \
+  --virtual-time-budget=4000 --window-size=1280,2100 \
   --screenshot=docs/assets/dashboard-finished.png file:///tmp/shot/dashboard.html
 ```
 
@@ -66,7 +87,10 @@ the page working, not the fixture drifting.
 
 `npm run dashboard` proves the page is self-contained — no CDN, no external
 stylesheet, no font fetch, no network API — and that the labels, stage order and
-gate map it carries still match `vocabulary.md`, `phases.md` and `gates.md`. The
+gate map it carries still match `vocabulary.md`, `phases.md` and `gates.md`. It
+also checks the words that belong to no field at all: every card and block name
+the vocabulary owns has to appear on the page, because a card renamed on the
+page and nowhere else is drift no value map can see. The
 page holds those copies because the state stores ids; an unchecked copy drifts.
 
 Its DOM-free logic is exercised separately by `scripts/validate/dashboard-logic.test.ts`,

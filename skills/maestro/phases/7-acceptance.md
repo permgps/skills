@@ -65,12 +65,18 @@ sections under its own date rather than replacing what is there:
 |---|---|
 | What was asked | every `R##`, its status, and where it landed |
 | Disagreements | the G4 findings, each quoted against its требование |
-| Assumptions | every placeholder standing in for a fact nobody supplied, and every wording whose translation was uncertain |
+| Assumptions | `debt` as the прогон recorded it — every placeholder standing in for a fact nobody supplied, every decision taken on the user's behalf, every unfilled variable by name — plus any wording whose translation was uncertain |
 | Observations | the non-blocking findings carried out of `reviews/` |
 | What is left | deferred and dropped требования, each with the reason recorded against it |
 
 A section with nothing in it says so in one line. An absent section reads as a
 section nobody wrote.
+
+**Assumptions is read out of the state, not reconstructed from memory.** The
+phases wrote `debt` as they incurred it; assembling the list again here would
+produce a second answer to the same question, and the two would differ exactly
+on what was forgotten. What this phase adds is the last full suite result into
+`tests`, and `finishedAt`.
 
 Findings are quoted as they came back, not summarised — yours is the copy
 anybody checking the прогон will read, and a rewritten finding cannot be checked

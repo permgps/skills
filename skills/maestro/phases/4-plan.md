@@ -103,17 +103,61 @@ README it produced described a tally the page does not keep. That file shipped.
 Reading a task file back yourself is what produced all four; the withholding is
 what would have caught them.
 
-### 6. Write the таски into the run state
+### 6. Compute the waves
 
-Every таск gets an entry in `tasks[]` with its id, title, `requirementIds`, and
-`blockedBy`.
+`blockedBy` says what cannot start yet. **A wave says what may start at the same
+time**, and computing it is not optional: without waves the прогон flies one таск
+at a time, and a plan whose таски are genuinely independent takes two or three
+times longer than it needs to, for no reason anybody chose.
+
+1. **`wave = 1 + max(wave of its blockers)`.** Everything with no blockers is
+   wave 1.
+2. **Then split each wave by zone.** A таск's **zone** is the part of
+   `interfaces.md` it owns — the files it may write. Two таски in one wave whose
+   zones overlap cannot run together: move the later one into the next wave.
+   Same files, always serialise. Two executors editing one file overwrite each
+   other and the loss is silent.
+
+A wave of one is a normal answer. The таск that lays the shell, the schema and
+the shared primitives is a wave of its own by definition, and a tiny project is
+one таск carrying the whole spec.
+
+**Do not manufacture parallelism.** Splitting a таск in two so a wave looks wider
+spends two contexts to save one. Waves are *discovered* in the dependency graph,
+never designed into it. If everything genuinely depends on everything, the answer
+is N waves of one — say so and run it.
+
+**A wave number is assigned once, here, and is never recomputed.** It describes
+the plan, not the frontier: when a таск finishes and the next becomes launchable,
+that is the build moving through the plan, not the plan changing. The build is
+free to launch anything whose blockers are done — what it may not do is renumber.
+Rows that jump between groups on the dashboard read, to a user with no way to
+know the numbers were rewritten, as the прогон losing its own plan. If a wave
+genuinely has to change, that is a re-cut: one line to the user saying why, and a
+`D##` row if the code forced it.
+
+### 7. Write the таски into the run state
+
+**The whole `tasks[]` array is written now, when the таски are cut** — not as
+each one starts. Every entry carries its id, title, `requirementIds`,
+`blockedBy`, `wave`, `zone`, and the three counters at zero.
 
 - `requirementIds` is never empty. That is half of G3, and the state validator
   refuses a таск without it.
-- `blockedBy` holds the таск ids that must finish first. It is what bounds the
-  wave width, together with file ownership.
+- `blockedBy` holds the таск ids that must finish first.
+- `wave` and `zone` come from step 6. The dashboard groups the build by wave;
+  the zone is why two таски in one wave can be trusted not to collide.
+- `retries`, `repairs` and `handoffs` all start at `0`, and `files` starts empty.
+  A counter created halfway through a прогон is a counter somebody increments
+  from nothing, and the arithmetic downstream never says so.
 
-### 7. Show it, by mode
+An array published only as таски start makes the dashboard state three false
+things at once, at the moment the user is most likely to look: that the таски
+were never cut, while the files are on disk and the build is running; that there
+is no build to show; and a progress bar that cannot move with the work because
+the share of finished таски is zero out of zero.
+
+### 8. Show it, by mode
 
 | Mode | What happens |
 |---|---|
@@ -164,6 +208,6 @@ itself.
 |---|---|
 | `.maestro/<slug>/interfaces.md` | written once, the boundaries derived from the spec |
 | `.maestro/<slug>/tasks/NN-<slug>.md` | one file per таск, each self-sufficient |
-| `.maestro/state.js` | `tasks[]` filled with ids, `requirementIds` and `blockedBy`; `G3` recorded as passed |
+| `.maestro/state.js` | `tasks[]` filled whole — ids, `requirementIds`, `blockedBy`, `wave`, `zone`, counters at zero; `G3` recorded as passed |
 
 Then read the build phase file.

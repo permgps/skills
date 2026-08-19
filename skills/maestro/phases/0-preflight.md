@@ -87,16 +87,27 @@ Write `.maestro/state.js` through the state writer. It carries:
 | `runId` | stable for the whole прогон |
 | `slug` | from step 2 |
 | `startedAt` | now, ISO 8601, written once and never again |
+| `updatedAt` | now, and restamped at every write from here on |
 | `mode`, `depth`, `polish` | as resolved by the dials phase |
 | `dialChanges` | empty |
 | `stages` | all eight, `preflight` active, the rest `pending` |
 | `currentStage` | `preflight` |
 | `tasks`, `requirements` | empty |
 | `gates` | all four — `G1`, `G2`, `G3`, `G4` — `pending`, with no findings |
+| `debt` | three empty lists: `placeholders`, `assumptions`, `emptyEnv` |
+| `additions` | empty |
+| `tests` | `null` — no suite has run |
 
 Write the whole file, validated, at once. Never edit it in place, and never
 write it on a timer — the state changes at phase boundaries and task transitions
 only.
+
+**Empty-but-valid is the point of the last three rows.** `debt` seeded here is a
+`debt` later phases append to; `debt` created the first time something is owed is
+a field somebody appends to from nothing, and the dashboard shows the arithmetic
+that follows. `tests` is `null` rather than `{ passed: 0, failed: 0 }` for the
+same reason in the other direction: zero passed tests is a claim about a suite
+that ran, and nothing has run yet.
 
 **The object literal must be valid JSON, not merely valid JavaScript**: every
 key quoted, no trailing comma, no comment inside it. The page will render a

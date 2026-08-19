@@ -19,20 +19,29 @@ If a task file is missing something an executor would need, that is a G3 finding
 arriving late. Say so and re-cut rather than filling the gap in the handover
 message, which no artifact records.
 
-### 2. Form the wave
+### 2. Launch what is ready — the wave is already numbered
 
-A wave is the set of таски that can run at the same time:
+The plan phase assigned every таск a `wave` and a `zone`, and **neither is
+recomputed here.** A таск is launchable when every id in its `blockedBy` has
+finished; launch it then, even if a wave-mate is still running. A таск that
+finishes early releases what it was blocking, and waiting for its whole layer to
+land buys nothing.
+
+Two rules bound what may fly together, and both still hold:
 
 - every id in their `blockedBy` has finished, **and**
-- no two of them own the same file.
+- no two of them own the same file — which is what the zones settle.
 
-Both halves. The dependency graph alone lets two таски edit one module from
-opposite ends; file ownership alone starts a таск before what it builds on
-exists.
+The dependency graph alone lets two таски edit one module from opposite ends;
+file ownership alone starts a таск before what it builds on exists.
 
-Recompute the wave after each таск returns, not once at the start. A таск that
-finishes early releases what it was blocking, and the next wave should form
-around what is actually done.
+**What changed here, and why it is worth a paragraph.** This step used to say
+«recompute the wave after each таск returns». Under that rule a таск had no wave
+number until the moment it started, so there was nothing for the dashboard to
+group by — and a number that is rewritten mid-прогон makes rows jump between
+groups, which a user reads as the прогон losing its plan. The layer is now the
+plan's, fixed at the cut; the frontier is still yours, recomputed every time a
+таск lands.
 
 ### 3. Raise the worktrees — only if the wave is wider than one
 
@@ -96,7 +105,32 @@ For each таск that returns done, in this order:
    writing it here would mean the same word described a checked таск in one
    place and an unchecked one in another.
 
-Then form the next wave and go back to step 3.
+Then take whatever became launchable and go back to step 3.
+
+**Write each transition into `tasks[]` as it happens**, not in a batch at the
+end. `running` and `startedAt` go in **before** the executor goes out; `files`,
+`tests`, `commit` and `finishedAt` when it returns. `retries`, `repairs` and
+`handoffs` are incremented when they are spent. A таск left `queued` while its
+executor is flying makes the screen a lie, and one left `running` through its
+whole review does the same thing more quietly.
+
+`handoffs` counts the times a таск outgrew a context and was relayed to a fresh
+one. **It is not a defect count** — nothing was found wrong; the таск was long.
+Its status stays `running` across a handoff, so the user sees one таск still
+being written rather than one that failed and restarted.
+
+**Debt is recorded when it is incurred, never assembled at the end.** A decision
+taken on the user's behalf because nobody was asked joins `debt.assumptions` the
+moment it is taken; an environment variable the build needs and nobody has filled
+joins `debt.emptyEnv` **by name only** — S2 forbids a credential reaching disk,
+and this list is where that is broken by accident rather than on purpose;
+anything delivered beyond what was asked joins `additions` with the `R##` it
+served. A debt card that reads zero for the whole прогон and fills at приёмка is
+a claim nobody checked.
+
+A таск that comes back wrong and cannot be rescued by its retries is `failed`.
+Leaving it `queued` or `running` reports work that is not happening; the one
+door it opens is `not-done`, in the repair phase.
 
 ## When It Does Not Go That Way
 
