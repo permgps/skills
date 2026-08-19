@@ -66,11 +66,10 @@ Each of these has its own visible outcome. None of them is handled by picking up
 the keyboard.
 
 **A review has a blocking finding.** Write the review file, mark the таск
-`repair`, and **stop — say which таск and quote which finding.** Repair is a
-phase whose rules file does not exist in this bundle yet, and a repair
-improvised from the table describing it produces a second failure that looks
-exactly like the first. The state and the review are what that phase will start
-from when it is written.
+`repair`, say which таск and quote which finding — then go to the repair phase,
+which `SKILL.md` names. The review file and the state are what it reads; whether
+that таск is retried or the specification is amended is decided there, and
+neither is decided here.
 
 **A diff touched a file its task file does not own.** Blocking, whatever else
 the review says and however good the change is. That list is the only thing

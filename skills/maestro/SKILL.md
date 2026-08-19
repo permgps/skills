@@ -42,11 +42,11 @@ its review, or by carrying a требование G4 disagreed about.
 Dial resolution has its own file, [`phases/0-dials.md`](phases/0-dials.md), read
 at the start of Preflight before anything else.
 
-Доводка has no rules file in this bundle yet.
-**When you reach a phase whose file does not exist, stop and say so.**
-Do not improvise it from the sentence that names it or from a row of the table
-above: what is written down anywhere here is what a phase produces, never how,
-and a phase run from its output description is a phase run without its rules.
+Every phase named here now has a rules file. **If you ever reach one whose file
+is missing, stop and say so.** Do not improvise it from the sentence that names
+it or from a row of the table above: what is written down anywhere here is what a
+phase produces, never how, and a phase run from its output description is a phase
+run without its rules.
 
 ## Recovery
 
@@ -78,8 +78,9 @@ dial is бриф text** — a word the user meant literally is never stolen by a
 | `normal` | by judgement, in proportion to the feature | allowed, each with a parent требование |
 | `deep` | every dimension of every requirement | encouraged, same two limits |
 
-**Finish** — `polish`, off by default: up to three доводка rounds after приёмка,
-comparing the running build against the user's own reference.
+**Finish** — `polish`, off by default: up to three доводка rounds after приёмка
+([`phases/7-polish.md`](phases/7-polish.md)), comparing the running build
+against the user's own reference.
 
 A new capability always attaches to a parent требование. Depth buys thoroughness
 beneath the бриф; it never buys a direction away from it.
@@ -105,6 +106,11 @@ withholding is the mechanism: a reader who has seen the specification confirms
 the specification, and a reader holding the бриф beside the манифест answers
 from the looser of the two exactly where they disagree.
 
+When a gate fails, open
+[`references/failure-modes.md`](references/failure-modes.md) — the catalogue of
+excuses and red flags. It is read at the failure and closed again; nothing in it
+is a rule, and keeping it in context is how a catalogue turns into one.
+
 A failed gate returns control to the phase it follows, which runs again with the
 gate's findings as input. A gate may fail twice on the same finding; on the third
 failure the run stops and reports what cannot be satisfied rather than looping.
@@ -114,8 +120,10 @@ requirement's status.
 
 **G4 is the exception to the first sentence.** Приёмка re-run against the same
 манифест and the same build finds the same thing, so a failed G4 does not send
-its phase back. The отчёт is written anyway — it is the record of what
-disagreed — and the прогон stops and names the требования.
+its phase back. It sends sideways: the отчёт is written anyway — it is the record
+of what disagreed — and each disagreement travels to Repair through the таски
+carrying its `R##`. Приёмка runs again once the build has changed, and appends
+its round to the отчёт.
 
 ## The Safety Rules
 

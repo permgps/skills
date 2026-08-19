@@ -82,10 +82,11 @@ Then form the next wave and go back to step 3.
 Each of these has its own visible outcome. None of them is handled by picking up
 the keyboard.
 
-**A таск comes back anything other than done.** It belongs to the repair phase,
-whose rules file does not exist in this bundle yet. **Stop and say which таск and
-why.** Do not retry it by rules nobody wrote: a second failure by improvised
-rules looks exactly like the first, and nothing records which attempt built what.
+**A таск comes back anything other than done.** It belongs to the repair phase.
+Say which таск and why, leave its files alone, and go there — `SKILL.md` names
+the file. Do not retry it here: the decision between another attempt and an
+amendment is what that phase exists to make, and a retry started without it looks
+exactly like the failure it is repeating.
 
 **A таск ran out of context.** Its executor said what is finished, what is not,
 and what the next one needs. Write that to `tasks/NN-<slug>-handoff.md` and hand

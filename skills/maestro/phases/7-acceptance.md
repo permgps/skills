@@ -58,7 +58,8 @@ otherwise finished. `in-spec` means the прогон undertook to build it.
 ### 4. Write the отчёт
 
 `.maestro/<slug>/report.md`, written **by you**, in five sections and in that
-order:
+order. A second приёмка — after repair, or after доводка — appends its own five
+sections under its own date rather than replacing what is there:
 
 | Section | Holds |
 |---|---|
@@ -76,10 +77,16 @@ anybody checking the прогон will read, and a rewritten finding cannot be c
 against its original. **The отчёт is English**, like every other file this прогон
 writes.
 
-### 5. Close the run
+### 5. Close the round
 
-Write the state once, at this boundary: G4 `passed` with no findings or `failed`
-with them, the acceptance stage `done`, `finishedAt` set.
+Write the state once, at this boundary: G4 `passed` with no findings, or `failed`
+with them.
+
+`finishedAt` and the acceptance stage's `done` are written **only when nothing
+else is due** — G4 passed, and either the finish dial is off or доводка has
+already run. A round that sends disagreements to repair leaves both unset: a
+прогон marked finished while work is still routed out of it is a dashboard
+telling the user something that is not true.
 
 Then say in Russian what the отчёт contains — what was asked and what was
 delivered, what disagreed, what was assumed. Labels are resolved from the
@@ -89,10 +96,11 @@ delivered, what disagreed, what was assumed. Labels are resolved from the
 
 **G4 has findings.** The отчёт is written anyway — it is the record of what
 disagreed, and withholding it deletes the evidence at the moment it matters
-most. Then **stop and name the требования.** Repairing them means changing the
-build, which is the repair phase, and its rules file does not exist in this
-bundle. The отчёт and the state are what that phase will start from when it is
-written.
+most. Then each disagreement travels to the repair phase — `SKILL.md` names the
+file — through the таски that carry its `R##`. When those have been repaired and
+re-reviewed, this phase runs again and appends a second round to the отчёт. A
+disagreement that survives two repairs stops the прогон and is reported as one
+nobody could close.
 
 **The reader asks for `spec.md` or the бриф.** Refuse, and record that it asked.
 Handing either over ends the gate — not the reading, the gate — because the
@@ -121,11 +129,11 @@ chance to know rather than when it is still cheap to change.
 
 | Artifact | State |
 |---|---|
-| `.maestro/<slug>/report.md` | five sections, findings quoted as they came back |
-| `.maestro/state.js` | G4 `passed` or `failed` with its findings, acceptance stage `done`, `finishedAt` set |
+| `.maestro/<slug>/report.md` | five sections for this round, appended; findings quoted as they came back |
+| `.maestro/state.js` | G4 `passed` or `failed` with its findings; the stage `done` and `finishedAt` only when nothing else is due |
 | project code | unchanged — this phase writes none of it |
 
-The прогон is over. Two things may still follow, and neither is improvised from
-here: **доводка**, if the finish dial asked for it, and the **memory** phase.
-Both have rules files that do not exist in this bundle yet — when one is due,
-say so and stop.
+The прогон is over unless one of two things is due, and both have rules of their
+own that `SKILL.md` names: **доводка**, if the finish dial asked for it, and then
+the **memory** phase, which runs last because it describes the code as it finally
+is.

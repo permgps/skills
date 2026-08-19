@@ -35,7 +35,7 @@ actually built.
 | `brief.md` | manifest | manifest, acceptance | no |
 | `manifest.md` | manifest | briefing, spec, plan, acceptance, G1, G2, G3, G4 | append-only |
 | `answers.md` | briefing | spec | append-only |
-| `reference.md` | briefing | acceptance | append-only |
+| `reference.md` | briefing | polish | append-only |
 | `spec.md` | spec | plan, build, review | yes, by amendment only |
 | `interfaces.md` | plan | build, review | no |
 | `discovered-interfaces.md` | build | build, memory | append-only |
@@ -59,11 +59,11 @@ the task file its executor was handed and the boundaries in `interfaces.md`;
 what other таски discovered afterwards was not part of that contract, and
 measuring against it would be judging an executor by words it never saw.
 
-`reference.md` is read by доводка, which runs inside the acceptance stage after
-приёмка and has no rules file yet. The row above names `acceptance` because the
-stage is where that reading happens — a reader arriving with a later milestone
-is a different thing from a reader that never existed, and the two are worth
-keeping apart in a table whose job is to say who opens what.
+`reference.md` has exactly one reader and it is доводка. Приёмка never opens it:
+that phase measures the build against the манифест, and a reader holding the
+user's comparables beside it would start reporting distance from the reference
+as a disagreement with the требования. The two questions are asked by two phases
+against two documents, which is why the run keeps both.
 
 A handoff exists only for a таск that ran out of context before it was done. It
 is written by the orchestrator from what the executor returned — the executor's

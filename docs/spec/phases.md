@@ -16,12 +16,14 @@ right thing was built.
 | build | Build | yes | `tasks/`, `interfaces.md` | project code, `discovered-interfaces.md`, a handoff where one was needed |
 | review | Review | yes | `tasks/`, `interfaces.md`, project code | `reviews/` |
 | acceptance | Acceptance | yes | `manifest.md`, `brief.md`, `reviews/`, project code | `report.md` |
+| polish | Доводка | no | `reference.md`, project code | polished build, `tasks/` of its own |
 | memory | Memory | no | `discovered-interfaces.md`, `spec.md`, project code, run state | the memory block in `AGENTS.md`, `decisions.md` |
 | repair | Repair | no | a task result that is not done, or a review with a blocking finding | retried таск, `amendments.md` |
 
-`memory` runs twice — once during `build`, when the build discovers something
-worth outliving the run, and once after `acceptance`, when the finished code can
-be described. `repair` runs on demand, and it has two entrances: a task that
+`polish` runs only when the finish dial asked for it, inside the acceptance
+stage and after приёмка. `memory` runs twice — once during `build`, when the
+build discovers something worth outliving the run, and once after `acceptance`,
+when the finished code can be described. `repair` runs on demand, and it has two entrances: a task that
 comes back anything other than done, and a task whose review found something
 blocking. The second one arrives already committed, which is why the build
 stops short of calling it done.
@@ -134,10 +136,11 @@ handoff.
 
 ### A таск That Does Not Come Back Done
 
-It goes to the repair phase. Until that phase's rules exist, **the прогон stops
-and says which таск and why.** A build that retries a таск by rules nobody wrote
-produces a second failure that looks like the first, and the run has no record of
-which attempt built what.
+It goes to the repair phase, which is the first of that phase's three doors and
+the only one where nothing has been committed yet. The build says which таск and
+why, and stops handing out work in that таск's files until repair has answered.
+A build that retries a таск on its own would be running the repair phase without
+reading it, and the run would have no record of which attempt built what.
 
 ## Review
 
@@ -199,11 +202,12 @@ checked yet.
 
 ### A Blocking Finding
 
-**The прогон stops and says which таск and which finding.** Repairing it belongs
-to the repair phase, whose rules do not exist yet — and a repair improvised from
-the table describing it produces a second failure that looks like the first,
-with no record of which attempt built what. This is the same rule the build
-applies to a таск that comes back not done, for the same reason.
+**The таск is marked `repair` and goes to the repair phase**, which is that
+phase's second door: the таск is already committed, and the finding names what it
+contradicts. The review says which таск and quotes which finding, and writes
+neither the retry nor the fix — deciding what the code should say is what the
+repair phase reads an executor in for. This is the same route the build takes for
+a таск that comes back not done.
 
 ### Who Writes What
 
@@ -387,6 +391,49 @@ No gate follows memory, in either of its two runs. There is no question about
 the user's words for it to answer — it records what the прогон learned, and a
 run that recorded nothing worth keeping is a run that learned nothing worth
 keeping rather than a failed one.
+
+## Доводка
+
+Off unless the finish dial asked for it. When it is on, it runs inside the
+acceptance stage, after приёмка, for **up to three rounds**.
+
+The question it asks is not the one приёмка asks. Приёмка measures the build
+against the манифест — what the user said they wanted. Доводка measures it
+against `reference.md` — what the user pointed at and said *like this*. A
+reference shows things a бриф cannot say: spacing, tone, how dense a page feels,
+what a good error message sounds like.
+
+### A Round
+
+One reader is given the running build and `reference.md`, and returns the
+differences it can see. Each difference becomes a таск, cut and handed to an
+executor exactly as a build таск is: one commit, one review, `done` written by
+the review phase. **Доводка changes what is worked on, never how**; a polish
+change that skipped review would be the one change in the прогон nobody checked.
+
+A round that returns nothing ends доводка, whether it was the first or the
+third. Three is a ceiling, not a quota, and a second round run to use up the
+budget produces differences invented to fill it.
+
+### What Доводка May Not Do
+
+**It never adds a требование.** `S1` in [`safety.md`](safety.md) says a
+требование is removed only by the user; this is the same boundary from the other
+side. A difference that would need something the манифест never asked for is
+reported in the отчёт and not built — doing it anyway would put work into the
+build that no gate is measuring, arriving after the last gate has run.
+
+It also does not touch `manifest.md`, `spec.md` or the requirement statuses.
+Nothing about what was promised changes because the result was polished.
+
+### After The Last Round
+
+**Приёмка runs once more**, and appends its round to `report.md`.
+
+The build the last отчёт describes no longer exists — доводка changed it — and
+the rule that a changed build gets a fresh reading is the same one a repaired
+прогон follows. One re-reading after доводка finishes, not one per round: what
+is being checked is the build the user will keep.
 
 ## Repair
 
