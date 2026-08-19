@@ -19,9 +19,10 @@ disagree, this specification is right and the phase file is a bug.
 | 6 | `artifacts.md` | Every file a run writes, its single writer, its lifecycle |
 | 7 | `state-contract.md` | The run-state schema, who writes it, how it is versioned |
 | 8 | `dashboard.md` | What the dashboard renders, and what it may never read |
+| 9 | `hosts.md` | What a прогон needs from an agent host, and what a missing capability costs |
 
 Read them in that order once. After that each document stands alone, which is
-the point: a phase file being written needs one of them, not all eight.
+the point: a phase file being written needs one of them, not all nine.
 
 ## Identifier Schemes
 

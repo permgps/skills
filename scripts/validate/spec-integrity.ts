@@ -26,6 +26,7 @@ const REQUIRED_DOCS = [
   'artifacts.md',
   'state-contract.md',
   'dashboard.md',
+  'hosts.md',
 ];
 
 /**

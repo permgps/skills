@@ -18,6 +18,18 @@ question about the бриф is asked.
 - If there is no repository at all, say so and continue. Version control is how
   the отчёт is later checked, not how the run works.
 
+### 1b. Resolve the host
+
+If you are running under Claude Code, everything the прогон assumes is present:
+subagent fan-out with a context you control, worktrees, commits, file writes.
+Note it and move on.
+
+**Otherwise, open [`../references/hosts.md`](../references/hosts.md)** and
+establish the five capabilities it lists by trying them rather than by believing
+the product's description. Two answers are stop conditions — no subagent whose
+context you control, and no way to write project files — and the rest narrow the
+wave. Record what you found; it goes into the announcement in step 6.
+
 ### 2. Choose the slug
 
 The slug names the run's directory and appears in every artifact path.
@@ -89,6 +101,11 @@ Show the announcement composed by the dials phase, in Russian, in one block:
 mode, depth, whether доводка is on, and the one consequence most likely to
 surprise.
 
+**Add what step 1b found**, if anything was missing: name the capability and what
+it costs, one line each. A прогон that quietly ran its таски one at a time
+because the host had no fan-out looks exactly like a прогон whose plan cut one
+таск, and this is the cheapest place to tell the two apart.
+
 It is a statement, not a question. Do not wait for a reply, in any mode.
 
 ## Gates
@@ -103,6 +120,6 @@ nothing yet to check against the user's words.
 | `.maestro/<slug>/` | created, empty |
 | `.maestro/state.js` | written, `preflight` active |
 | `.maestro/dashboard.html` | copied and opened |
-| the announcement | shown |
+| the announcement | shown, with any missing host capability named |
 
 Then read the manifest phase file.

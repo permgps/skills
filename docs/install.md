@@ -69,6 +69,46 @@ Last verified on 2026-08-19, with the bundle complete: the listing still reports
 30 skills, of which one is Maestro's, and `diff -r` reports no difference across
 `SKILL.md`, `phases/`, `prompts/`, `references/` and `assets/`.
 
+## For Codex and Gemini CLI
+
+The same bundle, a different target convention. The agent is selected by name:
+
+```bash
+npx skills add /path/to/maestro -s maestro -a codex -y --copy
+npx skills add /path/to/maestro -s maestro -a gemini-cli -y --copy
+```
+
+Two things are worth knowing before either command is run. The Gemini agent is
+called **`gemini-cli`**, not `gemini`; the shorter name is rejected with a list
+of valid agents. And both of them install to the **same** directory:
+
+```text
+●  Selected 1 skill: maestro
+│    copy → Codex            │
+◇  Installation complete
+│  ✓ maestro (copied)
+│    → ./.agents/skills/maestro
+```
+
+```text
+●  Selected 1 skill: maestro
+│    copy → Gemini CLI       │
+◇  Installation complete
+│  ✓ maestro (copied)
+│    → ./.agents/skills/maestro
+```
+
+Verified on 2026-08-19; `diff -r` against `skills/maestro` reports no difference
+for either. Installing under two agents in one directory therefore means the
+second copy replaces the first — which is fine, because it is the same bundle,
+and worth knowing before it looks like one of them failed.
+
+**Installing is not support.** It proves the skills directory and nothing else.
+What each host does about subagent fan-out, context isolation and worktrees — and
+what a прогон does when one of those is missing — is in
+[the hosts specification](spec/hosts.md), where both rows still read *unverified*
+because no прогон has been run on either.
+
 ## Developing against the checkout
 
 To run the skill from the repository while working on it, link it into the local
@@ -78,6 +118,9 @@ agent directories instead of installing a copy:
 npm run link      # symlink skills/maestro into .claude, .codex and .gemini
 npm run unlink    # remove those symlinks
 ```
+
+Verified on 2026-08-19: all three symlinks are created and removed, and the
+script refuses any path that is not already a symlink.
 
 The links are deliberately not tracked by git: `.claude/`, `.codex/` and
 `.gemini/` are ignored wholesale, and the script exists so that rule does not

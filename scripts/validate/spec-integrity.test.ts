@@ -65,6 +65,12 @@ Index.
 
 Renders the run state.
 `,
+  'hosts.md': `# Hosts
+
+| Capability | What a прогон uses it for | Without it |
+|---|---|---|
+| subagent fan-out | one executor per таск | waves narrow to one |
+`,
   'state-contract.md': `# Run-State Contract
 
 | Field | Type | Written in | Read by |
