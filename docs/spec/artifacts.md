@@ -16,7 +16,8 @@ project that was built, not with Maestro.
 │   ├── tasks/NN-<slug>.md
 │   ├── tasks/NN-<slug>-handoff.md
 │   ├── reviews/NN-<slug>.md
-│   └── report.md
+│   ├── report.md
+│   └── decisions.md
 ├── state.js
 └── dashboard.html
 ```
@@ -41,6 +42,7 @@ actually built.
 | `tasks/NN-<slug>-handoff.md` | build | build, review | no |
 | `reviews/NN-<slug>.md` | review | repair, acceptance | append-only |
 | `report.md` | acceptance | the user | no |
+| `decisions.md` | memory | the user, a later прогон | append-only |
 | `state.js` | preflight | dashboard | yes |
 | `dashboard.html` | preflight | the user | no |
 
@@ -68,6 +70,14 @@ what is not, and what the next executor needs in order to continue the same
 таск. **Its absence is the normal case.** A run where every таск has one is a run
 whose plan cut таски too large, and the handoff is the symptom rather than the
 remedy.
+
+The project memory file is **not in that table**, and its absence is deliberate.
+It is `AGENTS.md` in the target project's root — not a run artifact, not under
+`.maestro/`, and not written once per прогон but added to across many. Its
+single writer is named where the write permission is granted rather than here:
+`safety.md` (`S5`) limits the orchestrator to run artifacts, the project memory
+file, and version control, and [`phases.md`](phases.md) says what goes in it and
+which region of it the прогон owns.
 
 Requirement **statuses are not in `manifest.md`.** The manifest holds requirement
 text, written once; the statuses live in the run state, whose writer is the

@@ -16,7 +16,7 @@ right thing was built.
 | build | Build | yes | `tasks/`, `interfaces.md` | project code, `discovered-interfaces.md`, a handoff where one was needed |
 | review | Review | yes | `tasks/`, `interfaces.md`, project code | `reviews/` |
 | acceptance | Acceptance | yes | `manifest.md`, `brief.md`, `reviews/`, project code | `report.md` |
-| memory | Memory | no | project code, `spec.md` | project memory file, decision records |
+| memory | Memory | no | `discovered-interfaces.md`, `spec.md`, project code, run state | the memory block in `AGENTS.md`, `decisions.md` |
 | repair | Repair | no | a task result that is not done, or a review with a blocking finding | retried task, spec amendment with a `D##` row |
 
 `memory` runs twice — once during `build`, when the build discovers something
@@ -302,6 +302,84 @@ most.
 What happens after that is in [`gates.md`](gates.md), where the failure
 behaviour of every gate lives: G4 is the one gate that cannot send its phase
 back, so the прогон stops and names the требования.
+
+## Memory
+
+The next session starts cold. Everything the прогон worked out — why a boundary
+is where it is, which of two plausible shapes the data took, what the build
+tried first and abandoned — is in a context that ends when the прогон does. This
+phase is what survives that.
+
+It runs twice, and the two runs have different things to say. **During build**,
+when a таск returns having discovered something the rest of the project will
+keep running into, the fact is recorded while it is still attached to the таск
+that found it. **After acceptance**, when the code exists and can be described,
+what is written is what the project now is rather than what a таск ran into.
+
+### Where It Writes
+
+The project memory file is **`AGENTS.md` in the target project's root**, and the
+прогон owns only the region between `<!-- maestro:begin -->` and
+`<!-- maestro:end -->`.
+
+Everything outside those two markers belongs to the user. It is not edited, not
+reformatted, not reordered, and not summarised — not even when it says something
+the прогон believes is wrong. A memory phase that improves the user's own
+paragraph has done the one thing that makes the whole feature untrustworthy: the
+next time they write something there, they will not know whether it will still
+be theirs afterwards.
+
+If the file does not exist, it is created containing the block and nothing else.
+If it exists without the markers, the block is appended and the existing content
+is left exactly as it was.
+
+`safety.md` (`S5`) already names this file as one of the three paths the
+orchestrator may write. This section is where it gets a name.
+
+### Decision Records
+
+`.maestro/<slug>/decisions.md`, append-only. One entry per decision that should
+outlive the прогон: what was decided, what it was decided instead of, and what
+made the difference.
+
+**A decision record carries no identifier of its own.** It names the `D##` or
+`R##` it came from and the date it was written. The identifier schemes in
+[`README.md`](README.md) already assign `D` to a fact the build discovered, and
+a decision derived from one of those would otherwise carry two ids for one
+thing.
+
+The two writes are for two readers. The memory block is read by whoever opens
+the project next — a person or an agent — and is short for that reason.
+`decisions.md` is read by somebody asking why, and is as long as the reasoning
+was.
+
+### What Qualifies
+
+A fact qualifies when the next session would otherwise have to rediscover it,
+and rediscovering it would cost more than reading it.
+
+Two things do not qualify, and they are the two that fill a memory file with
+noise:
+
+- **Anything the code already says.** A list of the modules, the framework in
+  use, the name of the entry point. The next session can read those faster than
+  it can trust a copy of them, and a copy is wrong the first time somebody
+  renames something.
+- **Anything true only for this прогон.** Which таск ran in which wave, how long
+  a stage took, what a review found and got fixed. That is what the отчёт and
+  the run state are for, and they already hold it.
+
+`S2` applies here with no softening: the memory file is committed and read by
+every later session, so a credential reaching it is the worst version of the
+same violation. Redaction runs over what this phase writes exactly as it runs
+over the бриф.
+
+### No Gate
+
+No gate follows memory, in either of its two runs. There is no question about
+the user's words for it to answer — it records what the прогон learned, and a
+run that recorded nothing worth keeping is a run that learned nothing worth
+keeping rather than a failed one.
 
 ## Mode Matrix
 

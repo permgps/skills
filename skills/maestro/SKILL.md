@@ -33,15 +33,16 @@ right thing was built.
 | 6 | Review | [`phases/6-review.md`](phases/6-review.md) | `reviews/` |
 | 7 | Acceptance | [`phases/7-acceptance.md`](phases/7-acceptance.md) | `report.md` |
 
-Two phases run outside the sequence: **Memory**, once during Build and once
-after Acceptance, and **Repair**, which a таск reaches two ways — by coming back
+Two phases run outside the sequence: **Memory**
+([`phases/9-memory.md`](phases/9-memory.md)), once during Build and once after
+Acceptance, and **Repair**, which a таск reaches two ways — by coming back
 anything other than done, or by failing its review.
 
 Dial resolution has its own file, [`phases/0-dials.md`](phases/0-dials.md), read
 at the start of Preflight before anything else.
 
-Neither Memory nor Repair has a rules file in this bundle yet, and neither does
-доводка. **When you reach a phase whose file does not exist, stop and say so.**
+Repair has no rules file in this bundle yet, and neither does доводка.
+**When you reach a phase whose file does not exist, stop and say so.**
 Do not improvise it from the sentence that names it or from a row of the table
 above: what is written down anywhere here is what a phase produces, never how,
 and a phase run from its output description is a phase run without its rules.
