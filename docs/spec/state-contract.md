@@ -21,8 +21,8 @@ input.
 | `currentStage` | stage id | preflight | dashboard |
 | `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commit? }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason? }` | manifest | dashboard |
-| `gates[]` | list of `{ id, status, findings[] }` | preflight | dashboard |
-| `debt` | `{ placeholders[], assumptions[], emptyEnv[] }` | preflight | dashboard |
+| `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
+| `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
 | `tests` | `{ passed, failed }` | build | dashboard |
 | `finishedAt` | ISO 8601 string | acceptance | dashboard |
@@ -77,6 +77,17 @@ zero for the whole run is a claim nobody checked. `emptyEnv` holds variable
 **names** only — safety rule `S2` in [`safety.md`](safety.md) forbids a
 credential ever reaching disk, and a list of environment variables is the
 obvious place to break that by accident.
+
+**`gates[].findings`, the three lists inside `debt`, and `additions` hold
+strings, one line each.** The rows above say so and the validator enforces it;
+it is repeated here because the phase writing one of them is pulled the other
+way. A finding names a требование, quotes what the reader said, and records what
+was done about it, which reads like three fields — and a writer that gives it
+three fields produces a state the dashboard prints as `[object Object]`, the
+metrics tool counts as nothing, and G4's own checker cannot read at all. The id
+goes inside the line. Prose that does not fit a line belongs in the phase's
+document, which is where a прогон keeps its prose; the state carries what the
+dashboard shows.
 
 **Nothing here is a duration or a percentage.** Every clock, every share and
 every estimate on the dashboard is derived from the marks above. A number stored

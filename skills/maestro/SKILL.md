@@ -76,6 +76,21 @@ performed dozens of times in a run. Skipping it degrades rather than breaks: a
 page served over http still updates from `state.js`; what goes stale is what
 someone sees when they open the page with no server behind it.
 
+## What The State's Lists Hold
+
+**`gates[].findings`, the three lists inside `debt`, and `additions` hold plain
+strings — one line each, never a record.** An id belongs inside the line, not
+in a field beside it: `"R02 — the hard label follows the size"`. Everything
+that reads the state reads these as text, so a finding written as
+`{ "id": …, "quote": …, "resolution": … }` reaches the dashboard as
+`[object Object]` and reaches the tool that measures the прогон as nothing it
+can count.
+
+The pull towards a record is real — a finding names a требование, quotes what
+was said, and says what was done about it — and all three of those go in the
+line. Anything longer than a line belongs in the phase's own document, which is
+where the прогон keeps its prose; the state carries what the dashboard shows.
+
 ## The Dials
 
 Everything typed after `/maestro` splits into four parts: the mode, the depth,

@@ -98,6 +98,10 @@ same number, which is the whole run's elapsed time wearing a stage's label.
 - A page that has already shown a state and then loses the file keeps showing
   it and says the clocks stopped. Reporting an unreadable state there would be
   false: one was read, and it is on the screen.
+- A list item the contract declares a string and the state wrote as something
+  else is shown as it was written, never as `[object Object]`. The page is the
+  reader, not the writer: it cannot repair the state, and printing the name of a
+  JavaScript type in place of a finding hides both the finding and the fault.
 
 ## Constraints
 

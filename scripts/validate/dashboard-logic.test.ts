@@ -34,6 +34,7 @@ interface Logic {
   isStateShape: (value: unknown) => boolean;
   readOutcome: (held: unknown, incoming: unknown) => string;
   gateFor: (state: unknown, stageId: string) => { id: string; findings: string[] } | null;
+  lineOf: (value: unknown) => string;
   IDLE_CEILING_MS: number;
   plural: (n: number, one: string, few: string, many: string) => string;
   formatMinutes: (ms: unknown) => string;
@@ -233,6 +234,19 @@ test('a failed stage finds the gate that follows it', () => {
   assert.equal(L.gateFor(state, 'briefing')?.id, 'G1');
   assert.equal(L.gateFor(state, 'spec')?.id, 'G2');
   assert.equal(L.gateFor(state, 'preflight'), null);
+});
+
+test('a finding the state wrote as a record still reads as text', () => {
+  // A прогон wrote its G2 finding as an object; the page printed [object Object],
+  // which is the one thing a list of findings must never say.
+  assert.equal(L.lineOf('R04 осталось открытым'), 'R04 осталось открытым');
+  assert.equal(
+    L.lineOf({ id: 'G2-F01', finding: 'the spec header is silent about доводка' }),
+    '{"id":"G2-F01","finding":"the spec header is silent about доводка"}',
+  );
+  assert.equal(L.lineOf(42), '42');
+  assert.equal(L.lineOf(null), '');
+  assert.equal(L.lineOf(undefined), '');
 });
 
 test('a state that is not a state is refused before anything renders', () => {

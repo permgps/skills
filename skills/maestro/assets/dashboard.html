@@ -336,6 +336,28 @@ globalThis.MAESTRO_LOGIC = (function () {
   var GATE_ORDER = ['G1', 'G2', 'G3', 'G4'];
   var GATE_AFTER = { G1: 'briefing', G2: 'spec', G3: 'plan', G4: 'acceptance' };
 
+  /**
+   * One item of a list the contract says holds strings, made printable.
+   *
+   * `findings`, `debt` and `additions` are lists of strings, and the phase that
+   * writes one is the only party that can get that wrong. When it does — a
+   * finding recorded as a record of id, quote and resolution — `String()` turns
+   * every one of them into `[object Object]`, which is the single thing a list
+   * of findings must never say. The record is shown as it was written instead:
+   * the page invents nothing, and the прогон stays readable while the state is
+   * corrected.
+   */
+  function lineOf(value) {
+    if (typeof value === 'string') return value;
+    if (value === null || value === undefined) return '';
+    try {
+      var written = JSON.stringify(value);
+      return typeof written === 'string' ? written : String(value);
+    } catch (error) {
+      return String(value);
+    }
+  }
+
   function gateFor(state, stageId) {
     var gates = (state && state.gates) || [];
     for (var i = 0; i < gates.length; i += 1) {
@@ -805,6 +827,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     STAGE_WEIGHT: STAGE_WEIGHT,
     IDLE_CEILING_MS: IDLE_CEILING_MS,
     gateFor: gateFor,
+    lineOf: lineOf,
     orderedStages: orderedStages,
     MODE: MODE,
     DEPTH: DEPTH,
@@ -1127,7 +1150,7 @@ globalThis.MAESTRO_SNAPSHOT = null;
           put(host, 'p', 'Гейт не оставил замечаний.', 'findings');
         } else {
           var list = put(host, 'ul', null, 'findings');
-          findings.forEach(function (finding) { put(list, 'li', finding); });
+          findings.forEach(function (finding) { put(list, 'li', L.lineOf(finding)); });
         }
       }
     });
@@ -1233,7 +1256,7 @@ globalThis.MAESTRO_SNAPSHOT = null;
       var findings = gate.findings || [];
       if (findings.length > 0) {
         var list = put(host, 'ul', null, 'findings');
-        findings.forEach(function (finding) { put(list, 'li', finding); });
+        findings.forEach(function (finding) { put(list, 'li', L.lineOf(finding)); });
       }
     });
   }
