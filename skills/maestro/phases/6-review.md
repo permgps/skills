@@ -66,6 +66,7 @@ Each of these has its own visible outcome. None of them is handled by picking up
 the keyboard.
 
 **A review has a blocking finding.** Write the review file, mark the таск
+<!-- maestro:opens:blocking-review -->
 `repair`, say which таск and quote which finding — then go to the repair phase,
 which `SKILL.md` names. The review file and the state are what it reads; whether
 that таск is retried or the specification is amended is decided there, and

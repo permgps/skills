@@ -18,15 +18,12 @@ right thing was built.
 | acceptance | Acceptance | yes | `manifest.md`, `brief.md`, `reviews/`, project code | `report.md` |
 | polish | Доводка | no | `reference.md`, project code | polished build, `tasks/` of its own |
 | memory | Memory | no | `discovered-interfaces.md`, `spec.md`, project code, run state | the memory block in `AGENTS.md`, `decisions.md` |
-| repair | Repair | no | a task result that is not done, or a review with a blocking finding | retried таск, `amendments.md` |
+| repair | Repair | no | whatever one of its four doors provides | retried таск, `amendments.md` |
 
 `polish` runs only when the finish dial asked for it, inside the acceptance
 stage and after приёмка. `memory` runs twice — once during `build`, when the
 build discovers something worth outliving the run, and once after `acceptance`,
-when the finished code can be described. `repair` runs on demand, and it has two entrances: a task that
-comes back anything other than done, and a task whose review found something
-blocking. The second one arrives already committed, which is why the build
-stops short of calling it done.
+when the finished code can be described. `repair` runs on demand, through the four doors its own section lists.
 
 ## Loading Rule
 
@@ -437,10 +434,35 @@ is being checked is the build the user will keep.
 
 ## Repair
 
-Two things arrive here, and they are the only two: a таск that came back
-anything other than done, and a таск whose review found something blocking. The
-first has not been committed. The second has — the build committed it before the
-review looked — which is why the build stops short of calling it done.
+### The Doors
+
+Four things arrive here, and they are the only four. Each names the phase that
+opens it, because a door nobody opens is a promise the прогон cannot keep — the
+first end-to-end run wrote «carried to the repair phase» into a `D##` row that
+had no door, and the divergence it described shipped.
+
+| Door | Opened by | State of the таск | What arrives with it |
+|---|---|---|---|
+| not-done | build | anything other than done | nothing is committed |
+| blocking-review | review | `repair` | committed, and the finding names what it contradicts |
+| g4-disagreement | acceptance | `done` | the disagreement and the `R##` it names |
+| recorded-divergence | build | `review` or `done` | the `D##`, and what the таск it depends on actually built |
+
+The first has not been committed. The second has — the build committed it before
+the review looked — which is why the build stops short of calling it done.
+
+**recorded-divergence exists because the other three cannot see it.** A `D##`
+that says a delivered file disagrees with the build is a fact about the product,
+not a finding against a таск: no review blocks over it, because each review
+judges one таск against the contract that таск was given, and G4 does not find
+it, because G4 reads the build against the манифест and a README the манифест
+never mentions is not a disagreement with the user's words. The build opens this
+door itself, after its last wave, for every `D##` it recorded as a divergence
+rather than as a fact.
+
+A `D##` that merely records what a таск turned out to do — an ordering, a
+performance number, a behaviour nobody pinned — is not a divergence and opens
+nothing.
 
 This phase decides between two answers and writes one of them down. It never
 writes project code: `S5` in [`safety.md`](safety.md) holds here exactly as it
@@ -448,8 +470,10 @@ holds in the build, and a retry travels to an executor like everything else.
 
 ### What A Retry Is Given
 
-The task file, the failure exactly as it came back, and the handoff if the таск
-left one. Not `spec.md`, not the манифест, not the other таски — the same
+Whatever its door carries, and nothing else. The task file always; then the
+failure exactly as it came back, or the review's blocking finding, or the G4
+disagreement, or the `D##` together with what the таск it depends on built. The
+handoff too, if the таск left one. Not `spec.md`, not the манифест, not the other таски — the same
 withholding the build applies, for the same reason [`gates.md`](gates.md) gives:
 a finding derived from words the executor never saw is a finding nobody can act
 on, and that is as true of a retry's instructions as of a review's findings.

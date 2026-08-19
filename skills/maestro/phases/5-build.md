@@ -103,6 +103,7 @@ Then form the next wave and go back to step 3.
 Each of these has its own visible outcome. None of them is handled by picking up
 the keyboard.
 
+<!-- maestro:opens:not-done -->
 **A таск comes back anything other than done.** It belongs to the repair phase.
 Say which таск and why, leave its files alone, and go there — `SKILL.md` names
 the file. Do not retry it here: the decision between another attempt and an
@@ -126,6 +127,27 @@ thing this phase may not do.
 **An executor asks for `spec.md`.** Refuse, and record that it asked. A task file
 that sends its executor looking for the specification is a task file that did not
 carry what it needed, and that is worth knowing before the next таск repeats it.
+
+### 6. Before leaving: open the door for what you recorded
+
+<!-- maestro:opens:recorded-divergence -->
+Read back the `D##` rows this phase wrote. A row that says a **delivered file
+disagrees with what the build does** sends its таск to the repair phase now,
+after the last wave, together with what the таск it depends on actually built.
+
+That is a narrow set and it is worth stating what falls outside it. A row that
+pins behaviour nobody specified, records an ordering, a performance number or a
+signature that came back richer than planned, is a fact and opens nothing. A row
+that reports a defect in a task file which the executor then resolved correctly
+is also a fact — the code is right and the plan is what was wrong. What goes
+through this door is the case where the product itself now says two things.
+
+**Nothing else will catch it.** A review reads one таск against the contract that
+таск was given, and a file that follows its own task file faithfully has no
+blocking finding. G4 reads the build against the манифест, and a требование the
+user never stated cannot be disagreed with. The first end-to-end прогон wrote
+«carried to the repair phase» into such a row, no door existed, and the
+divergence shipped — in a README describing a score the page does not keep.
 
 ## The Dials Here
 
@@ -159,6 +181,6 @@ not the бриф.
 | project code | written by executors, one commit per finished таск |
 | `.maestro/<slug>/discovered-interfaces.md` | `D##` rows appended as each таск returned |
 | `.maestro/<slug>/tasks/NN-<slug>-handoff.md` | only for a таск that ran out of context; normally absent |
-| `.maestro/state.js` | every таск `review`, `currentStage` moved on |
+| `.maestro/state.js` | every таск `review`, or `repair` where a recorded divergence sent it back; `currentStage` moved on |
 
 Then read the review phase file.

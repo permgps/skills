@@ -96,6 +96,7 @@ delivered, what disagreed, what was assumed. Labels are resolved from the
 
 **G4 has findings.** The отчёт is written anyway — it is the record of what
 disagreed, and withholding it deletes the evidence at the moment it matters
+<!-- maestro:opens:g4-disagreement -->
 most. Then each disagreement travels to the repair phase — `SKILL.md` names the
 file — through the таски that carry its `R##`. When those have been repaired and
 re-reviewed, this phase runs again and appends a second round to the отчёт. A

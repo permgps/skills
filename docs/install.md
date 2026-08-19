@@ -176,6 +176,7 @@ npm run check     # everything below, in this order
 | `npm run bundle` | frontmatter, link targets, no cross-phase links, no orphaned phase |
 | `npm run state` | `docs/spec/state-contract.md` and `scripts/state/contract.ts` still agree |
 | `npm run hosts` | every host capability that degrades is probed in preflight and spent in a phase |
+| `npm run doors` | every door into the repair phase is listed there and opened by some phase |
 | `npm run test` | the checkers' own tests |
 
 `npm run metrics -- <run-dir>` measures a finished run. It is not part of

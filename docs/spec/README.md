@@ -83,6 +83,8 @@ node scripts/validate/dashboard-integrity.ts \
 node scripts/validate/state-matches-spec.ts docs/spec  # the contract vs its code
 node scripts/validate/host-degradation.ts \
   docs/spec skills/maestro                               # host degradations vs the bundle
+node scripts/validate/repair-doors.ts \
+  docs/spec skills/maestro                               # the repair phase's doors
 node --test 'scripts/**/*.test.ts'                     # the checkers themselves
 
 LOG_LEVEL=DEBUG node scripts/validate/spec-integrity.ts docs/spec
@@ -112,6 +114,15 @@ document: every degrading capability owes a cost row there, each row names the
 capability it is the runtime half of, and a row that stops the прогон where the
 specification says it narrows — or the reverse — is the same defect seen from
 the reference side.
+
+`repair-doors` proves that every door into the repair phase declared in
+[`phases.md`](phases.md) is listed by the bundle's own repair phase and marked
+`<!-- maestro:opens:<door> -->` in the phase that sends work through it. The same
+прогон is why: the specification's prose said repair had two entrances, a
+paragraph forty lines below described a third, the bundle said three, and the
+build wrote «carried to the repair phase» into a row for which none of them
+existed. A door nobody opens is a promise, and this is the check that reads it
+as a defect.
 
 Pass a directory to the validator to check a different tree; it defaults to
 `docs/spec`. `LOG_LEVEL` accepts `DEBUG`, `INFO`, `WARN`, `ERROR` and defaults to

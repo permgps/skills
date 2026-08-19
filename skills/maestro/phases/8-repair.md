@@ -1,13 +1,19 @@
 # Phase 8 — Repair
 
 Read when a таск needs another attempt. It runs outside the sequence, and there
-are exactly three doors into it:
+are exactly four doors into it:
 
-| Arrived from | State of the таск | What is known |
-|---|---|---|
-| Разработка | not `done` — the executor stopped, failed, or returned something incomplete | nothing is committed |
-| Ревью | `repair` — the review found a blocking finding | the таск is committed, and the finding names what it contradicts |
-| Приёмка | `done`, and G4 disagreed about a `R##` it carries | the build is finished and the disagreement is against the манифест |
+| Door | Arrived from | State of the таск | What is known |
+|---|---|---|---|
+| not-done | Разработка | not `done` — the executor stopped, failed, or returned something incomplete | nothing is committed |
+| blocking-review | Ревью | `repair` — the review found a blocking finding | the таск is committed, and the finding names what it contradicts |
+| g4-disagreement | Приёмка | `done`, and G4 disagreed about a `R##` it carries | the build is finished and the disagreement is against the манифест |
+| recorded-divergence | Разработка, after its last wave | `review` or `done` | a `D##` says a delivered file disagrees with what the build does, and no review or gate will say it again |
+
+The fourth exists because the other three cannot see it. A review judges one
+таск against the contract that таск was given; G4 reads the build against the
+манифест. A README that describes the build wrongly contradicts neither — so
+without this door it is found, written down twice, and shipped.
 
 No mode and no depth changes anything here: a таск that failed failed under
 whatever dials the прогон is running, and the two answers this phase chooses
@@ -27,6 +33,10 @@ and the review that follows will judge it as if an executor had.
   if it left one.
 - From Ревью: the same, plus the review's blocking finding as it was written.
 - From Приёмка: the same, plus the G4 disagreement and the `R##` it names.
+- From a recorded divergence: the same, plus the `D##` as it was written, and
+  what the таск it depends on actually built — that is what the divergence has
+  to be made true against, and it is the reason this door opens after the last
+  wave rather than when the row was written.
 
 Not `spec.md`, not the манифест, not the other таски. You are deciding about one
 таск against the contract it was given, and the withholding that makes a review
