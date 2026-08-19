@@ -31,7 +31,7 @@ right thing was built.
 | 4 | Plan | [`phases/4-plan.md`](phases/4-plan.md) | `tasks/`, `interfaces.md` |
 | 5 | Build | [`phases/5-build.md`](phases/5-build.md) | project code, `discovered-interfaces.md` |
 | 6 | Review | [`phases/6-review.md`](phases/6-review.md) | `reviews/` |
-| 7 | Acceptance | not yet written | `report.md` |
+| 7 | Acceptance | [`phases/7-acceptance.md`](phases/7-acceptance.md) | `report.md` |
 
 Two phases run outside the sequence: **Memory**, once during Build and once
 after Acceptance, and **Repair**, which a таск reaches two ways — by coming back
@@ -40,10 +40,11 @@ anything other than done, or by failing its review.
 Dial resolution has its own file, [`phases/0-dials.md`](phases/0-dials.md), read
 at the start of Preflight before anything else.
 
-A row marked *not yet written* is a phase whose rules file does not exist in this
-bundle yet. When you reach one, stop and say so. **Do not improvise the phase
-from this table** — the table states what a phase produces, never how, and a
-phase run from its output description is a phase run without its rules.
+Neither of those two has a rules file in this bundle yet, and neither does
+доводка. **When you reach a phase whose file does not exist, stop and say so.**
+Do not improvise it from the sentence that names it or from a row of the table
+above: what is written down anywhere here is what a phase produces, never how,
+and a phase run from its output description is a phase run without its rules.
 
 ## Recovery
 
