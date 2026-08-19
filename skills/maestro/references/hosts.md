@@ -3,9 +3,13 @@
 Opened in preflight, and only when the host is not Claude Code. Closed again
 once the capabilities are recorded — this is a lookup, not a rule you carry.
 
+Three of the questions below are asked on **every** host, this one included, and
+preflight asks them there: subagent fan-out, worktrees and commits. What this
+file adds for another host is the rest of the list and what each answer costs.
+
 ## What To Establish
 
-Answer these five, by observation rather than by belief about the product:
+Answer these six, by observation rather than by belief about the product:
 
 | Question | How you know |
 |---|---|
@@ -22,14 +26,19 @@ counted on: half the таски are in worktrees nobody can merge.
 
 ## What Each Answer Costs
 
-| Missing | What changes |
-|---|---|
-| subagent fan-out | every wave is one таск wide. The independent reader, the reviewer and the blind reader still run — sequentially, each in a fresh context — because they are gates, not optimisations |
-| a subagent with a context you control | **stop.** G2 and G4 are withholding checks. A reader that inherits what you know confirms what you know, and nothing downstream can tell that it did |
-| worktrees | every wave is one таск wide. Same consequence as no fan-out, arrived at from the other side |
-| commits | the прогон runs. Say in the announcement that it cannot commit, and tell the review phase it will be reading the working tree rather than one таск's diff |
-| writing project files | **stop.** There is nowhere to build |
-| a page that follows the state | the прогон runs and the отчёт is unaffected. Say the view is a still picture, name the file, and stop promising a live one |
+The `Capability` column names the row in `docs/spec/hosts.md` this one is the
+runtime half of, so the two cannot drift apart unnoticed; `—` marks a cost the
+specification's capability table does not carry. A row that stops the прогон
+says so in its first word.
+
+| Missing | Capability | What changes |
+|---|---|---|
+| subagent fan-out | subagent fan-out | every wave is one таск wide. The independent reader, the reviewer and the blind reader still run — sequentially, each in a fresh context — because they are gates, not optimisations |
+| a subagent with a context you control | context isolation | **stop.** G2 and G4 are withholding checks. A reader that inherits what you know confirms what you know, and nothing downstream can tell that it did |
+| worktrees | worktree isolation | every wave is one таск wide. Same consequence as no fan-out, arrived at from the other side |
+| commits | version control | the прогон runs. Say in the announcement that it cannot commit, and tell the review phase it will be reading the working tree rather than one таск's diff |
+| writing project files | file writes | **stop.** There is nowhere to build |
+| a page that follows the state | — | the прогон runs and the отчёт is unaffected. Say the view is a still picture, name the file, and stop promising a live one |
 
 Two of those are stops and they are not negotiable. The rest narrow the wave,
 which a tiny project's plan does anyway.

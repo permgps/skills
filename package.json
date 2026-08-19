@@ -14,10 +14,11 @@
     "bundle": "node scripts/validate/bundle-integrity.ts skills/maestro",
     "dashboard": "node scripts/validate/dashboard-integrity.ts skills/maestro/assets/dashboard.html docs/spec",
     "test": "node --test 'scripts/**/*.test.ts'",
-    "check": "npm run typecheck && npm run spec && npm run bundle && npm run dashboard && npm run state && npm run test",
+    "check": "npm run typecheck && npm run spec && npm run bundle && npm run dashboard && npm run state && npm run hosts && npm run test",
     "link": "node scripts/package/link-local.ts link",
     "unlink": "node scripts/package/link-local.ts unlink",
     "state": "node scripts/validate/state-matches-spec.ts docs/spec",
+    "hosts": "node scripts/validate/host-degradation.ts docs/spec skills/maestro",
     "metrics": "node scripts/metrics/measure.ts"
   },
   "devDependencies": {

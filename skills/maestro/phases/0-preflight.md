@@ -20,17 +20,40 @@ question about the бриф is asked.
 
 ### 1b. Resolve the host
 
-If you are running under Claude Code, everything the прогон assumes is present:
-subagent fan-out with a context you control, worktrees, commits, file writes.
-Note it and move on. **The dashboard is not one of these**: whether the user can
-watch the прогон depends on the viewer, not the host, and it is established in
-step 5 by looking — on every host, this one included.
+Three capabilities are established by trying them, on every host, this one
+included. They are the three that narrow a прогон instead of stopping it, and a
+прогон that assumed one and lost it halfway through a wave is worse off than one
+that never counted on it.
 
-**Otherwise, open [`../references/hosts.md`](../references/hosts.md)** and
-establish the five capabilities it lists by trying them rather than by believing
-the product's description. Two answers are stop conditions — no subagent whose
-context you control, and no way to write project files — and the rest narrow the
-wave. Record what you found; it goes into the announcement in step 6.
+<!-- maestro:probes:subagent-fan-out -->
+<!-- maestro:probes:worktree-isolation -->
+<!-- maestro:probes:version-control -->
+
+| Capability | The attempt that settles it |
+|---|---|
+| subagent fan-out with a context you control | hand a trivial question to one subagent and read what comes back |
+| worktree isolation | ask the host for an isolated tree, before the first wave wider than one таск needs it |
+| version control | `git status` in the project directory |
+
+**Do not read any of the three off the host's name.** The first end-to-end
+прогон ran under Claude Code, where worktrees are a documented capability, and
+its worktrees did not come up: the host decides whether it is inside a
+repository when the session starts, and a `git init` run after that does not
+change its mind. Committing worked in the same прогон, which is the shape this
+failure has — the capabilities are separate answers and one of them being true
+says nothing about the next.
+
+**The dashboard is a fourth**: whether the user can watch the прогон depends on
+the viewer, not the host, and it is established in step 5 by looking.
+
+Everything else Claude Code provides — file writes, a context you can withhold
+from — is assumed present here and fails loudly if it is not. **On any other
+host, open [`../references/hosts.md`](../references/hosts.md)** and establish
+what it lists the same way. Two answers there are stop conditions — no subagent
+whose context you control, and no way to write project files.
+
+Record what you found. A capability that came back missing goes into the
+announcement in step 6, and the phase that spends it says what it costs.
 
 ### 2. Choose the slug
 

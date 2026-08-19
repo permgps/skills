@@ -45,6 +45,23 @@ Isolation is a property of the wave, not of the таск. A wave of one has no
 second writer to be protected from, and a tiny project is one таск carrying the
 whole spec — putting it in its own tree charges a merge for nothing.
 
+<!-- maestro:degrades:worktree-isolation -->
+<!-- maestro:degrades:subagent-fan-out -->
+
+**If a worktree does not come up, the wave is one таск wide.** Not two таски in
+the project directory with a check afterwards that they touched different files:
+that check passes on the прогон where it did not matter and is unavailable on
+the one where it did — an executor that has already written over another's file
+leaves the same tree as one that never tried. Narrow the wave, say in one line
+that isolation was unavailable and what it cost in wall-clock, and carry on.
+**A degraded прогон is a прогон.** The same is true when the host has no
+subagent fan-out at all, arrived at from the other side: one таск per wave, and
+every gate still runs.
+
+Do not go looking for a repair. `git init` mid-прогон does not give the host a
+worktree it decided it could not make; preflight settled that question and this
+phase spends the answer.
+
 ### 4. Hand each таск over
 
 Give the executor its task file and `interfaces.md`, briefed by
@@ -70,6 +87,10 @@ For each таск that returns done, in this order:
 3. **Commit**, one commit per finished таск. A прогон survives a compaction and
    a crash by what is committed, and the review phase judges each таск against
    the diff of its own commit.
+   <!-- maestro:degrades:version-control -->
+   Where preflight found no version control, there is nothing to commit: say so
+   once, and tell the review phase it will be reading the working tree rather
+   than one таск's diff. The прогон continues and every gate still runs.
 4. **Mark it `review`** in the run state — the таск is committed, not
    accepted. `done` is written by the review phase, which has not run yet;
    writing it here would mean the same word described a checked таск in one
