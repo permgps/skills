@@ -2,12 +2,20 @@
 // G3 — the gate after the plan phase.
 //
 // Pass condition, from docs/spec/gates.md: every in-spec требование maps to at
-// least one таск, and every таск traces back to at least one требование.
+// least one таск, every таск traces back to at least one требование, and a
+// reader given exactly what an executor will be given finds each task file
+// buildable without asking a question.
 //
-// Both directions, because either alone is worth little. A cut can cover every
-// требование and still carry two таски invented along the way; it can be
-// perfectly traceable while quietly leaving a требование out. The gate is the
-// map, and a map with an unmatched entry on either side is not a map.
+// Both directions of the map, because either alone is worth little. A cut can
+// cover every требование and still carry two таски invented along the way; it
+// can be perfectly traceable while quietly leaving a требование out. The gate is
+// the map, and a map with an unmatched entry on either side is not a map.
+//
+// The third half is not mechanical — like G2's reader, it is a subagent's
+// verdict — so what this script checks is the trace it leaves. The first
+// end-to-end прогон is why it exists: four of five task files contradicted
+// themselves or left something undefined, every one of them passed the map, and
+// the one whose executor had nothing to fall back on shipped wrong.
 
 import { pathToFileURL } from 'node:url';
 
@@ -74,6 +82,22 @@ export function checkG3(state: RunState): GateFinding[] {
           + 'between the specification and the cut',
       });
     }
+  }
+
+  // --- the task-file reader's verdict was recorded, not filed ---------------
+  const gate = state.gates.find(entry => entry.id === 'G3');
+  if (gate === undefined) {
+    findings.push({
+      requirementId: '',
+      message: 'the run state has no G3 entry — the task-file reader left no verdict',
+    });
+  } else if (gate.status === 'passed' && gate.findings.length > 0) {
+    findings.push({
+      requirementId: '',
+      message: `G3 is recorded as passed while carrying ${gate.findings.length} finding(s). `
+        + 'A gate is never passed with notes: fix each task file, or record the finding as an '
+        + 'explicit deferral against a requirement id',
+    });
   }
 
   log.info('g3', 'traceability map built', {

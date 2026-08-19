@@ -64,8 +64,13 @@ Three rules decide the cut, and they outrank the table:
    they are sequenced. Parallel width is bounded by file ownership, not by the
    number of executors available.
 3. **A таск traces to at least one требование**, and every in-spec требование
-   reaches at least one таск. That is G3, and it is what stops the cut from
-   drifting into work nobody asked for.
+   reaches at least one таск. That is half of G3, and it is what stops the cut
+   from drifting into work nobody asked for.
+4. **A task file is buildable by somebody who has only what its executor will
+   have** — the file itself and `interfaces.md`. That is the other half of G3,
+   read by a subagent given exactly that pair and nothing else, and it is what
+   stops a file that is perfectly traceable from contradicting itself. The
+   findings are acted on by editing the task file before any executor sees it.
 
 A tiny project produces **one** таск carrying the whole spec, and that is a valid
 plan. Cutting one requirement into three таски to look thorough costs three

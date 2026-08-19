@@ -7,7 +7,7 @@ that fails is not a warning: the phase is redone.
 |---|---|---|
 | G1 | briefing | Every требование has a status, and none is left open without a recorded reason |
 | G2 | spec | Every live требование is in-spec, deferred, or dropped with zero left open, **and** an independent reader given only `brief.md` and `spec.md` finds nothing missing |
-| G3 | plan | Every in-spec требование maps to at least one таск, **and** every таск traces back to at least one требование |
+| G3 | plan | Every in-spec требование maps to at least one таск, **and** every таск traces back to at least one требование, **and** a reader given exactly what an executor will be given finds every task file buildable without asking a question |
 | G4 | acceptance | The build is checked against `manifest.md` with `spec.md` withheld, and every disagreement is reported |
 
 ## Evidence
@@ -16,7 +16,7 @@ that fails is not a warning: the phase is redone.
 |---|---|
 | G1 | The requirement status map in the run state has no `open` entries lacking a reason |
 | G2 | The status map plus the independent reader's findings, recorded as a list that is empty or acted upon |
-| G3 | The two-directional map between requirement ids and task ids, with no unmatched entry on either side |
+| G3 | The two-directional map between requirement ids and task ids, with no unmatched entry on either side, plus the task-file reader's findings, recorded as a list that is empty or acted upon |
 | G4 | The acceptance findings, each naming the requirement id it disagrees with |
 
 The requirement id is what makes a finding evidence rather than an opinion. A

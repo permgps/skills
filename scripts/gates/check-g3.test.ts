@@ -13,7 +13,11 @@ function task(id: string, requirementIds: string[]): TaskEntry {
   return { id, title: `build ${id}`, requirementIds, status: 'queued', blockedBy: [] };
 }
 
-function stateWith(requirements: RequirementEntry[], tasks: TaskEntry[]): RunState {
+function stateWith(
+  requirements: RequirementEntry[],
+  tasks: TaskEntry[],
+  gates: RunState['gates'] = [{ id: 'G3', status: 'pending', findings: [] }],
+): RunState {
   return {
     contractVersion: CONTRACT_VERSION,
     runId: 'run-1',
@@ -27,7 +31,7 @@ function stateWith(requirements: RequirementEntry[], tasks: TaskEntry[]): RunSta
     currentStage: 'build',
     tasks,
     requirements,
-    gates: [{ id: 'G3', status: 'pending', findings: [] }],
+    gates,
   };
 }
 
@@ -153,4 +157,29 @@ test('a таск with no id is named by its index in the finding it causes', () 
   ));
   assert.deepEqual(ids(findings), ['R99']);
   assert.match(findings[0]?.message ?? '', /таск tasks\[1\]/);
+});
+
+// G3's second half: the reader that is handed exactly what an executor will be
+// handed. Its verdict leaves the same trace G2's does, and for the same reason
+// — a gate recorded as passed while carrying findings has not been acted on.
+const OK: RequirementEntry[] = [{ id: 'R01', status: 'in-spec' }];
+
+test('a run state with no G3 entry is reported — the reader left no verdict', () => {
+  const findings = checkG3(stateWith(OK, [task('01', ['R01'])], []));
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]?.message ?? '', /no G3 entry/);
+});
+
+test('G3 passed while carrying findings is reported', () => {
+  const findings = checkG3(stateWith(OK, [task('01', ['R01'])], [
+    { id: 'G3', status: 'passed', findings: ['T05 does not say what the score counts'] },
+  ]));
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]?.message ?? '', /passed while carrying/);
+});
+
+test('G3 failed while carrying findings is honest, not a violation', () => {
+  assert.deepEqual(checkG3(stateWith(OK, [task('01', ['R01'])], [
+    { id: 'G3', status: 'failed', findings: ['T05 does not say what the score counts'] },
+  ])), []);
 });

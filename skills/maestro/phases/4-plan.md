@@ -78,7 +78,32 @@ Each file carries:
 A task file that assumes context the executor does not have is the defect this
 phase produces most often. Read each one back as if you had never seen the spec.
 
-### 5. Write the таски into the run state
+### 5. Have each task file read by somebody standing where the executor will
+
+Hand every task file to its own subagent, briefed by
+[`../prompts/task-reader.md`](../prompts/task-reader.md), together with
+`interfaces.md`. **Nothing else** — not `spec.md`, not the манифест, not the
+other task files. It is given exactly what its executor will be given, and asked
+one question: could you build this without asking a question?
+
+They are independent of each other, so they go out at once and the wave is as
+wide as the host allows.
+
+Act on every finding by editing the task file, here, before any executor sees
+it. Then record them in the G3 entry of the run state — an empty list is a real
+answer, and a gate passed while carrying findings is not passed.
+
+**Why this is a gate half and not a proofread.** The first end-to-end прогон cut
+five таски, and four of the five task files contradicted themselves or left a
+term undefined. Every executor resolved its own correctly, three of them by
+falling back on `interfaces.md`, which wins by rule — so the code was right and
+nothing failed. The fourth had nothing to fall back on: its task file said «a
+running score for the session» without saying what the score counts, and the
+README it produced described a tally the page does not keep. That file shipped.
+Reading a task file back yourself is what produced all four; the withholding is
+what would have caught them.
+
+### 6. Write the таски into the run state
 
 Every таск gets an entry in `tasks[]` with its id, title, `requirementIds`, and
 `blockedBy`.
@@ -88,7 +113,7 @@ Every таск gets an entry in `tasks[]` with its id, title, `requirementIds`, 
 - `blockedBy` holds the таск ids that must finish first. It is what bounds the
   wave width, together with file ownership.
 
-### 6. Show it, by mode
+### 7. Show it, by mode
 
 | Mode | What happens |
 |---|---|
@@ -108,8 +133,9 @@ pass.
 
 ## Gates
 
-**G3 runs after this phase.** It passes when the map between требования and таски
-holds in **both** directions:
+**G3 runs after this phase.** It has two halves, and the second one is step 5.
+
+The map between требования and таски holds in **both** directions:
 
 - every `in-spec` требование maps to at least one таск — nothing the user asked
   for was dropped on the way from the spec to the cut;
@@ -119,6 +145,11 @@ holds in **both** directions:
 One direction alone is worth little. A cut can cover every требование and still
 carry two таски invented along the way, and it can be entirely traceable while
 quietly leaving a требование out.
+
+And every task file is buildable by a reader who has only what its executor will
+have. The map measures coverage; this measures the thing the executor is
+actually handed, and a task file can be perfectly traceable while contradicting
+itself.
 
 - A failed G3 returns control here: this phase runs again with the findings as
   input. It may fail twice on the same finding; on the third the прогон stops and
