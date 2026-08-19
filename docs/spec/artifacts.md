@@ -36,7 +36,7 @@ actually built.
 | `reference.md` | briefing | acceptance | append-only |
 | `spec.md` | spec | plan, build, review | yes, by amendment only |
 | `interfaces.md` | plan | build, review | no |
-| `discovered-interfaces.md` | build | build, review, memory | append-only |
+| `discovered-interfaces.md` | build | build, memory | append-only |
 | `tasks/NN-<slug>.md` | plan | build, review, G3 | no |
 | `tasks/NN-<slug>-handoff.md` | build | build, review | no |
 | `reviews/NN-<slug>.md` | review | repair, acceptance | append-only |
@@ -49,6 +49,17 @@ more naturally. `interfaces.md` holds the boundaries the plan derived from the
 spec; `discovered-interfaces.md` holds what finished таски actually built. One
 file written by two phases has no owner, and the first disagreement between them
 is unattributable.
+
+The review phase is **not** among its readers. A review judges one таск against
+the task file its executor was handed and the boundaries in `interfaces.md`;
+what other таски discovered afterwards was not part of that contract, and
+measuring against it would be judging an executor by words it never saw.
+
+`reference.md` is read by доводка, which runs inside the acceptance stage after
+приёмка and has no rules file yet. The row above names `acceptance` because the
+stage is where that reading happens — a reader arriving with a later milestone
+is a different thing from a reader that never existed, and the two are worth
+keeping apart in a table whose job is to say who opens what.
 
 A handoff exists only for a таск that ran out of context before it was done. It
 is written by the orchestrator from what the executor returned — the executor's

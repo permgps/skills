@@ -15,7 +15,7 @@ right thing was built.
 | plan | Plan | yes | `spec.md` | `tasks/`, `interfaces.md` |
 | build | Build | yes | `tasks/`, `interfaces.md` | project code, `discovered-interfaces.md`, a handoff where one was needed |
 | review | Review | yes | `tasks/`, `interfaces.md`, project code | `reviews/` |
-| acceptance | Acceptance | yes | `manifest.md`, project code | `report.md` |
+| acceptance | Acceptance | yes | `manifest.md`, `brief.md`, `reviews/`, project code | `report.md` |
 | memory | Memory | no | project code, `spec.md` | project memory file, decision records |
 | repair | Repair | no | a task result that is not done, or a review with a blocking finding | retried task, spec amendment with a `D##` row |
 
@@ -224,6 +224,84 @@ contradictory if a phase and its subagent are read as one thing: the phase
 composes `report.md` from everything the прогон knows, while the reader it
 consults about the манифест is given the манифест and the build and nothing
 else.
+
+## Acceptance
+
+The last phase asks the question the прогон was started for: does what was built
+do what the user asked. It is the only phase that measures against the манифест
+instead of against something the прогон wrote about the манифест.
+
+**The reader is given `manifest.md` and the running build, and nothing else.**
+Not `spec.md`, not the plan, not the task files, not `reviews/` — and not
+`brief.md` either. The first four are withheld by [`gates.md`](gates.md), which
+owns G4 and says why: a reader who has seen the specification confirms the
+specification. `brief.md` is withheld on the same reasoning carried one step
+further. The манифест is the numbered form of the бриф, agreed with the user
+before any other work began; a reader holding both would answer from the looser
+of the two exactly where they disagree — and that disagreement is the thing
+worth knowing.
+
+### The Phase And Its Reader Are Not One Actor
+
+The *phase* opens `brief.md`, `manifest.md`, `reviews/` and the run state,
+because the отчёт is composed from all of them. The *reader* it consults about
+the манифест gets the two inputs above and nothing more. The review section
+above drew this distinction already, for `reviews/`; this is the phase it was
+drawn for.
+
+Withholding binds the reader, not the orchestrator. A phase that could not read
+the run state could not record a finding against a требование, and one that
+could not read `reviews/` would drop every observation the прогон collected on
+its way here.
+
+### A Disagreement Names A Требование
+
+Every G4 finding carries the `R##` it disagrees with, and the requirement text
+quoted from the манифест. A finding that names nothing cannot be acted on,
+cannot be counted against the requirement coverage the dashboard renders, and
+cannot be told apart from an opinion about the build.
+
+A требование the reader could not check — one needing data, credentials, or a
+running service it was not given — is neither a finding nor a pass. It is named
+as unchecked and carried into the отчёт as such. Failing it for being awkward
+and passing it quietly are the same mistake made in opposite directions.
+
+### The Отчёт
+
+`report.md` has five sections and they are fixed:
+
+| Section | Holds |
+|---|---|
+| What was asked | every `R##`, its status, and where it landed |
+| Disagreements | G4's findings, each against its требование |
+| Assumptions | every placeholder standing in for a fact nobody supplied, and every wording whose translation was uncertain |
+| Observations | the non-blocking findings the reviews carried forward |
+| What is left | deferred and dropped требования, with the reason recorded against each |
+
+Fixed, because a отчёт whose shape is decided per прогон is a отчёт two прогона
+cannot be compared through. A section with nothing in it says so in one line
+rather than disappearing; an absent section reads as a section nobody wrote.
+
+Assumptions is where `S3` in [`safety.md`](safety.md) sends every invented fact
+it replaced with a placeholder, and where the manifest phase sends a translation
+it was not sure of. It is the one section that exists to be read even when
+everything passed.
+
+**The отчёт is English, and what is said about it in the chat is Russian.**
+*Translate Once* in [`artifacts.md`](artifacts.md) has no exception for the last
+file, and this is the file most likely to grow one — it is the only artifact
+written for the user rather than for a later phase. Labels are resolved through
+`vocabulary.md` when the summary is spoken, not stored in the отчёт.
+
+### When G4 Disagrees
+
+The отчёт is written either way. It is the record of what disagreed, so
+withholding it on a failure would delete the evidence exactly when it matters
+most.
+
+What happens after that is in [`gates.md`](gates.md), where the failure
+behaviour of every gate lives: G4 is the one gate that cannot send its phase
+back, so the прогон stops and names the требования.
 
 ## Mode Matrix
 
