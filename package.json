@@ -17,7 +17,8 @@
     "check": "npm run typecheck && npm run spec && npm run bundle && npm run dashboard && npm run state && npm run test",
     "link": "node scripts/package/link-local.ts link",
     "unlink": "node scripts/package/link-local.ts unlink",
-    "state": "node scripts/validate/state-matches-spec.ts docs/spec"
+    "state": "node scripts/validate/state-matches-spec.ts docs/spec",
+    "metrics": "node scripts/metrics/measure.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
