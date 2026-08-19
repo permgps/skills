@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url';
 
 import { createLogger } from '../shared/log.ts';
 import { formatViolation, type Violation } from '../shared/violation.ts';
-import { redact } from './redact.ts';
+import { findSecrets } from './redact.ts';
 
 export type { Violation };
 
@@ -25,8 +25,6 @@ export const DEFAULT_IGNORED = ['.git', 'node_modules', '.venv', 'dist', 'build'
 
 /** How much of a file is inspected before deciding it is not text. */
 const SNIFF_BYTES = 8192;
-
-const PLACEHOLDER = /\[REDACTED:([A-Z0-9_]+)\]/g;
 
 /**
  * A NUL byte inside the first few kilobytes means binary.
@@ -48,23 +46,33 @@ export interface ScanSummary {
   filesSkipped: number;
 }
 
-/** Findings for one already-read text, anchored to the lines they sit on. */
+/**
+ * Findings for one already-read text, anchored to the lines they sit on.
+ *
+ * The line numbers come from `findSecrets`, which reports offsets into the text
+ * given to it. Deriving them from redacted output instead would shift every
+ * finding below a private key block by the number of lines that block collapsed
+ * into one — and point the person rotating the credential at the wrong line.
+ */
 export function scanText(file: string, content: string): Violation[] {
-  const { text, names } = redact(content);
-  if (names.length === 0) return [];
+  const found = findSecrets(content);
+  if (found.length === 0) return [];
 
-  const violations: Violation[] = [];
-  text.split('\n').forEach((line, index) => {
-    const found = [...line.matchAll(PLACEHOLDER)].map(match => match[1] ?? '');
-    if (found.length === 0) return;
-    violations.push({
+  const byLine = new Map<number, string[]>();
+  for (const secret of found) {
+    const names = byLine.get(secret.line) ?? [];
+    if (!names.includes(secret.name)) names.push(secret.name);
+    byLine.set(secret.line, names);
+  }
+
+  return [...byLine.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([line, names]) => ({
       check: 'secret',
       file,
-      line: index + 1,
-      message: `credential found in a written file: ${[...new Set(found)].join(', ')}`,
-    });
-  });
-  return violations;
+      line,
+      message: `credential found in a written file: ${names.join(', ')}`,
+    }));
 }
 
 export async function scanDirectory(root: string, options: ScanOptions = {}): Promise<ScanSummary> {
@@ -72,6 +80,18 @@ export async function scanDirectory(root: string, options: ScanOptions = {}): Pr
   const violations: Violation[] = [];
   let filesScanned = 0;
   let filesSkipped = 0;
+
+  // One place, so a finding is logged the same way whether a directory was
+  // swept or a single file was.
+  const record = (found: Violation[]): void => {
+    for (const violation of found) {
+      violations.push(violation);
+      log.error(violation.check, violation.message, {
+        file: violation.file,
+        line: violation.line,
+      });
+    }
+  };
 
   const walk = async (relative: string): Promise<void> => {
     const entries = await readdir(path.join(root, relative), { withFileTypes: true });
@@ -107,14 +127,7 @@ export async function scanDirectory(root: string, options: ScanOptions = {}): Pr
       }
 
       filesScanned += 1;
-      const found = scanText(child, buffer.toString('utf8'));
-      for (const violation of found) {
-        violations.push(violation);
-        log.error(violation.check, violation.message, {
-          file: violation.file,
-          line: violation.line,
-        });
-      }
+      record(scanText(child, buffer.toString('utf8')));
     }
   };
 
@@ -124,7 +137,7 @@ export async function scanDirectory(root: string, options: ScanOptions = {}): Pr
     if (looksBinary(buffer)) filesSkipped += 1;
     else {
       filesScanned += 1;
-      violations.push(...scanText(path.basename(root), buffer.toString('utf8')));
+      record(scanText(path.basename(root), buffer.toString('utf8')));
     }
   } else {
     await walk('');

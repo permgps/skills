@@ -148,3 +148,62 @@ test('a single file can be swept directly', async () => {
     assert.equal(summary.violations[0]?.file, 'answers.md');
   });
 });
+
+// --- regression: line numbers must survive a multi-line secret ---------------
+
+test('a finding after a multi-line secret keeps its own line number', () => {
+  // Reported by /aif-review: the private key block collapses to one line during
+  // redaction, and every finding below it was reported six lines too high.
+  const content = [
+    'line 1',                          // 1
+    '-----BEGIN RSA PRIVATE KEY-----', // 2
+    'AAAA', 'BBBB', 'CCCC', 'DDDD', 'EEEE',
+    '-----END RSA PRIVATE KEY-----',   // 8
+    'line 9',                          // 9
+    'DB_PASSWORD=s3cr3t-value-here',   // 10
+  ].join('\n');
+
+  const violations = scanText('answers.md', content);
+
+  assert.equal(violations.length, 2);
+  assert.equal(violations[0]?.line, 2, 'the private key block starts on line 2');
+  assert.equal(violations[1]?.line, 10, 'the password is on line 10 of the source');
+});
+
+test('two secrets separated by a multi-line block are both placed correctly', () => {
+  const content = [
+    'API_TOKEN=aaaaaaaaaaaa',          // 1
+    '-----BEGIN PRIVATE KEY-----',     // 2
+    'XXXX', 'YYYY',
+    '-----END PRIVATE KEY-----',       // 5
+    'DB_PASSWORD=s3cr3t-value-here',   // 6
+  ].join('\n');
+
+  assert.deepEqual(scanText('answers.md', content).map(v => v.line), [1, 2, 6]);
+});
+
+test('two secrets on one line are reported as a single finding naming both', () => {
+  const violations = scanText('answers.md', 'DB_PASSWORD=s3cr3t-value-here API_TOKEN=aaaaaaaaaaaa\n');
+
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.line, 1);
+  assert.match(violations[0]?.message ?? '', /DB_PASSWORD, API_TOKEN/);
+});
+
+test('a secret on the very first line is reported at line 1', () => {
+  const violations = scanText('answers.md', 'DB_PASSWORD=s3cr3t-value-here\nrest\n');
+  assert.equal(violations[0]?.line, 1);
+});
+
+test('CRLF line endings do not shift line numbers', () => {
+  const content = 'one\r\ntwo\r\nDB_PASSWORD=s3cr3t-value-here\r\n';
+  const violations = scanText('answers.md', content);
+
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.line, 3);
+});
+
+test('a secret on the last line without a trailing newline is located', () => {
+  const violations = scanText('answers.md', 'one\ntwo\nDB_PASSWORD=s3cr3t-value-here');
+  assert.equal(violations[0]?.line, 3);
+});

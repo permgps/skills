@@ -162,3 +162,73 @@ test('toVarName produces a name a placeholder can carry', () => {
   assert.equal(toVarName('!!!'), 'SECRET');
   assert.equal(toVarName(''), 'SECRET');
 });
+
+// --- regression: pasted code must survive redaction --------------------------
+
+test('a TypeScript type annotation is not a credential', () => {
+  // Reported by /aif-review: `keys` matches KEY and `Map<string` is longer than
+  // the eight-character floor, so a pasted interface came back mangled.
+  const source = [
+    'export interface Frontmatter {',
+    '  keys: Map<string, string>;',
+    '  token: string;',
+    '  secrets: Array<string>;',
+    '}',
+  ].join('\n');
+
+  assert.deepEqual(redact(source), { text: source, names: [] });
+});
+
+test('a real credential inside a fenced code block is still removed', () => {
+  // The mirror of the test above: a fenced block is exactly where somebody
+  // pastes an .env file, so fences must not become a hiding place.
+  const source = '```\nDB_PASSWORD=s3cr3t-value-here\n```\n';
+  const result = redact(source);
+
+  assert.equal(result.text.includes('s3cr3t-value-here'), false);
+  assert.deepEqual(result.names, ['DB_PASSWORD']);
+});
+
+test('a YAML password written with a colon is still removed', () => {
+  // The mirror of the type-annotation test: `:` must not become a blind spot.
+  const result = redact('database:\n  password: correcthorsebatterystaple\n');
+
+  assert.equal(result.text.includes('correcthorsebatterystaple'), false);
+  assert.deepEqual(result.names, ['PASSWORD']);
+});
+
+test('a colon value that is short but obviously generated is removed', () => {
+  const result = redact('api_key: a1b2c3d4');
+  assert.equal(result.text.includes('a1b2c3d4'), false);
+  assert.deepEqual(result.names, ['API_KEY']);
+});
+
+test('a member expression under a credential-shaped key survives', () => {
+  // `keys` matches KEY but does not name a credential outright, and
+  // `frontmatter.keys.size` is written rather than generated.
+  const source = "log.info('frontmatter', 'checked', { keys: frontmatter.keys.size });";
+  assert.deepEqual(redact(source), { text: source, names: [] });
+});
+
+test('two secrets on adjacent lines are both removed and both named', () => {
+  const result = redact('DB_PASSWORD=first-secret-value\nAPI_TOKEN=second-secret-val\n');
+
+  assert.equal(result.text.includes('first-secret-value'), false);
+  assert.equal(result.text.includes('second-secret-val'), false);
+  assert.deepEqual(result.names, ['DB_PASSWORD', 'API_TOKEN']);
+});
+
+test('CRLF line endings survive redaction unchanged', () => {
+  const result = redact('line one\r\nDB_PASSWORD=s3cr3t-value-here\r\nline three\r\n');
+
+  assert.equal(result.text.includes('s3cr3t-value-here'), false);
+  // The carriage returns are not part of the value and must still be there.
+  assert.equal(result.text, 'line one\r\nDB_PASSWORD=[REDACTED:DB_PASSWORD]\r\nline three\r\n');
+});
+
+test('a secret on the last line without a trailing newline is removed', () => {
+  const result = redact('notes\nDB_PASSWORD=s3cr3t-value-here');
+
+  assert.equal(result.text, 'notes\nDB_PASSWORD=[REDACTED:DB_PASSWORD]');
+  assert.deepEqual(result.names, ['DB_PASSWORD']);
+});

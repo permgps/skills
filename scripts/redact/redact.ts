@@ -5,6 +5,10 @@
 // is the name of the thing that was found, because a user who is told
 // "ANTHROPIC_API_KEY was removed, rotate it" can act, and a user who is told
 // "a secret was removed" cannot.
+//
+// The rules are applied by scanning, not by rewriting in place. Every offset a
+// caller sees therefore points into the text it passed in — which is what lets
+// the sweep report the line a secret is actually on.
 
 import { createLogger } from '../shared/log.ts';
 
@@ -26,7 +30,7 @@ interface Rule {
   /** Which capture group holds the value to remove. */
   group: number;
   /** The name to record, from the match. */
-  name: (match: RegExpMatchArray) => string;
+  name: (match: RegExpExecArray) => string;
 }
 
 /** Key prefixes that identify a provider on sight. */
@@ -50,7 +54,16 @@ const STRONG_SECRET_KEY =
   /(?:PASSWORD|PASSWD|PWD|SECRET|TOKEN|API_?KEY|PASSPHRASE|CREDENTIALS?|PRIVATE_?KEY)/i;
 
 /**
- * Shortest value an assignment rule will treat as a credential.
+ * Characters a credential is drawn from. Anything outside this set means the
+ * "value" is a fragment of code: `Map<string`, `Array<string>`, `() => void`.
+ */
+const VALUE_CHARSET = /^[A-Za-z0-9._~+/=:@-]+$/;
+
+/** Marks of a generated secret rather than a word: digits and token punctuation. */
+const TOKEN_SHAPE = /[0-9_~+/=-]/;
+
+/**
+ * Shortest value an `=` assignment will treat as a credential.
  *
  * `Authorization: Bearer <token>` is the case that forces this: after the
  * bearer rule has done its work, the assignment rule sees the key
@@ -60,6 +73,9 @@ const STRONG_SECRET_KEY =
  */
 const MIN_VALUE_LENGTH = 8;
 const MIN_VALUE_LENGTH_STRONG = 4;
+
+/** Length at which a `:` value is credential-shaped on size alone. */
+const MIN_COLON_VALUE_LENGTH = 12;
 
 const RULES: Rule[] = [
   {
@@ -92,13 +108,95 @@ const RULES: Rule[] = [
   })),
   {
     // KEY=value and "key": "value" alike. The name comes from the key, which is
-    // the only part of the pair that is safe to keep.
+    // the only part of the pair that is safe to keep. Groups: 1 opening quote,
+    // 2 key, 3 separator, 4 opening value quote, 5 value.
+    //
+    // The spacing is [ \t]* rather than \s*, and that is not cosmetic: \s
+    // matches a newline, so in YAML the pair `database:` would reach across the
+    // line break and swallow the `password` key underneath it as its own value.
+    // A key and its value are on one line.
     id: 'assignment',
-    pattern: /(["']?)([A-Za-z_][A-Za-z0-9_.-]*)\1\s*[:=]\s*(["']?)([^\s"',;]+)\3/g,
-    group: 4,
+    pattern: /(["']?)([A-Za-z_][A-Za-z0-9_.-]*)\1[ \t]*([:=])[ \t]*(["']?)([^\s"',;]+)\4/g,
+    group: 5,
     name: match => toVarName(match[2] ?? ''),
   },
 ];
+
+/**
+ * Decide whether a `key <sep> value` pair is a credential.
+ *
+ * The separator carries most of the signal. `=` is env-file syntax, where a
+ * credential-shaped key means what it says. `:` is also how every typed
+ * language writes an annotation and every object writes a member, so
+ * `token: string` and `keys: frontmatter.keys.size` reach this function looking
+ * exactly like a secret. For `:` the key must therefore name a credential
+ * outright, and the value must look generated rather than written.
+ */
+function isCredentialAssignment(match: RegExpExecArray): boolean {
+  const key = match[2] ?? '';
+  const separator = match[3] ?? '';
+  const value = match[5] ?? '';
+
+  if (!SECRET_KEY.test(key)) return false;
+  if (!VALUE_CHARSET.test(value)) return false;
+
+  const strong = STRONG_SECRET_KEY.test(key);
+  if (value.length < (strong ? MIN_VALUE_LENGTH_STRONG : MIN_VALUE_LENGTH)) return false;
+
+  if (separator === ':') {
+    if (!strong) return false;
+    if (!TOKEN_SHAPE.test(value) && value.length < MIN_COLON_VALUE_LENGTH) return false;
+  }
+
+  return true;
+}
+
+interface Hit {
+  name: string;
+  /** Offset of the value to remove, in the text that was passed in. */
+  index: number;
+  length: number;
+  /** Offset where the whole construct starts — the line a reader should look at. */
+  matchIndex: number;
+}
+
+/**
+ * Find every credential in `text` without changing it.
+ *
+ * Rules are ordered, and an earlier rule's whole match claims its span: that is
+ * what stops `Authorization: Bearer <token>` from being read a second time as
+ * an assignment whose value is the word "Bearer", and what stops
+ * `ANTHROPIC_API_KEY=sk-ant-…` from being counted twice.
+ */
+function scanRules(text: string): Hit[] {
+  const hits: Hit[] = [];
+  const claimed: Array<[number, number]> = [];
+  const overlapsClaimed = (start: number, end: number): boolean =>
+    claimed.some(([from, to]) => start < to && from < end);
+
+  for (const rule of RULES) {
+    for (const match of text.matchAll(rule.pattern)) {
+      const whole = match[0];
+      const value = match[rule.group];
+      if (value === undefined || value === '') continue;
+
+      const matchIndex = match.index;
+      const matchEnd = matchIndex + whole.length;
+      if (overlapsClaimed(matchIndex, matchEnd)) continue;
+      if (rule.id === 'assignment' && !isCredentialAssignment(match)) continue;
+
+      claimed.push([matchIndex, matchEnd]);
+      hits.push({
+        name: rule.name(match),
+        index: matchIndex + whole.lastIndexOf(value),
+        length: value.length,
+        matchIndex,
+      });
+    }
+  }
+
+  return hits.sort((a, b) => a.index - b.index);
+}
 
 export interface RedactionResult {
   /** The input with every detected value replaced by a named placeholder. */
@@ -115,54 +213,67 @@ export interface RedactionResult {
  * would be a change nobody asked for on every brief.
  */
 export function redact(text: string): RedactionResult {
-  const names: string[] = [];
-  const seen = new Set<string>();
-  let result = text;
-
-  const record = (name: string): string => {
-    if (!seen.has(name)) {
-      seen.add(name);
-      names.push(name);
-    }
-    return placeholder(name);
-  };
-
-  for (const rule of RULES) {
-    result = result.replace(rule.pattern, (...args: unknown[]) => {
-      const groups = args.slice(0, -2) as Array<string | undefined>;
-      const whole = groups[0] ?? '';
-      const value = groups[rule.group];
-      if (value === undefined || value === '') return whole;
-
-      // A span an earlier rule already touched is not a second secret. The
-      // whole match is checked, not just the value: `Authorization: Bearer
-      // [REDACTED:BEARER_TOKEN]` would otherwise be read as an assignment whose
-      // value is the word "Bearer".
-      if (whole.includes('[REDACTED:')) return whole;
-
-      // The assignment rule is the broad one: without a credential-shaped key
-      // it would redact every `width: 100` in the брифе.
-      if (rule.id === 'assignment') {
-        const key = groups[2] ?? '';
-        if (!SECRET_KEY.test(key)) return whole;
-        const minimum = STRONG_SECRET_KEY.test(key) ? MIN_VALUE_LENGTH_STRONG : MIN_VALUE_LENGTH;
-        if (value.length < minimum) return whole;
-      }
-
-      const match = groups as unknown as RegExpMatchArray;
-      const start = whole.lastIndexOf(value);
-      return whole.slice(0, start) + record(rule.name(match)) + whole.slice(start + value.length);
-    });
+  const hits = scanRules(text);
+  if (hits.length === 0) {
+    log.debug('redact', 'no values found');
+    return { text, names: [] };
   }
 
-  // Rules run in their own order, which is not the reader's. Sorting by where
-  // each placeholder ended up puts the list in the order the отчёт will want it.
-  names.sort((a, b) => result.indexOf(placeholder(a)) - result.indexOf(placeholder(b)));
+  const names: string[] = [];
+  const seen = new Set<string>();
+  let result = '';
+  let cursor = 0;
+
+  for (const hit of hits) {
+    if (!seen.has(hit.name)) {
+      seen.add(hit.name);
+      names.push(hit.name);
+    }
+    result += text.slice(cursor, hit.index) + placeholder(hit.name);
+    cursor = hit.index + hit.length;
+  }
+  result += text.slice(cursor);
 
   // Names only. Logging a count and a list of variable names is the whole of
   // what may be said about a redaction.
-  if (names.length > 0) log.info('redact', 'values removed', { count: names.length, names });
-  else log.debug('redact', 'no values found');
+  log.info('redact', 'values removed', { count: names.length, names });
 
   return { text: result, names };
+}
+
+export interface SecretLocation {
+  name: string;
+  /** 1-based line in the text that was passed in. */
+  line: number;
+}
+
+/**
+ * Where the credentials are, without producing redacted text.
+ *
+ * The line is the one the construct starts on, so a private key block is
+ * reported at its `-----BEGIN` fence rather than at the base64 underneath.
+ */
+export function findSecrets(text: string): SecretLocation[] {
+  const hits = scanRules(text);
+  if (hits.length === 0) return [];
+
+  const lineStarts = [0];
+  for (let i = 0; i < text.length; i += 1) {
+    if (text[i] === '\n') lineStarts.push(i + 1);
+  }
+
+  const lineOf = (offset: number): number => {
+    let low = 0;
+    let high = lineStarts.length - 1;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if ((lineStarts[middle] ?? 0) <= offset) low = middle;
+      else high = middle - 1;
+    }
+    return low + 1;
+  };
+
+  return hits
+    .map(hit => ({ name: hit.name, line: lineOf(hit.matchIndex) }))
+    .sort((a, b) => a.line - b.line);
 }
