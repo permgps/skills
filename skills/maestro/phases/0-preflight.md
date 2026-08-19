@@ -63,14 +63,25 @@ only.
 
 ### 5. Raise the dashboard
 
-**This step is specified and currently inert.** It copies `assets/dashboard.html`
-into `.maestro/` and opens it for the user before the first stage begins.
+Copy [`../assets/dashboard.html`](../assets/dashboard.html) into `.maestro/`,
+beside the state you just wrote, and open it for the user before the first stage
+begins. Say once where it is. That is the whole step.
 
-The asset does not exist in this bundle yet; it arrives with the **Live
-Dashboard** milestone. Until then: skip the step, and say once that the прогон
-has no live view. Do not substitute a textual progress display — a stand-in that
-looks like the dashboard is harder to remove later than a missing feature is to
-notice.
+- **The state is written first.** The page reads `state.js` and nothing else, so
+  opening it before step 4 shows a прогон that cannot be read yet.
+- **Copy it, never edit it.** The asset is written once per прогон and is not
+  the place to record anything; everything the user sees comes from the state.
+- **Open it once.** The page re-reads the state on its own interval, because you
+  are often busy for minutes at a time and it must not wait for you. Do not
+  reopen it at every stage, and do not announce each refresh.
+- **It outlives the прогон.** After приёмка it stays as the record of what
+  happened, with every clock stopped. Nothing deletes it at the end.
+
+If the copy fails — no `assets/` in the installed bundle, an unwritable
+`.maestro/` — say so plainly and continue. A прогон without a live view is a
+прогон the user cannot watch, not a прогон that cannot run. **Do not substitute a
+textual progress display**: a stand-in that looks like the dashboard is harder to
+remove later than a missing feature is to notice.
 
 ### 6. Announce the dials
 
@@ -91,6 +102,7 @@ nothing yet to check against the user's words.
 |---|---|
 | `.maestro/<slug>/` | created, empty |
 | `.maestro/state.js` | written, `preflight` active |
+| `.maestro/dashboard.html` | copied and opened |
 | the announcement | shown |
 
 Then read the manifest phase file.

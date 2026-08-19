@@ -74,6 +74,8 @@ npm run check                                          # everything below, in or
 
 node scripts/validate/spec-integrity.ts docs/spec      # the specification vs itself
 node scripts/validate/bundle-integrity.ts skills/maestro   # the skill bundle's structure
+node scripts/validate/dashboard-integrity.ts \
+  skills/maestro/assets/dashboard.html docs/spec           # the dashboard asset
 node scripts/validate/state-matches-spec.ts docs/spec  # the contract vs its code
 node --test 'scripts/**/*.test.ts'                     # the checkers themselves
 
@@ -83,6 +85,12 @@ LOG_LEVEL=DEBUG node scripts/validate/spec-integrity.ts docs/spec
 Scripts are TypeScript and run directly: Node 22.18+ strips the types, so there
 is no build step between the source and the command above. `npm run typecheck`
 runs `tsc --noEmit` separately when only the types are in question.
+
+`dashboard-integrity` takes the asset and the specification directory, and
+defaults to both paths above. It proves the page is self-contained and that the
+labels, stage order and gate map it copies still match `vocabulary.md`,
+`phases.md` and `gates.md` — the page holds those copies because the state
+stores ids and labels are resolved at render time, and an unchecked copy drifts.
 
 Pass a directory to the validator to check a different tree; it defaults to
 `docs/spec`. `LOG_LEVEL` accepts `DEBUG`, `INFO`, `WARN`, `ERROR` and defaults to
