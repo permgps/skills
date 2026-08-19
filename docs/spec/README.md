@@ -106,7 +106,14 @@ directory could not be read.
 node scripts/gates/check-g1.ts <run-dir>   # after брифинг: every требование has a status
 node scripts/gates/check-g2.ts <run-dir>   # after the spec: none left open
 node scripts/gates/check-g3.ts <run-dir>   # after the plan: the map holds both ways
+node scripts/gates/check-g4.ts <run-dir>   # after приёмка: the disagreements were recorded
 ```
+
+Two of the four have a half no script can reach: the reader at G2 and the blind
+reader at G4 are judged by what they were handed, and no field of the run state
+records that. Those two check what was written down afterwards instead — that a
+verdict exists, that it agrees with the findings under it, and that each finding
+names a требование somebody can act on.
 
 These are **not** part of `npm run check`, and no phase file names them. They
 read a прогон's `state.js` — a file this repository never contains — so there is
