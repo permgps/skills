@@ -3,42 +3,44 @@
 One self-contained HTML file, copied into `.maestro/` during preflight and
 opened for the user at that moment. It reads `state.js` on its own, on a short
 interval, because the orchestrator is often busy for minutes at a time and a
-view that waits to be told to refresh shows a прогон that looks frozen.
+view that waits to be told to refresh shows a run that looks frozen.
 
 Its only input is the run state. It never opens `manifest.md`, a task file, or
 any path in the repository — a view that reaches into artifacts becomes a second
-source of truth about a прогон, and the second one is silently wrong.
+source of truth about a run, and the second one is silently wrong.
 
-## A прогон in flight
+## A run in flight
 
-![The dashboard during Разработка](assets/dashboard-running.png)
+![The dashboard during the build stage](assets/dashboard-running.png)
 
 The stage timeline is the run: eight stages in order, the current one marked.
 Every visible word comes from `docs/spec/vocabulary.md` — the state stores ids
 and the page resolves them at render time, so a wording change never requires a
-state migration.
+state migration. Those words are Russian, because the interface is: the
+screenshots show `Разработка` where this page says the build stage, and the
+mapping between the two is the vocabulary file.
 
-The таск table shows what is happening now, including what each таск is waiting
-for. Two таски running at once is a wave, and the wave is recomputed after each
-таск returns rather than planned once at the start.
+The task table shows what is happening now, including what each task is waiting
+for. Two tasks running at once is a wave, and the wave is recomputed after each
+task returns rather than planned once at the start.
 
-Requirement coverage is counted rather than claimed: every таск carries the
+Requirement coverage is counted rather than claimed: every task carries the
 requirement ids it traces to, which is what G3 checks in both directions.
 
-## A finished прогон
+## A finished run
 
-![The dashboard after приёмка](assets/dashboard-finished.png)
+![The dashboard after acceptance](assets/dashboard-finished.png)
 
 After `finishedAt` the page stays a readable record with every clock stopped,
 and each stage shows its own duration rather than the run's. A frozen clock with
 no explanation is the one failure mode the header notice exists to prevent: an
-interrupted прогон says it was interrupted and when.
+interrupted run says it was interrupted and when.
 
 ## The fixtures behind these images
 
 `docs/assets/state-running.fixture.js` and `state-finished.fixture.js` are the
 two states the screenshots were rendered from. They are fixtures, not the record
-of a real прогон — a real one belongs to the project it built and is never
+of a real run — a real one belongs to the project it built and is never
 committed here.
 
 To reproduce a capture:

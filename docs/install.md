@@ -14,13 +14,32 @@ install time.
 ## From the published repository
 
 ```bash
-npx skills add <handle>/skills -s maestro
+npx skills add permgps/skills -s maestro
 ```
 
-`<handle>` is a placeholder until the umbrella repository is published; see the
-open item in `.ai-factory/ROADMAP.md`. Everything below has been run and its
-output recorded; this line has not, and is marked as such rather than presented
-as verified.
+Verified output:
+
+```text
+◇  Installation complete
+│  ✓ maestro (copied)
+│    → ./.claude/skills/maestro
+```
+
+One line of that run is worth reading twice. The summary printed *before* the
+copy names `./.agents/skills/maestro`, and the summary printed *after* it names
+`./.claude/skills/maestro`. Only the second one is true — no `.agents/`
+directory exists afterwards. The install is correct; it is the preview that is
+wrong, and it is wrong in exactly the direction that makes a Claude Code user
+think the skill landed somewhere their agent will not look.
+
+The `skills-lock.json` written beside it records `"source": "permgps/skills"`
+with `"sourceType": "github"`; the local form below records a relative path and
+`"sourceType": "local"`. The `computedHash` is the same in both, which is the
+short proof that what GitHub serves and what this checkout holds are one bundle.
+
+Last verified on 2026-08-19: `diff -r` against `skills/maestro` reports no
+difference across `SKILL.md`, `phases/`, `prompts/`, `references/` and
+`assets/`.
 
 ## From a local checkout
 
@@ -105,9 +124,9 @@ and worth knowing before it looks like one of them failed.
 
 **Installing is not support.** It proves the skills directory and nothing else.
 What each host does about subagent fan-out, context isolation and worktrees — and
-what a прогон does when one of those is missing — is in
+what a run does when one of those is missing — is in
 [the hosts specification](spec/hosts.md), where both rows still read *unverified*
-because no прогон has been run on either.
+because neither has hosted a run yet.
 
 ## Developing against the checkout
 
@@ -141,7 +160,7 @@ npm run check     # everything below, in this order
 | `npm run state` | `docs/spec/state-contract.md` and `scripts/state/contract.ts` still agree |
 | `npm run test` | the checkers' own tests |
 
-`npm run metrics -- <run-dir>` measures a finished прогон. It is not part of
-`npm run check`, because this repository contains no прогон for it to measure.
+`npm run metrics -- <run-dir>` measures a finished run. It is not part of
+`npm run check`, because this repository contains no run for it to measure.
 
 Individual checks are documented in [the specification README](spec/README.md).

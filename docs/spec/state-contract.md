@@ -83,10 +83,10 @@ not recoverable from the result:
 | Last stage id | `final` | `acceptance` | The stage is named after what it does, and the same word is used by `phases.md`, `gates.md` and the отчёт. `final` describes a position in a list, not an activity |
 | `stages[].label` | stored in the state | absent | Labels live in `vocabulary.md` and are resolved at render time. Storing them would mean a wording change requires a state migration, and would give the same string two owners |
 
-The illustration in `.ai-factory/ARCHITECTURE.md` now reflects both. It remains an
-illustration: it shows the shape, not the whole field list, and
+Both are settled here, and this document is where they are settled: any
+illustration of the state elsewhere shows the shape, not the whole field list.
 `scripts/validate/state-matches-spec.ts` checks this document against
-`scripts/state/contract.ts` — never against the architecture example.
+`scripts/state/contract.ts` — never against an illustration.
 
 ## Versioning
 
