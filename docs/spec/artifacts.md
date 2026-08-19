@@ -17,9 +17,13 @@ project that was built, not with Maestro.
 │   ├── reviews/NN-<slug>.md
 │   └── report.md
 ├── state.js
-├── dashboard.html
-└── index.html
+└── dashboard.html
 ```
+
+The dashboard is opened directly and there is no second entry point beside it.
+An `index.html` pointing at a self-contained page would be an artifact with no
+writer, which is how it survived unnoticed in this tree until the dashboard was
+actually built.
 
 ## One Writer Each
 

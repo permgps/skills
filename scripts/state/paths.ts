@@ -62,7 +62,6 @@ function within(root: string, ...segments: string[]): string {
 export const runRoot = (): string => ROOT;
 export const statePath = (): string => within(ROOT, 'state.js');
 export const dashboardPath = (): string => within(ROOT, 'dashboard.html');
-export const indexPath = (): string => within(ROOT, 'index.html');
 
 /** Every path belonging to one feature slug. */
 export function forRun(slug: string) {

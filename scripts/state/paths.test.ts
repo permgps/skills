@@ -10,7 +10,6 @@ import {
   toSlug,
   statePath,
   dashboardPath,
-  indexPath,
   PathEscapeError,
   ROOT,
 } from './paths.ts';
@@ -21,7 +20,6 @@ const p = forRun('landing-page');
 test('project-level artifacts sit directly under the run root', () => {
   assert.equal(statePath(), path.join(ROOT, 'state.js'));
   assert.equal(dashboardPath(), path.join(ROOT, 'dashboard.html'));
-  assert.equal(indexPath(), path.join(ROOT, 'index.html'));
 });
 
 test('every feature artifact lands in the slug directory', () => {
