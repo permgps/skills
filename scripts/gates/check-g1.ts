@@ -12,14 +12,11 @@ import { pathToFileURL } from 'node:url';
 
 import { createLogger } from '../shared/log.ts';
 import type { RunState, RequirementStatus } from '../state/contract.ts';
-import { readState } from '../state/read.ts';
+import { runGate, targetFromArgv, type GateFinding } from './cli.ts';
+
+export type { GateFinding };
 
 const log = createLogger('gate-g1');
-
-export interface GateFinding {
-  requirementId: string;
-  message: string;
-}
 
 /** Statuses that are incomplete without a reason. */
 const REASON_REQUIRED: RequirementStatus[] = ['open', 'deferred', 'dropped'];
@@ -58,41 +55,10 @@ export function checkG1(state: RunState): GateFinding[] {
     total: state.requirements.length,
     ...Object.fromEntries(counts),
   });
-  for (const finding of findings) {
-    log.error('g1', finding.message, { requirementId: finding.requirementId });
-  }
 
   return findings;
 }
 
-async function main(): Promise<number> {
-  const target = process.argv[2] ?? '.maestro';
-  log.info('run', 'checking G1', { target });
-
-  let state: RunState;
-  try {
-    state = await readState(target);
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    log.error('run', 'state could not be read', { target, reason });
-    process.stdout.write(`check-g1: ${reason}\n`);
-    return 2;
-  }
-
-  const findings = checkG1(state);
-  if (findings.length === 0) {
-    process.stdout.write('check-g1: pass\n');
-    return 0;
-  }
-
-  for (const finding of findings) process.stdout.write(`  ${finding.message}\n`);
-  process.stdout.write(
-    `check-g1: fail — ${findings.length} finding(s). `
-    + 'A failed gate is not a warning: брифинг runs again with these as input.\n',
-  );
-  return 1;
-}
-
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exit(await main());
+  process.exit(await runGate('check-g1', checkG1, targetFromArgv()));
 }

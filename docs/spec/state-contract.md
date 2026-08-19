@@ -20,9 +20,16 @@ input.
 | `currentStage` | stage id | preflight | dashboard |
 | `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], startedAt?, finishedAt? }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason? }` | manifest | dashboard |
-| `gates[]` | list of `{ id, status, findings[] }` | briefing | dashboard |
+| `gates[]` | list of `{ id, status, findings[] }` | preflight | dashboard |
 | `finishedAt` | ISO 8601 string | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
+
+**`Written in` names the phase that creates a field, not every phase that later
+changes it.** `stages[]` is the example: preflight writes all eight entries and
+each later phase only moves a status. `gates[]` works the same way — preflight
+seeds G1–G4 as `pending`, and the phase each gate follows fills in that gate's
+own status and findings. The column has room for one phase because there is one
+writer; a field with two creators would have no owner.
 
 `stages[].id` is the stage id set defined in `phases.md`; it is not re-listed
 here, because two lists of the same thing drift. Labels come from

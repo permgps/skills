@@ -54,7 +54,8 @@ Write `.maestro/state.js` through the state writer. It carries:
 | `dialChanges` | empty |
 | `stages` | all eight, `preflight` active, the rest `pending` |
 | `currentStage` | `preflight` |
-| `tasks`, `requirements`, `gates` | empty |
+| `tasks`, `requirements` | empty |
+| `gates` | all four — `G1`, `G2`, `G3`, `G4` — `pending`, with no findings |
 
 Write the whole file, validated, at once. Never edit it in place, and never
 write it on a timer — the state changes at phase boundaries and task transitions
