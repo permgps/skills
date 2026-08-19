@@ -105,6 +105,34 @@ Last verified on 2026-08-19, with the bundle complete: the listing still reports
 30 skills, of which one is Maestro's, and `diff -r` reports no difference across
 `SKILL.md`, `phases/`, `prompts/`, `references/` and `assets/`.
 
+## The First Run Asks One Thing
+
+Installing settles nothing about how a прогон behaves. The first `/maestro` in a
+project asks which mode it should start in when the arguments do not say — the
+four are shown with a line each, `semi` marked as the built-in default. If that
+first run already named a mode, the question is instead whether to pin it.
+
+The answer goes to `<project>/.maestro/config.json`, which is **not** part of
+the bundle:
+
+```json
+{
+  "configVersion": 1,
+  "mode": "full"
+}
+```
+
+That location is the point. `npx skills update` overwrites every file it
+installed — verified: a stale bundle updated in place had eleven of its files
+replaced — so a default stored inside the skill would be erased by the next
+update, silently, in the middle of a project. Beside the runs it survives both
+updating and reinstalling.
+
+It is asked once per project and never again; the file existing is what records
+that it was asked. `"mode": null` is a user who was asked and chose not to pin
+one. To change the answer later, edit the file — every announcement names its
+path, so there is nothing to look up.
+
 ## For Codex and Gemini CLI
 
 The same bundle, a different target convention. The agent is selected by name:
@@ -174,9 +202,11 @@ npm run check     # everything below, in this order
 | `npm run typecheck` | `tsc --noEmit` over every script |
 | `npm run spec` | the behavior specification does not contradict itself |
 | `npm run bundle` | frontmatter, link targets, no cross-phase links, no orphaned phase |
+| `npm run dashboard` | the dashboard asset's regions, labels and pure logic |
 | `npm run state` | `docs/spec/state-contract.md` and `scripts/state/contract.ts` still agree |
 | `npm run hosts` | every host capability that degrades is probed in preflight and spent in a phase |
 | `npm run doors` | every door into the repair phase is listed there and opened by some phase |
+| `npm run dials` | the mode set and its built-in default agree across spec, phase and `SKILL.md` |
 | `npm run test` | the checkers' own tests |
 
 `npm run metrics -- <run-dir>` measures a finished run. It is not part of

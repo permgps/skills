@@ -60,10 +60,18 @@ manifest whose numbering shifts cannot be checked against anything.
 | `vocabulary.md` | Banned synonyms | `Banned`, `Use instead` |
 | `phases.md` | Phases | `Id`, `Name`, `Stage`, `Reads`, `Produces` |
 | `phases.md` | Mode Matrix | `Phase`, then one column per mode defined in `dials.md` |
-| `dials.md` | Modes | `Mode`, `Human gates` |
+| `dials.md` | Modes | `Mode`, `Default`, `Human gates` |
 | `gates.md` | Gates | `Gate`, `After phase`, `Pass condition` |
 | `artifacts.md` | Run artifacts | `Artifact`, `Writer`, `Readers`, `Mutable` |
 | `state-contract.md` | State fields | `Field`, `Type`, `Written in`, `Read by` |
+
+`dials.md`'s `Default` column has a second reader:
+`scripts/validate/dials-defaults.ts` holds the mode set and the marked default
+to the same answer in this document, the bundle's `phases/0-dials.md` and its
+`SKILL.md`. The bundle has no column to put a default in, so it declares one in
+a sentence — «Built-in default `semi`» — and that phrasing is the contract the
+checker reads. A project's own pinned default lives in the user's
+`.maestro/config.json` and is outside anything this repository can check.
 
 The validator enforces that gates point at phases that exist, that every
 artifact has exactly one writer, that every state field is produced and consumed,
@@ -85,6 +93,8 @@ node scripts/validate/host-degradation.ts \
   docs/spec skills/maestro                               # host degradations vs the bundle
 node scripts/validate/repair-doors.ts \
   docs/spec skills/maestro                               # the repair phase's doors
+node scripts/validate/dials-defaults.ts \
+  docs/spec skills/maestro                               # the mode set and its default
 node --test 'scripts/**/*.test.ts'                     # the checkers themselves
 
 LOG_LEVEL=DEBUG node scripts/validate/spec-integrity.ts docs/spec

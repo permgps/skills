@@ -20,6 +20,10 @@ to this repository. No selector is needed — the published tree holds exactly o
 skill. [`docs/install.md`](docs/install.md) shows that run and the
 local-checkout form with their real output.
 
+The first run in a project asks one thing: which mode it should start in when
+you do not name one. The answer goes to that project's `.maestro/config.json`,
+outside the bundle, where updating the skill cannot erase it.
+
 ## The order is the product
 
 Project code is written in the second-to-last stage. Everything before it decides
@@ -111,7 +115,7 @@ The skill carries no runtime dependencies. The tooling needs Node.js 22.18 or
 newer, because it is TypeScript executed by Node's native type stripping.
 
 ```bash
-npm run check     # typecheck, six validators, and their tests
+npm run check     # typecheck, seven validators, and their tests
 npm run metrics   # measure a finished run
 ```
 
