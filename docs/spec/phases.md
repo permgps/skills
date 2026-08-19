@@ -50,7 +50,7 @@ person who asked.
 
 | Project size | Signal | Таски | Wave width |
 |---|---|---|---|
-| tiny | one file, one behavior, no new boundary | none — build directly against the spec | 1 |
+| tiny | one file, one behavior, no new boundary | 1 — the whole spec, uncut | 1 |
 | small | one module, no new external dependency | 2–4 | 2 |
 | medium | several modules, or one new integration | 5–10 | 3 |
 | large | new subsystem, or a data model others depend on | 10–20 | 3, widened only when the dependency graph allows |
@@ -66,9 +66,16 @@ Three rules decide the cut, and they outrank the table:
    reaches at least one таск. That is G3, and it is what stops the cut from
    drifting into work nobody asked for.
 
-A tiny project produces no таски at all, and that is a valid plan. Cutting one
-requirement into three таски to look thorough costs three contexts and three
-reviews to build what one executor would have finished in one pass.
+A tiny project produces **one** таск carrying the whole spec, and that is a valid
+plan. Cutting one requirement into three таски to look thorough costs three
+contexts and three reviews to build what one executor would have finished in one
+pass.
+
+One, not none. `S5` says the orchestrator does not write the project's code, so
+somebody is handed the work either way — and by `vocabulary.md` the unit one
+executor is handed is a таск. A plan with zero таски would make G3 vacuous
+exactly when there is nothing else checking that the spec reached anyone, so the
+smallest plan is one таск rather than an exemption from the gate.
 
 ## Mode Matrix
 
