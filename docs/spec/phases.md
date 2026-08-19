@@ -17,7 +17,7 @@ right thing was built.
 | review | Review | yes | `tasks/`, `interfaces.md`, project code | `reviews/` |
 | acceptance | Acceptance | yes | `manifest.md`, `brief.md`, `reviews/`, project code | `report.md` |
 | memory | Memory | no | `discovered-interfaces.md`, `spec.md`, project code, run state | the memory block in `AGENTS.md`, `decisions.md` |
-| repair | Repair | no | a task result that is not done, or a review with a blocking finding | retried task, spec amendment with a `D##` row |
+| repair | Repair | no | a task result that is not done, or a review with a blocking finding | retried таск, `amendments.md` |
 
 `memory` runs twice — once during `build`, when the build discovers something
 worth outliving the run, and once after `acceptance`, when the finished code can
@@ -282,6 +282,12 @@ Fixed, because a отчёт whose shape is decided per прогон is a отч�
 cannot be compared through. A section with nothing in it says so in one line
 rather than disappearing; an absent section reads as a section nobody wrote.
 
+When приёмка runs a second time — after a failed G4 sent its disagreements to
+repair — the five sections are written again, under that round's date, beneath
+the ones already there. The отчёт accumulates rounds rather than replacing them:
+the earlier round is what the build did before it was repaired, and nothing else
+in the прогон records that.
+
 Assumptions is where `S3` in [`safety.md`](safety.md) sends every invented fact
 it replaced with a placeholder, and where the manifest phase sends a translation
 it was not sure of. It is the one section that exists to be read even when
@@ -301,7 +307,8 @@ most.
 
 What happens after that is in [`gates.md`](gates.md), where the failure
 behaviour of every gate lives: G4 is the one gate that cannot send its phase
-back, so the прогон stops and names the требования.
+back, so each disagreement travels to repair through the таски carrying its
+`R##`, and приёмка runs again once the build has changed.
 
 ## Memory
 
@@ -380,6 +387,67 @@ No gate follows memory, in either of its two runs. There is no question about
 the user's words for it to answer — it records what the прогон learned, and a
 run that recorded nothing worth keeping is a run that learned nothing worth
 keeping rather than a failed one.
+
+## Repair
+
+Two things arrive here, and they are the only two: a таск that came back
+anything other than done, and a таск whose review found something blocking. The
+first has not been committed. The second has — the build committed it before the
+review looked — which is why the build stops short of calling it done.
+
+This phase decides between two answers and writes one of them down. It never
+writes project code: `S5` in [`safety.md`](safety.md) holds here exactly as it
+holds in the build, and a retry travels to an executor like everything else.
+
+### What A Retry Is Given
+
+The task file, the failure exactly as it came back, and the handoff if the таск
+left one. Not `spec.md`, not the манифест, not the other таски — the same
+withholding the build applies, for the same reason [`gates.md`](gates.md) gives:
+a finding derived from words the executor never saw is a finding nobody can act
+on, and that is as true of a retry's instructions as of a review's findings.
+
+### The Budget
+
+**A таск is retried at most twice. The third failure stops the прогон**, which
+reports which таск, both attempts, and what each one produced.
+
+This is the number [`gates.md`](gates.md) already uses for a gate failing on the
+same finding, and it is the same number deliberately. Two numbers for "how many
+times do we try again before admitting we cannot" would be two answers to one
+question, and the second one would be found only by somebody who read the
+document that disagreed with what they had just done.
+
+### Retry Or Amendment
+
+A retry says the таск can be built as specified and the attempt was wrong. An
+**amendment** says the specification was wrong, and the build is what
+demonstrated it.
+
+The test is evidence, not effort. An amendment requires a specific thing the
+build tried and a specific way it failed — a signature that cannot exist, a
+dependency that does not do what the spec assumed, a requirement that
+contradicts another one. "It was hard" and "the executor read it differently"
+are retries. **A second reading of the specification is never an amendment**; if
+the words were ambiguous, they were ambiguous before the build ran, and what
+changed is only who is inconvenienced by them.
+
+An amendment is written to `.maestro/<slug>/amendments.md`, naming the `R##` it
+affects and the `D##` that demonstrated it, and it moves that requirement's
+status in the run state. It is not written into `spec.md`:
+[`artifacts.md`](artifacts.md) gives that file one writer, and a specification
+edited by two phases makes the first disagreement between them unattributable.
+
+### Where A Repaired Таск Goes
+
+Back through the review, not around it. A retried таск is committed and returns
+to `review` status; `done` is written where it is always written, by the review
+phase, and only for a таск whose review has no blocking finding.
+
+**No gate follows repair.** The таск re-enters a phase that already has one
+answer to give about it, and G4 still measures the whole build against the
+манифест afterwards — a repair that quietly built something else is caught
+there, by a reader that never saw any of this.
 
 ## Mode Matrix
 

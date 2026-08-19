@@ -31,6 +31,14 @@ seeds G1–G4 as `pending`, and the phase each gate follows fills in that gate's
 own status and findings. The column has room for one phase because there is one
 writer; a field with two creators would have no owner.
 
+**`Read by` names readers outside the orchestrator, which is why every row says
+`dashboard` and nothing else.** The orchestrator reads its own state constantly —
+on recovery after a compaction, and in the repair phase, which learns from
+`tasks[].status` which таск arrived and by which entrance. Listing itself as a
+reader of what it writes would turn a column about the integration point into a
+list of everywhere the state is opened, and the one thing that column has to say
+is that the dashboard is the only party outside this process that reads it.
+
 `stages[].id` is the stage id set defined in `phases.md`; it is not re-listed
 here, because two lists of the same thing drift. Labels come from
 `vocabulary.md` and are never stored in the state — the dashboard maps id to

@@ -65,14 +65,19 @@ what the gate exists to surface.
 
 The first rule above was written for the three gates that can. Приёмка re-run
 against the same манифест and the same build produces the same finding: acting
-on a disagreement means changing the build, which is the repair phase and not
-this one.
+on a disagreement means changing the build, and the build is not what this phase
+touches.
 
-So G4 fails differently. `report.md` is written whether the gate passed or not —
-it is the record of what disagreed, and withholding it on a failure would delete
-the evidence at the moment it matters most. G4 is recorded `failed` with its
-findings, and **the прогон stops and names the требования that disagreed.**
+So G4 fails sideways rather than backwards. `report.md` is written whether the
+gate passed or not — it is the record of what disagreed, and withholding it on a
+failure would delete the evidence at the moment it matters most. G4 is recorded
+`failed` with its findings, and **each disagreement travels to the repair phase
+through the таски that carry its `R##`.** When those таски have been repaired and
+re-reviewed, приёмка runs again — against a build that is now different, which is
+the one condition under which asking the same question twice can produce a
+different answer.
 
-Until the repair phase has rules, that is where a failed G4 ends. A repair
-improvised from the description of one produces a second failure that looks like
-the first, with no record of which attempt built what.
+The two-failure budget above is what stops this from circling. A disagreement
+that survives two repairs stops the прогон, which names the требования and both
+attempts. A требование nobody can build is a fact about the требование, and it
+is reported rather than retried a third time.

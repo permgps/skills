@@ -17,7 +17,8 @@ project that was built, not with Maestro.
 │   ├── tasks/NN-<slug>-handoff.md
 │   ├── reviews/NN-<slug>.md
 │   ├── report.md
-│   └── decisions.md
+│   ├── decisions.md
+│   └── amendments.md
 ├── state.js
 └── dashboard.html
 ```
@@ -41,8 +42,9 @@ actually built.
 | `tasks/NN-<slug>.md` | plan | build, review, G3 | no |
 | `tasks/NN-<slug>-handoff.md` | build | build, review | no |
 | `reviews/NN-<slug>.md` | review | repair, acceptance | append-only |
-| `report.md` | acceptance | the user | no |
+| `report.md` | acceptance | the user | append-only |
 | `decisions.md` | memory | the user, a later прогон | append-only |
+| `amendments.md` | repair | build, review, acceptance | append-only |
 | `state.js` | preflight | dashboard | yes |
 | `dashboard.html` | preflight | the user | no |
 
@@ -70,6 +72,21 @@ what is not, and what the next executor needs in order to continue the same
 таск. **Its absence is the normal case.** A run where every таск has one is a run
 whose plan cut таски too large, and the handoff is the symptom rather than the
 remedy.
+
+`report.md` is append-only rather than written once, and that is a consequence
+of a failed G4 routing to repair. A прогон whose disagreements were repaired
+reaches приёмка a second time, against a build that has changed. The second
+reading appends its own five sections under its own date; it does not replace the
+first, because the first is the record of what the build did before it was
+repaired, and that is the part somebody checking the прогон afterwards has no
+other way to see.
+
+`amendments.md` exists because `spec.md` already has a writer. When the build
+demonstrates that a требование cannot be built as it was specified, the record of
+that is not an edit to the specification — it is a new fact, written by the
+phase that established it, and read by everyone downstream. Two phases editing
+one file would leave the first disagreement between them with no owner, which is
+the single thing this table exists to prevent.
 
 The project memory file is **not in that table**, and its absence is deliberate.
 It is `AGENTS.md` in the target project's root — not a run artifact, not under
