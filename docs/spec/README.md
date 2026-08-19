@@ -91,3 +91,26 @@ form for the tests — a bare directory argument is not resolved as a test targe
 
 Exit codes: `0` clean, `1` the specification contradicts itself, `2` the
 directory could not be read.
+
+## Running The Gates
+
+```bash
+node scripts/gates/check-g1.ts <run-dir>   # after брифинг: every требование has a status
+node scripts/gates/check-g2.ts <run-dir>   # after the spec: none left open
+node scripts/gates/check-g3.ts <run-dir>   # after the plan: the map holds both ways
+```
+
+These are **not** part of `npm run check`, and no phase file names them. They
+read a прогон's `state.js` — a file this repository never contains — so there is
+nothing here for them to run against. `<run-dir>` defaults to `.maestro`.
+
+What they are for is making each gate's pass condition executable and tested
+rather than only described. `scripts/` ships with this repository and not inside
+the skill bundle, so a прогон in a target project cannot reach them; the phase
+file states the same condition in the orchestrator's own terms, and these say it
+in a form that can be proven.
+
+Exit codes: `0` the gate passes, `1` it fails with findings, `2` the state could
+not be read at all. The last is kept distinct because an unreadable state is not
+a failed gate — nothing was checked, and reporting it as a failure would send a
+phase back to redo work that was never judged.
