@@ -88,7 +88,7 @@ export function parseTables(markdown: string): Table[] {
 const findTable = (tables: Table[], required: string[]): Table | undefined =>
   tables.find(table => required.every(column => table.columns.includes(column)));
 
-const cleanCell = (value: string | number | undefined): string =>
+export const cleanCell = (value: string | number | undefined): string =>
   String(value ?? '').replace(/`/g, '').trim();
 
 export async function checkSpec(specDir: string): Promise<Violation[]> {
