@@ -28,6 +28,12 @@ const VOCABULARY = `# Vocabulary
 | \`mode\` | \`semi\` | Полуавтомат |
 | \`depth\` | \`normal\` | Обычная |
 | \`polish\` | \`false\` | Выключена |
+
+## Screen Labels
+
+| Label | What it names |
+|---|---|
+| Ход разработки | The таски as they are being built |
 `;
 
 const PHASES = `# Phases
@@ -65,7 +71,10 @@ const LOGIC = {
   GATE_AFTER: "{ G1: 'preflight' }",
 };
 
-const REGIONS = ['run-clock', 'stage-clock', 'dials', 'stages', 'tasks', 'requirements', 'gates'];
+const REGIONS = [
+  'run-clock', 'stage-clock', 'dials', 'progress', 'cards',
+  'stages', 'tasks', 'now', 'requirements', 'gates',
+];
 
 /** A page shaped like the real one, small enough that a test can bend one part of it. */
 function page(overrides: {
@@ -92,6 +101,7 @@ function page(overrides: {
 
   return [
     '<!doctype html>', '<html lang="ru">', '<head><title>Maestro</title></head>', '<body>',
+    '<h2>Ход разработки</h2>',
     regions, overrides.body ?? '', snapshotBlock, logicBlock, '</body>', '</html>',
   ].join('\n');
 }
@@ -210,9 +220,13 @@ test('a gate pointing at the wrong stage is reported', () => {
 
 test('a vocabulary with no value table is reported once, not as every field', () => {
   const spec: SpecSources = { ...SPEC, 'vocabulary.md': '# Vocabulary\n\n| Stage id | Label |\n|---|---|\n| preflight | Подготовка |\n| build | Разработка |\n' };
-  const violations = checkDashboard(page(), spec).filter(v => v.check === 'labels');
+  // The screen-label table is missing from this fixture too, and says so
+  // separately; the point here is that one absent value table is one finding
+  // rather than seven.
+  const violations = checkDashboard(page(), spec)
+    .filter(v => v.check === 'labels')
+    .filter(v => v.message.includes('Field, Value and Label'));
   assert.equal(violations.length, 1);
-  assert.match(violations[0]?.message ?? '', /no table with columns Field, Value and Label/);
 });
 
 test('stripComments keeps every line number in place', () => {
@@ -264,4 +278,25 @@ test('an empty snapshot with untidy whitespace still passes', () => {
     snapshot: '/* maestro:snapshot:start */\n\n  globalThis.MAESTRO_SNAPSHOT = null;  \n\n/* maestro:snapshot:end */',
   }));
   assert.doesNotMatch(found, /snapshot/);
+});
+
+test('a screen label the specification owns and the page dropped is reported', () => {
+  // The card labels are static text, so no value map can see them drift.
+  const spec: SpecSources = {
+    ...SPEC,
+    'vocabulary.md': VOCABULARY.replace('| Ход разработки |', '| Ход сборки |'),
+  };
+  const violations = checkDashboard(page(), spec).filter(v => v.check === 'labels');
+  assert.equal(violations.length, 1);
+  assert.match(violations[0]?.message ?? '', /"Ход сборки".*does not carry it/s);
+});
+
+test('a vocabulary with no screen label table is reported', () => {
+  const spec: SpecSources = {
+    ...SPEC,
+    'vocabulary.md': VOCABULARY.slice(0, VOCABULARY.indexOf('## Screen Labels')),
+  };
+  const messages = checkDashboard(page(), spec)
+    .filter(v => v.check === 'labels').map(v => v.message).join('\n');
+  assert.match(messages, /no table with columns Label and What it names/);
 });

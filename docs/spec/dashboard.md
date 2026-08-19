@@ -12,17 +12,63 @@ becomes a second source of truth, and the second one is silently wrong.
 
 | Region | Shows | Source |
 |---|---|---|
-| Stage timeline | The eight stages in order, each with its Label, current one marked | `stages[]`, labels from `vocabulary.md` |
-| Run clock | Time since `startedAt`, stopped at `finishedAt` | `startedAt`, `finishedAt` |
-| Stage clock | Time in the current stage; a finished stage shows its own duration | `stages[].startedAt`, `stages[].finishedAt` |
+| Прогресс проекта | The whole road as one percentage and one bar | `stages[]`, `tasks[]` |
+| Покрытие брифа | The share of live требования that reached the specification | `requirements[]` |
+| Этап сейчас | The stage, its position in the eight, and its own clock | `currentStage`, `stages[]` |
+| Прошло времени | Working time since `startedAt`, the median таск beneath it, and the calendar span when the two differ | every timestamp in the state |
+| Осталось | The estimate as a range, and the critical path it was measured along | `tasks[]` |
+| Таски | Finished out of cut, with what is in motion and what was retried | `tasks[]` |
+| Долг | Заглушки, допущения and переменные as one number and three | `debt` |
+| Тесты | The last full suite | `tests`, or the last таск's own |
+| Требования | The манифест counted by status | `requirements[]` |
+| Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
+| Ход разработки | The таски grouped by волна, each with its status, phase and clock, and a line naming what is running now | `tasks[]` |
 | Dials | Mode, depth, доводка on/off, and any mid-run change | `mode`, `depth`, `polish`, `dialChanges[]` |
-| Task table | Each таск: title, status, its own clock, what blocks it | `tasks[]` |
-| Requirement coverage | How many требования are in-spec, deferred, dropped, still open | `requirements[]` |
 | Gates | G1–G4 with status, and findings when failed | `gates[]` |
 
 Every visible word comes from `vocabulary.md`. The dashboard defines no term of
 its own; if it needs a word that is not there, the word is added to the
 vocabulary first.
+
+## The Numbers Are Computed, Never Stored
+
+Every percentage, every clock and the estimate are derived from the marks the
+state already carries. Nothing here is written as a duration, and the
+orchestrator has no metric to calculate: it records what happened and the page
+does the arithmetic. A number stored once goes stale in silence; one derived at
+render time cannot.
+
+Two of them are worth stating outright, because both are places where a page
+could flatter its прогон:
+
+- **Прогресс weights the stages by how long they take** — разработка six,
+  спецификация and ревью two, the rest one — and subdivides разработка by
+  finished таски. Equal weights make the bar stand still through the longest
+  stage and then jump, which reads as a stuck прогон.
+- **Осталось is the median of finished таски along the remaining critical path,
+  shown as a range**, and says *рано считать* below two finished таски rather
+  than guessing. A precise wall-clock prediction is a fabrication; a range built
+  from what already happened is not. Nothing in the chat may offer the user a
+  sharper number than the page does.
+
+**`N тасков параллельно` on a волна is read from the clocks, not from the size
+of the wave.** A wave says what *may* run together. Claiming parallelism the
+прогон did not get is the kind of flattery that makes the rest of the screen
+untrustworthy.
+
+## Working Time, Not The Calendar
+
+The clocks show time worked. A прогон someone left for a day must not report a
+day of work, and no extra record is needed to know that: the state is full of
+timestamps, and a gap between two adjacent ones longer than **45 minutes** is a
+person being away rather than a build being slow. Each gap counts up to that
+ceiling and no further, so an overnight pause adds 45 minutes and a two-day one
+adds the same. The same subtraction applies to each таск, and therefore to the
+median and to the estimate.
+
+The calendar span is printed beside the run clock whenever the two have parted
+company, and only then: a second number that always equals the first teaches the
+reader to ignore the line they will one day need.
 
 A clock belongs to the thing it is timing. A stage or a таск that recorded its
 own `finishedAt` is measured between its own two stamps; only what is still

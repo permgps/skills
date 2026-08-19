@@ -34,6 +34,27 @@ interface Logic {
   isStateShape: (value: unknown) => boolean;
   readOutcome: (held: unknown, incoming: unknown) => string;
   gateFor: (state: unknown, stageId: string) => { id: string; findings: string[] } | null;
+  IDLE_CEILING_MS: number;
+  plural: (n: number, one: string, few: string, many: string) => string;
+  formatMinutes: (ms: unknown) => string;
+  collectMarks: (state: unknown) => number[];
+  activeSpan: (from: number, to: number, marks: number[]) => number;
+  worked: (from: string, state: unknown, now: number, until?: string, marks?: number[]) => number | null;
+  stagePosition: (state: unknown) => { position: number; total: number };
+  countTasks: (tasks: unknown) => Record<string, number>;
+  coverage: (list: unknown) => { percent: number; inSpec: number; live: number };
+  overallProgress: (state: unknown) => {
+    percent: number; stagesDone: number; stagesTotal: number;
+    tasksDone: number; tasksTotal: number;
+  };
+  taskDurations: (state: unknown, now: number, marks?: number[]) => number[];
+  medianTaskMs: (state: unknown, now: number, marks?: number[]) => number | null;
+  criticalPath: (tasks: unknown) => number;
+  estimateMs: (state: unknown, now: number, marks?: number[]) => { low: number; high: number } | null;
+  groupByWave: (tasks: unknown) => Array<{ wave: number; tasks: Array<{ id: string }> }>;
+  peakParallel: (tasks: unknown, state: unknown, now: number) => number;
+  debtCounts: (state: unknown) => Record<string, number>;
+  testsOf: (state: unknown) => { passed: number; failed: number } | null;
 }
 
 const html = await readFile(ASSET, 'utf8');
@@ -283,4 +304,271 @@ test('knowing nothing is the only outcome that reports knowing nothing', () => {
   // A held value that is not a state is not a state: a page cannot go stale
   // against something it never managed to read.
   assert.equal(L.readOutcome({ runId: 'r1' }, undefined), 'blank');
+});
+
+// --- what the cards are built from -------------------------------------------
+
+const MIN = 60_000;
+
+/** A state with nothing in it but the marks a test puts there. */
+const bare = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
+  contractVersion: 2,
+  runId: 'r1',
+  slug: 'landing-page',
+  startedAt: STARTED,
+  mode: 'semi',
+  depth: 'normal',
+  polish: false,
+  currentStage: 'build',
+  stages: [],
+  tasks: [],
+  requirements: [],
+  gates: [],
+  ...extra,
+});
+
+const task = (
+  id: string,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> => ({
+  id, title: 'таск ' + id, requirementIds: ['R01'], status: 'queued', blockedBy: [],
+  wave: 1, zone: [], retries: 0, repairs: 0, handoffs: 0, files: [],
+  ...extra,
+});
+
+test('Russian counts three ways', () => {
+  assert.equal(L.plural(1, 'таск', 'таска', 'тасков'), 'таск');
+  assert.equal(L.plural(2, 'таск', 'таска', 'тасков'), 'таска');
+  assert.equal(L.plural(5, 'таск', 'таска', 'тасков'), 'тасков');
+  assert.equal(L.plural(11, 'таск', 'таска', 'тасков'), 'тасков');
+  assert.equal(L.plural(21, 'таск', 'таска', 'тасков'), 'таск');
+});
+
+test('an estimate is stated in minutes, never to the second', () => {
+  assert.equal(L.formatMinutes(0), '1 мин');
+  assert.equal(L.formatMinutes(4 * MIN), '4 мин');
+  assert.equal(L.formatMinutes(65 * MIN), '1 ч 05 мин');
+  assert.equal(L.formatMinutes(NaN), '—');
+});
+
+test('a pause longer than the ceiling counts as the ceiling, not as work', () => {
+  // A прогон left overnight must not report a night of work, and the state
+  // already carries the marks that say so.
+  const state = bare({ updatedAt: '2026-08-19T14:00:00.000Z' });
+  const marks = L.collectMarks(state);
+  const now = AT('2026-08-19T14:00:00.000Z');
+  assert.equal(L.elapsed(STARTED, state, now), 4 * 60 * MIN);
+  assert.equal(L.worked(STARTED, state, now, undefined, marks), L.IDLE_CEILING_MS);
+});
+
+test('marks inside the span are what turn a pause back into work', () => {
+  const state = bare({
+    updatedAt: '2026-08-19T14:00:00.000Z',
+    stages: [{ id: 'build', status: 'active', startedAt: '2026-08-19T10:30:00.000Z' }],
+  });
+  const marks = L.collectMarks(state);
+  const now = AT('2026-08-19T14:00:00.000Z');
+  // 10:00 → 10:30 is work; 10:30 → 14:00 is a pause capped at the ceiling.
+  assert.equal(L.worked(STARTED, state, now, undefined, marks), 30 * MIN + L.IDLE_CEILING_MS);
+});
+
+test('the progress bar weights the stages rather than counting them', () => {
+  const preflightOnly = L.overallProgress(bare({
+    stages: [{ id: 'preflight', status: 'done' }],
+  }));
+  const throughPlan = L.overallProgress(bare({
+    stages: [
+      { id: 'preflight', status: 'done' }, { id: 'manifest', status: 'done' },
+      { id: 'briefing', status: 'skipped', note: 'полный автомат' },
+      { id: 'spec', status: 'done' }, { id: 'plan', status: 'done' },
+    ],
+  }));
+  assert.equal(preflightOnly.stagesDone, 1);
+  assert.equal(preflightOnly.stagesTotal, 8);
+  // Five of eight stages, but they are the cheap ones: разработка alone weighs six.
+  assert.equal(throughPlan.stagesDone, 5);
+  assert.ok(throughPlan.percent < 50, `expected under half, got ${throughPlan.percent}`);
+});
+
+test('inside the build the bar moves with the таски', () => {
+  const stages = [
+    { id: 'preflight', status: 'done' }, { id: 'manifest', status: 'done' },
+    { id: 'briefing', status: 'done' }, { id: 'spec', status: 'done' },
+    { id: 'plan', status: 'done' }, { id: 'build', status: 'active' },
+  ];
+  const none = L.overallProgress(bare({ stages, tasks: [task('01'), task('02')] }));
+  const half = L.overallProgress(bare({
+    stages, tasks: [task('01', { status: 'done' }), task('02')],
+  }));
+  assert.ok(half.percent > none.percent, 'a finished таск must move the bar');
+  assert.equal(half.tasksDone, 1);
+  assert.equal(half.tasksTotal, 2);
+});
+
+test('a stage nobody skipped and nobody started contributes nothing', () => {
+  const progress = L.overallProgress(bare({ stages: [{ id: 'build', status: 'pending' }] }));
+  assert.equal(progress.percent, 0);
+});
+
+test('coverage measures live требования, so a dropped one is not a gap', () => {
+  const cover = L.coverage([
+    { id: 'R01', status: 'in-spec' },
+    { id: 'R02', status: 'in-spec' },
+    { id: 'R03', status: 'dropped' },
+    { id: 'R04', status: 'placeholder' },
+  ]);
+  assert.equal(cover.live, 3);
+  assert.equal(cover.inSpec, 2);
+  assert.equal(cover.percent, 67);
+});
+
+test('a таск in review is still in motion, not waiting', () => {
+  const counts = L.countTasks([
+    task('01', { status: 'done' }),
+    task('02', { status: 'running' }),
+    task('03', { status: 'review' }),
+    task('04', { status: 'repair', repairs: 1, retries: 2 }),
+    task('05', { status: 'failed' }),
+    task('06'),
+  ]);
+  assert.equal(counts['done'], 1);
+  assert.equal(counts['active'], 3);
+  assert.equal(counts['queued'], 1);
+  assert.equal(counts['failed'], 1);
+  assert.equal(counts['retries'], 2);
+});
+
+test('one finished таск is an anecdote, and the median says so', () => {
+  const now = AT('2026-08-19T12:00:00.000Z');
+  const one = bare({
+    tasks: [task('01', {
+      status: 'done',
+      startedAt: STARTED, finishedAt: '2026-08-19T10:10:00.000Z',
+    })],
+  });
+  assert.equal(L.medianTaskMs(one, now), null);
+
+  const three = bare({
+    tasks: [
+      task('01', { status: 'done', startedAt: STARTED, finishedAt: '2026-08-19T10:10:00.000Z' }),
+      task('02', { status: 'done', startedAt: STARTED, finishedAt: '2026-08-19T10:20:00.000Z' }),
+      task('03', { status: 'done', startedAt: STARTED, finishedAt: '2026-08-19T10:30:00.000Z' }),
+    ],
+  });
+  assert.equal(L.medianTaskMs(three, now), 20 * MIN);
+});
+
+test('the critical path counts only what is left, and survives a cycle', () => {
+  const chain = [
+    task('01', { status: 'done' }),
+    task('02', { blockedBy: ['01'] }),
+    task('03', { blockedBy: ['02'] }),
+  ];
+  assert.equal(L.criticalPath(chain), 2);
+  assert.equal(L.criticalPath([task('01', { status: 'done' })]), 0);
+  // A plan should never contain one, and the page must not hang if it does.
+  assert.ok(L.criticalPath([
+    task('01', { blockedBy: ['02'] }), task('02', { blockedBy: ['01'] }),
+  ]) >= 1);
+});
+
+test('the estimate refuses to guess before there is anything to guess from', () => {
+  const now = AT('2026-08-19T12:00:00.000Z');
+  assert.equal(L.estimateMs(bare({ tasks: [task('01')] }), now), null);
+});
+
+test('the estimate is a range, and a таск already running is nearly done sooner', () => {
+  const now = AT('2026-08-19T11:00:00.000Z');
+  const state = bare({
+    updatedAt: '2026-08-19T11:00:00.000Z',
+    tasks: [
+      task('01', { status: 'done', startedAt: STARTED, finishedAt: '2026-08-19T10:20:00.000Z' }),
+      task('02', { status: 'done', startedAt: STARTED, finishedAt: '2026-08-19T10:20:00.000Z' }),
+      task('03', { status: 'queued', wave: 2, blockedBy: ['01'] }),
+    ],
+  });
+  const queued = L.estimateMs(state, now);
+  assert.ok(queued && queued.low < queued.high, 'the estimate is always a range');
+
+  const started = L.estimateMs(bare({
+    updatedAt: '2026-08-19T11:00:00.000Z',
+    tasks: [
+      task('01', { status: 'done', startedAt: STARTED, finishedAt: '2026-08-19T10:20:00.000Z' }),
+      task('02', { status: 'done', startedAt: STARTED, finishedAt: '2026-08-19T10:20:00.000Z' }),
+      task('03', { status: 'running', wave: 2, blockedBy: ['01'], startedAt: '2026-08-19T10:50:00.000Z' }),
+    ],
+  }), now);
+  assert.ok(started && queued && started.high < queued.high,
+    'a таск ten minutes in must not be estimated as one that has not begun');
+});
+
+test('таски group by the layer the plan gave them, in id order', () => {
+  const groups = L.groupByWave([
+    task('03', { wave: 2 }), task('01', { wave: 1 }), task('02', { wave: 1 }),
+  ]);
+  // Values, not structures: the logic block runs in a vm realm, and its arrays
+  // carry that realm's prototypes, which strict deep equality compares.
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0]?.wave, 1);
+  assert.equal(groups[1]?.wave, 2);
+  assert.equal(groups[0]?.tasks.length, 2);
+  assert.equal(groups[0]?.tasks[0]?.id, '01');
+  assert.equal(groups[0]?.tasks[1]?.id, '02');
+});
+
+test('a таск with no wave is not lost — it lands in the first one', () => {
+  const groups = L.groupByWave([{ id: '01', status: 'queued' }]);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0]?.wave, 1);
+});
+
+test('parallelism is read from the clocks, never from the size of the wave', () => {
+  const state = bare({});
+  const now = AT('2026-08-19T12:00:00.000Z');
+
+  const together = [
+    task('01', { startedAt: STARTED, finishedAt: '2026-08-19T10:30:00.000Z' }),
+    task('02', { startedAt: '2026-08-19T10:10:00.000Z', finishedAt: '2026-08-19T10:40:00.000Z' }),
+  ];
+  assert.equal(L.peakParallel(together, state, now), 2);
+
+  // Two таски of one wave that in fact ran one after the other. Claiming
+  // parallelism here is the flattery that makes the rest of the screen suspect.
+  const inTurn = [
+    task('01', { startedAt: STARTED, finishedAt: '2026-08-19T10:30:00.000Z' }),
+    task('02', { startedAt: '2026-08-19T10:30:00.000Z', finishedAt: '2026-08-19T11:00:00.000Z' }),
+  ];
+  assert.equal(L.peakParallel(inTurn, state, now), 1);
+
+  assert.equal(L.peakParallel([task('01')], state, now), 0);
+});
+
+test('the debt is three lists counted as one number', () => {
+  const nothing = L.debtCounts(bare({}));
+  assert.equal(nothing['placeholders'], 0);
+  assert.equal(nothing['assumptions'], 0);
+  assert.equal(nothing['emptyEnv'], 0);
+  assert.equal(nothing['total'], 0);
+  const counted = L.debtCounts(bare({
+    debt: { placeholders: ['R05 — цвета'], assumptions: ['SQLite'], emptyEnv: ['TOKEN', 'SHEET_ID'] },
+  }));
+  assert.equal(counted['total'], 4);
+});
+
+test('a прогон with no suite says nothing rather than claiming a green one', () => {
+  assert.equal(L.testsOf(bare({})), null);
+  assert.equal(L.testsOf(bare({ tests: { passed: 41, failed: 0 } }))?.passed, 41);
+  // Falling back to the last таск's own suite is the honest second answer.
+  const fallback = L.testsOf(bare({ tasks: [task('01', { tests: { passed: 6, failed: 1 } })] }));
+  assert.equal(fallback?.passed, 6);
+  assert.equal(fallback?.failed, 1);
+});
+
+test('the stage position counts from one and does not run past the road', () => {
+  const inBuild = L.stagePosition(bare({
+    currentStage: 'build', stages: [{ id: 'build', status: 'active' }],
+  }));
+  assert.equal(inBuild.position, 6);
+  assert.equal(inBuild.total, 8);
+  assert.equal(L.stagePosition(bare({ stages: [] })).position, 8);
 });

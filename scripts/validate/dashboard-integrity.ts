@@ -24,7 +24,8 @@ const log = createLogger('dashboard-integrity');
 /** Ids the page must offer, one per region of the What It Renders table. */
 const REQUIRED_REGIONS = [
   'run-clock', 'stage-clock', 'dials',
-  'stages', 'tasks', 'requirements', 'gates',
+  'progress', 'cards',
+  'stages', 'tasks', 'now', 'requirements', 'gates',
 ];
 
 /** Anything that would make the page depend on a network it may not have. */
@@ -216,6 +217,27 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     const owned = new Map(stageLabels.rows.map(row =>
       [cleanCell(row['Stage id']), cleanCell(row['Label'])] as const));
     compare('labels', 'stage', owned, asMap('STAGE_LABEL'));
+  }
+
+  // --- the words on the page that belong to no field ------------------------
+  // A card renamed on the page and nowhere else is drift the value maps cannot
+  // see: these labels are static text, not the value of anything.
+  const screenLabels = findTable(vocabularyTables, ['Label', 'What it names']);
+  if (!screenLabels) {
+    add('labels', 0, 'vocabulary.md has no table with columns Label and What it names');
+  } else {
+    let missing = 0;
+    for (const row of screenLabels.rows) {
+      const label = cleanCell(row['Label']);
+      if (label === '') continue;
+      if (!html.includes(label)) {
+        missing += 1;
+        add('labels', 0,
+          `the specification names "${label}" as a word the dashboard shows, `
+          + 'and the page does not carry it');
+      }
+    }
+    log.info('labels', 'screen labels checked', { labels: screenLabels.rows.length, missing });
   }
 
   const valueLabels = findTable(vocabularyTables, ['Field', 'Value', 'Label']);

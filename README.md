@@ -70,6 +70,16 @@ state on its own. Offline, no CDN, no build step.
 
 ![The dashboard during the build stage](docs/assets/dashboard-running.png)
 
+Progress across the whole прогон, weighted by how long each stage actually takes.
+Eight cards: brief coverage, the current stage, working time, what is left,
+таски, debt, tests, requirements. And the build itself grouped by wave, so the
+parallelism you paid for is the parallelism you can see — measured from the
+clocks rather than claimed from the plan.
+
+Every number there is computed from the run state when the page draws itself.
+Nothing is stored as a duration, and «осталось» is a range that refuses to be
+sharper than the таски it was measured from.
+
 More about it in [`docs/dashboard.md`](docs/dashboard.md).
 
 ## Six rules nothing turns off
@@ -101,7 +111,7 @@ The skill carries no runtime dependencies. The tooling needs Node.js 22.18 or
 newer, because it is TypeScript executed by Node's native type stripping.
 
 ```bash
-npm run check     # typecheck, four validators, and their tests
+npm run check     # typecheck, six validators, and their tests
 npm run metrics   # measure a finished run
 ```
 
