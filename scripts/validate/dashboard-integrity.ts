@@ -203,12 +203,14 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
 
   // --- the stage order and the gate map are copies too ----------------------
   const phaseTable = findTable(parseTables(spec['phases.md']), ['Id', 'Stage']);
+  let comparedStages = 0;
   if (!phaseTable) {
     add('order', 0, 'phases.md has no table with columns Id and Stage');
   } else {
     const specStages = phaseTable.rows
       .filter(row => cleanCell(row['Stage']).toLowerCase() === 'yes')
       .map(row => cleanCell(row['Id']));
+    comparedStages = specStages.length;
     const held = Array.isArray(logic['STAGE_ORDER']) ? logic['STAGE_ORDER'] as string[] : [];
     if (held.join(',') !== specStages.join(',')) {
       add('order', 0,
@@ -225,7 +227,8 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
       [cleanCell(row['Gate']), cleanCell(row['After phase'])] as const));
     compare('order', 'gate', owned, asMap('GATE_AFTER'));
   }
-  log.info('order', 'stage order and gate map compared', { stages: 1, gates: gateTable?.rows.length ?? 0 });
+  log.info('order', 'stage order and gate map compared',
+    { stages: comparedStages, gates: gateTable?.rows.length ?? 0 });
 
   return violations;
 }
