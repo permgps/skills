@@ -49,12 +49,24 @@ same number, which is the whole run's elapsed time wearing a stage's label.
   is the one failure mode this rule exists to prevent.
 - A state file that cannot be parsed produces a plain message naming the file,
   not an empty page.
+- A page that has already shown a state and then loses the file keeps showing
+  it and says the clocks stopped. Reporting an unreadable state there would be
+  false: one was read, and it is on the screen.
 
 ## Constraints
 
 - One self-contained HTML file. No CDN, no external stylesheet, no font fetch,
   no analytics — the page must render with the network off.
 - No build step. It is copied, not compiled.
-- Opens from `file://`, including when the project directory is on a path with
-  spaces.
+- Opens from `file://` in a browser, including when the project directory is on
+  a path with spaces. **That is a claim about browsers and not about every
+  viewer.** An in-app pane typically inlines the page instead of navigating to
+  it, which leaves the document with a `null` origin, and from there the state
+  file beside it is unreachable by relative `src`, absolute `file://` and
+  `fetch` alike. The page therefore carries a snapshot of the state inside
+  itself: the snapshot is what makes it show, and the file beside it is what
+  makes the clocks move.
+- The snapshot is written from the state file and never by hand, so it is equal
+  to that file or older than it — never newer, and never in disagreement. A
+  missed synchronisation costs a stale view, never a wrong one.
 - Readable in both light and dark, since it is opened in whatever the user has.

@@ -11,11 +11,24 @@ install time.
 - **To develop it:** Node.js 22.18 or newer, because the repository's own scripts
   are TypeScript executed by Node's native type stripping.
 
+**Run Maestro inside a git repository.** It works without one and says so, but
+the final отчёт is checked against what actually reached version control, and
+outside a repository that check silently has nothing to read. `git init` in the
+project directory before the first прогон is the whole of it.
+
+`python3` is used for one thing: mirroring the run state into the dashboard and
+serving it on the loopback interface so the page stays live inside an in-app
+pane. Without it the dashboard still opens in a browser.
+
 ## From the published repository
 
 ```bash
-npx skills add permgps/skills -s maestro
+npx skills add permgps/skills
 ```
+
+The selector is not needed here and the reason is worth one sentence: the CLI
+walks the tree for `SKILL.md` files and installs what it finds, and the
+published tree holds exactly one. A development checkout does not — see below.
 
 Verified output:
 

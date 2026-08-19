@@ -12,11 +12,12 @@ compiled, and nothing runs at install time.
 ## Install
 
 ```bash
-npx skills add permgps/skills -s maestro
+npx skills add permgps/skills
 ```
 
 Verified on 2026-08-19: the bundle installs from GitHub and arrives byte-identical
-to this repository. [`docs/install.md`](docs/install.md) shows that run and the
+to this repository. No selector is needed — the published tree holds exactly one
+skill. [`docs/install.md`](docs/install.md) shows that run and the
 local-checkout form with their real output.
 
 ## The order is the product

@@ -5,8 +5,12 @@ opened for the user at that moment. It reads `state.js` on its own, on a short
 interval, because the orchestrator is often busy for minutes at a time and a
 view that waits to be told to refresh shows a run that looks frozen.
 
-Its only input is the run state. It never opens `manifest.md`, a task file, or
-any path in the repository — a view that reaches into artifacts becomes a second
+Its only input is the run state — carried twice: as a snapshot written into the
+page, and as `state.js` beside it. The snapshot is what lets the page show a
+прогон when it is opened with no address at all, which is what an in-app pane
+does to it; the file is what makes the clocks move. Whichever loaded last wins,
+and a load that fails never replaces a state that worked. It never opens
+`manifest.md`, a task file, or any path in the repository — a view that reaches into artifacts becomes a second
 source of truth about a run, and the second one is silently wrong.
 
 ## A run in flight
