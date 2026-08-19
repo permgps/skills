@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Maestro</title>
+<!--
+  The human view of a прогон. Specification: docs/spec/dashboard.md.
+
+  One file, no build step, no network. Every style and every script is inline
+  because the page is copied into a target project and opened from file://,
+  where a sibling fetch is blocked and an absent CDN is indistinguishable from
+  a broken page. Its only input is state.js.
+-->
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fbfbfa;
+    --panel: #ffffff;
+    --line: #e3e2df;
+    --ink: #1b1a17;
+    --muted: #6d6a63;
+    --accent: #2f6f4f;
+    --warn: #8a5a12;
+    --fail: #9b2c2c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181a;
+      --panel: #1f2124;
+      --line: #33363b;
+      --ink: #e8e6e1;
+      --muted: #9a978f;
+      --accent: #6cc38f;
+      --warn: #d8a657;
+      --fail: #e07a72;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 1.5rem;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  h2 { font-size: .95rem; margin: 0 0 .6rem; color: var(--muted); font-weight: 600; }
+  header { margin-bottom: 1.5rem; }
+  main { display: grid; gap: 1rem; }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1rem;
+  }
+  #clocks { display: flex; gap: 1.5rem; margin: .5rem 0; font-variant-numeric: tabular-nums; }
+  #clocks span b { font-weight: 600; }
+  #dials { color: var(--muted); font-size: .9rem; }
+  #notice {
+    margin: .75rem 0 0;
+    padding: .6rem .8rem;
+    border-left: 3px solid var(--warn);
+    background: var(--panel);
+    color: var(--warn);
+  }
+  #problem {
+    padding: 1rem;
+    border: 1px solid var(--fail);
+    border-radius: 8px;
+    color: var(--fail);
+    background: var(--panel);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: minmax(7rem, auto) 1fr auto auto auto;
+    gap: .75rem;
+    align-items: baseline;
+    padding: .3rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row .status, .row .clock, .row .blocked, .row .count { color: var(--muted); font-size: .9rem; }
+  .row .clock, .row .count { font-variant-numeric: tabular-nums; }
+  .stage-active .name, .task-running .name { color: var(--accent); font-weight: 600; }
+  .stage-failed .name, .stage-failed .status,
+  .gate-failed .name, .gate-failed .status { color: var(--fail); }
+  .gate-passed .status { color: var(--accent); }
+  .findings { margin: .25rem 0 .75rem 1rem; color: var(--fail); font-size: .9rem; }
+  .empty, .total { color: var(--muted); margin: .25rem 0 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="run-title">Прогон</h1>
+  <div id="clocks">
+    <span>Прогон: <b id="run-clock">—</b></span>
+    <span>Этап: <b id="stage-clock">—</b></span>
+  </div>
+  <div id="dials"></div>
+  <p id="notice" hidden></p>
+</header>
+
+<p id="problem" hidden></p>
+
+<main id="regions">
+  <section><h2>Этапы</h2><div id="stages"></div></section>
+  <section><h2>Таски</h2><div id="tasks"></div></section>
+  <section><h2>Требования</h2><div id="requirements"></div></section>
+  <section><h2>Гейты</h2><div id="gates"></div></section>
+</main>
+
+<script id="logic">
+// Pure logic, no DOM. Kept separable on purpose: scripts/validate/dashboard-logic.test.ts
+// evaluates exactly this block in a node:vm context, which is the only way to
+// test a browser page in a repository with no runtime dependencies.
+globalThis.MAESTRO_LOGIC = (function () {
+  'use strict';
+
+  var KNOWN_CONTRACT_VERSION = 1;
+
+  // Mirrors docs/spec/phases.md. scripts/validate/dashboard-integrity.ts fails
+  // the build when this set or any label below drifts from vocabulary.md.
+  var STAGE_ORDER = [
+    'preflight', 'manifest', 'briefing', 'spec',
+    'plan', 'build', 'review', 'acceptance'
+  ];
+
+  var STAGE_LABEL = {
+    preflight: 'Подготовка',
+    manifest: 'Требования',
+    briefing: 'Брифинг',
+    spec: 'Спецификация',
+    plan: 'План',
+    build: 'Разработка',
+    review: 'Ревью',
+    acceptance: 'Приёмка'
+  };
+
+  var STAGE_STATUS = {
+    pending: 'Ожидает', active: 'Идёт', done: 'Готово', failed: 'Сбой'
+  };
+  var TASK_STATUS = {
+    queued: 'В очереди', running: 'В работе', review: 'На ревью',
+    repair: 'На исправлении', done: 'Готов'
+  };
+  var REQUIREMENT_STATUS = {
+    open: 'Открыто', 'in-spec': 'В спецификации',
+    deferred: 'Отложено', dropped: 'Снято'
+  };
+  var GATE_STATUS = {
+    pending: 'Ожидает', passed: 'Пройден', failed: 'Провален'
+  };
+  var MODE = {
+    full: 'Полный', semi: 'Полуавтомат', interview: 'Интервью', manual: 'Ручной'
+  };
+  var DEPTH = { strict: 'Строгая', normal: 'Обычная', deep: 'Глубокая' };
+  var POLISH = { 'true': 'Включена', 'false': 'Выключена' };
+
+  var REQUIREMENT_ORDER = ['in-spec', 'deferred', 'dropped', 'open'];
+
+  // Mirrors the Gate / After phase table of docs/spec/gates.md, and is checked
+  // against it by scripts/validate/dashboard-integrity.ts. A stage renders its
+  // gate's findings inline, so the page needs to know which gate follows which.
+  var GATE_ORDER = ['G1', 'G2', 'G3', 'G4'];
+  var GATE_AFTER = { G1: 'briefing', G2: 'spec', G3: 'plan', G4: 'acceptance' };
+
+  function gateFor(state, stageId) {
+    var gates = (state && state.gates) || [];
+    for (var i = 0; i < gates.length; i += 1) {
+      if (gates[i] && GATE_AFTER[gates[i].id] === stageId) return gates[i];
+    }
+    return null;
+  }
+
+  /** The stage entries in specification order, so a reordered state still reads correctly. */
+  function orderedStages(state) {
+    var stages = (state && state.stages) || [];
+    var found = {};
+    for (var i = 0; i < stages.length; i += 1) {
+      if (stages[i] && stages[i].id) found[stages[i].id] = stages[i];
+    }
+    return STAGE_ORDER.map(function (id) {
+      return found[id] || { id: id, status: 'pending' };
+    });
+  }
+
+  /** An unknown id renders as itself. A blank cell hides exactly the surprise worth seeing. */
+  function label(map, value) {
+    var key = String(value);
+    return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : key;
+  }
+
+  function pad(n) { return n < 10 ? '0' + n : String(n); }
+
+  /** `M:SS` under an hour, `H:MM:SS` above it. Never a bare number of seconds. */
+  function formatDuration(ms) {
+    if (typeof ms !== 'number' || !isFinite(ms) || ms < 0) return '—';
+    var total = Math.floor(ms / 1000);
+    var hours = Math.floor(total / 3600);
+    var minutes = Math.floor((total % 3600) / 60);
+    var seconds = total % 60;
+    return hours > 0
+      ? hours + ':' + pad(minutes) + ':' + pad(seconds)
+      : minutes + ':' + pad(seconds);
+  }
+
+  function formatMoment(iso) {
+    var when = new Date(iso);
+    if (isNaN(when.getTime())) return String(iso);
+    return when.getFullYear() + '-' + pad(when.getMonth() + 1) + '-' + pad(when.getDate())
+      + ' ' + pad(when.getHours()) + ':' + pad(when.getMinutes());
+  }
+
+  /**
+   * The instant every clock is measured against.
+   *
+   * A finished прогон is terminal, so `finishedAt` wins even when a stale
+   * `interruptedAt` survived the resume that should have cleared it. Reporting
+   * a completed run as interrupted is the worse of the two wrong answers.
+   */
+  function referenceTime(state, now) {
+    if (state && state.finishedAt) {
+      var finished = Date.parse(state.finishedAt);
+      if (!isNaN(finished)) return finished;
+    }
+    if (state && state.interruptedAt) {
+      var interrupted = Date.parse(state.interruptedAt);
+      if (!isNaN(interrupted)) return interrupted;
+    }
+    return now;
+  }
+
+  /** Milliseconds from an ISO instant to the reference time, or null if unusable. */
+  function elapsed(fromIso, state, now) {
+    var from = Date.parse(fromIso);
+    if (isNaN(from)) return null;
+    var span = referenceTime(state, now) - from;
+    return span < 0 ? null : span;
+  }
+
+  function currentStage(state) {
+    var stages = (state && state.stages) || [];
+    var byId = null;
+    for (var i = 0; i < stages.length; i += 1) {
+      if (stages[i] && stages[i].id === (state && state.currentStage)) byId = stages[i];
+    }
+    if (byId) return byId;
+    for (var j = 0; j < stages.length; j += 1) {
+      if (stages[j] && stages[j].status === 'active') return stages[j];
+    }
+    return null;
+  }
+
+  function countRequirements(requirements) {
+    var counts = { total: 0, open: 0, 'in-spec': 0, deferred: 0, dropped: 0 };
+    var list = requirements || [];
+    for (var i = 0; i < list.length; i += 1) {
+      counts.total += 1;
+      var status = list[i] && list[i].status;
+      if (REQUIREMENT_ORDER.indexOf(status) !== -1) counts[status] += 1;
+    }
+    return counts;
+  }
+
+  /** Renders what it can rather than refusing — docs/spec/state-contract.md. */
+  function contractNotice(version) {
+    if (typeof version !== 'number' || version <= KNOWN_CONTRACT_VERSION) return null;
+    return 'Прогон записан контрактом версии ' + version
+      + ', эта страница знает версию ' + KNOWN_CONTRACT_VERSION
+      + '. Показано то, что удалось прочитать.';
+  }
+
+  function runNotice(state) {
+    if (!state) return null;
+    if (state.finishedAt) {
+      return 'Прогон завершён ' + formatMoment(state.finishedAt) + '. Часы остановлены.';
+    }
+    if (state.interruptedAt) {
+      return 'Прогон прерван ' + formatMoment(state.interruptedAt)
+        + '. Часы остановлены на этом моменте.';
+    }
+    return null;
+  }
+
+  /** A frozen clock with no explanation is the failure mode this guards. */
+  function isStopped(state) {
+    return !!(state && (state.finishedAt || state.interruptedAt));
+  }
+
+  function isStateShape(value) {
+    return !!value
+      && typeof value === 'object'
+      && typeof value.runId === 'string'
+      && typeof value.slug === 'string'
+      && Array.isArray(value.stages);
+  }
+
+  return {
+    KNOWN_CONTRACT_VERSION: KNOWN_CONTRACT_VERSION,
+    STAGE_ORDER: STAGE_ORDER,
+    STAGE_LABEL: STAGE_LABEL,
+    STAGE_STATUS: STAGE_STATUS,
+    TASK_STATUS: TASK_STATUS,
+    REQUIREMENT_STATUS: REQUIREMENT_STATUS,
+    REQUIREMENT_ORDER: REQUIREMENT_ORDER,
+    GATE_STATUS: GATE_STATUS,
+    GATE_ORDER: GATE_ORDER,
+    GATE_AFTER: GATE_AFTER,
+    gateFor: gateFor,
+    orderedStages: orderedStages,
+    MODE: MODE,
+    DEPTH: DEPTH,
+    POLISH: POLISH,
+    label: label,
+    formatDuration: formatDuration,
+    formatMoment: formatMoment,
+    referenceTime: referenceTime,
+    elapsed: elapsed,
+    currentStage: currentStage,
+    countRequirements: countRequirements,
+    contractNotice: contractNotice,
+    runNotice: runNotice,
+    isStopped: isStopped,
+    isStateShape: isStateShape
+  };
+})();
+</script>
+
+<script id="view">
+(function () {
+  'use strict';
+
+  var L = globalThis.MAESTRO_LOGIC;
+  var STATE_FILE = 'state.js';
+  var POLL_MS = 2000;
+  var TICK_MS = 1000;
+
+  var generation = 0;
+  var lastGood = null;
+  var pollTimer = null;
+
+  function el(id) { return document.getElementById(id); }
+
+  /**
+   * Re-inject state.js rather than fetch it.
+   *
+   * The page opens from file://, where fetch and XMLHttpRequest against a
+   * sibling are blocked by the origin rules — which is why the writer emits a
+   * JS assignment instead of JSON. The query string is not decoration: without
+   * it the browser serves the first copy for the rest of the прогон, and the
+   * page freezes while still looking live.
+   */
+  function poll() {
+    generation += 1;
+    globalThis.MAESTRO_STATE = undefined;
+
+    var script = document.createElement('script');
+    script.src = STATE_FILE + '?v=' + generation;
+    script.addEventListener('load', settle);
+    script.addEventListener('error', settle);
+    document.head.appendChild(script);
+
+    function settle() {
+      if (script.parentNode) script.parentNode.removeChild(script);
+      apply(globalThis.MAESTRO_STATE);
+    }
+  }
+
+  function apply(state) {
+    if (!L.isStateShape(state)) {
+      // A stale MAESTRO_STATE cannot survive here: it is cleared before every
+      // load, so a file that stops parsing is reported instead of being read
+      // as an unchanging прогон.
+      problem('Не удалось прочитать ' + STATE_FILE + ' рядом с этой страницей.'
+        + ' Файл отсутствует, ещё не записан или повреждён.');
+      return;
+    }
+    lastGood = state;
+    clearProblem();
+    render(state);
+    if (state.finishedAt && pollTimer !== null) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function problem(message) {
+    var box = el('problem');
+    box.textContent = message;
+    box.hidden = false;
+    // With nothing ever read, an empty page would say less than the message.
+    el('regions').hidden = lastGood === null;
+  }
+
+  function clearProblem() {
+    el('problem').hidden = true;
+    el('regions').hidden = false;
+  }
+
+  function render(state) {
+    el('run-title').textContent = 'Прогон: ' + state.slug;
+
+    var notices = [L.runNotice(state), L.contractNotice(state.contractVersion)]
+      .filter(function (line) { return !!line; });
+    var notice = el('notice');
+    notice.textContent = notices.join(' ');
+    notice.hidden = notices.length === 0;
+
+    el('dials').textContent = 'Режим: ' + L.label(L.MODE, state.mode)
+      + ' · Глубина: ' + L.label(L.DEPTH, state.depth)
+      + ' · Доводка: ' + L.label(L.POLISH, state.polish);
+
+    tick();
+    renderRegions(state);
+  }
+
+  /** Clocks redraw every second; the state is only re-read on the poll. */
+  function tick() {
+    if (!lastGood) return;
+    var now = Date.now();
+    el('run-clock').textContent = L.formatDuration(L.elapsed(lastGood.startedAt, lastGood, now));
+
+    var stage = L.currentStage(lastGood);
+    el('stage-clock').textContent = stage && stage.startedAt
+      ? L.formatDuration(L.elapsed(stage.startedAt, lastGood, now))
+      : '—';
+  }
+
+  /**
+   * Every value reaches the page through textContent, never innerHTML. The
+   * state carries the user's own words — requirement text, gate findings, таск
+   * titles — and a view that interprets them as markup is a view that can be
+   * made to render something nobody wrote.
+   */
+  function put(parent, tag, text, className) {
+    var node = document.createElement(tag);
+    if (text !== undefined && text !== null) node.textContent = String(text);
+    if (className) node.className = className;
+    parent.appendChild(node);
+    return node;
+  }
+
+  function clear(node) {
+    while (node.firstChild) node.removeChild(node.firstChild);
+    return node;
+  }
+
+  function empty(parent, message) {
+    put(parent, 'p', message, 'empty');
+  }
+
+  function renderRegions(state) {
+    renderStages(state);
+    renderTasks(state);
+    renderRequirements(state);
+    renderGates(state);
+  }
+
+  function renderStages(state) {
+    var host = clear(el('stages'));
+    var now = Date.now();
+
+    L.orderedStages(state).forEach(function (stage) {
+      var row = put(host, 'div', null, 'row stage stage-' + stage.status);
+      put(row, 'span', L.label(L.STAGE_LABEL, stage.id), 'name');
+      put(row, 'span', L.label(L.STAGE_STATUS, stage.status), 'status');
+      put(row, 'span', stage.startedAt
+        ? L.formatDuration(L.elapsed(stage.startedAt, state, now))
+        : '', 'clock');
+
+      // A failed stage is never drawn as still running, and never without the
+      // reason: the findings are the whole point of showing the failure.
+      if (stage.status === 'failed') {
+        var gate = L.gateFor(state, stage.id);
+        var findings = (gate && gate.findings) || [];
+        if (findings.length === 0) {
+          put(host, 'p', 'Гейт не оставил замечаний.', 'findings');
+        } else {
+          var list = put(host, 'ul', null, 'findings');
+          findings.forEach(function (finding) { put(list, 'li', finding); });
+        }
+      }
+    });
+  }
+
+  function renderTasks(state) {
+    var host = clear(el('tasks'));
+    var tasks = state.tasks || [];
+    if (tasks.length === 0) {
+      empty(host, 'Таски ещё не нарезаны.');
+      return;
+    }
+
+    var now = Date.now();
+    tasks.forEach(function (task) {
+      var row = put(host, 'div', null, 'row task task-' + task.status);
+      put(row, 'span', task.id, 'id');
+      put(row, 'span', task.title, 'name');
+      put(row, 'span', L.label(L.TASK_STATUS, task.status), 'status');
+      put(row, 'span', task.startedAt
+        ? L.formatDuration(L.elapsed(task.startedAt, state, now))
+        : '', 'clock');
+      var blockers = task.blockedBy || [];
+      put(row, 'span', blockers.length ? 'ждёт ' + blockers.join(', ') : '', 'blocked');
+    });
+  }
+
+  function renderRequirements(state) {
+    var host = clear(el('requirements'));
+    var counts = L.countRequirements(state.requirements);
+    if (counts.total === 0) {
+      empty(host, 'Требования ещё не записаны.');
+      return;
+    }
+
+    L.REQUIREMENT_ORDER.forEach(function (status) {
+      var row = put(host, 'div', null, 'row coverage coverage-' + status);
+      put(row, 'span', L.label(L.REQUIREMENT_STATUS, status), 'name');
+      put(row, 'span', counts[status], 'count');
+    });
+    put(host, 'p', 'Всего требований: ' + counts.total, 'total');
+  }
+
+  function renderGates(state) {
+    var host = clear(el('gates'));
+    var gates = state.gates || [];
+    if (gates.length === 0) {
+      empty(host, 'Гейты ещё не заведены.');
+      return;
+    }
+
+    gates.forEach(function (gate) {
+      var row = put(host, 'div', null, 'row gate gate-' + gate.status);
+      put(row, 'span', gate.id, 'id');
+      put(row, 'span', L.label(L.STAGE_LABEL, L.GATE_AFTER[gate.id]) || '', 'name');
+      put(row, 'span', L.label(L.GATE_STATUS, gate.status), 'status');
+
+      var findings = gate.findings || [];
+      if (findings.length > 0) {
+        var list = put(host, 'ul', null, 'findings');
+        findings.forEach(function (finding) { put(list, 'li', finding); });
+      }
+    });
+  }
+
+  poll();
+  pollTimer = setInterval(poll, POLL_MS);
+  setInterval(tick, TICK_MS);
+})();
+</script>
+
+</body>
+</html>

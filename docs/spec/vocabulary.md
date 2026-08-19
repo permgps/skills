@@ -45,6 +45,48 @@ sees — the English ids in `phases.md` are internal and never displayed.
 | review | Ревью |
 | acceptance | Приёмка |
 
+## Value Labels
+
+Every other word the user sees. The state stores value ids; the dashboard, the
+chat and the отчёт resolve them here at render time, for the same reason stage
+labels are not stored: a wording change must never require a state migration.
+
+The `Label` column is the enforcement surface. `scripts/validate/spec-integrity.ts`
+scans every table with that column for banned synonyms, so a status accidentally
+called "задача" fails the build exactly like a stage would.
+
+| Field | Value | Label |
+|---|---|---|
+| `stages[].status` | `pending` | Ожидает |
+| `stages[].status` | `active` | Идёт |
+| `stages[].status` | `done` | Готово |
+| `stages[].status` | `failed` | Сбой |
+| `tasks[].status` | `queued` | В очереди |
+| `tasks[].status` | `running` | В работе |
+| `tasks[].status` | `review` | На ревью |
+| `tasks[].status` | `repair` | На исправлении |
+| `tasks[].status` | `done` | Готов |
+| `requirements[].status` | `open` | Открыто |
+| `requirements[].status` | `in-spec` | В спецификации |
+| `requirements[].status` | `deferred` | Отложено |
+| `requirements[].status` | `dropped` | Снято |
+| `gates[].status` | `pending` | Ожидает |
+| `gates[].status` | `passed` | Пройден |
+| `gates[].status` | `failed` | Провален |
+| `mode` | `full` | Полный |
+| `mode` | `semi` | Полуавтомат |
+| `mode` | `interview` | Интервью |
+| `mode` | `manual` | Ручной |
+| `depth` | `strict` | Строгая |
+| `depth` | `normal` | Обычная |
+| `depth` | `deep` | Глубокая |
+| `polish` | `true` | Включена |
+| `polish` | `false` | Выключена |
+
+`Готово` and `Готов` differ because one describes a stage and the other a таск,
+and Russian will not let one form serve both without reading as a mistake. They
+are two labels for two fields, not a synonym pair.
+
 ## Banned Synonyms
 
 | Banned | Use instead |
