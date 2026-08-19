@@ -17,12 +17,14 @@ right thing was built.
 | review | Review | yes | `tasks/`, `interfaces.md`, project code | `reviews/` |
 | acceptance | Acceptance | yes | `manifest.md`, project code | `report.md` |
 | memory | Memory | no | project code, `spec.md` | project memory file, decision records |
-| repair | Repair | no | a task result that is not done | retried task, spec amendment with a `D##` row |
+| repair | Repair | no | a task result that is not done, or a review with a blocking finding | retried task, spec amendment with a `D##` row |
 
 `memory` runs twice — once during `build`, when the build discovers something
 worth outliving the run, and once after `acceptance`, when the finished code can
-be described. `repair` runs on demand, whenever a task comes back anything other
-than done.
+be described. `repair` runs on demand, and it has two entrances: a task that
+comes back anything other than done, and a task whose review found something
+blocking. The second one arrives already committed, which is why the build
+stops short of calling it done.
 
 ## Loading Rule
 

@@ -68,8 +68,8 @@ For each таск that returns done, in this order:
    this phase.
 2. **Merge its worktree back**, if it had one.
 3. **Commit**, one commit per finished таск. A прогон survives a compaction and
-   a crash by what is committed, and the review phase reads one таск's diff at a
-   time.
+   a crash by what is committed, and the review phase judges each таск against
+   the diff of its own commit.
 4. **Mark it `review`** in the run state — the таск is committed, not
    accepted. `done` is written by the review phase, which has not run yet;
    writing it here would mean the same word described a checked таск in one

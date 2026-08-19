@@ -26,9 +26,11 @@ what the user actually said, with our paraphrase of it taken away. G2 asks while
 the answer is still a paragraph of spec and cheap to change. G4 asks when it is
 the last chance to know.
 
-Everything between them measures against `spec.md`, because that is the contract
-the executors were given. Judging an executor against words it never saw produces
-findings nobody can act on.
+Everything between them measures against the contract the executors were
+actually given — the task file the plan cut out of `spec.md`, and the
+boundaries in `interfaces.md`. Not `spec.md` itself: an executor never sees
+it, and judging one against words it never saw produces findings nobody can
+act on.
 
 ## What "Blind" Means
 

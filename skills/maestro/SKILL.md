@@ -34,8 +34,8 @@ right thing was built.
 | 7 | Acceptance | not yet written | `report.md` |
 
 Two phases run outside the sequence: **Memory**, once during Build and once
-after Acceptance, and **Repair**, whenever a таск comes back anything other than
-done.
+after Acceptance, and **Repair**, which a таск reaches two ways — by coming back
+anything other than done, or by failing its review.
 
 Dial resolution has its own file, [`phases/0-dials.md`](phases/0-dials.md), read
 at the start of Preflight before anything else.
