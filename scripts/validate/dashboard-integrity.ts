@@ -33,6 +33,19 @@ const NETWORK_APIS = [
   'sendBeacon', 'importScripts',
 ];
 
+/**
+ * The snapshot block, and the one thing that must be true of it here.
+ *
+ * The page carries a copy of the state so that it can be shown with no address
+ * at all. The sync tool replaces whatever lies between these markers, which
+ * means the asset in this repository is the one copy nobody rewrites — so it
+ * has to stay empty. A template that shipped a real прогон would copy that run
+ * into every project the skill is installed into.
+ */
+const SNAPSHOT_START = 'maestro:snapshot:start';
+const SNAPSHOT_END = 'maestro:snapshot:end';
+const EMPTY_SNAPSHOT = 'globalThis.MAESTRO_SNAPSHOT = null;';
+
 /** Which vocabulary `Field` cell owns which map inside the page. */
 const VALUE_MAPS: Array<{ field: string; map: string }> = [
   { field: 'stages[].status', map: 'STAGE_STATUS' },
@@ -134,6 +147,27 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     }
   }
   log.info('regions', 'regions checked', { count: REQUIRED_REGIONS.length });
+
+  // --- the page can show a state it was not able to load --------------------
+  const snapshot = scriptBlock(html, 'snapshot');
+  if (snapshot === null) {
+    add('snapshot', 0,
+      'no <script id="snapshot"> block — a page opened without an address can load nothing '
+      + 'from beside it, and an in-app pane opens it exactly that way');
+  } else {
+    const between = snapshot.match(
+      new RegExp(`${SNAPSHOT_START}\\s*\\*/([\\s\\S]*?)/\\*\\s*${SNAPSHOT_END}`));
+    if (between === null) {
+      add('snapshot', 0,
+        `the snapshot block carries no ${SNAPSHOT_START} … ${SNAPSHOT_END} pair — `
+        + 'the sync tool replaces what lies between them and would have nothing to find');
+    } else if ((between[1] ?? '').trim() !== EMPTY_SNAPSHOT) {
+      add('snapshot', 0,
+        'the snapshot in this repository is not empty — the asset is the one copy nothing '
+        + `rewrites, so a run left here ships into every project. Expected exactly "${EMPTY_SNAPSHOT}"`);
+    }
+  }
+  log.info('snapshot', 'snapshot block checked', { present: snapshot !== null });
 
   // --- the copied vocabulary still matches the vocabulary -------------------
   const block = scriptBlock(html, 'logic');

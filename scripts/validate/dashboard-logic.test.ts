@@ -32,6 +32,7 @@ interface Logic {
   runNotice: (state: unknown) => string | null;
   isStopped: (state: unknown) => boolean;
   isStateShape: (value: unknown) => boolean;
+  readOutcome: (held: unknown, incoming: unknown) => string;
   gateFor: (state: unknown, stageId: string) => { id: string; findings: string[] } | null;
 }
 
@@ -244,4 +245,40 @@ test('an unusable end falls back to the reference time rather than to nothing', 
 
 test('an end before the start is null, not a negative clock', () => {
   assert.equal(L.elapsed(STARTED, run(), AT(STARTED), '2026-08-19T08:00:00.000Z'), null);
+});
+
+// --- the two inputs, and the rule between them -------------------------------
+//
+// The page can be handed a state twice over: once as the snapshot written into
+// it, and once as state.js loaded from beside it. Which one it shows is the
+// difference between a dashboard that works in an in-app pane and one that
+// reports an empty прогон with the state file lying right next to it.
+
+test('a readable state is adopted whichever input it arrived on', () => {
+  assert.equal(L.readOutcome(null, run()), 'live');
+  assert.equal(L.readOutcome(run(), run({ currentStage: 'build' })), 'live');
+});
+
+test('the file wins over the snapshot, because it is the one that keeps moving', () => {
+  const snapshot = run({ currentStage: 'plan' });
+  const file = run({ currentStage: 'build' });
+  assert.equal(L.readOutcome(snapshot, file), 'live');
+});
+
+test('a failed load never demotes a state that already worked', () => {
+  // The server died, or the pane cannot reach the file at all. The page is
+  // still showing something true — it just stopped moving, and saying it
+  // cannot read the state would be a lie about what is on the screen.
+  const snapshot = run();
+  for (const missing of [undefined, null, '', 0, {}, { runId: 'r1' }]) {
+    assert.equal(L.readOutcome(snapshot, missing), 'stale');
+  }
+});
+
+test('knowing nothing is the only outcome that reports knowing nothing', () => {
+  assert.equal(L.readOutcome(null, undefined), 'blank');
+  assert.equal(L.readOutcome(undefined, null), 'blank');
+  // A held value that is not a state is not a state: a page cannot go stale
+  // against something it never managed to read.
+  assert.equal(L.readOutcome({ runId: 'r1' }, undefined), 'blank');
 });

@@ -74,6 +74,8 @@ function page(overrides: {
   body?: string;
   omitLogicBlock?: boolean;
   logicSource?: string;
+  /** The body of the snapshot block. `null` leaves the block out entirely. */
+  snapshot?: string | null;
 } = {}): string {
   const maps = { ...LOGIC, ...(overrides.logic ?? {}) };
   const entries = Object.entries(maps).map(([name, value]) => `${name}: ${value}`).join(',\n    ');
@@ -82,10 +84,15 @@ function page(overrides: {
   const source = overrides.logicSource
     ?? `globalThis.MAESTRO_LOGIC = {\n    ${entries}\n  };`;
   const logicBlock = overrides.omitLogicBlock ? '' : `<script id="logic">\n${source}\n</script>`;
+  const snapshotBody = overrides.snapshot === undefined
+    ? '/* maestro:snapshot:start */\nglobalThis.MAESTRO_SNAPSHOT = null;\n/* maestro:snapshot:end */'
+    : overrides.snapshot;
+  const snapshotBlock = snapshotBody === null
+    ? '' : `<script id="snapshot">\n${snapshotBody}\n</script>`;
 
   return [
     '<!doctype html>', '<html lang="ru">', '<head><title>Maestro</title></head>', '<body>',
-    regions, overrides.body ?? '', logicBlock, '</body>', '</html>',
+    regions, overrides.body ?? '', snapshotBlock, logicBlock, '</body>', '</html>',
   ].join('\n');
 }
 
@@ -225,4 +232,36 @@ test('stripComments leaves a URL inside code alone', () => {
 
 test('scriptBlock returns null for a block that is not there', () => {
   assert.equal(scriptBlock('<html></html>', 'logic'), null);
+});
+
+// --- the snapshot, and the reason it must stay empty here --------------------
+
+test('a page with no snapshot block is reported', () => {
+  const found = messages(page({ snapshot: null }));
+  assert.match(found, /no <script id="snapshot"> block/);
+});
+
+test('a snapshot block without its markers is reported', () => {
+  // The sync tool replaces what lies between the markers. Without them it has
+  // nothing to find, and the page would show the same state for the whole run.
+  const found = messages(page({ snapshot: 'globalThis.MAESTRO_SNAPSHOT = null;' }));
+  assert.match(found, /carries no maestro:snapshot:start … maestro:snapshot:end pair/);
+});
+
+test('a snapshot carrying a real run is reported', () => {
+  // This is the one that matters: the asset is the copy nothing rewrites, so a
+  // run left in it ships into every project the skill is installed into.
+  const found = messages(page({
+    snapshot: '/* maestro:snapshot:start */\n'
+      + 'globalThis.MAESTRO_SNAPSHOT = { runId: "r1", slug: "someones-project", stages: [] };\n'
+      + '/* maestro:snapshot:end */',
+  }));
+  assert.match(found, /snapshot in this repository is not empty/);
+});
+
+test('an empty snapshot with untidy whitespace still passes', () => {
+  const found = messages(page({
+    snapshot: '/* maestro:snapshot:start */\n\n  globalThis.MAESTRO_SNAPSHOT = null;  \n\n/* maestro:snapshot:end */',
+  }));
+  assert.doesNotMatch(found, /snapshot/);
 });

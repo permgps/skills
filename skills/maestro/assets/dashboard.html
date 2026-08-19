@@ -308,6 +308,20 @@ globalThis.MAESTRO_LOGIC = (function () {
       && Array.isArray(value.stages);
   }
 
+  /**
+   * The page has two possible inputs — the snapshot written into it and
+   * state.js beside it — and one rule between them: whichever loaded last
+   * wins, and a load that failed never demotes a state that already worked.
+   *
+   * Three outcomes rather than a boolean, because "shows nothing" and "shows
+   * something true that stopped moving" are different things to tell the user,
+   * and the second one used to be reported as the first.
+   */
+  function readOutcome(held, incoming) {
+    if (isStateShape(incoming)) return 'live';
+    return isStateShape(held) ? 'stale' : 'blank';
+  }
+
   return {
     KNOWN_CONTRACT_VERSION: KNOWN_CONTRACT_VERSION,
     STAGE_ORDER: STAGE_ORDER,
@@ -334,9 +348,33 @@ globalThis.MAESTRO_LOGIC = (function () {
     contractNotice: contractNotice,
     runNotice: runNotice,
     isStopped: isStopped,
-    isStateShape: isStateShape
+    isStateShape: isStateShape,
+    readOutcome: readOutcome
   };
 })();
+</script>
+
+<!--
+  The snapshot: the run state as it stood when the page was last synchronised.
+
+  It exists because the page can be opened with no address at all — inlined into
+  an in-app pane, double-clicked, or read a month after the прогон — and a
+  document whose origin is null cannot reach the file beside it by any route:
+  not a relative src, not an absolute file://, not fetch. The snapshot is what
+  makes the page show; state.js beside it is what makes the clocks move.
+
+  It is written from state.js and never by hand, so it is equal to that file or
+  older than it — never newer, and never in disagreement with it.
+
+  In this repository it stays null. A template carrying a real прогон would
+  copy that run into every project the skill is installed into, and
+  scripts/validate/dashboard-integrity.ts fails the bundle when this block holds
+  anything else.
+-->
+<script id="snapshot">
+/* maestro:snapshot:start */
+globalThis.MAESTRO_SNAPSHOT = null;
+/* maestro:snapshot:end */
 </script>
 
 <script id="view">
@@ -380,14 +418,26 @@ globalThis.MAESTRO_LOGIC = (function () {
   }
 
   function apply(state) {
-    if (!L.isStateShape(state)) {
-      // A stale MAESTRO_STATE cannot survive here: it is cleared before every
-      // load, so a file that stops parsing is reported instead of being read
-      // as an unchanging прогон.
+    // A stale MAESTRO_STATE cannot survive here: it is cleared before every
+    // load, so a file that stops parsing is reported rather than read as an
+    // unchanging прогон.
+    var outcome = L.readOutcome(lastGood, state);
+
+    if (outcome === 'blank') {
       problem('Не удалось прочитать ' + STATE_FILE + ' рядом с этой страницей.'
         + ' Файл отсутствует, ещё не записан или повреждён.');
       return;
     }
+
+    if (outcome === 'stale') {
+      // Saying the state cannot be read would be false: one was read, and it
+      // is on the screen. What changed is that it stopped moving, and that is
+      // the part worth naming.
+      problem('Показан снимок внутри страницы: ' + STATE_FILE
+        + ' рядом не читается, поэтому часы остановлены.');
+      return;
+    }
+
     lastGood = state;
     clearProblem();
     render(state);
@@ -555,6 +605,10 @@ globalThis.MAESTRO_LOGIC = (function () {
       }
     });
   }
+
+  // The snapshot first, so a page opened without an address shows the прогон
+  // instead of an error; then the file, which is what makes it move.
+  if (L.isStateShape(globalThis.MAESTRO_SNAPSHOT)) apply(globalThis.MAESTRO_SNAPSHOT);
 
   poll();
   pollTimer = setInterval(poll, POLL_MS);
