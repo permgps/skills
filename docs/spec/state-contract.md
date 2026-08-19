@@ -54,18 +54,24 @@ or still `open` at G1 — which is exactly what G1 checks.
 - The orchestrator never reads the dashboard's rendering of the state back. The
   state file is the only direction of travel.
 
-## Divergence From ARCHITECTURE.md
+## Precedence Over ARCHITECTURE.md
 
 The architecture document carries an illustrative `RunState` type. Where it and
-this contract disagree, this contract wins, and the two differences are
-deliberate:
+this contract disagree, **this contract wins**, and the illustration is corrected
+to match rather than left to argue with it.
 
-| Point | Architecture example | This contract | Why |
+Two points were settled that way, and are recorded here because the reasoning is
+not recoverable from the result:
+
+| Point | First written as | Settled as | Why |
 |---|---|---|---|
 | Last stage id | `final` | `acceptance` | The stage is named after what it does, and the same word is used by `phases.md`, `gates.md` and the отчёт. `final` describes a position in a list, not an activity |
 | `stages[].label` | stored in the state | absent | Labels live in `vocabulary.md` and are resolved at render time. Storing them would mean a wording change requires a state migration, and would give the same string two owners |
 
-Everything else — field names, value sets, and the single-writer rule — matches.
+The illustration in `.ai-factory/ARCHITECTURE.md` now reflects both. It remains an
+illustration: it shows the shape, not the whole field list, and
+`scripts/validate/state-matches-spec.ts` checks this document against
+`scripts/state/contract.ts` — never against the architecture example.
 
 ## Versioning
 
