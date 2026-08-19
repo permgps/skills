@@ -46,7 +46,7 @@ manifest whose numbering shifts cannot be checked against anything.
 2. **Behavior, not phrasing.** No document here contains text meant to be pasted
    into a prompt.
 3. **Machine-checkable where it matters.** The tables named in the next section
-   have a fixed column layout because `scripts/validate/spec-integrity.mjs`
+   have a fixed column layout because `scripts/validate/spec-integrity.ts`
    parses them. Renaming a column is a breaking change to that script.
 4. **Russian appears only as data.** These documents are English. A Russian
    string inside them is always a user-facing label being defined, never prose.
@@ -70,12 +70,20 @@ banned synonym appears in any defined label.
 ## Running The Checks
 
 ```bash
-node scripts/validate/spec-integrity.mjs docs/spec     # check the specification
-node --test 'scripts/**/*.test.mjs'                    # check the checker
-LOG_LEVEL=DEBUG node scripts/validate/spec-integrity.mjs docs/spec
+npm run check                                         # everything below, in order
+node scripts/validate/spec-integrity.ts docs/spec     # check the specification
+node --test 'scripts/**/*.test.ts'                    # check the checker
+LOG_LEVEL=DEBUG node scripts/validate/spec-integrity.ts docs/spec
 ```
+
+Scripts are TypeScript and run directly: Node 22.18+ strips the types, so there
+is no build step between the source and the command above. `npm run typecheck`
+runs `tsc --noEmit` separately when only the types are in question.
 
 Pass a directory to the validator to check a different tree; it defaults to
 `docs/spec`. `LOG_LEVEL` accepts `DEBUG`, `INFO`, `WARN`, `ERROR` and defaults to
 `INFO`, so a CI run can be quietened without editing the script. Use the glob
 form for the tests — a bare directory argument is not resolved as a test target.
+
+Exit codes: `0` clean, `1` the specification contradicts itself, `2` the
+directory could not be read.

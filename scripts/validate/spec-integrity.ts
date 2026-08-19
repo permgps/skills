@@ -1,20 +1,14 @@
 #!/usr/bin/env node
 // Checks the behavior specification in docs/spec for internal contradictions.
-// Dependency-free by design: the TypeScript toolchain arrives with the
-// repository skeleton milestone, and this script must run before it exists.
+// Runs directly under Node's type stripping — no build step, no runtime deps.
 
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const LEVELS = { DEBUG: 10, INFO: 20, WARN: 30, ERROR: 40 };
-const FLOOR = LEVELS[(process.env.LOG_LEVEL ?? 'INFO').toUpperCase()] ?? LEVELS.INFO;
+import { createLogger } from '../shared/log.ts';
 
-function log(level, check, message, data) {
-  if (LEVELS[level] < FLOOR) return;
-  const suffix = data === undefined ? '' : ` ${JSON.stringify(data)}`;
-  process.stderr.write(`${level} [spec-integrity.${check}] ${message}${suffix}\n`);
-}
+const log = createLogger('spec-integrity');
 
 // Two different lists, deliberately: REQUIRED_DOCS is what must exist, and the
 // parse set is every markdown file actually present. Collapsing them into one
@@ -31,8 +25,31 @@ const REQUIRED_DOCS = [
   'dashboard.md',
 ];
 
-// Split a markdown table row on pipes that are not backslash-escaped.
-function splitRow(line) {
+/**
+ * One parsed table row. `__line` is the 1-based source line, so a violation can
+ * point at the row that caused it; every other key is a column name.
+ */
+export interface TableRow {
+  __line: number;
+  [column: string]: string | number;
+}
+
+export interface Table {
+  columns: string[];
+  rows: TableRow[];
+  /** 1-based line of the header row. */
+  line: number;
+}
+
+export interface Violation {
+  check: string;
+  file: string;
+  line: number;
+  message: string;
+}
+
+/** Split a markdown table row on pipes that are not backslash-escaped. */
+function splitRow(line: string): string[] {
   return line
     .replace(/^\s*\|/, '')
     .replace(/\|\s*$/, '')
@@ -40,22 +57,25 @@ function splitRow(line) {
     .map(cell => cell.replace(/\\\|/g, '|').trim());
 }
 
-const isSeparator = line => /^\s*\|?[\s:-]*-[\s:|-]*\|?\s*$/.test(line) && line.includes('-');
+const isSeparator = (line: string): boolean =>
+  /^\s*\|?[\s:-]*-[\s:|-]*\|?\s*$/.test(line) && line.includes('-');
 
-export function parseTables(markdown) {
+export function parseTables(markdown: string): Table[] {
   const lines = markdown.split('\n');
-  const tables = [];
+  const tables: Table[] = [];
 
   for (let i = 0; i < lines.length - 1; i += 1) {
-    if (!lines[i].trim().startsWith('|') || !isSeparator(lines[i + 1])) continue;
+    const header = lines[i] ?? '';
+    const separator = lines[i + 1] ?? '';
+    if (!header.trim().startsWith('|') || !isSeparator(separator)) continue;
 
-    const columns = splitRow(lines[i]);
-    const rows = [];
+    const columns = splitRow(header);
+    const rows: TableRow[] = [];
     let cursor = i + 2;
 
-    while (cursor < lines.length && lines[cursor].trim().startsWith('|')) {
-      const cells = splitRow(lines[cursor]);
-      const row = { __line: cursor + 1 };
+    while (cursor < lines.length && (lines[cursor] ?? '').trim().startsWith('|')) {
+      const cells = splitRow(lines[cursor] ?? '');
+      const row: TableRow = { __line: cursor + 1 };
       columns.forEach((column, index) => { row[column] = cells[index] ?? ''; });
       rows.push(row);
       cursor += 1;
@@ -68,16 +88,17 @@ export function parseTables(markdown) {
   return tables;
 }
 
-const findTable = (tables, required) =>
+const findTable = (tables: Table[], required: string[]): Table | undefined =>
   tables.find(table => required.every(column => table.columns.includes(column)));
 
-const cleanCell = value => value.replace(/`/g, '').trim();
+const cleanCell = (value: string | number | undefined): string =>
+  String(value ?? '').replace(/`/g, '').trim();
 
-export async function checkSpec(specDir) {
-  const violations = [];
-  const add = (check, file, line, message) => {
+export async function checkSpec(specDir: string): Promise<Violation[]> {
+  const violations: Violation[] = [];
+  const add = (check: string, file: string, line: number, message: string): void => {
     violations.push({ check, file, line, message });
-    log('ERROR', check, message, { file, line });
+    log.error(check, message, { file, line });
   };
 
   const present = new Set(
@@ -87,33 +108,37 @@ export async function checkSpec(specDir) {
   for (const doc of REQUIRED_DOCS) {
     if (!present.has(doc)) add('documents', doc, 0, `required document is missing: ${doc}`);
   }
-  log('DEBUG', 'documents', 'documents scanned', { found: present.size });
+  log.debug('documents', 'documents scanned', { found: present.size });
   if (violations.length > 0) return violations;
 
   // Parse everything present, not only the required set: a table defined in any
   // document of the specification is part of the specification.
-  const docs = {};
+  const docs = new Map<string, Table[]>();
   for (const name of [...present].sort()) {
-    docs[name] = parseTables(await readFile(path.join(specDir, name), 'utf8'));
+    docs.set(name, parseTables(await readFile(path.join(specDir, name), 'utf8')));
   }
-  log('DEBUG', 'documents', 'documents parsed', { documents: Object.keys(docs) });
+  log.debug('documents', 'documents parsed', { documents: [...docs.keys()] });
+
+  // Every required document is present by the time we get here; the fallback
+  // keeps the types honest without inventing a second failure path.
+  const tablesOf = (name: string): Table[] => docs.get(name) ?? [];
 
   // --- phases: the id set every other check resolves against ---------------
-  const phaseTable = findTable(docs['phases.md'], ['Id', 'Stage']);
+  const phaseTable = findTable(tablesOf('phases.md'), ['Id', 'Stage']);
   if (!phaseTable) {
     add('phases', 'phases.md', 0, 'no table with columns Id and Stage');
     return violations;
   }
-  const phaseIds = new Set(phaseTable.rows.map(row => cleanCell(row.Id)));
+  const phaseIds = new Set(phaseTable.rows.map(row => cleanCell(row['Id'])));
   const stageIds = new Set(
     phaseTable.rows
-      .filter(row => cleanCell(row.Stage).toLowerCase() === 'yes')
-      .map(row => cleanCell(row.Id)),
+      .filter(row => cleanCell(row['Stage']).toLowerCase() === 'yes')
+      .map(row => cleanCell(row['Id'])),
   );
-  log('INFO', 'phases', 'phase ids resolved', { phases: phaseIds.size, stages: stageIds.size });
+  log.info('phases', 'phase ids resolved', { phases: phaseIds.size, stages: stageIds.size });
 
   // --- gates point at phases that exist ------------------------------------
-  const gateTable = findTable(docs['gates.md'], ['Gate', 'After phase']);
+  const gateTable = findTable(tablesOf('gates.md'), ['Gate', 'After phase']);
   if (!gateTable) {
     add('gates', 'gates.md', 0, 'no table with columns Gate and After phase');
   } else {
@@ -121,20 +146,20 @@ export async function checkSpec(specDir) {
       const phase = cleanCell(row['After phase']);
       if (!phaseIds.has(phase)) {
         add('gates', 'gates.md', row.__line,
-          `gate ${cleanCell(row.Gate)} runs after unknown phase "${phase}"`);
+          `gate ${cleanCell(row['Gate'])} runs after unknown phase "${phase}"`);
       }
     }
-    log('INFO', 'gates', 'gates checked', { count: gateTable.rows.length });
+    log.info('gates', 'gates checked', { count: gateTable.rows.length });
   }
 
   // --- every artifact has exactly one writer -------------------------------
-  const artifactTable = findTable(docs['artifacts.md'], ['Artifact', 'Writer']);
+  const artifactTable = findTable(tablesOf('artifacts.md'), ['Artifact', 'Writer']);
   if (!artifactTable) {
     add('artifacts', 'artifacts.md', 0, 'no table with columns Artifact and Writer');
   } else {
     for (const row of artifactTable.rows) {
-      const artifact = cleanCell(row.Artifact);
-      const writer = cleanCell(row.Writer);
+      const artifact = cleanCell(row['Artifact']);
+      const writer = cleanCell(row['Writer']);
       if (writer === '') {
         add('artifacts', 'artifacts.md', row.__line, `artifact ${artifact} has no writer`);
       } else if (/[,/]| and /.test(writer)) {
@@ -145,16 +170,16 @@ export async function checkSpec(specDir) {
           `artifact ${artifact} is written by unknown phase "${writer}"`);
       }
     }
-    log('INFO', 'artifacts', 'artifacts checked', { count: artifactTable.rows.length });
+    log.info('artifacts', 'artifacts checked', { count: artifactTable.rows.length });
   }
 
   // --- every state field is produced and consumed --------------------------
-  const stateTable = findTable(docs['state-contract.md'], ['Field', 'Written in', 'Read by']);
+  const stateTable = findTable(tablesOf('state-contract.md'), ['Field', 'Written in', 'Read by']);
   if (!stateTable) {
     add('state', 'state-contract.md', 0, 'no table with columns Field, Written in and Read by');
   } else {
     for (const row of stateTable.rows) {
-      const field = cleanCell(row.Field);
+      const field = cleanCell(row['Field']);
       const writtenIn = cleanCell(row['Written in']);
       const readBy = cleanCell(row['Read by']);
       if (!phaseIds.has(writtenIn)) {
@@ -165,11 +190,11 @@ export async function checkSpec(specDir) {
         add('state', 'state-contract.md', row.__line, `field ${field} has no reader`);
       }
     }
-    log('INFO', 'state', 'state fields checked', { count: stateTable.rows.length });
+    log.info('state', 'state fields checked', { count: stateTable.rows.length });
   }
 
   // --- stage ids and labels are the same set -------------------------------
-  const labelTable = findTable(docs['vocabulary.md'], ['Stage id', 'Label']);
+  const labelTable = findTable(tablesOf('vocabulary.md'), ['Stage id', 'Label']);
   if (!labelTable) {
     add('labels', 'vocabulary.md', 0, 'no table with columns Stage id and Label');
   } else {
@@ -185,37 +210,51 @@ export async function checkSpec(specDir) {
           `label defined for "${id}", which is not a stage in phases.md`);
       }
     }
-    log('INFO', 'labels', 'stage labels checked', { stages: stageIds.size, labels: labelled.size });
+    log.info('labels', 'stage labels checked', { stages: stageIds.size, labels: labelled.size });
   }
 
   // --- no banned synonym survives inside a defined label -------------------
-  const bannedTable = findTable(docs['vocabulary.md'], ['Banned', 'Use instead']);
+  const bannedTable = findTable(tablesOf('vocabulary.md'), ['Banned', 'Use instead']);
   if (!bannedTable) {
     add('banned', 'vocabulary.md', 0, 'no table with columns Banned and Use instead');
   } else {
-    const banned = bannedTable.rows.map(row => cleanCell(row.Banned).toLowerCase()).filter(Boolean);
-    for (const [name, tables] of Object.entries(docs)) {
+    const banned = bannedTable.rows
+      .map(row => cleanCell(row['Banned']).toLowerCase())
+      .filter(Boolean);
+    for (const [name, tables] of docs) {
       for (const table of tables) {
         if (!table.columns.includes('Label')) continue;
         for (const row of table.rows) {
-          const label = cleanCell(row.Label).toLowerCase();
+          const label = cleanCell(row['Label']).toLowerCase();
           const hit = banned.find(term => label.includes(term));
           if (hit) {
-            add('banned', name, row.__line, `label "${cleanCell(row.Label)}" uses banned term "${hit}"`);
+            add('banned', name, row.__line,
+              `label "${cleanCell(row['Label'])}" uses banned term "${hit}"`);
           }
         }
       }
     }
-    log('INFO', 'banned', 'labels scanned for banned terms', { terms: banned.length });
+    log.info('banned', 'labels scanned for banned terms', { terms: banned.length });
   }
 
   return violations;
 }
 
-async function main() {
+async function main(): Promise<number> {
   const specDir = process.argv[2] ?? 'docs/spec';
-  log('INFO', 'run', 'checking specification', { specDir });
-  const violations = await checkSpec(specDir);
+  log.info('run', 'checking specification', { specDir });
+
+  let violations: Violation[];
+  try {
+    violations = await checkSpec(specDir);
+  } catch (error) {
+    // A missing or unreadable directory is an operator mistake, not a defect in
+    // the specification. Report it as one line instead of a stack trace.
+    const reason = error instanceof Error ? error.message : String(error);
+    log.error('run', 'specification directory could not be read', { specDir, reason });
+    process.stdout.write(`spec-integrity: cannot read ${specDir}\n`);
+    return 2;
+  }
 
   if (violations.length === 0) {
     process.stdout.write('spec-integrity: OK\n');
@@ -223,7 +262,9 @@ async function main() {
   }
 
   for (const violation of violations) {
-    process.stdout.write(`${violation.file}:${violation.line}  [${violation.check}] ${violation.message}\n`);
+    process.stdout.write(
+      `${violation.file}:${violation.line}  [${violation.check}] ${violation.message}\n`,
+    );
   }
   process.stdout.write(`spec-integrity: ${violations.length} violation(s)\n`);
   return 1;

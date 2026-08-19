@@ -58,6 +58,6 @@ sees — the English ids in `phases.md` are internal and never displayed.
 | полировка | доводка |
 
 A banned word may not appear in any label defined anywhere in this
-specification. `scripts/validate/spec-integrity.mjs` enforces this against every
+specification. `scripts/validate/spec-integrity.ts` enforces this against every
 `Label` column, which is why the labels above are the enforcement surface rather
 than a style suggestion.
