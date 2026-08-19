@@ -14,7 +14,7 @@ right thing was built.
 | spec | Specification | yes | `manifest.md`, `answers.md` | `spec.md` |
 | plan | Plan | yes | `spec.md` | `tasks/`, `interfaces.md` |
 | build | Build | yes | `tasks/`, `interfaces.md` | project code, `discovered-interfaces.md`, a handoff where one was needed |
-| review | Review | yes | `tasks/`, project code | `reviews/` |
+| review | Review | yes | `tasks/`, `interfaces.md`, project code | `reviews/` |
 | acceptance | Acceptance | yes | `manifest.md`, project code | `report.md` |
 | memory | Memory | no | project code, `spec.md` | project memory file, decision records |
 | repair | Repair | no | a task result that is not done | retried task, spec amendment with a `D##` row |
@@ -136,6 +136,92 @@ It goes to the repair phase. Until that phase's rules exist, **the прогон 
 and says which таск and why.** A build that retries a таск by rules nobody wrote
 produces a second failure that looks like the first, and the run has no record of
 which attempt built what.
+
+## Review
+
+The build hands over a таск and takes back what an executor says it did. This
+phase is where somebody other than that executor looks.
+
+**A reviewer is given one таск's file, the diff of that таск's own commit, and
+`interfaces.md`.** It does not get `spec.md`, the манифест, the plan's
+reasoning, or any other таск. That is the rule [`gates.md`](gates.md) already
+states for everything between G2 and G4: the measurement is against the contract
+the executor was actually given, because a finding derived from words the
+executor never saw is a finding nobody can act on. The task file is that
+contract, and `interfaces.md` is the rest of it — the boundaries the таск was
+told to meet.
+
+A reviewer holding `spec.md` would report the distance between the specification
+and one таск's slice of it as a defect in the таск. It is not one. It is a
+defect in the cut, and the cut is what G3 checks.
+
+### Scope And Width
+
+**One review per таск, and every таск is reviewed at once.** A review reads the
+project and writes nothing into it, so neither of the two things that bound a
+build wave — file ownership and `blockedBy` — bounds anything here. No
+worktrees, no merges, no ordering.
+
+The unit stays the таск because the diff is per таск. One commit per finished
+таск exists so that this phase has something it can read whole.
+
+### What A Finding Is
+
+Two kinds, and no third:
+
+| Kind | Means | Consequence |
+|---|---|---|
+| blocking | contradicts an item of the task file's *done means*, or a signature in `interfaces.md` | the таск does not become done |
+| observation | anything else worth recording | carried into `report.md` |
+
+A middle grade is where a defect goes to be politely ignored: everything
+unpleasant lands in it and the прогон continues. Two kinds force an answer to
+the only question this phase asks — did the таск do what it was told.
+
+A design the reviewer would have chosen differently is not a finding, and
+neither is a style the task file never asked for. Nor is a patch: a reviewer
+that edits code to demonstrate a finding has stopped being a reviewer, and the
+project's code has one route into a прогон either way
+([`safety.md`](safety.md), `S5`).
+
+### The Таск Lifecycle
+
+A таск that has been committed is `review`, not `done`. The build phase writes
+that status as it commits; **`done` is written here**, and only for a таск whose
+review has no blocking finding. A blocking finding writes `repair` instead.
+
+`done` then means one thing everywhere: reviewed and accepted. While the build
+wrote it, it meant "committed" in that phase and "accepted" in every other, and
+the dashboard showed a прогон finished at the moment when nothing had been
+checked yet.
+
+### A Blocking Finding
+
+**The прогон stops and says which таск and which finding.** Repairing it belongs
+to the repair phase, whose rules do not exist yet — and a repair improvised from
+the table describing it produces a second failure that looks like the first,
+with no record of which attempt built what. This is the same rule the build
+applies to a таск that comes back not done, for the same reason.
+
+### Who Writes What
+
+The reviewer returns text. **The orchestrator writes `reviews/NN-<slug>.md`**
+from it, quoting findings as they came back rather than summarising them.
+*One Writer Each* in [`artifacts.md`](artifacts.md) names one writer for that
+directory, and several subagents appending to it at once is exactly the
+unattributable disagreement that table exists to prevent.
+
+### No Gate
+
+No gate follows this phase. G4 asks a different question, against a different
+document, blind.
+
+The acceptance phase reads `reviews/` — `artifacts.md` lists it as a reader —
+and the blind reader inside that phase does not. Those two statements only look
+contradictory if a phase and its subagent are read as one thing: the phase
+composes `report.md` from everything the прогон knows, while the reader it
+consults about the манифест is given the манифест and the build and nothing
+else.
 
 ## Mode Matrix
 

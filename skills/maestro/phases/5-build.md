@@ -70,7 +70,10 @@ For each таск that returns done, in this order:
 3. **Commit**, one commit per finished таск. A прогон survives a compaction and
    a crash by what is committed, and the review phase reads one таск's diff at a
    time.
-4. **Mark it `done`** in the run state.
+4. **Mark it `review`** in the run state — the таск is committed, not
+   accepted. `done` is written by the review phase, which has not run yet;
+   writing it here would mean the same word described a checked таск in one
+   place and an unchecked one in another.
 
 Then form the next wave and go back to step 3.
 
@@ -120,6 +123,6 @@ not the бриф.
 | project code | written by executors, one commit per finished таск |
 | `.maestro/<slug>/discovered-interfaces.md` | `D##` rows appended as each таск returned |
 | `.maestro/<slug>/tasks/NN-<slug>-handoff.md` | only for a таск that ran out of context; normally absent |
-| `.maestro/state.js` | every таск `done`, `currentStage` moved on |
+| `.maestro/state.js` | every таск `review`, `currentStage` moved on |
 
 Then read the review phase file.
