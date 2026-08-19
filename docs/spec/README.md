@@ -70,9 +70,13 @@ banned synonym appears in any defined label.
 ## Running The Checks
 
 ```bash
-npm run check                                         # everything below, in order
-node scripts/validate/spec-integrity.ts docs/spec     # check the specification
-node --test 'scripts/**/*.test.ts'                    # check the checker
+npm run check                                          # everything below, in order
+
+node scripts/validate/spec-integrity.ts docs/spec      # the specification vs itself
+node scripts/validate/bundle-integrity.ts skills/maestro   # the skill bundle's structure
+node scripts/validate/state-matches-spec.ts docs/spec  # the contract vs its code
+node --test 'scripts/**/*.test.ts'                     # the checkers themselves
+
 LOG_LEVEL=DEBUG node scripts/validate/spec-integrity.ts docs/spec
 ```
 

@@ -65,9 +65,8 @@ The installed bundle must be byte-identical to the source:
 diff -r skills/maestro <target>/.claude/skills/maestro
 ```
 
-Last verified on 2026-08-19: `SKILL.md` identical, sha256
-`e3f8bd71…`. The bundle contained no phase files at that point, so the check
-covered the entry point only; it is re-run once the phase files land.
+Last verified on 2026-08-19, after the first phase files landed: `diff -r`
+reports no difference across `SKILL.md` and all three files under `phases/`.
 
 ## Developing against the checkout
 
@@ -87,7 +86,15 @@ existing directory of your own skills is never overwritten.
 ## Checking the repository
 
 ```bash
-npm run check     # typecheck, specification integrity, bundle integrity, tests
+npm run check     # everything below, in this order
 ```
+
+| Command | Checks |
+|---|---|
+| `npm run typecheck` | `tsc --noEmit` over every script |
+| `npm run spec` | the behavior specification does not contradict itself |
+| `npm run bundle` | frontmatter, link targets, no cross-phase links, no orphaned phase |
+| `npm run state` | `docs/spec/state-contract.md` and `scripts/state/contract.ts` still agree |
+| `npm run test` | the checkers' own tests |
 
 Individual checks are documented in [the specification README](spec/README.md).

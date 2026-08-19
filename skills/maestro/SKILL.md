@@ -24,8 +24,8 @@ right thing was built.
 
 | # | Phase | Rules | Produces |
 |---|---|---|---|
-| 0 | Preflight | not yet written | resolved dials, run state, dashboard |
-| 1 | Manifest | not yet written | `brief.md`, `manifest.md` |
+| 0 | Preflight | [`phases/0-preflight.md`](phases/0-preflight.md) | resolved dials, run state, dashboard |
+| 1 | Manifest | [`phases/1-manifest.md`](phases/1-manifest.md) | `brief.md`, `manifest.md` |
 | 2 | Briefing | not yet written | `answers.md`, `reference.md` |
 | 3 | Specification | not yet written | `spec.md` |
 | 4 | Plan | not yet written | `tasks/`, `interfaces.md` |
@@ -37,8 +37,8 @@ Two phases run outside the sequence: **Memory**, once during Build and once
 after Acceptance, and **Repair**, whenever a таск comes back anything other than
 done.
 
-Dial resolution has its own file, read at the start of Preflight before
-anything else.
+Dial resolution has its own file, [`phases/0-dials.md`](phases/0-dials.md), read
+at the start of Preflight before anything else.
 
 A row marked *not yet written* is a phase whose rules file does not exist in this
 bundle yet. When you reach one, stop and say so. **Do not improvise the phase
@@ -140,7 +140,5 @@ The бриф is translated exactly once, in the Manifest phase, and the numbered
 
 ## Start
 
-Read the dials file, resolve the dials, then read the preflight file. Nothing
-else until then. Both are listed in the table above; if the table marks them *not
-yet written*, this bundle cannot run a прогон yet — say so instead of starting
-one.
+Read [`phases/0-dials.md`](phases/0-dials.md), resolve the dials, then read
+[`phases/0-preflight.md`](phases/0-preflight.md). Nothing else until then.
