@@ -30,7 +30,7 @@ right thing was built.
 | 3 | Specification | [`phases/3-spec.md`](phases/3-spec.md) | `spec.md` |
 | 4 | Plan | [`phases/4-plan.md`](phases/4-plan.md) | `tasks/`, `interfaces.md` |
 | 5 | Build | [`phases/5-build.md`](phases/5-build.md) | project code, `discovered-interfaces.md` |
-| 6 | Review | not yet written | `reviews/` |
+| 6 | Review | [`phases/6-review.md`](phases/6-review.md) | `reviews/` |
 | 7 | Acceptance | not yet written | `report.md` |
 
 Two phases run outside the sequence: **Memory**, once during Build and once
