@@ -24,7 +24,7 @@ interface Logic {
   formatDuration: (ms: unknown) => string;
   formatMoment: (iso: string) => string;
   referenceTime: (state: unknown, now: number) => number;
-  elapsed: (from: string, state: unknown, now: number) => number | null;
+  elapsed: (from: string, state: unknown, now: number, until?: string) => number | null;
   currentStage: (state: unknown) => { id: string; status: string } | null;
   orderedStages: (state: unknown) => Array<{ id: string; status: string }>;
   countRequirements: (list: unknown) => Record<string, number>;
@@ -223,4 +223,25 @@ test('a state that is not a state is refused before anything renders', () => {
 test('a moment renders without a timezone suffix the user did not ask for', () => {
   assert.match(L.formatMoment('2026-08-19T10:00:00.000Z'), /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
   assert.equal(L.formatMoment('not a date'), 'not a date');
+});
+
+test('an entry that recorded its own end is timed to that end, not to the run clock', () => {
+  const state = run();
+  // The whole прогон is an hour long; the stage inside it is two minutes.
+  assert.equal(
+    L.formatDuration(L.elapsed(STARTED, state, AT(STARTED) + 3_600_000, '2026-08-19T10:02:00.000Z')),
+    '2:00',
+  );
+});
+
+test('an unusable end falls back to the reference time rather than to nothing', () => {
+  const state = run();
+  assert.equal(
+    L.formatDuration(L.elapsed(STARTED, state, AT(STARTED) + 900_000, 'not a date')),
+    '15:00',
+  );
+});
+
+test('an end before the start is null, not a negative clock', () => {
+  assert.equal(L.elapsed(STARTED, run(), AT(STARTED), '2026-08-19T08:00:00.000Z'), null);
 });

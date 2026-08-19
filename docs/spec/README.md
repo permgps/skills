@@ -103,6 +103,23 @@ form for the tests — a bare directory argument is not resolved as a test targe
 Exit codes: `0` clean, `1` the specification contradicts itself, `2` the
 directory could not be read.
 
+## Measuring A Finished Прогон
+
+```bash
+node scripts/metrics/measure.ts <run-dir>   # or: npm run metrics -- <run-dir>
+node scripts/metrics/measure.ts <run-dir> --json
+```
+
+It reads `state.js` and nothing else, which is the rule
+[`dashboard.md`](dashboard.md) sets for the same reason: a measurement that
+reached into `manifest.md` or a task file would be a second source of truth about
+a прогон. What the state does not record is printed as a dash rather than
+inferred from a neighbouring field.
+
+Exit codes are `0` measured and `2` the state could not be read. There is no `1`:
+this script checks nothing, and a прогон that went badly is measured exactly as
+successfully as one that went well.
+
 ## Running The Gates
 
 ```bash

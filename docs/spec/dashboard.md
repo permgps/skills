@@ -14,7 +14,7 @@ becomes a second source of truth, and the second one is silently wrong.
 |---|---|---|
 | Stage timeline | The eight stages in order, each with its Label, current one marked | `stages[]`, labels from `vocabulary.md` |
 | Run clock | Time since `startedAt`, stopped at `finishedAt` | `startedAt`, `finishedAt` |
-| Stage clock | Time in the current stage | `stages[].startedAt` |
+| Stage clock | Time in the current stage; a finished stage shows its own duration | `stages[].startedAt`, `stages[].finishedAt` |
 | Dials | Mode, depth, доводка on/off, and any mid-run change | `mode`, `depth`, `polish`, `dialChanges[]` |
 | Task table | Each таск: title, status, its own clock, what blocks it | `tasks[]` |
 | Requirement coverage | How many требования are in-spec, deferred, dropped, still open | `requirements[]` |
@@ -23,6 +23,12 @@ becomes a second source of truth, and the second one is silently wrong.
 Every visible word comes from `vocabulary.md`. The dashboard defines no term of
 its own; if it needs a word that is not there, the word is added to the
 vocabulary first.
+
+A clock belongs to the thing it is timing. A stage or a таск that recorded its
+own `finishedAt` is measured between its own two stamps; only what is still
+running is measured against the run clock. Timing everything against the run
+clock is the cheaper implementation and it makes every finished row report the
+same number, which is the whole run's elapsed time wearing a stage's label.
 
 ## Lifecycle
 

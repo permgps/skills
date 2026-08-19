@@ -233,11 +233,21 @@ globalThis.MAESTRO_LOGIC = (function () {
     return now;
   }
 
-  /** Milliseconds from an ISO instant to the reference time, or null if unusable. */
-  function elapsed(fromIso, state, now) {
+  /**
+   * Milliseconds from an ISO instant to when the thing being timed ended.
+   *
+   * `untilIso` is the end the entry itself recorded — a stage's or a таск's own
+   * `finishedAt`. Without it the clock runs to the reference time, which is
+   * right for whatever is still going and wrong for everything that already
+   * stopped: a finished stage would otherwise show the whole run's elapsed time
+   * rather than its own duration.
+   */
+  function elapsed(fromIso, state, now, untilIso) {
     var from = Date.parse(fromIso);
     if (isNaN(from)) return null;
-    var span = referenceTime(state, now) - from;
+    var until = untilIso ? Date.parse(untilIso) : NaN;
+    var to = isNaN(until) ? referenceTime(state, now) : until;
+    var span = to - from;
     return span < 0 ? null : span;
   }
 
@@ -425,7 +435,7 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     var stage = L.currentStage(lastGood);
     el('stage-clock').textContent = stage && stage.startedAt
-      ? L.formatDuration(L.elapsed(stage.startedAt, lastGood, now))
+      ? L.formatDuration(L.elapsed(stage.startedAt, lastGood, now, stage.finishedAt))
       : '—';
   }
 
@@ -468,7 +478,7 @@ globalThis.MAESTRO_LOGIC = (function () {
       put(row, 'span', L.label(L.STAGE_LABEL, stage.id), 'name');
       put(row, 'span', L.label(L.STAGE_STATUS, stage.status), 'status');
       put(row, 'span', stage.startedAt
-        ? L.formatDuration(L.elapsed(stage.startedAt, state, now))
+        ? L.formatDuration(L.elapsed(stage.startedAt, state, now, stage.finishedAt))
         : '', 'clock');
 
       // A failed stage is never drawn as still running, and never without the
@@ -501,7 +511,7 @@ globalThis.MAESTRO_LOGIC = (function () {
       put(row, 'span', task.title, 'name');
       put(row, 'span', L.label(L.TASK_STATUS, task.status), 'status');
       put(row, 'span', task.startedAt
-        ? L.formatDuration(L.elapsed(task.startedAt, state, now))
+        ? L.formatDuration(L.elapsed(task.startedAt, state, now, task.finishedAt))
         : '', 'clock');
       var blockers = task.blockedBy || [];
       put(row, 'span', blockers.length ? 'ждёт ' + blockers.join(', ') : '', 'blocked');

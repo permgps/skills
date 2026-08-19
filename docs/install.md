@@ -65,8 +65,9 @@ The installed bundle must be byte-identical to the source:
 diff -r skills/maestro <target>/.claude/skills/maestro
 ```
 
-Last verified on 2026-08-19, after the first phase files landed: `diff -r`
-reports no difference across `SKILL.md` and all three files under `phases/`.
+Last verified on 2026-08-19, with the bundle complete: the listing still reports
+30 skills, of which one is Maestro's, and `diff -r` reports no difference across
+`SKILL.md`, `phases/`, `prompts/`, `references/` and `assets/`.
 
 ## Developing against the checkout
 
@@ -96,5 +97,8 @@ npm run check     # everything below, in this order
 | `npm run bundle` | frontmatter, link targets, no cross-phase links, no orphaned phase |
 | `npm run state` | `docs/spec/state-contract.md` and `scripts/state/contract.ts` still agree |
 | `npm run test` | the checkers' own tests |
+
+`npm run metrics -- <run-dir>` measures a finished прогон. It is not part of
+`npm run check`, because this repository contains no прогон for it to measure.
 
 Individual checks are documented in [the specification README](spec/README.md).
