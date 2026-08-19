@@ -37,7 +37,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** Statuses whose meaning is incomplete without a reason. */
-const REASON_REQUIRED = ['open', 'deferred', 'dropped'];
+const REASON_REQUIRED = ['open', 'deferred', 'dropped', 'placeholder'];
 
 export function validateState(value: unknown): StateViolation[] {
   const violations: StateViolation[] = [];
@@ -71,6 +71,26 @@ export function validateState(value: unknown): StateViolation[] {
   const optionalString = (field: string, raw: unknown): void => {
     if (raw !== undefined && typeof raw !== 'string') add(field, `${field} must be a string`);
   };
+  const requireStringArray = (field: string, raw: unknown): void => {
+    if (!requireArray(field, raw)) return;
+    raw.forEach((item, position) => {
+      if (typeof item !== 'string') {
+        add(`${field}[${position}]`, `${field}[${position}] must be a string`);
+      }
+    });
+  };
+  const requireCount = (field: string, raw: unknown): void => {
+    if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 0) {
+      add(field, `${field} must be a non-negative integer — got ${JSON.stringify(raw)}`);
+    }
+  };
+  /** `null` is accepted for a suite that has not run: it is what an initialised state carries. */
+  const optionalTests = (field: string, raw: unknown): void => {
+    if (raw === undefined || raw === null) return;
+    if (!isRecord(raw)) return add(field, `${field} must be an object`);
+    requireCount(`${field}.passed`, raw['passed']);
+    requireCount(`${field}.failed`, raw['failed']);
+  };
 
   // --- scalars --------------------------------------------------------------
   const version = value['contractVersion'];
@@ -92,6 +112,19 @@ export function validateState(value: unknown): StateViolation[] {
   requireOneOf('currentStage', value['currentStage'], STAGE_IDS);
   optionalString('finishedAt', value['finishedAt']);
   optionalString('interruptedAt', value['interruptedAt']);
+
+  /**
+   * Whether this state promises what contract 2 added.
+   *
+   * A прогон written under contract 1 is still a valid прогон — the metrics tool
+   * reads finished runs, and the one this repository has was written before any
+   * of these fields existed. Demanding them of it would turn "this run predates
+   * the field" into "this run is corrupt", which is the wrong sentence and the
+   * one that stops a measurement nobody can redo.
+   */
+  const atLeastV2 = typeof version === 'number' && version >= 2;
+  if (atLeastV2) requireString('updatedAt', value['updatedAt']);
+  else optionalString('updatedAt', value['updatedAt']);
 
   // --- dialChanges[] --------------------------------------------------------
   const dialChanges = value['dialChanges'];
@@ -116,6 +149,14 @@ export function validateState(value: unknown): StateViolation[] {
       requireOneOf(`${at}.status`, entry['status'], STAGE_STATUSES);
       optionalString(`${at}.startedAt`, entry['startedAt']);
       optionalString(`${at}.finishedAt`, entry['finishedAt']);
+      optionalString(`${at}.note`, entry['note']);
+
+      // A stage nobody ran and nobody explained is indistinguishable on screen
+      // from a прогон that stalled there.
+      const note = entry['note'];
+      if (entry['status'] === 'skipped' && (typeof note !== 'string' || note.trim() === '')) {
+        add(`${at}.note`, `stage "${String(entry['id'])}" is skipped with no recorded reason`);
+      }
     });
   }
 
@@ -151,6 +192,22 @@ export function validateState(value: unknown): StateViolation[] {
       }
       optionalString(`${at}.startedAt`, entry['startedAt']);
       optionalString(`${at}.finishedAt`, entry['finishedAt']);
+      optionalTests(`${at}.tests`, entry['tests']);
+      optionalString(`${at}.commit`, entry['commit']);
+
+      if (atLeastV2) {
+        // The wave is a layer, and a layer starts at one. A таск carrying zero
+        // is a таск the plan phase never placed.
+        const wave = entry['wave'];
+        if (typeof wave !== 'number' || !Number.isInteger(wave) || wave < 1) {
+          add(`${at}.wave`, `${at}.wave must be an integer of 1 or more — got ${JSON.stringify(wave)}`);
+        }
+        requireStringArray(`${at}.zone`, entry['zone']);
+        requireStringArray(`${at}.files`, entry['files']);
+        requireCount(`${at}.retries`, entry['retries']);
+        requireCount(`${at}.repairs`, entry['repairs']);
+        requireCount(`${at}.handoffs`, entry['handoffs']);
+      }
     });
   }
 
@@ -189,6 +246,33 @@ export function validateState(value: unknown): StateViolation[] {
         });
       }
     });
+  }
+
+  // --- debt, additions and the suite ----------------------------------------
+  optionalTests('tests', value['tests']);
+
+  if (atLeastV2) {
+    const debt = value['debt'];
+    if (!isRecord(debt)) {
+      add('debt', 'debt must be an object');
+    } else {
+      requireStringArray('debt.placeholders', debt['placeholders']);
+      requireStringArray('debt.assumptions', debt['assumptions']);
+      requireStringArray('debt.emptyEnv', debt['emptyEnv']);
+
+      // S2 says a credential is never written. The list of environment
+      // variables is where that rule is broken by accident rather than on
+      // purpose, so the shape of a name is checked rather than trusted.
+      if (Array.isArray(debt['emptyEnv'])) {
+        debt['emptyEnv'].forEach((name, position) => {
+          if (typeof name === 'string' && /[=\s]/.test(name)) {
+            add(`debt.emptyEnv[${position}]`,
+              'debt.emptyEnv holds variable names only — this entry looks like a value');
+          }
+        });
+      }
+    }
+    requireStringArray('additions', value['additions']);
   }
 
   log.debug('validate', 'validation finished', { violations: violations.length });

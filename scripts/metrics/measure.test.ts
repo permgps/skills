@@ -27,12 +27,17 @@ function baseline(): RunState {
       {
         id: '01', title: 'a', requirementIds: ['R01'], status: 'done', blockedBy: [],
         startedAt: '2026-08-19T09:10:00Z', finishedAt: '2026-08-19T09:40:00Z',
+        wave: 1, zone: ['src/a/'], retries: 0, repairs: 0, handoffs: 0, files: ['src/a/index.ts'],
       },
       {
         id: '02', title: 'b', requirementIds: ['R02'], status: 'done', blockedBy: [],
         startedAt: '2026-08-19T09:20:00Z', finishedAt: '2026-08-19T09:50:00Z',
+        wave: 1, zone: ['src/b/'], retries: 0, repairs: 0, handoffs: 0, files: ['src/b/index.ts'],
       },
-      { id: '03', title: 'c', requirementIds: ['R03'], status: 'repair', blockedBy: [] },
+      {
+        id: '03', title: 'c', requirementIds: ['R03'], status: 'repair', blockedBy: [],
+        wave: 1, zone: ['src/c/'], retries: 0, repairs: 1, handoffs: 0, files: [],
+      },
     ],
     requirements: [
       { id: 'R01', status: 'in-spec' },
@@ -43,6 +48,9 @@ function baseline(): RunState {
       { id: 'G1', status: 'passed', findings: [] },
       { id: 'G4', status: 'failed', findings: ['R03 is not built'] },
     ],
+    updatedAt: '2026-08-19T09:12:00Z',
+    debt: { placeholders: [], assumptions: [], emptyEnv: [] },
+    additions: [],
     finishedAt: '2026-08-19T10:30:00Z',
   };
 }

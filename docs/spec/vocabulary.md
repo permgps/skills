@@ -61,15 +61,18 @@ called "задача" fails the build exactly like a stage would.
 | `stages[].status` | `active` | Идёт |
 | `stages[].status` | `done` | Готово |
 | `stages[].status` | `failed` | Сбой |
+| `stages[].status` | `skipped` | Пропущен |
 | `tasks[].status` | `queued` | В очереди |
 | `tasks[].status` | `running` | В работе |
 | `tasks[].status` | `review` | На ревью |
 | `tasks[].status` | `repair` | На исправлении |
 | `tasks[].status` | `done` | Готов |
+| `tasks[].status` | `failed` | Упал |
 | `requirements[].status` | `open` | Открыто |
 | `requirements[].status` | `in-spec` | В спецификации |
 | `requirements[].status` | `deferred` | Отложено |
 | `requirements[].status` | `dropped` | Снято |
+| `requirements[].status` | `placeholder` | Заглушка |
 | `gates[].status` | `pending` | Ожидает |
 | `gates[].status` | `passed` | Пройден |
 | `gates[].status` | `failed` | Провален |
@@ -86,6 +89,44 @@ called "задача" fails the build exactly like a stage would.
 `Готово` and `Готов` differ because one describes a stage and the other a таск,
 and Russian will not let one form serve both without reading as a mistake. They
 are two labels for two fields, not a synonym pair.
+
+`Сбой` and `Упал` are the same distinction: a stage fails on something the user
+has to resolve, a таск fails after its retries are spent. One word for both would
+make «сбой» mean either «прогон остановился» or «один таск из шести не вышел».
+
+## Screen Labels
+
+The words the dashboard shows that are not the value of any field. They are
+named here for the same reason the value labels are: the page must not invent a
+term, and a term with two homes drifts.
+
+| Label | What it names |
+|---|---|
+| Прогресс проекта | The share of the whole прогон travelled — stages weighted by how long they take, the build subdivided by finished таски |
+| Покрытие брифа | The share of live требования that reached the specification. A different number from прогресс on purpose: one measures the road, the other the value |
+| Этап сейчас | The stage the прогон is in, with its own clock |
+| Прошло времени | Time the прогон has been worked on |
+| Осталось | The estimate, always a range, and only once enough таски have finished to build it from |
+| Таски | How many таски are done out of how many were cut |
+| Долг | What the прогон owes the user and has not settled, counted as one number |
+| Допущения | Decisions the прогон made for the user because nobody was asked |
+| Переменные | Environment variables the build needs and nobody has filled — names only, never values |
+| Тесты | The last full suite run |
+| Требования | The манифест counted by status |
+| Этапы | The stage timeline |
+| Ход разработки | The таски as they are being built, grouped by волна |
+| Волна | One layer of the plan — the таски that may run at the same time |
+| Критический путь | The longest remaining chain of blocked таски, which is what the estimate is measured along |
+| Сейчас | The таски being worked on at this moment, named in one line |
+| Календарных | Wall-clock time from the start, pauses included — shown beside Прошло времени, never instead of it |
+
+**The build block is «Ход разработки», never «Ход сборки».** `сборка` is banned
+below, and the stage it shows is called `Разработка`, so the block is named after
+the stage rather than after the activity.
+
+`Осталось` is a range and says so. A single wall-clock number would be a
+fabrication dressed as a measurement; a range built from таски that already
+finished is neither.
 
 ## Banned Synonyms
 

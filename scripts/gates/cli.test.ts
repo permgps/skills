@@ -23,6 +23,9 @@ function validState(): RunState {
     tasks: [],
     requirements: [{ id: 'R01', status: 'in-spec' }],
     gates: [{ id: 'G1', status: 'pending', findings: [] }],
+    updatedAt: '2026-08-19T09:12:00Z',
+    debt: { placeholders: [], assumptions: [], emptyEnv: [] },
+    additions: [],
   };
 }
 

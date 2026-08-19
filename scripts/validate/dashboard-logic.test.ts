@@ -164,10 +164,12 @@ test('an empty манифест tallies to zero rather than throwing', () => {
 });
 
 test('a newer contract produces a notice and not an empty render', () => {
+  assert.equal(L.contractNotice(L.KNOWN_CONTRACT_VERSION), null);
   assert.equal(L.contractNotice(1), null);
   assert.equal(L.contractNotice(0), null);
-  const notice = L.contractNotice(L.KNOWN_CONTRACT_VERSION + 1);
-  assert.match(String(notice), /версии 2/);
+  const newer = L.KNOWN_CONTRACT_VERSION + 1;
+  const notice = L.contractNotice(newer);
+  assert.match(String(notice), new RegExp(`версии ${newer}`));
   assert.match(String(notice), /Показано то, что удалось прочитать/);
 });
 

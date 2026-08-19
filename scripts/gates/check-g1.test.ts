@@ -24,6 +24,9 @@ function stateWith(requirements: RequirementEntry[]): RunState {
     tasks: [],
     requirements,
     gates: [{ id: 'G1', status: 'pending', findings: [] }],
+    updatedAt: '2026-08-19T09:12:00Z',
+    debt: { placeholders: [], assumptions: [], emptyEnv: [] },
+    additions: [],
   };
 }
 

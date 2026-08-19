@@ -22,6 +22,9 @@ function baseline(): RunState {
     tasks: [],
     requirements: [],
     gates: [],
+    updatedAt: '2026-08-19T09:12:00Z',
+    debt: { placeholders: [], assumptions: [], emptyEnv: [] },
+    additions: [],
   };
 }
 

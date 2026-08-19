@@ -9,8 +9,11 @@
 
   One file, no build step, no network. Every style and every script is inline
   because the page is copied into a target project and opened from file://,
-  where a sibling fetch is blocked and an absent CDN is indistinguishable from
+  where a sibling load is blocked and an absent CDN is indistinguishable from
   a broken page. Its only input is state.js.
+
+  Every number here is derived, never stored. A duration written into the state
+  goes stale silently; one computed at render time cannot.
 -->
 <style>
   :root {
@@ -18,9 +21,12 @@
     --bg: #fbfbfa;
     --panel: #ffffff;
     --line: #e3e2df;
+    --ghost: #ececea;
     --ink: #1b1a17;
     --muted: #6d6a63;
     --accent: #2f6f4f;
+    --info: #2c5a8a;
+    --fix: #6b3f8a;
     --warn: #8a5a12;
     --fail: #9b2c2c;
   }
@@ -29,9 +35,12 @@
       --bg: #17181a;
       --panel: #1f2124;
       --line: #33363b;
+      --ghost: #2a2d31;
       --ink: #e8e6e1;
       --muted: #9a978f;
       --accent: #6cc38f;
+      --info: #7aa9d8;
+      --fix: #b28ad0;
       --warn: #d8a657;
       --fail: #e07a72;
     }
@@ -44,9 +53,12 @@
     color: var(--ink);
     font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
-  h2 { font-size: .95rem; margin: 0 0 .6rem; color: var(--muted); font-weight: 600; }
-  header { margin-bottom: 1.5rem; }
+  h1 { font-size: 1.25rem; margin: 0 0 .5rem; }
+  h2 {
+    font-size: .72rem; margin: 0 0 .6rem; color: var(--muted);
+    font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+  }
+  header { margin-bottom: 1rem; }
   main { display: grid; gap: 1rem; }
   section {
     background: var(--panel);
@@ -54,9 +66,17 @@
     border-radius: 8px;
     padding: 1rem;
   }
-  #clocks { display: flex; gap: 1.5rem; margin: .5rem 0; font-variant-numeric: tabular-nums; }
-  #clocks span b { font-weight: 600; }
-  #dials { color: var(--muted); font-size: .9rem; }
+  #dials { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .chip {
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: .1rem .6rem; font-size: .78rem; color: var(--muted);
+    white-space: nowrap;
+  }
+  .chip-done { color: var(--accent); border-color: var(--accent); }
+  .chip-running { color: var(--warn); border-color: var(--warn); }
+  .chip-review { color: var(--info); border-color: var(--info); }
+  .chip-repair { color: var(--fix); border-color: var(--fix); }
+  .chip-failed { color: var(--fail); border-color: var(--fail); }
   #notice {
     margin: .75rem 0 0;
     padding: .6rem .8rem;
@@ -71,23 +91,75 @@
     color: var(--fail);
     background: var(--panel);
   }
+
+  /* --- the whole road, in one bar --- */
+  #progress .head { display: flex; justify-content: space-between; align-items: baseline; }
+  #progress-percent { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bar { background: var(--ghost); border-radius: 999px; height: .5rem; overflow: hidden; margin: .5rem 0 .4rem; }
+  .bar > i { display: block; height: 100%; background: var(--ink); border-radius: 999px; }
+  .sub { color: var(--muted); font-size: .85rem; margin: 0; }
+
+  /* --- the eight cards --- */
+  #cards {
+    display: grid; gap: 1rem; padding: 0; border: 0; background: none;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  /* Two rows of four on anything wide enough; two columns on a phone. */
+  @media (min-width: 62rem) { #cards { grid-template-columns: repeat(4, 1fr); } }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: .9rem 1rem; min-height: 7.5rem;
+  }
+  .card .value { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* A range is two numbers and a gap; at the headline size it wraps mid-phrase. */
+  #estimate { font-size: 1.25rem; }
+  .card .value small { font-size: .95rem; font-weight: 400; color: var(--muted); }
+  .card .stage-name { font-size: 1.25rem; font-weight: 600; }
+  .ring { display: block; margin: .2rem 0; }
+  .ring circle { fill: none; stroke-width: 9; }
+
+  /* --- rows shared by stages, requirements and gates --- */
   .row {
     display: grid;
-    grid-template-columns: minmax(7rem, auto) 1fr auto auto auto;
+    grid-template-columns: minmax(7rem, auto) 1fr auto auto;
     gap: .75rem;
     align-items: baseline;
     padding: .3rem 0;
     border-bottom: 1px solid var(--line);
   }
   .row:last-child { border-bottom: 0; }
-  .row .status, .row .clock, .row .blocked, .row .count { color: var(--muted); font-size: .9rem; }
+  .row .status, .row .clock, .row .count { color: var(--muted); font-size: .9rem; }
   .row .clock, .row .count { font-variant-numeric: tabular-nums; }
   .stage-active .name, .task-running .name { color: var(--accent); font-weight: 600; }
   .stage-failed .name, .stage-failed .status,
   .gate-failed .name, .gate-failed .status { color: var(--fail); }
+  .stage-skipped .name, .stage-skipped .status { color: var(--muted); }
   .gate-passed .status { color: var(--accent); }
+  .note { color: var(--muted); font-size: .85rem; margin: -.1rem 0 .3rem 0; }
   .findings { margin: .25rem 0 .75rem 1rem; color: var(--fail); font-size: .9rem; }
   .empty, .total { color: var(--muted); margin: .25rem 0 0; }
+
+  /* --- the build, grouped by wave --- */
+  .wave-name {
+    font-size: .72rem; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--muted); margin: .9rem 0 .35rem;
+  }
+  .wave-name:first-child { margin-top: 0; }
+  .task {
+    display: grid; grid-template-columns: 2.2rem 1fr 3.5rem;
+    gap: .6rem; align-items: center; padding: .12rem 0;
+  }
+  .task .id { color: var(--muted); font-variant-numeric: tabular-nums; font-size: .85rem; }
+  .task .mins { text-align: right; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+  .track { background: var(--ghost); border-radius: 4px; overflow: hidden; }
+  .track > .fill {
+    display: flex; justify-content: space-between; gap: .5rem;
+    padding: .18rem .5rem; border-radius: 4px; color: #fff;
+  }
+  .track > .fill.queued { background: none; color: var(--muted); border: 1px dashed var(--line); }
+  .track > .fill .phase { opacity: .85; font-size: .8rem; }
+  #now { color: var(--muted); font-size: .9rem; margin: .6rem 0 0; }
+  #build-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -95,10 +167,6 @@
 
 <header>
   <h1 id="run-title">Прогон</h1>
-  <div id="clocks">
-    <span>Прогон: <b id="run-clock">—</b></span>
-    <span>Этап: <b id="stage-clock">—</b></span>
-  </div>
   <div id="dials"></div>
   <p id="notice" hidden></p>
 </header>
@@ -106,8 +174,83 @@
 <p id="problem" hidden></p>
 
 <main id="regions">
+
+  <section id="progress">
+    <div class="head">
+      <h2>Прогресс проекта</h2>
+      <b id="progress-percent">—</b>
+    </div>
+    <div class="bar"><i id="progress-fill" style="width:0%"></i></div>
+    <p class="sub" id="progress-sub"></p>
+  </section>
+
+  <section id="cards">
+    <div class="card">
+      <h2>Покрытие брифа</h2>
+      <svg class="ring" viewBox="0 0 80 80" width="72" height="72" aria-hidden="true">
+        <circle cx="40" cy="40" r="34" stroke="var(--ghost)"></circle>
+        <circle id="coverage-arc" cx="40" cy="40" r="34" stroke="var(--accent)"
+                stroke-linecap="round" transform="rotate(-90 40 40)"
+                stroke-dasharray="213.6" stroke-dashoffset="213.6"></circle>
+      </svg>
+      <div class="value"><span id="coverage-percent">—</span><small>%</small></div>
+      <p class="sub" id="coverage-sub"></p>
+    </div>
+
+    <div class="card">
+      <h2>Этап сейчас</h2>
+      <div class="stage-name" id="stage-name">—</div>
+      <p class="sub"><span id="stage-position"></span> · <span id="stage-clock">—</span></p>
+    </div>
+
+    <div class="card">
+      <h2>Прошло времени</h2>
+      <div class="value" id="run-clock">—</div>
+      <p class="sub" id="run-median"></p>
+      <p class="sub" id="run-calendar"></p>
+    </div>
+
+    <div class="card">
+      <h2>Осталось (оценка)</h2>
+      <div class="value" id="estimate">—</div>
+      <p class="sub" id="estimate-sub"></p>
+    </div>
+
+    <div class="card">
+      <h2>Таски</h2>
+      <div class="value"><span id="tasks-done">—</span><small id="tasks-total"></small></div>
+      <div class="bar"><i id="tasks-fill" style="width:0%"></i></div>
+      <p class="sub" id="tasks-sub"></p>
+    </div>
+
+    <div class="card">
+      <h2>Долг</h2>
+      <div class="value" id="debt-count">—</div>
+      <p class="sub" id="debt-sub"></p>
+    </div>
+
+    <div class="card">
+      <h2>Тесты</h2>
+      <div class="value" id="tests-count">—</div>
+      <p class="sub" id="tests-sub"></p>
+    </div>
+
+    <div class="card">
+      <h2>Требования</h2>
+      <div class="value" id="req-count">—</div>
+      <p class="sub" id="req-sub"></p>
+    </div>
+  </section>
+
   <section><h2>Этапы</h2><div id="stages"></div></section>
-  <section><h2>Таски</h2><div id="tasks"></div></section>
+
+  <section>
+    <h2>Ход разработки</h2>
+    <div id="build-chips"></div>
+    <div id="tasks"></div>
+    <p id="now" hidden></p>
+  </section>
+
   <section><h2>Требования</h2><div id="requirements"></div></section>
   <section><h2>Гейты</h2><div id="gates"></div></section>
 </main>
@@ -119,7 +262,7 @@
 globalThis.MAESTRO_LOGIC = (function () {
   'use strict';
 
-  var KNOWN_CONTRACT_VERSION = 1;
+  var KNOWN_CONTRACT_VERSION = 2;
 
   // Mirrors docs/spec/phases.md. scripts/validate/dashboard-integrity.ts fails
   // the build when this set or any label below drifts from vocabulary.md.
@@ -140,14 +283,15 @@ globalThis.MAESTRO_LOGIC = (function () {
   };
 
   var STAGE_STATUS = {
-    pending: 'Ожидает', active: 'Идёт', done: 'Готово', failed: 'Сбой'
+    pending: 'Ожидает', active: 'Идёт', done: 'Готово',
+    failed: 'Сбой', skipped: 'Пропущен'
   };
   var TASK_STATUS = {
     queued: 'В очереди', running: 'В работе', review: 'На ревью',
-    repair: 'На исправлении', done: 'Готов'
+    repair: 'На исправлении', done: 'Готов', failed: 'Упал'
   };
   var REQUIREMENT_STATUS = {
-    open: 'Открыто', 'in-spec': 'В спецификации',
+    open: 'Открыто', 'in-spec': 'В спецификации', placeholder: 'Заглушка',
     deferred: 'Отложено', dropped: 'Снято'
   };
   var GATE_STATUS = {
@@ -159,7 +303,32 @@ globalThis.MAESTRO_LOGIC = (function () {
   var DEPTH = { strict: 'Строгая', normal: 'Обычная', deep: 'Глубокая' };
   var POLISH = { 'true': 'Включена', 'false': 'Выключена' };
 
-  var REQUIREMENT_ORDER = ['in-spec', 'deferred', 'dropped', 'open'];
+  var REQUIREMENT_ORDER = ['in-spec', 'placeholder', 'deferred', 'dropped', 'open'];
+  var TASK_ORDER = ['done', 'running', 'review', 'repair', 'queued', 'failed'];
+
+  /**
+   * How much of the прогон each stage is worth.
+   *
+   * Not one eighth apiece: разработка runs for hours and подготовка for minutes,
+   * so equal weights make the bar stand still through the longest stage and then
+   * jump. Inside разработки the share is subdivided by finished таски, which is
+   * what makes it creep with the work.
+   */
+  var STAGE_WEIGHT = {
+    preflight: 1, manifest: 1, briefing: 1, spec: 2,
+    plan: 1, build: 6, review: 2, acceptance: 1
+  };
+
+  /**
+   * A gap between two marks longer than this is a person being away.
+   *
+   * The clocks show working time, not the calendar: a прогон someone left for a
+   * day should not report a day of work. Nothing extra is recorded for this —
+   * the state is already full of stamps, and a gap between two of them is either
+   * work or a pause. Each gap counts up to the ceiling and no further, so an
+   * overnight pause adds 45 minutes and a two-day one adds the same.
+   */
+  var IDLE_CEILING_MS = 45 * 60 * 1000;
 
   // Mirrors the Gate / After phase table of docs/spec/gates.md, and is checked
   // against it by scripts/validate/dashboard-integrity.ts. A stage renders its
@@ -193,6 +362,14 @@ globalThis.MAESTRO_LOGIC = (function () {
     return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : key;
   }
 
+  /** Russian counts three ways, and «2 таска» read as «2 тасков» is the tell of a page nobody read. */
+  function plural(n, one, few, many) {
+    var a = Math.abs(n) % 10, b = Math.abs(n) % 100;
+    if (a === 1 && b !== 11) return one;
+    if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return few;
+    return many;
+  }
+
   function pad(n) { return n < 10 ? '0' + n : String(n); }
 
   /** `M:SS` under an hour, `H:MM:SS` above it. Never a bare number of seconds. */
@@ -205,6 +382,14 @@ globalThis.MAESTRO_LOGIC = (function () {
     return hours > 0
       ? hours + ':' + pad(minutes) + ':' + pad(seconds)
       : minutes + ':' + pad(seconds);
+  }
+
+  /** Coarser than the clocks on purpose: an estimate stated to the second is a lie about its own precision. */
+  function formatMinutes(ms) {
+    if (typeof ms !== 'number' || !isFinite(ms) || ms < 0) return '—';
+    var minutes = Math.max(1, Math.round(ms / 60000));
+    if (minutes < 60) return minutes + ' мин';
+    return Math.floor(minutes / 60) + ' ч ' + pad(minutes % 60) + ' мин';
   }
 
   function formatMoment(iso) {
@@ -251,6 +436,116 @@ globalThis.MAESTRO_LOGIC = (function () {
     return span < 0 ? null : span;
   }
 
+  /** Every instant the state recorded, sorted — the raw material of working time. */
+  function collectMarks(state) {
+    var out = [];
+    var take = function (iso) {
+      if (typeof iso !== 'string') return;
+      var at = Date.parse(iso);
+      if (!isNaN(at)) out.push(at);
+    };
+    if (state) {
+      take(state.startedAt); take(state.updatedAt);
+      take(state.finishedAt); take(state.interruptedAt);
+      (state.stages || []).forEach(function (s) { take(s && s.startedAt); take(s && s.finishedAt); });
+      (state.tasks || []).forEach(function (t) { take(t && t.startedAt); take(t && t.finishedAt); });
+    }
+    out.sort(function (a, b) { return a - b; });
+    return out.filter(function (at, i) { return i === 0 || at !== out[i - 1]; });
+  }
+
+  /** The part of `[from, to]` that was work rather than a pause. */
+  function activeSpan(fromMs, toMs, marks) {
+    if (!(toMs > fromMs)) return 0;
+    var points = [fromMs];
+    (marks || []).forEach(function (at) { if (at > fromMs && at < toMs) points.push(at); });
+    points.push(toMs);
+    var total = 0;
+    for (var i = 1; i < points.length; i += 1) {
+      total += Math.min(points[i] - points[i - 1], IDLE_CEILING_MS);
+    }
+    return total;
+  }
+
+  /** `elapsed`, with the pauses taken out. Same arguments, same edges. */
+  function worked(fromIso, state, now, untilIso, marks) {
+    var from = Date.parse(fromIso);
+    if (isNaN(from)) return null;
+    var until = untilIso ? Date.parse(untilIso) : NaN;
+    var to = isNaN(until) ? referenceTime(state, now) : until;
+    if (to < from) return null;
+    return activeSpan(from, to, marks || collectMarks(state));
+  }
+
+  function countTasks(tasks) {
+    var counts = { total: 0, queued: 0, running: 0, review: 0, repair: 0, done: 0, failed: 0, retries: 0 };
+    var list = tasks || [];
+    for (var i = 0; i < list.length; i += 1) {
+      var task = list[i] || {};
+      counts.total += 1;
+      if (TASK_ORDER.indexOf(task.status) !== -1) counts[task.status] += 1;
+      if (typeof task.retries === 'number') counts.retries += task.retries;
+    }
+    // Written, then checked, then sometimes repaired — and review and repair run
+    // while the next таск is already flying. Collapsing them into «not done» is
+    // what makes the screen answer «готово 2 из 6» with four таски in motion.
+    counts.active = counts.running + counts.review + counts.repair;
+    return counts;
+  }
+
+  function countRequirements(requirements) {
+    var counts = { total: 0, open: 0, 'in-spec': 0, placeholder: 0, deferred: 0, dropped: 0 };
+    var list = requirements || [];
+    for (var i = 0; i < list.length; i += 1) {
+      counts.total += 1;
+      var status = list[i] && list[i].status;
+      if (REQUIREMENT_ORDER.indexOf(status) !== -1) counts[status] += 1;
+    }
+    // A требование the user removed is not a gap in the coverage; it is gone.
+    counts.live = counts.total - counts.dropped;
+    return counts;
+  }
+
+  /** The share of live требования that reached the specification. */
+  function coverage(requirements) {
+    var counts = countRequirements(requirements);
+    return {
+      percent: counts.live > 0 ? Math.round(counts['in-spec'] / counts.live * 100) : 0,
+      inSpec: counts['in-spec'],
+      live: counts.live
+    };
+  }
+
+  /** How far along the whole прогон is — weighted by stage, subdivided by таск. */
+  function overallProgress(state) {
+    var stages = orderedStages(state);
+    var tasks = countTasks(state && state.tasks);
+    var got = 0, total = 0, stagesDone = 0;
+
+    stages.forEach(function (stage) {
+      var weight = STAGE_WEIGHT[stage.id] || 1;
+      total += weight;
+      if (stage.status === 'done' || stage.status === 'skipped') {
+        got += weight;
+        stagesDone += 1;
+      } else if (stage.status === 'active') {
+        // A stage that has begun is never zero, and the build reports what it
+        // has actually landed rather than a flat half.
+        got += weight * (stage.id === 'build' && tasks.total > 0
+          ? Math.max(0.05, tasks.done / tasks.total)
+          : 0.5);
+      }
+    });
+
+    return {
+      percent: total > 0 ? Math.round(got / total * 100) : 0,
+      stagesDone: stagesDone,
+      stagesTotal: stages.length,
+      tasksDone: tasks.done,
+      tasksTotal: tasks.total
+    };
+  }
+
   function currentStage(state) {
     var stages = (state && state.stages) || [];
     var byId = null;
@@ -264,15 +559,188 @@ globalThis.MAESTRO_LOGIC = (function () {
     return null;
   }
 
-  function countRequirements(requirements) {
-    var counts = { total: 0, open: 0, 'in-spec': 0, deferred: 0, dropped: 0 };
-    var list = requirements || [];
-    for (var i = 0; i < list.length; i += 1) {
-      counts.total += 1;
-      var status = list[i] && list[i].status;
-      if (REQUIREMENT_ORDER.indexOf(status) !== -1) counts[status] += 1;
+  /** Where the current stage sits in the road, counting from one. */
+  function stagePosition(state) {
+    var stage = currentStage(state);
+    var index = stage ? STAGE_ORDER.indexOf(stage.id) : -1;
+    return { position: index === -1 ? STAGE_ORDER.length : index + 1, total: STAGE_ORDER.length };
+  }
+
+  /** Working durations of the таски that finished, ascending. */
+  function taskDurations(state, now, marks) {
+    var list = (state && state.tasks) || [];
+    var out = [];
+    var stamps = marks || collectMarks(state);
+    list.forEach(function (task) {
+      if (!task || !task.startedAt || !task.finishedAt) return;
+      var span = worked(task.startedAt, state, now, task.finishedAt, stamps);
+      if (typeof span === 'number') out.push(span);
+    });
+    out.sort(function (a, b) { return a - b; });
+    return out;
+  }
+
+  /** `null` below two finished таски: one sample is an anecdote, not a median. */
+  function medianTaskMs(state, now, marks) {
+    var durations = taskDurations(state, now, marks);
+    if (durations.length < 2) return null;
+    return durations[Math.floor(durations.length / 2)];
+  }
+
+  /** The longest chain of таски still to run, counted in таски. */
+  function criticalPath(tasks) {
+    var list = tasks || [];
+    var byId = {};
+    list.forEach(function (task) { if (task && task.id) byId[task.id] = task; });
+    var memo = {};
+
+    function depth(id, seen) {
+      var task = byId[id];
+      if (!task || task.status === 'done') return 0;
+      if (memo[id] !== undefined) return memo[id];
+      if (seen[id]) return 1;
+      seen[id] = true;
+      var deepest = 0;
+      (task.blockedBy || []).forEach(function (blocker) {
+        deepest = Math.max(deepest, depth(blocker, seen));
+      });
+      delete seen[id];
+      memo[id] = 1 + deepest;
+      return memo[id];
     }
-    return counts;
+
+    var longest = 0;
+    list.forEach(function (task) {
+      if (task && task.id) longest = Math.max(longest, depth(task.id, {}));
+    });
+    return longest;
+  }
+
+  /**
+   * What is left, as a range, or `null` while there is nothing to build it from.
+   *
+   * Measured along the critical path in minutes rather than as «median × chain
+   * length»: a таск twenty minutes into its work would otherwise count as a
+   * whole one, and the last almost-finished таск would read as a fresh start.
+   */
+  function estimateMs(state, now, marks) {
+    var median = medianTaskMs(state, now, marks);
+    if (median === null) return null;
+
+    var list = (state && state.tasks) || [];
+    var stamps = marks || collectMarks(state);
+    var byId = {};
+    list.forEach(function (task) { if (task && task.id) byId[task.id] = task; });
+
+    function remaining(task) {
+      if (!task || task.status === 'done') return 0;
+      if (task.status === 'failed') return median;
+      if (task.status === 'review') return median * 0.2;
+      if (task.status === 'repair') return median * 0.5;
+      if (task.status === 'running' && task.startedAt) {
+        var spent = worked(task.startedAt, state, now, undefined, stamps) || 0;
+        return Math.max(60000, median - spent);
+      }
+      return median;
+    }
+
+    var memo = {};
+    function chain(id, seen) {
+      var task = byId[id];
+      if (!task || task.status === 'done') return 0;
+      if (memo[id] !== undefined) return memo[id];
+      if (seen[id]) return remaining(task);
+      seen[id] = true;
+      var behind = 0;
+      (task.blockedBy || []).forEach(function (blocker) {
+        behind = Math.max(behind, chain(blocker, seen));
+      });
+      delete seen[id];
+      memo[id] = remaining(task) + behind;
+      return memo[id];
+    }
+
+    var longest = 0;
+    list.forEach(function (task) {
+      if (task && task.id) longest = Math.max(longest, chain(task.id, {}));
+    });
+    if (longest <= 0) return null;
+    return { low: longest * 0.75, high: longest * 1.4 };
+  }
+
+  /** The таски grouped by the layer the plan put them in, each group in id order. */
+  function groupByWave(tasks) {
+    var list = (tasks || []).filter(Boolean);
+    var seen = [];
+    list.forEach(function (task) {
+      var wave = typeof task.wave === 'number' ? task.wave : 1;
+      if (seen.indexOf(wave) === -1) seen.push(wave);
+    });
+    seen.sort(function (a, b) { return a - b; });
+    return seen.map(function (wave) {
+      return {
+        wave: wave,
+        tasks: list
+          .filter(function (task) { return (typeof task.wave === 'number' ? task.wave : 1) === wave; })
+          .sort(function (a, b) { return String(a.id).localeCompare(String(b.id), 'en', { numeric: true }); })
+      };
+    });
+  }
+
+  /**
+   * How many of these таски were ever in flight at the same moment.
+   *
+   * Read from the clocks, not from the size of the wave. A wave is what *may*
+   * run together; claiming parallelism the прогон did not actually get is the
+   * kind of flattery that makes the rest of the screen untrustworthy.
+   */
+  function peakParallel(tasks, state, now) {
+    var edges = [];
+    (tasks || []).forEach(function (task) {
+      if (!task || !task.startedAt) return;
+      var from = Date.parse(task.startedAt);
+      if (isNaN(from)) return;
+      var until = task.finishedAt ? Date.parse(task.finishedAt) : NaN;
+      var to = isNaN(until) ? referenceTime(state, now) : until;
+      if (to < from) return;
+      edges.push({ at: from, delta: 1 });
+      edges.push({ at: to, delta: -1 });
+    });
+    // A таск ending exactly as another begins is a handover, not an overlap.
+    edges.sort(function (a, b) { return a.at - b.at || a.delta - b.delta; });
+    var live = 0, peak = 0;
+    edges.forEach(function (edge) {
+      live += edge.delta;
+      peak = Math.max(peak, live);
+    });
+    return peak;
+  }
+
+  function debtCounts(state) {
+    var debt = (state && state.debt) || {};
+    var count = function (list) { return Array.isArray(list) ? list.length : 0; };
+    var out = {
+      placeholders: count(debt.placeholders),
+      assumptions: count(debt.assumptions),
+      emptyEnv: count(debt.emptyEnv)
+    };
+    out.total = out.placeholders + out.assumptions + out.emptyEnv;
+    return out;
+  }
+
+  /**
+   * The suite to show: the last full run, or failing that the last таск's own.
+   *
+   * `null` is not zero. A прогон with no suite says nothing rather than
+   * claiming every test passed.
+   */
+  function testsOf(state) {
+    if (state && state.tests) return state.tests;
+    var list = (state && state.tasks) || [];
+    for (var i = list.length - 1; i >= 0; i -= 1) {
+      if (list[i] && list[i].tests) return list[i].tests;
+    }
+    return null;
   }
 
   /** Renders what it can rather than refusing — docs/spec/state-contract.md. */
@@ -328,23 +796,43 @@ globalThis.MAESTRO_LOGIC = (function () {
     STAGE_LABEL: STAGE_LABEL,
     STAGE_STATUS: STAGE_STATUS,
     TASK_STATUS: TASK_STATUS,
+    TASK_ORDER: TASK_ORDER,
     REQUIREMENT_STATUS: REQUIREMENT_STATUS,
     REQUIREMENT_ORDER: REQUIREMENT_ORDER,
     GATE_STATUS: GATE_STATUS,
     GATE_ORDER: GATE_ORDER,
     GATE_AFTER: GATE_AFTER,
+    STAGE_WEIGHT: STAGE_WEIGHT,
+    IDLE_CEILING_MS: IDLE_CEILING_MS,
     gateFor: gateFor,
     orderedStages: orderedStages,
     MODE: MODE,
     DEPTH: DEPTH,
     POLISH: POLISH,
     label: label,
+    plural: plural,
     formatDuration: formatDuration,
+    formatMinutes: formatMinutes,
     formatMoment: formatMoment,
     referenceTime: referenceTime,
     elapsed: elapsed,
+    collectMarks: collectMarks,
+    activeSpan: activeSpan,
+    worked: worked,
     currentStage: currentStage,
+    stagePosition: stagePosition,
+    countTasks: countTasks,
     countRequirements: countRequirements,
+    coverage: coverage,
+    overallProgress: overallProgress,
+    taskDurations: taskDurations,
+    medianTaskMs: medianTaskMs,
+    criticalPath: criticalPath,
+    estimateMs: estimateMs,
+    groupByWave: groupByWave,
+    peakParallel: peakParallel,
+    debtCounts: debtCounts,
+    testsOf: testsOf,
     contractNotice: contractNotice,
     runNotice: runNotice,
     isStopped: isStopped,
@@ -360,8 +848,9 @@ globalThis.MAESTRO_LOGIC = (function () {
   It exists because the page can be opened with no address at all — inlined into
   an in-app pane, double-clicked, or read a month after the прогон — and a
   document whose origin is null cannot reach the file beside it by any route:
-  not a relative src, not an absolute file://, not fetch. The snapshot is what
-  makes the page show; state.js beside it is what makes the clocks move.
+  not a relative src, not an absolute file://, not a request from script. The
+  snapshot is what makes the page show; state.js beside it is what makes the
+  clocks move.
 
   It is written from state.js and never by hand, so it is equal to that file or
   older than it — never newer, and never in disagreement with it.
@@ -389,17 +878,18 @@ globalThis.MAESTRO_SNAPSHOT = null;
   var generation = 0;
   var lastGood = null;
   var pollTimer = null;
+  var marks = [];
 
   function el(id) { return document.getElementById(id); }
 
   /**
-   * Re-inject state.js rather than fetch it.
+   * Re-inject state.js rather than request it.
    *
-   * The page opens from file://, where fetch and XMLHttpRequest against a
-   * sibling are blocked by the origin rules — which is why the writer emits a
-   * JS assignment instead of JSON. The query string is not decoration: without
-   * it the browser serves the first copy for the rest of the прогон, and the
-   * page freezes while still looking live.
+   * The page opens from file://, where a sibling request is blocked by the
+   * origin rules — which is why the writer emits a JS assignment instead of
+   * JSON. The query string is not decoration: without it the browser serves the
+   * first copy for the rest of the прогон, and the page freezes while still
+   * looking live.
    */
   function poll() {
     generation += 1;
@@ -439,6 +929,7 @@ globalThis.MAESTRO_SNAPSHOT = null;
     }
 
     lastGood = state;
+    marks = L.collectMarks(state);
     clearProblem();
     render(state);
     if (state.finishedAt && pollTimer !== null) {
@@ -458,35 +949,6 @@ globalThis.MAESTRO_SNAPSHOT = null;
   function clearProblem() {
     el('problem').hidden = true;
     el('regions').hidden = false;
-  }
-
-  function render(state) {
-    el('run-title').textContent = 'Прогон: ' + state.slug;
-
-    var notices = [L.runNotice(state), L.contractNotice(state.contractVersion)]
-      .filter(function (line) { return !!line; });
-    var notice = el('notice');
-    notice.textContent = notices.join(' ');
-    notice.hidden = notices.length === 0;
-
-    el('dials').textContent = 'Режим: ' + L.label(L.MODE, state.mode)
-      + ' · Глубина: ' + L.label(L.DEPTH, state.depth)
-      + ' · Доводка: ' + L.label(L.POLISH, state.polish);
-
-    tick();
-    renderRegions(state);
-  }
-
-  /** Clocks redraw every second; the state is only re-read on the poll. */
-  function tick() {
-    if (!lastGood) return;
-    var now = Date.now();
-    el('run-clock').textContent = L.formatDuration(L.elapsed(lastGood.startedAt, lastGood, now));
-
-    var stage = L.currentStage(lastGood);
-    el('stage-clock').textContent = stage && stage.startedAt
-      ? L.formatDuration(L.elapsed(stage.startedAt, lastGood, now, stage.finishedAt))
-      : '—';
   }
 
   /**
@@ -512,24 +974,149 @@ globalThis.MAESTRO_SNAPSHOT = null;
     put(parent, 'p', message, 'empty');
   }
 
-  function renderRegions(state) {
+  function text(id, value) { el(id).textContent = value; }
+
+  function chip(parent, label, count, kind) {
+    put(parent, 'span', label + ' ' + count, 'chip' + (kind ? ' chip-' + kind : ''));
+  }
+
+  var STATUS_COLOR = {
+    done: 'var(--accent)', running: 'var(--warn)', review: 'var(--info)',
+    repair: 'var(--fix)', failed: 'var(--fail)', queued: ''
+  };
+
+  function render(state) {
+    el('run-title').textContent = 'Прогон: ' + state.slug;
+
+    var notices = [L.runNotice(state), L.contractNotice(state.contractVersion)]
+      .filter(function (line) { return !!line; });
+    var notice = el('notice');
+    notice.textContent = notices.join(' ');
+    notice.hidden = notices.length === 0;
+
+    var dials = clear(el('dials'));
+    put(dials, 'span', L.label(L.MODE, state.mode), 'chip');
+    put(dials, 'span', L.label(L.DEPTH, state.depth), 'chip');
+    put(dials, 'span', 'Доводка: ' + L.label(L.POLISH, state.polish), 'chip');
+
+    renderProgress(state);
+    renderCards(state);
     renderStages(state);
-    renderTasks(state);
+    renderBuild(state);
     renderRequirements(state);
     renderGates(state);
+    tick();
+  }
+
+  function renderProgress(state) {
+    var progress = L.overallProgress(state);
+    text('progress-percent', progress.percent + '%');
+    el('progress-fill').style.width = progress.percent + '%';
+
+    var line = progress.stagesDone + ' из ' + progress.stagesTotal + ' этапов пройдено';
+    if (progress.tasksTotal > 0) {
+      line += ' · ' + progress.tasksDone + ' из ' + progress.tasksTotal + ' '
+        + L.plural(progress.tasksTotal, 'таска', 'тасков', 'тасков');
+    }
+    text('progress-sub', line);
+  }
+
+  function renderCards(state) {
+    var now = Date.now();
+
+    // --- покрытие брифа -------------------------------------------------
+    var cover = L.coverage(state.requirements);
+    var circumference = 2 * Math.PI * 34;
+    el('coverage-arc').setAttribute('stroke-dashoffset',
+      String(circumference * (1 - cover.percent / 100)));
+    text('coverage-percent', cover.percent);
+    text('coverage-sub', cover.live > 0
+      ? cover.inSpec + ' из ' + cover.live + ' требований'
+      : 'Требования ещё не записаны');
+
+    // --- этап сейчас ----------------------------------------------------
+    var stage = L.currentStage(state);
+    var place = L.stagePosition(state);
+    text('stage-name', stage ? L.label(L.STAGE_LABEL, stage.id) : '—');
+    text('stage-position', place.position + ' из ' + place.total + ' этапов');
+    var stageClock = el('stage-clock');
+    stageClock.dataset.from = (stage && stage.startedAt) || '';
+    stageClock.dataset.until = (stage && stage.finishedAt) || '';
+
+    // --- прошло времени -------------------------------------------------
+    var runClock = el('run-clock');
+    runClock.dataset.from = state.startedAt || '';
+    runClock.dataset.until = '';
+    var median = L.medianTaskMs(state, now, marks);
+    text('run-median', median === null
+      ? 'Медиана появится после двух готовых тасков'
+      : 'Медиана на таск — ' + L.formatMinutes(median));
+
+    // --- осталось -------------------------------------------------------
+    var estimate = L.estimateMs(state, now, marks);
+    var chain = L.criticalPath(state.tasks);
+    if (state.finishedAt) {
+      text('estimate', '—');
+      text('estimate-sub', 'Прогон завершён');
+    } else if (estimate === null) {
+      text('estimate', 'Рано считать');
+      text('estimate-sub', 'Нужно два готовых таска');
+    } else {
+      text('estimate', L.formatMinutes(estimate.low) + ' … ' + L.formatMinutes(estimate.high));
+      text('estimate-sub', 'Критический путь: ' + chain + ' '
+        + L.plural(chain, 'таск', 'таска', 'тасков') + ' в цепочке');
+    }
+
+    // --- таски ----------------------------------------------------------
+    var tasks = L.countTasks(state.tasks);
+    text('tasks-done', tasks.total > 0 ? tasks.done : '—');
+    text('tasks-total', tasks.total > 0 ? ' / ' + tasks.total : '');
+    var share = tasks.total > 0
+      ? Math.round((tasks.done + 0.75 * (tasks.review + tasks.repair)) / tasks.total * 100)
+      : 0;
+    el('tasks-fill').style.width = share + '%';
+    var taskLine = tasks.total > 0 ? share + '% готово' : 'Таски ещё не нарезаны';
+    if (tasks.active > 0) taskLine += ' · в работе ' + tasks.active;
+    if (tasks.retries > 0) taskLine += ' · повторов ' + tasks.retries;
+    text('tasks-sub', taskLine);
+
+    // --- долг -----------------------------------------------------------
+    var debt = L.debtCounts(state);
+    text('debt-count', debt.total);
+    text('debt-sub', 'Заглушки ' + debt.placeholders
+      + ' · Допущения ' + debt.assumptions
+      + ' · Переменные ' + debt.emptyEnv);
+
+    // --- тесты ----------------------------------------------------------
+    var tests = L.testsOf(state);
+    text('tests-count', tests ? tests.passed : '—');
+    text('tests-sub', !tests
+      ? 'Прогон ещё не запускал тесты'
+      : (tests.failed > 0 ? 'Упало ' + tests.failed : 'После последнего таска'));
+
+    // --- требования -----------------------------------------------------
+    var counts = L.countRequirements(state.requirements);
+    text('req-count', counts.total);
+    text('req-sub', L.label(L.REQUIREMENT_STATUS, 'dropped') + ' ' + counts.dropped
+      + ' · ' + L.label(L.REQUIREMENT_STATUS, 'deferred') + ' ' + counts.deferred
+      + ' · ' + L.label(L.REQUIREMENT_STATUS, 'placeholder') + ' ' + counts.placeholder);
   }
 
   function renderStages(state) {
     var host = clear(el('stages'));
-    var now = Date.now();
 
     L.orderedStages(state).forEach(function (stage) {
       var row = put(host, 'div', null, 'row stage stage-' + stage.status);
       put(row, 'span', L.label(L.STAGE_LABEL, stage.id), 'name');
       put(row, 'span', L.label(L.STAGE_STATUS, stage.status), 'status');
-      put(row, 'span', stage.startedAt
-        ? L.formatDuration(L.elapsed(stage.startedAt, state, now, stage.finishedAt))
-        : '', 'clock');
+      var clock = put(row, 'span', '', 'clock');
+      if (stage.startedAt) {
+        clock.dataset.from = stage.startedAt;
+        clock.dataset.until = stage.finishedAt || '';
+      }
+
+      // The note is why a stage was skipped, and how far a running one has got.
+      if (stage.note) put(host, 'p', stage.note, 'note');
 
       // A failed stage is never drawn as still running, and never without the
       // reason: the findings are the whole point of showing the failure.
@@ -546,26 +1133,71 @@ globalThis.MAESTRO_SNAPSHOT = null;
     });
   }
 
-  function renderTasks(state) {
+  function renderBuild(state) {
     var host = clear(el('tasks'));
+    var chips = clear(el('build-chips'));
+    var now = el('now');
     var tasks = state.tasks || [];
+
     if (tasks.length === 0) {
       empty(host, 'Таски ещё не нарезаны.');
+      now.hidden = true;
       return;
     }
 
-    var now = Date.now();
-    tasks.forEach(function (task) {
-      var row = put(host, 'div', null, 'row task task-' + task.status);
-      put(row, 'span', task.id, 'id');
-      put(row, 'span', task.title, 'name');
-      put(row, 'span', L.label(L.TASK_STATUS, task.status), 'status');
-      put(row, 'span', task.startedAt
-        ? L.formatDuration(L.elapsed(task.startedAt, state, now, task.finishedAt))
-        : '', 'clock');
-      var blockers = task.blockedBy || [];
-      put(row, 'span', blockers.length ? 'ждёт ' + blockers.join(', ') : '', 'blocked');
+    var counts = L.countTasks(tasks);
+    chip(chips, L.label(L.TASK_STATUS, 'done'), counts.done, 'done');
+    chip(chips, L.label(L.TASK_STATUS, 'running'), counts.running, 'running');
+    if (counts.review > 0) chip(chips, L.label(L.TASK_STATUS, 'review'), counts.review, 'review');
+    if (counts.repair > 0) chip(chips, L.label(L.TASK_STATUS, 'repair'), counts.repair, 'repair');
+    chip(chips, L.label(L.TASK_STATUS, 'queued'), counts.queued);
+    if (counts.failed > 0) chip(chips, L.label(L.TASK_STATUS, 'failed'), counts.failed, 'failed');
+
+    L.groupByWave(tasks).forEach(function (group) {
+      // The claim of parallelism is read from the clocks, never from the size
+      // of the wave: a wave is what may run together, not what did.
+      var parallel = L.peakParallel(group.tasks, state, Date.now());
+      var name = 'Волна ' + group.wave;
+      if (parallel > 1) {
+        name += ' — ' + parallel + ' ' + L.plural(parallel, 'таск', 'таска', 'тасков') + ' параллельно';
+      }
+      put(host, 'div', name, 'wave-name');
+
+      group.tasks.forEach(function (task) {
+        var row = put(host, 'div', null, 'task task-' + task.status);
+        put(row, 'span', task.id, 'id');
+
+        var track = put(row, 'div', null, 'track');
+        var fill = put(track, 'div', null, 'fill ' + task.status);
+        if (STATUS_COLOR[task.status]) fill.style.background = STATUS_COLOR[task.status];
+        put(fill, 'span', task.title, 'nm');
+
+        // Colour says the таск is not ordinary work; the word says which kind.
+        if (task.status === 'review' || task.status === 'repair' || task.status === 'failed') {
+          put(fill, 'span', L.label(L.TASK_STATUS, task.status), 'phase');
+        }
+
+        var clock = put(row, 'span', '—', 'mins');
+        if (task.startedAt) {
+          clock.dataset.from = task.startedAt;
+          clock.dataset.until = task.finishedAt || '';
+        }
+      });
     });
+
+    var live = tasks.filter(function (task) {
+      return task.status === 'running' || task.status === 'review' || task.status === 'repair';
+    });
+    clear(now);
+    now.hidden = live.length === 0;
+    if (live.length > 0) {
+      put(now, 'span', 'Сейчас: ');
+      live.forEach(function (task, index) {
+        if (index > 0) put(now, 'span', ' · ');
+        put(now, 'b', task.id);
+        put(now, 'span', ' ' + task.title + ' — ' + L.label(L.TASK_STATUS, task.status));
+      });
+    }
   }
 
   function renderRequirements(state) {
@@ -604,6 +1236,40 @@ globalThis.MAESTRO_SNAPSHOT = null;
         findings.forEach(function (finding) { put(list, 'li', finding); });
       }
     });
+  }
+
+  /**
+   * Clocks redraw every second; the state is only re-read on the poll.
+   *
+   * Every clock on the page is a `[data-from]` element, so one loop moves the
+   * run, the stage and each таск. They show working time — a прогон left for a
+   * day does not report a day of work — and the calendar span is printed beside
+   * the run clock whenever the two have parted company.
+   */
+  function tick() {
+    if (!lastGood) return;
+    var now = Date.now();
+
+    var nodes = document.querySelectorAll('[data-from]');
+    for (var i = 0; i < nodes.length; i += 1) {
+      var node = nodes[i];
+      var from = node.dataset.from;
+      if (!from) { node.textContent = '—'; continue; }
+      var until = node.dataset.until || undefined;
+      node.textContent = L.formatDuration(L.worked(from, lastGood, now, until, marks));
+    }
+
+    var span = L.elapsed(lastGood.startedAt, lastGood, now);
+    var active = L.worked(lastGood.startedAt, lastGood, now, undefined, marks);
+    var calendar = el('run-calendar');
+    // Printed only when a pause actually happened: an identical second number
+    // teaches the reader to ignore the line it will one day need.
+    if (span !== null && active !== null && span - active > 60000) {
+      calendar.textContent = 'Календарных ' + L.formatDuration(span);
+      calendar.hidden = false;
+    } else {
+      calendar.hidden = true;
+    }
   }
 
   // The snapshot first, so a page opened without an address shows the прогон

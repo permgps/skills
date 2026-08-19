@@ -21,14 +21,31 @@ function baseline(): RunState {
     ],
     currentStage: 'manifest',
     tasks: [
-      { id: '01', title: 'Build the hero section', requirementIds: ['R01'], status: 'queued', blockedBy: [] },
+      {
+        id: '01', title: 'Build the hero section', requirementIds: ['R01'],
+        status: 'queued', blockedBy: [],
+        wave: 1, zone: ['src/hero/'], retries: 0, repairs: 0, handoffs: 0, files: [],
+      },
     ],
     requirements: [
       { id: 'R01', status: 'in-spec' },
       { id: 'R02', status: 'deferred', reason: 'no pricing supplied yet' },
     ],
     gates: [{ id: 'G1', status: 'pending', findings: [] }],
+    updatedAt: '2026-08-19T09:12:00Z',
+    debt: { placeholders: [], assumptions: [], emptyEnv: [] },
+    additions: [],
   };
+}
+
+/** The same прогон as it would have been written before contract 2 existed. */
+function contractOne(): Record<string, unknown> {
+  const state: Record<string, unknown> = { ...baseline(), contractVersion: 1 };
+  for (const field of ['updatedAt', 'debt', 'additions']) delete state[field];
+  state['tasks'] = [
+    { id: '01', title: 'Build the hero section', requirementIds: ['R01'], status: 'queued', blockedBy: [] },
+  ];
+  return state;
 }
 
 /** Apply an override to a copy of the baseline, escaping the type on purpose. */
@@ -66,12 +83,14 @@ test('an unknown mode is reported with the allowed set', () => {
 test('an unknown depth, stage status and task status are each reported', () => {
   assert.deepEqual(fields(validateState(withPatch({ depth: 'shallow' }))), ['depth']);
   assert.deepEqual(
-    fields(validateState(withPatch({ stages: [{ id: 'preflight', status: 'skipped' }] }))),
+    // `skipped` used to stand here as the unknown value. Contract 2 made it a
+    // real one, so the example moved rather than the rule.
+    fields(validateState(withPatch({ stages: [{ id: 'preflight', status: 'paused' }] }))),
     ['stages[0].status'],
   );
   assert.deepEqual(
     fields(validateState(withPatch({
-      tasks: [{ id: '01', title: 't', requirementIds: ['R01'], status: 'paused', blockedBy: [] }],
+      tasks: [{ ...baseline().tasks[0], status: 'paused' }],
     }))),
     ['tasks[0].status'],
   );
@@ -140,7 +159,7 @@ test('an in-spec requirement needs no reason', () => {
 
 test('a task tracing to no requirement is reported', () => {
   const violations = validateState(withPatch({
-    tasks: [{ id: '01', title: 't', requirementIds: [], status: 'queued', blockedBy: [] }],
+    tasks: [{ ...baseline().tasks[0], requirementIds: [] }],
   }));
   assert.deepEqual(fields(violations), ['tasks[0].requirementIds']);
   assert.match(violations[0]?.message ?? '', /traces to no/);
@@ -149,7 +168,7 @@ test('a task tracing to no requirement is reported', () => {
 test('a non-string requirement id inside a task is reported by position', () => {
   assert.deepEqual(
     fields(validateState(withPatch({
-      tasks: [{ id: '01', title: 't', requirementIds: ['R01', 7], status: 'queued', blockedBy: [] }],
+      tasks: [{ ...baseline().tasks[0], requirementIds: ['R01', 7] }],
     }))),
     ['tasks[0].requirementIds[1]'],
   );
@@ -188,4 +207,88 @@ test('every violation is reported, not just the first', () => {
     polish: 'yes',
   }));
   assert.deepEqual(fields(violations).sort(), ['depth', 'mode', 'polish']);
+});
+
+// --- what contract 2 added ---------------------------------------------------
+
+test('a state written under contract 1 is still valid without any contract 2 field', () => {
+  // The finished прогон this repository can measure predates every one of them.
+  // Reporting it as corrupt would be the wrong sentence about a run nobody can redo.
+  assert.deepEqual(validateState(contractOne()), []);
+});
+
+test('a contract 2 state missing what contract 2 promised is reported', () => {
+  const state: Record<string, unknown> = { ...baseline() };
+  for (const field of ['updatedAt', 'debt', 'additions']) delete state[field];
+  assert.deepEqual(fields(validateState(state)).sort(), ['additions', 'debt', 'updatedAt']);
+});
+
+test('a таск without a wave is reported, and a wave of zero is not a layer', () => {
+  const noWave: Record<string, unknown> = { ...baseline().tasks[0] };
+  delete noWave['wave'];
+  assert.deepEqual(fields(validateState(withPatch({ tasks: [noWave] }))), ['tasks[0].wave']);
+  assert.deepEqual(
+    fields(validateState(withPatch({ tasks: [{ ...baseline().tasks[0], wave: 0 }] }))),
+    ['tasks[0].wave'],
+  );
+});
+
+test('the three counters must be non-negative integers', () => {
+  assert.deepEqual(
+    fields(validateState(withPatch({
+      tasks: [{ ...baseline().tasks[0], retries: -1, repairs: 1.5, handoffs: 'two' }],
+    }))).sort(),
+    ['tasks[0].handoffs', 'tasks[0].repairs', 'tasks[0].retries'],
+  );
+});
+
+test('a skipped stage with no note is reported', () => {
+  assert.deepEqual(
+    fields(validateState(withPatch({ stages: [{ id: 'briefing', status: 'skipped' }] }))),
+    ['stages[0].note'],
+  );
+  assert.deepEqual(
+    validateState(withPatch({
+      stages: [{ id: 'briefing', status: 'skipped', note: 'полный автомат — самобрифинг' }],
+    })),
+    [],
+  );
+});
+
+test('a placeholder requirement carries what is still missing', () => {
+  assert.deepEqual(
+    fields(validateState(withPatch({ requirements: [{ id: 'R01', status: 'placeholder' }] }))),
+    ['requirements[0].reason'],
+  );
+  assert.deepEqual(
+    validateState(withPatch({
+      requirements: [{ id: 'R01', status: 'placeholder', reason: 'awaiting the brand colours' }],
+    })),
+    [],
+  );
+});
+
+test('debt.emptyEnv holding a value rather than a name is reported', () => {
+  // S2 is never broken on purpose. This is the shape it gets broken by accident.
+  assert.deepEqual(
+    fields(validateState(withPatch({
+      debt: { placeholders: [], assumptions: [], emptyEnv: ['TELEGRAM_BOT_TOKEN=8123:AAF'] },
+    }))),
+    ['debt.emptyEnv[0]'],
+  );
+  assert.deepEqual(
+    validateState(withPatch({
+      debt: { placeholders: [], assumptions: [], emptyEnv: ['TELEGRAM_BOT_TOKEN'] },
+    })),
+    [],
+  );
+});
+
+test('a suite result is optional, null, or two counts', () => {
+  assert.deepEqual(validateState(withPatch({ tests: null })), []);
+  assert.deepEqual(validateState(withPatch({ tests: { passed: 41, failed: 0 } })), []);
+  assert.deepEqual(
+    fields(validateState(withPatch({ tests: { passed: '41', failed: 0 } }))),
+    ['tests.passed'],
+  );
 });
