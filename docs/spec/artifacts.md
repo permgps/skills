@@ -19,9 +19,19 @@ project that was built, not with Maestro.
 │   ├── report.md
 │   ├── decisions.md
 │   └── amendments.md
+├── config.json
 ├── state.js
 └── dashboard.html
 ```
+
+**`config.json` is the one artifact that outlives the run that created it.** It
+holds the mode this project starts in when the arguments do not say — its shape,
+its precedence and the question that fills it belong to
+[`dials.md`](dials.md). It sits beside the run directories rather than inside
+one because a setting that lived in `<feature-slug>/` would be a setting the
+next прогон could not find. Preflight writes it on the first run in a project
+and never again; after that the user edits it, which is why it is the only
+mutable artifact here with no phase that rewrites it.
 
 The dashboard is opened directly and there is no second entry point beside it.
 An `index.html` pointing at a self-contained page would be an artifact with no
@@ -45,6 +55,7 @@ actually built.
 | `report.md` | acceptance | the user | append-only |
 | `decisions.md` | memory | the user, a later прогон | append-only |
 | `amendments.md` | repair | build, review, acceptance | append-only |
+| `config.json` | preflight | preflight | yes |
 | `state.js` | preflight | dashboard | yes |
 | `dashboard.html` | preflight | the user | no |
 
