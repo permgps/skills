@@ -9,6 +9,7 @@ import {
   parseRunStateFields,
   parseUnionCell,
   parseStringArrayConst,
+  parsePythonListConst,
   type Violation,
 } from './state-matches-spec.ts';
 
@@ -49,7 +50,20 @@ export interface RunState {
 }
 `;
 
-type Overrides = { spec?: string; phases?: string; contract?: string };
+// The Python side carries the same set under the same name. It is a fixture
+// for the same reason the others are: a checker that reads the real file can
+// only ever agree with it, and could not be shown to catch anything.
+const SYNC = `STAGE_STATUSES = ['pending', 'active']
+`;
+
+type Overrides = {
+  spec?: string;
+  phases?: string;
+  contract?: string;
+  sync?: string;
+  /** Write no sync.py at all, so the checker is handed a path that is not there. */
+  dropSync?: boolean;
+};
 
 async function violationsFor(overrides: Overrides = {}): Promise<Violation[]> {
   const root = await mkdtemp(path.join(tmpdir(), 'state-spec-'));
@@ -62,9 +76,15 @@ async function violationsFor(overrides: Overrides = {}): Promise<Violation[]> {
     const contractFile = path.join(root, 'contract.ts');
     await writeFile(contractFile, overrides.contract ?? CONTRACT, 'utf8');
 
+    const syncFile = path.join(root, 'sync.py');
+    if (overrides.dropSync !== true) {
+      await writeFile(syncFile, overrides.sync ?? SYNC, 'utf8');
+    }
+
     return await checkStateMatchesSpec({
       specDir,
       contractFile,
+      syncFile,
       phasesFile: path.join(specDir, 'phases.md'),
     });
   } finally {
@@ -76,6 +96,17 @@ test('parseStringArrayConst reads an exported array, typed or not', () => {
   assert.deepEqual(parseStringArrayConst(CONTRACT, 'MODES'), ['full', 'semi']);
   assert.deepEqual(parseStringArrayConst(CONTRACT, 'STAGE_IDS'), ['preflight', 'build']);
   assert.equal(parseStringArrayConst(CONTRACT, 'DEPTHS'), null);
+});
+
+test('parsePythonListConst reads a module-level list', () => {
+  assert.deepEqual(parsePythonListConst(SYNC, 'STAGE_STATUSES'), ['pending', 'active']);
+  assert.equal(parsePythonListConst(SYNC, 'TASK_STATUSES'), null);
+});
+
+test('parsePythonListConst refuses a list that is not at module level', () => {
+  // An indented assignment is a local, and a local is not the copy the прогон
+  // carries — reading it would report agreement the run does not have.
+  assert.equal(parsePythonListConst('    STAGE_STATUSES = [\'pending\']\n', 'STAGE_STATUSES'), null);
 });
 
 test('parseUnionCell reads a union of backticked literals', () => {
@@ -146,21 +177,46 @@ test('a scalar union in the Type column is compared too', async () => {
   assert.match(violations[0]?.message ?? '', /value set for "mode" differs/);
 });
 
-test('a value set stated only in the contract is reported', async () => {
+// A value set now has three homes — the contract, the shipped TypeScript, and
+// the copy sync.py runs inside a прогон — so a set present in one of them and
+// missing from the others is reported once per silent side, not once in total.
+test('a value set stated only in the contract is reported on both silent sides', async () => {
   const violations = await violationsFor({
     spec: SPEC.replace('| `stages[].status` | `pending`, `active` |',
       '| `stages[].status` | `pending`, `active` |\n| `tasks[].status` | `queued`, `done` |'),
   });
-  assert.equal(violations.length, 1);
+  assert.equal(violations.length, 2);
   assert.match(violations[0]?.message ?? '', /no constant in contract\.ts carries/);
+  assert.equal(violations[1]?.check, 'sync');
+  assert.match(violations[1]?.message ?? '', /TASK_STATUSES is absent/);
 });
 
-test('a value set carried only in code is reported', async () => {
+test('a value set carried only in code is reported on both sides that state it', async () => {
   const violations = await violationsFor({
     spec: SPEC.replace('| `stages[].status` | `pending`, `active` |\n', ''),
   });
-  assert.equal(violations.length, 1);
+  assert.equal(violations.length, 2);
   assert.match(violations[0]?.message ?? '', /the contract does not state/);
+  assert.equal(violations[1]?.check, 'sync');
+  assert.match(violations[1]?.message ?? '', /carries STAGE_STATUSES/);
+});
+
+test('a set sync.py drifts on is reported against the specification', async () => {
+  const violations = await violationsFor({
+    sync: "STAGE_STATUSES = ['pending', 'active', 'paused']\n",
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'sync');
+  assert.match(violations[0]?.message ?? '', /differs — contract \[pending, active\]/);
+});
+
+test('a sync.py that cannot be read is reported rather than skipped', async () => {
+  // The failure this guards against is silence: a checker that quietly stops
+  // reading one of its three sides looks exactly like one that agrees.
+  const violations = await violationsFor({ dropSync: true });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'sync');
+  assert.match(violations[0]?.message ?? '', /could not be read/);
 });
 
 test('a stage added to phases.md but not to the code is reported', async () => {

@@ -5,7 +5,7 @@ Run it after every write to `state.js`:
 
     python3 .maestro/sync.py
 
-It does four things, in this order, and reports what it did:
+It does five things, in this order, and reports what it did:
 
 1.  **Checks that `state.js` parses as JSON.** The page is happy with any valid
     JavaScript, so a hand-written object literal with bare keys renders exactly
@@ -21,14 +21,22 @@ It does four things, in this order, and reports what it did:
     origin with no path, and a directory listing is what it shows otherwise.
 4.  **Raises a static server** over this directory, bound to the loopback
     interface, if one is not already answering for it — and prints the address.
+5.  **Checks every status against the contract.** This runs last, after the
+    address, and on purpose: a прогон whose таск carries a word the contract
+    does not define is still worth showing, and a stopped дашборд helps nobody.
+    It is the only place a real прогон can catch the violation at all —
+    `scripts/state/validate.ts` lives in the development repository and is not
+    part of what is copied into `.maestro/`.
 
 Failing to raise a server is not an error. The page carries its snapshot, so a
 run without a server shows the truth and stops ticking; that is worth one line
 of output, not a stopped прогон.
 
-Nothing in this file is checked by `npm run check`: `bundle-integrity.ts` walks
-`.md` and this is the only executable in the bundle. Change it with that in
-mind — the first thing to break here breaks silently.
+Almost nothing in this file is checked by `npm run check`: `bundle-integrity.ts`
+walks `.md` and this is the only executable in the bundle. The four status sets
+below are the exception — `scripts/validate/state-matches-spec.ts` compares them
+with the specification, because a copy nothing reads goes stale in silence.
+Everything else here still breaks quietly, so change it with that in mind.
 """
 
 import json
@@ -43,6 +51,22 @@ STATE = os.path.join(DIR, 'state.js')
 PAGE = os.path.join(DIR, 'dashboard.html')
 INDEX = os.path.join(DIR, 'index.html')
 SERVE = os.path.join(DIR, 'serve.json')
+
+# The contract's own value sets, copied here because nothing else present in a
+# real прогон holds them. `scripts/validate/state-matches-spec.ts` compares these
+# four lists against docs/spec/state-contract.md and scripts/state/contract.ts,
+# so a set that drifts here is a finding rather than a silence.
+STAGE_STATUSES = ['pending', 'active', 'done', 'failed', 'skipped']
+TASK_STATUSES = ['queued', 'running', 'review', 'repair', 'done', 'failed']
+REQUIREMENT_STATUSES = ['open', 'in-spec', 'deferred', 'dropped', 'placeholder']
+GATE_STATUSES = ['pending', 'passed', 'failed']
+
+CHECKED = [
+    ('stages', STAGE_STATUSES),
+    ('tasks', TASK_STATUSES),
+    ('requirements', REQUIREMENT_STATUSES),
+    ('gates', GATE_STATUSES),
+]
 
 ASSIGNMENT = 'globalThis.MAESTRO_STATE ='
 SNAPSHOT_RE = re.compile(
@@ -155,6 +179,28 @@ def serve():
     return port
 
 
+def status_violations(state):
+    """Every `<field>[i].status` the contract does not define, in order.
+
+    A missing status counts: the field is required, and an entry without one is
+    exactly as uncountable on the page as an entry with the wrong one.
+    """
+    found = []
+    if not isinstance(state, dict):
+        return found
+    for field, allowed in CHECKED:
+        entries = state.get(field)
+        if not isinstance(entries, list):
+            continue
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                continue
+            status = entry.get('status')
+            if status not in allowed:
+                found.append(('%s[%d].status' % (field, index), status, allowed))
+    return found
+
+
 def main():
     if not os.path.exists(STATE):
         print('sync: no state.js beside this script — nothing to mirror yet')
@@ -184,11 +230,20 @@ def main():
     # Last, and deliberately after the address: the page works either way, and
     # this is about the tool that reads the run when it is over.
     try:
-        json.loads(text)
+        state = json.loads(text)
     except ValueError as error:
         print('sync: state.js is valid JavaScript but not valid JSON (%s).' % error)
         print('      The dashboard renders it; scripts/metrics/measure.ts cannot read it.')
         print('      Quote every key and use JSON values — the writer emits JSON.stringify output.')
+        return 1
+
+    offenders = status_violations(state)
+    if offenders:
+        for path, found, allowed in offenders:
+            print('sync: %s is %s — the contract allows %s'
+                  % (path, json.dumps(found, ensure_ascii=False), ', '.join(allowed)))
+        print('      The page cannot count a status it cannot name: it shows such an')
+        print('      entry as written, and the entry counts towards no progress at all.')
         return 1
 
     return 0

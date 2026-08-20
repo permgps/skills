@@ -39,6 +39,22 @@ const VALUE_SET_CONSTANTS: Record<string, string> = {
 const STAGE_IDS_CONSTANT = 'STAGE_IDS';
 
 /**
+ * The four sets `sync.py` carries, field name → the constant that holds it.
+ *
+ * It is the only executable this repository copies into a real прогон, which is
+ * why it holds a copy of the contract's value sets at all — and it says of
+ * itself that nothing here reads it. A copy nothing compares is a copy that
+ * goes stale in silence, and the silence surfaces as a run whose statuses were
+ * never checked.
+ */
+const SYNC_VALUE_SETS: Record<string, string> = {
+  'stages[].status': 'STAGE_STATUSES',
+  'tasks[].status': 'TASK_STATUSES',
+  'requirements[].status': 'REQUIREMENT_STATUSES',
+  'gates[].status': 'GATE_STATUSES',
+};
+
+/**
  * Read an exported array of string literals out of the source.
  *
  * The constants are imported nowhere on purpose. A checker that imports one of
@@ -50,9 +66,24 @@ export function parseStringArrayConst(source: string, name: string): string[] | 
     `export\\s+const\\s+${name}\\s*(?::[^=]*)?=\\s*\\[([^\\]]*)\\]`,
   );
   const match = pattern.exec(source);
-  if (match === null) return null;
+  return match === null ? null : stringLiterals(match[1] ?? '');
+}
 
-  const body = match[1] ?? '';
+/**
+ * The same read, for the Python side.
+ *
+ * A module-level `NAME = ['a', 'b']` and nothing cleverer: the constant exists
+ * to be compared, so the shape it is written in is part of what this checker
+ * asks of it.
+ */
+export function parsePythonListConst(source: string, name: string): string[] | null {
+  const pattern = new RegExp(`^${name}\\s*=\\s*\\[([^\\]]*)\\]`, 'm');
+  const match = pattern.exec(source);
+  return match === null ? null : stringLiterals(match[1] ?? '');
+}
+
+/** The quoted strings inside a list body, in order. */
+function stringLiterals(body: string): string[] {
   const values: string[] = [];
   for (const item of body.matchAll(/'([^']*)'|"([^"]*)"/g)) {
     values.push(item[1] ?? item[2] ?? '');
@@ -98,6 +129,7 @@ export interface CheckOptions {
   specDir?: string;
   contractFile?: string;
   phasesFile?: string;
+  syncFile?: string;
 }
 
 export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise<Violation[]> {
@@ -105,6 +137,7 @@ export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise
   const specFile = path.join(specDir, 'state-contract.md');
   const contractFile = options.contractFile ?? 'scripts/state/contract.ts';
   const phasesFile = options.phasesFile ?? path.join(specDir, 'phases.md');
+  const syncFile = options.syncFile ?? 'skills/maestro/tools/sync.py';
 
   const violations: Violation[] = [];
   const add = (check: string, file: string, line: number, message: string): void => {
@@ -197,6 +230,51 @@ export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise
     }
   }
   log.info('values', 'value sets compared', { sets: declared.size });
+
+  // --- the third side: the copy the прогон itself runs ---------------------
+  let syncSource: string | null = null;
+  try {
+    syncSource = await readFile(syncFile, 'utf8');
+  } catch {
+    add('sync', syncFile, 0,
+      'the only checker a real прогон runs could not be read, so its copy of the '
+      + 'value sets is unchecked');
+  }
+
+  if (syncSource !== null) {
+    let compared = 0;
+    for (const [field, constant] of Object.entries(SYNC_VALUE_SETS)) {
+      const carried = parsePythonListConst(syncSource, constant);
+      const stated = declared.get(field);
+
+      // The contract is the authority on which sets exist. A set it does not
+      // state is not one sync.py owes a copy of — but a copy of a set nobody
+      // states is still a finding, because it is a rule with no source.
+      if (stated === undefined) {
+        if (carried !== null) {
+          add('sync', specFile, 0,
+            `${path.basename(syncFile)} carries ${constant}, and the contract states no `
+            + `value set for "${field}"`);
+        }
+        continue;
+      }
+      if (carried === null) {
+        add('sync', syncFile, 0,
+          `${constant} is absent, so "${field}" is not checked where it still matters`);
+        continue;
+      }
+      compared += 1;
+      if (carried.join(',') !== stated.values.join(',')) {
+        add('sync', syncFile, 0,
+          `value set for "${field}" differs — contract [${stated.values.join(', ')}], `
+          + `${path.basename(syncFile)} [${carried.join(', ')}]`);
+      }
+    }
+    log.info('sync', 'the run-side copies compared', {
+      file: path.basename(syncFile),
+      sets: compared,
+    });
+  }
 
   // --- stage ids come from phases.md, not from the contract ----------------
   const phaseTables = parseTables(await readFile(phasesFile, 'utf8'));
