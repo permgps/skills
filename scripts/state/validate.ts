@@ -35,6 +35,24 @@ export interface StateViolation {
   message: string;
 }
 
+/**
+ * A state that failed the rules above, refused rather than handed on.
+ *
+ * It lives beside the violations it carries: both the writer and the reader
+ * throw it, and putting it in either one would make the other import its
+ * counterpart to name the error it raises itself.
+ */
+export class InvalidStateError extends Error {
+  readonly violations: StateViolation[];
+
+  constructor(violations: StateViolation[]) {
+    const summary = violations.map(v => `${v.field}: ${v.message}`).join('; ');
+    super(`refusing to write an invalid state — ${summary}`);
+    this.name = 'InvalidStateError';
+    this.violations = violations;
+  }
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 

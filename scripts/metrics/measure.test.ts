@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { CONTRACT_VERSION, type RunState } from '../state/contract.ts';
-import { serializeState, STATE_FILE } from '../state/write.ts';
+import { serializeState } from '../state/write.ts';
+import { STATE_FILE } from '../state/paths.ts';
 import { formatSpan, main, measure, render, span, targetFromArgv, wantsJson, widestWave } from './measure.ts';
 
 function baseline(): RunState {

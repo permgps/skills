@@ -6,7 +6,9 @@ import path from 'node:path';
 
 import { checkG1, type GateFinding } from './check-g1.ts';
 import { readState, parseStateSource, UnreadableStateError } from '../state/read.ts';
-import { writeState, InvalidStateError, STATE_FILE } from '../state/write.ts';
+import { writeState } from '../state/write.ts';
+import { InvalidStateError } from '../state/validate.ts';
+import { STATE_FILE } from '../state/paths.ts';
 import { CONTRACT_VERSION, type RequirementEntry, type RunState } from '../state/contract.ts';
 
 function stateWith(requirements: RequirementEntry[]): RunState {

@@ -58,9 +58,19 @@ function within(root: string, ...segments: string[]): string {
   return normalized;
 }
 
+/**
+ * The dashboard's only input, by name.
+ *
+ * Here rather than beside the writer because the reader needs it too, and a
+ * filename that two modules spell for themselves is a filename that can be
+ * spelled two ways. `statePath()` below is the same fact with the run root
+ * attached.
+ */
+export const STATE_FILE = 'state.js';
+
 /** Paths shared by the whole project, outside any one feature directory. */
 export const runRoot = (): string => ROOT;
-export const statePath = (): string => within(ROOT, 'state.js');
+export const statePath = (): string => within(ROOT, STATE_FILE);
 export const dashboardPath = (): string => within(ROOT, 'dashboard.html');
 
 /** Every path belonging to one feature slug. */

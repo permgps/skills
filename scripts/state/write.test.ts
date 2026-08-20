@@ -4,7 +4,9 @@ import { mkdtemp, mkdir, readFile, readdir, rm, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { writeState, serializeState, InvalidStateError, StaleStateError, STATE_FILE } from './write.ts';
+import { writeState, serializeState, StaleStateError } from './write.ts';
+import { InvalidStateError } from './validate.ts';
+import { STATE_FILE } from './paths.ts';
 import { CONTRACT_VERSION, type RunState } from './contract.ts';
 
 function baseline(): RunState {

@@ -10,18 +10,15 @@ import path from 'node:path';
 
 import { createLogger } from '../shared/log.ts';
 import type { RunState } from './contract.ts';
-// A cycle on purpose, and a safe one: read.ts takes `STATE_FILE` and
-// `InvalidStateError` from here, and both directions are used only inside
-// function bodies, never at module evaluation. The alternative was a second
-// copy of the unwrapping in this file, and the file format having two homes is
-// the defect that copy would create.
+import { STATE_FILE } from './paths.ts';
+// The conditional write has to see what is on disk, and unwrapping the
+// assignment is the reader's job. It is a one-way edge: `STATE_FILE` and
+// `InvalidStateError` live where they belong now, so read.ts does not come
+// back here for them.
 import { parseStateSource } from './read.ts';
-import { validateState, type StateViolation } from './validate.ts';
+import { InvalidStateError, validateState } from './validate.ts';
 
 const log = createLogger('state');
-
-/** The dashboard's only input, by name. */
-export const STATE_FILE = 'state.js';
 
 const HEADER = [
   '// Written by Maestro. Generated file — edit the run, not this.',
@@ -34,17 +31,6 @@ const HEADER = [
  */
 export function serializeState(state: RunState): string {
   return `${HEADER}\nglobalThis.MAESTRO_STATE = ${JSON.stringify(state, null, 2)};\n`;
-}
-
-export class InvalidStateError extends Error {
-  readonly violations: StateViolation[];
-
-  constructor(violations: StateViolation[]) {
-    const summary = violations.map(v => `${v.field}: ${v.message}`).join('; ');
-    super(`refusing to write an invalid state — ${summary}`);
-    this.name = 'InvalidStateError';
-    this.violations = violations;
-  }
 }
 
 /**

@@ -11,8 +11,8 @@ import path from 'node:path';
 
 import { createLogger } from '../shared/log.ts';
 import type { RunState } from './contract.ts';
-import { validateState } from './validate.ts';
-import { InvalidStateError, STATE_FILE } from './write.ts';
+import { STATE_FILE } from './paths.ts';
+import { InvalidStateError, validateState } from './validate.ts';
 
 const log = createLogger('state');
 
