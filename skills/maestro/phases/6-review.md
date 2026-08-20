@@ -23,8 +23,27 @@ G3.
 
 ### 2. Take each таск's diff
 
-One commit per finished таск is why this is possible at all — the diff of that
-commit is the whole of what the таск did.
+**A таск's diff is the union of its own commits, over its own files:**
+
+```
+git diff <tasks[].commits[0]>^..<tasks[].commits[-1]> -- <the таск's zone>
+```
+
+For a таск that landed once those are the same commit, and this is the diff of
+that commit — the whole of what the таск did, which is why reviewing it against
+its task file is possible at all.
+
+**For a таск that was repaired it is two, and the range is what makes the
+re-review honest.** The repair lands after the waves that followed the original,
+so the state those files were in when the first review was written no longer
+exists anywhere in the tree — only in that first commit. The range asks the one
+question this phase may ask: what did *this* таск do?
+
+**Do not review the tree.** By the time a repair lands, later waves are in it and
+always will be — waiting for a quiet tree would serialise the build, which is the
+one thing the wave order exists to avoid. A finding about what another таск put
+in the tree is a finding about the wrong таск, and it has cost a real прогон
+three uncheckable items already.
 
 A таск with no commit to point at did not finish the way the build recorded it.
 That is a build defect: report it and stop, rather than reviewing whatever sits

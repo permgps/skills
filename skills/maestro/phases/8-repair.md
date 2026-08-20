@@ -99,6 +99,15 @@ that word belongs to the review phase, and only for a таск whose review has 
 blocking finding. A repair that marks its own work accepted has removed the one
 check standing between it and the отчёт.
 
+**Append the new commit to the таск's `commits`; do not replace what is there.**
+The таск now has two, and the first is what its original review was written
+against — which is exactly what the re-review has to be measured by, because the
+tree those files sat in when that review was written no longer exists anywhere
+else. A single entry overwritten records the last commit and loses the first, and
+then the re-review has nothing to read but the tree, which by now carries every
+wave that landed since. Three *done means* items of a real таск became
+uncheckable that way.
+
 ## When It Does Not Go That Way
 
 **A later wave changed the таск's files.** The retry is against a file that has
@@ -137,6 +146,6 @@ this.
 
 | Artifact | State |
 |---|---|
-| project code | changed by an executor, never by you; one commit per retried таск |
+| project code | changed by an executor, never by you; one commit per retried таск, **appended** to that таск's `commits` |
 | `.maestro/<slug>/amendments.md` | one appended entry per amendment, each naming its `R##` and what demonstrated it |
-| `.maestro/state.js` | the таск back at `running` then `review`; a requirement status moved where an amendment moved it |
+| `.maestro/state.js` | the таск back at `running` then `review`; its repair commit appended to `commits`; a requirement status moved where an amendment moved it |

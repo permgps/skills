@@ -186,6 +186,16 @@ wave that fails halfway. The per-таск history is also what the review phase
 reads: a diff belonging to one таск can be judged against that таск's file, and
 a wave-sized diff cannot be split back apart afterwards.
 
+**A retried таск has more than one, and its commits are appended rather than
+replaced.** `tasks[].commits` in [`state-contract.md`](state-contract.md) is a
+list for this reason. What a таск did is the union of its commits —
+`git diff <first>^..<last>` over that таск's own files — and that is what the
+review reads, at first review and at re-review alike. **Not the tree.** By the
+time a repair lands, the waves that followed the original are in the tree and
+always will be; waiting for a quiet tree would serialise the build, which is the
+one thing the wave order exists to avoid. Only the range changes; the diff was
+already what the review read.
+
 ### Handoff
 
 A таск that runs out of context before it is done leaves
@@ -580,6 +590,12 @@ edited by two phases makes the first disagreement between them unattributable.
 Back through the review, not around it. A retried таск is committed and returns
 to `review` status; `done` is written where it is always written, by the review
 phase, and only for a таск whose review has no blocking finding.
+
+The repair's commit is **appended** to `tasks[].commits`, so the re-review is
+given the same range rule as the first: everything that таск did, from the first
+commit's parent to the last, over that таск's own files. Overwriting the entry
+would lose the commit the original review was written against, which is the one
+the re-review has to be measured against.
 
 **No gate follows repair.** The таск re-enters a phase that already has one
 answer to give about it, and G4 still measures the whole build against the

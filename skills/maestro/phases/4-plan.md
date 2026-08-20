@@ -78,7 +78,23 @@ Each file carries:
 A task file that assumes context the executor does not have is the defect this
 phase produces most often. Read each one back as if you had never seen the spec.
 
-**An item of *done means* is phrased so it can be answered without putting
+**An item of *done means* is answerable against this таск's own diff.** The
+executor is judged on what it did, and the review reads exactly that — the union
+of the таск's commits over the таск's own files, never the tree, which by then
+carries every wave that landed since. So an item measured against the tree, or
+against a total another таск also moves, stops being answerable the moment the
+build moves on. `board-sizes` T02 failed three items that were true when they
+were written: «35 of 35 self-checks pass», where another таск later took the
+total to 96; «`git status` shows one modified file», after T03 landed; and
+«`index.html` as it was before the прогон», which stopped being true for reasons
+that had nothing to do with T02. None of the three was about T02's work.
+
+Write items about **this** таск's files, this таск's assertions, this таск's
+exit code. A count that includes work other таски produce belongs to приёмка,
+which measures the whole build and is the only reader entitled to a whole-build
+number.
+
+**And an item of *done means* is phrased so it can be answered without putting
 anything in front of the user.** «The checks page shows all green» is not such an
 item: the only way to satisfy it is to open the page, and an executor that opens
 a page takes over the screen the прогон is being watched on. Write what can be
@@ -99,10 +115,12 @@ one question: could you build this without asking a question?
 They are independent of each other, so they go out at once and the wave is as
 wide as the host allows.
 
-The same test belongs to that reading: **a task file whose *done means* can only
-be satisfied by opening something is a finding.** The reader is standing exactly
-where the executor will stand, so it is the one place the question can be asked
-before the answer costs the user their screen.
+Both tests above belong to that reading: **a task file whose *done means* can
+only be satisfied by opening something is a finding, and so is one that can only
+be answered by looking at work this таск does not own.** The reader is standing
+exactly where the executor will stand, so it is the one place either question can
+be asked before the answer costs the user their screen or costs a reviewer an
+item nobody can check.
 
 Act on every finding by editing the task file, here, before any executor sees
 it. Then record them in the G3 entry of the run state — an empty list is a real

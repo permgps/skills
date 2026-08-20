@@ -34,7 +34,7 @@ Write it down as a finding rather than going to look.
 
 ## What Is A Finding
 
-Three shapes, and every one of them is about these two documents rather than
+Four shapes, and every one of them is about these two documents rather than
 about the project:
 
 - **A contradiction.** The task file requires two things that cannot both hold,
@@ -45,6 +45,12 @@ about the project:
 - **A name that is not the real name.** The task file quotes an identifier, a
   path or a signature in a form that does not match `interfaces.md`, so building
   it literally would produce something nothing else can call.
+- **An item of *done means* that is not about this таск.** You will be judged on
+  what you produce, and only that. An item measured against the whole project —
+  a total that counts other people's work, a clean `git status`, a file «as it
+  was before» — is one you cannot answer, because others are working beside you
+  and their work lands in the same place. Quote the item and say what about it
+  is not yours.
 
 Each finding is:
 
