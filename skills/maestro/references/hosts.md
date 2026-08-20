@@ -67,6 +67,14 @@ is that nobody later mistakes a host limitation for a decision the прогон 
   window. A client may present the pane as a folded row in the chat, and your
   tool reports the same success it reports for a panel filling half the screen.
   Name the address, and say the row opens with a press.
+- **Do not open a second page where the panel is.** The pane is the panel's for
+  the rest of the прогон. Twice now a page opened beside it — a subagent's own
+  checks, served on a port it chose — and afterwards the panel was gone from the
+  strip; whether the viewer keeps only one preview is its business, and creating
+  the situation is ours. If something truly has to be seen, the orchestrator
+  shows it in a window of its own, never in this pane, and never over `file://`:
+  the identical page that answers «96 прошло» over http answers «96 не прошло»
+  from a worktree, and the failure belongs to the route, not to the build.
 - **Do not skip a reader because fan-out is missing.** Sequential is slower, not
   weaker; the withholding is what makes the reading worth anything, and that
   survives.
