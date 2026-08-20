@@ -38,7 +38,7 @@ on something you were able to decide.
 
 | Mode | What is asked |
 |---|---|
-| `full` | nothing. Answer every fork from the бриф itself and record each answer as self-briefed |
+| `full` | nothing. Answer every fork yourself and record each answer as self-briefed |
 | `semi` | genuine forks only — sometimes none |
 | `interview` | every fork the бриф opens |
 | `manual` | the same as `interview` |
@@ -50,6 +50,24 @@ on something you were able to decide.
   attached to something.
 - S4 still asks in `full`. That mode buys freedom from questions about
   preference, never from questions about consequence.
+
+**Answering a fork yourself may mean looking, and looking has a floor and a
+ceiling here.** A бриф that reports a bug opens forks the бриф cannot settle —
+what the code does today is a fact about the repository, not about the sentence
+describing it. So in `full` you may read the project's files to answer such a
+fork, and that is the whole of the permission: read, and nothing else. You do
+not run the project, drive its interface, reproduce the defect, or change a line
+of it. Reproducing belongs to the таск that fixes it, five phases from here,
+where a субагент does it against a spec that says what «fixed» means.
+
+**And it ends in this turn, in `answers.md`.** The reading is one step inside
+step 3 and never a stage of its own. A прогон that announced it was going to see
+the bug for itself and then said nothing more left the user watching a стадия
+whose clock ran for twenty-six minutes over work that was never started — from
+outside, a run reading the codebase and a run that has stopped look exactly the
+same. If the files do not settle the fork, that is an answer too: record what
+you looked at and why it was not enough, and let the specification carry the
+question forward as a placeholder.
 
 ### 4. Write `answers.md`
 

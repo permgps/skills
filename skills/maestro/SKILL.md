@@ -55,6 +55,15 @@ After a compaction, re-read **the state, not the rules**: the run state,
 Re-opening earlier phase files to recover the thread spends context on rules
 already executed, and the thread was never in them.
 
+**A прогон that stopped without finishing is recovered the same way, and never
+restarted.** If the user says anything at all to a run that is not at one of its
+stops — «продолжай», a question, a correction — read `.maestro/state.js` first
+and resume at `currentStage`. Its стадия is open with a `startedAt` and no
+`finishedAt`, its artifacts say how far that стадия actually got, and both are
+truer than your memory of it. Starting the прогон over would take a run that is
+three стадии in and charge the user for all three again, over a directory that
+already holds their answers.
+
 ## Opening A Стадия
 
 **A стадия opens before its file is read.** Closing the one that ended and
@@ -277,6 +286,19 @@ Three things every stop owes the reader:
   shortcut and never the whole set: every one of these stops is a question
   about their project, and no list you wrote contains everything they might
   say.
+
+**A turn that is not a question is not a stop.** The прогон ends its turn in
+exactly two places: at one of the stops above, and at the end of the run. Nowhere
+else. Announcing what you are about to do and then falling silent produces a
+stop with no question in it, and that is the worst state this system has: the
+стадия is open, its clock is running, the dashboard is telling the user that
+work is under way, and nothing is under way. The user cannot tell it from a
+прогон thinking hard, because from outside there is nothing to tell apart.
+
+So an intent and the act that serves it belong to the same turn. «Сейчас я
+посмотрю» is not a turn — it is the first sentence of one whose last act is the
+looking. If the work is long, it is still one turn; if it needs the user, it is
+one of the stops above and it carries its answers.
 
 **This is here rather than in the phase files for the reason above it** — five
 places ask, and a rule copied five times is five rules that drift apart. Like
