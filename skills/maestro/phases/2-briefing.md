@@ -28,7 +28,7 @@ A **fork** is a question whose two answers produce different builds. A
 | Two answers change only wording the spec could pick either way | no — decide it, list it under Assumptions |
 | The answer is a fact about the user you do not have — a price, an address, an account name | yes, always. S3 forbids inventing it, and a placeholder that reached the build is a defect |
 | The answer commits the user to money, data loss, or a third party | yes, in every mode. That is S4, and no mode removes it |
-| The English wording of a требование reads oddly | **never asked.** The манифест was agreed in Russian in the previous phase; reopening the translation reopens a contract already closed. If the требование itself is unclear, ask about the требование |
+| The English wording of a требование reads oddly | **never asked.** The манифест was agreed in the previous phase, in the user's own language and with the original beside it where the two differed; reopening the translation reopens a contract already closed. If the требование itself is unclear, ask about the требование |
 
 A бриф that opens no forks is a normal бриф, not a suspiciously thin one. Do not
 manufacture a question to look thorough — each one spends the user's attention

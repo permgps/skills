@@ -94,9 +94,11 @@ already run. A round that sends disagreements to repair leaves both unset: a
 прогон marked finished while work is still routed out of it is a dashboard
 telling the user something that is not true.
 
-Then say in Russian what the отчёт contains — what was asked and what was
-delivered, what disagreed, what was assumed. Labels are resolved from the
-словарь at that moment; the отчёт itself stores none of them.
+Then say, in the прогон's language, what the отчёт contains — what was asked
+and what was delivered, what disagreed, what was assumed. Labels are resolved
+from the словарь at that moment, out of the column that language owns; the
+отчёт itself stores none of them, and `report.md` on disk stays English either
+way.
 
 ## When It Does Not Go That Way
 

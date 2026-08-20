@@ -33,6 +33,11 @@ Render the redacted бриф into English and write it to
 
 - This is the **only** translation in the whole прогон. No later phase
   re-translates anything.
+- **When the бриф is already English, it is translated zero times.** The file is
+  the redacted бриф as it was typed. There is nothing here to render, and a
+  pass that "tidied" it into better English would be the one thing this step
+  forbids: the бриф is the user's words, and improving them is substituting
+  them.
 - Translate; do not summarise, tidy, or resolve. An ambiguity in the бриф is
   carried into English as an ambiguity, and belongs to the брифинг phase.
 - Where a translation was genuinely uncertain, note it — it goes under
@@ -69,22 +74,42 @@ A status of `open`, `deferred` or `dropped` requires a recorded reason. At this
 point every требование is `open` with the reason "not yet briefed"; G1 is what
 later insists that none of them stayed that way without an answer.
 
-### 6. Show the манифест to the user, in Russian
+### 6. Show the манифест to the user, in the прогон's language
 
-Before any other work begins, show the numbered list back in Russian:
+Before any other work begins, show the numbered list back:
 
 ```text
 R01 — …
 R02 — …
 ```
 
-- This is the translated contract being agreed rather than substituted.
+- This is the contract being agreed rather than substituted.
+- **When the бриф and the dial are in different languages, each line carries the
+  original beneath it**, in the user's own words as they typed them:
+
+  ```text
+  R01 — Users can reset their password by email
+        Пользователь может сбросить пароль по почте
+  ```
+
+  This gate is a round-trip check — the user is being asked whether what came
+  back is what they said — and a round trip that shows only the far end is not
+  one. It is the single place in the прогон where hiding a translation costs
+  something, so it is the single place the original is shown beside it.
+- **When they agree, there is no second line**, because there was no
+  translation. A line repeated under itself would teach the user that the second
+  line means nothing.
+- **`manifest.md` is unchanged by all of this.** §4 stands: the file holds text
+  and nothing else, it is written once, and what is written in it is the English
+  требование. The second line lives in this display and nowhere on disk — the
+  file the gates read must have one wording, or S1 has two documents to compare
+  against and no way to choose.
 - In `semi`, `interview` and `manual`: ask whether anything is missing or
   misread, and wait. **Offer the answers** — see *Asking A Question* in
   `SKILL.md`. Three of them, at least: that it is right and the брифинг may
   begin, that a требование is wrong or missing and here is which, and their own
   words for anything neither covers. Say which requirement they would be
-  naming — `R02`, not «одно из них» — and say that this is the last moment the
+  naming — `R02`, not "one of them" — and say that this is the last moment the
   манифест is open to you, because after this phase only they can change it.
 - In `full`: show it anyway, **without a question**, and continue. Any wording
   whose translation was uncertain goes to Assumptions in `report.md`.
@@ -105,6 +130,6 @@ phase created.
 | `.maestro/<slug>/<YYYY-MM-DD>-brief.md` | written once, English, redacted |
 | `.maestro/<slug>/manifest.md` | written once, numbered требования, no statuses |
 | `.maestro/state.js` | `requirements[]` filled, every entry `open` with a reason |
-| the манифест | shown to the user in Russian |
+| the манифест | shown to the user in the прогон's language, with the original beside it when the two differ |
 
 Then read the briefing phase file.

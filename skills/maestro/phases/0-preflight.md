@@ -242,10 +242,10 @@ anything.
 
 ### 6. Announce the dials
 
-Show the announcement composed by the dials phase, in Russian, in one block:
-register, mode, depth, whether доводка is on, and the one consequence most
-likely to surprise. It was composed in the register it names; show it as it
-came.
+Show the announcement composed by the dials phase in one block: register, mode,
+depth, whether доводка is on, and the one consequence most likely to surprise.
+It was composed in the register **and the language** it names; show it as it
+came, and do not translate it here — this phase shows what that one composed.
 
 **Add what step 1b found**, if anything was missing: name the capability and what
 it costs, one line each. A прогон that quietly ran its таски one at a time

@@ -150,6 +150,11 @@ plainly, and the question that would have fixed it arrives too late.
 | a mode | the two registers, then pin that mode? |
 | both | pin them? |
 
+**Both questions are asked in the прогон's language**, which is resolved before
+them — it comes off the бриф, and the бриф is already in front of you. The
+wordings below are the Russian ones; in `en` say the same thing in English, and
+never mix the two inside one question.
+
 **The two registers**, marked so a user who does not care can take the default:
 
 | Register | What you get |
@@ -228,7 +233,7 @@ Use these:
 | `strict` | nothing beyond the бриф will be added |
 | `manual` | the run will wait for your approval twice |
 | `polish` | up to three доводка rounds run after приёмка |
-| `plain` | всё объясняется простыми словами; сказать «как обычно» — и вернётся обычный язык |
+| `plain` | всё объясняется простыми словами; сказать «как обычно» — и вернётся обычный язык. In `en`: everything is explained in ordinary words; say «as usual» to go back |
 
 The announcement is shown in **every** mode, `full` included. It is a statement,
 not a question. Do not wait for a reply.

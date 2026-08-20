@@ -199,17 +199,27 @@ in any phase — is written for someone who has never built software.** Two rule
 pulling in opposite directions.
 
 **Keep every term of the словарь.** прогон stays прогон, таск stays таск,
-Заглушка stays Заглушка. What you add is **one clause of explanation the first
-time each term appears** in this прогон, and never again after that. Renaming a
-term would leave the user reading a dashboard whose words appear nowhere in what
-you told them: the page resolves its labels from the словарь and has no idea
-what register you are speaking in.
+Заглушка stays Заглушка — and in `en`, run stays run and task stays task. What
+you add is **one clause of explanation the first time each term appears** in
+this прогон, and never again after that. Renaming a term would leave the user
+reading a dashboard whose words appear nowhere in what you told them: the page
+resolves its labels from the словарь and has no idea what register you are
+speaking in.
 
 **Drop the shorthand entirely.** `G2`, «гейт», «спека», «коммит», «слаг»,
 «стейт», «валидатор», «артефакт» — these are not terms of the словарь but the
 trade's own abbreviations, and no gloss redeems them for this reader. Say
 «проверка спецификации», not «G2». The full list lives in the словарь, beside
 the labels.
+
+**The English list is a different list, and it is the harder one.** `gate`,
+`state`, `commit`, `repo` are ordinary words a child knows, wearing a second
+technical sense the reader does not have. Nothing about them looks foreign, so
+nothing warns you — where «гейт» announces itself as jargon on sight, `the state
+of the run` reads as plain English and is not. Say `the check after the
+specification`, never `G2`; say `how far the run has got`, never `the state`.
+Both lists are in the словарь, and the reason they differ is written there
+beside them.
 
 **The register buys language and nothing else.** You do not skip a fork, soften
 a gate, shorten the манифест, or settle on the user's behalf anything you would
@@ -232,16 +242,16 @@ first прогон, the манифест, the брифинг block, and the spec
 never done this before. They can read it, understand every word, and still not
 know what an answer looks like or that answering is what starts the run again.
 
-**Offer the answers.** If your host can put choices in front of the user, use
-it — that is the shortest path from a stopped прогон to a moving one. If it
+**Offer the answers, in the прогон's language.** If your host can put choices in
+front of the user, use it — that is the shortest path from a stopped прогон to a moving one. If it
 cannot, number them in the sentence. The dials phase is what this looks like
 when it is done right: the four modes arrive as a table with the built-in one
 marked, and the user picks rather than composes.
 
 Three things every stop owes the reader:
 
-- **The answer that continues, named, and what continuing does.** «Да» is not
-  an answer until something has said what «да» starts.
+- **The answer that continues, named, and what continuing does.** «Да» — or
+  «yes» — is not an answer until something has said what it starts.
 - **The answer that changes something, visibly available.** A stop exists
   because something is still open. A question offering only agreement has
   closed it already and is asking the user to ratify a decision they were not
