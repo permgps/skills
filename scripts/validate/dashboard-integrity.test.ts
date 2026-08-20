@@ -28,12 +28,20 @@ const VOCABULARY = `# Vocabulary
 | \`mode\` | \`semi\` | Полуавтомат |
 | \`depth\` | \`normal\` | Обычная |
 | \`polish\` | \`false\` | Выключена |
+| \`explain\` | \`plain\` | Простые |
 
 ## Screen Labels
 
 | Label | What it names |
 |---|---|
 | Ход разработки | The таски as they are being built |
+
+## Plain Words
+
+| Shorthand | Say instead |
+|---|---|
+| гейт, гейты | проверка |
+| медиана | серединное значение |
 `;
 
 const PHASES = `# Phases
@@ -79,6 +87,7 @@ const LOGIC = {
   MODE: "{ semi: 'Полуавтомат' }",
   DEPTH: "{ normal: 'Обычная' }",
   POLISH: "{ 'false': 'Выключена' }",
+  REGISTER: "{ plain: 'Простые' }",
   GATE_AFTER: "{ G1: 'preflight' }",
   EXPLAIN_ORDER: "['progress', 'gates']",
   explain: "function (key) { return key === 'nothing' ? [] : ['what it is', 'what it holds']; }",
@@ -101,6 +110,8 @@ function page(overrides: {
   body?: string;
   omitLogicBlock?: boolean;
   logicSource?: string;
+  /** The body of the page's plain-explanation literal, read as source. */
+  plain?: string | null;
   /** The body of the snapshot block. `null` leaves the block out entirely. */
   snapshot?: string | null;
 } = {}): string {
@@ -110,8 +121,12 @@ function page(overrides: {
     .map(id => `<div id="${id}"></div>`).join('\n');
   const explained = (overrides.explained ?? EXPLAINED)
     .map(key => `<section data-region="${key}"><h2>${key}</h2></section>`).join('\n');
+  const plainBody = overrides.plain === undefined
+    ? "progress: function () { return ['простыми словами']; }"
+    : overrides.plain;
+  const plainLiteral = plainBody === null ? '' : `var EXPLAIN_PLAIN = {\n    ${plainBody}\n  };\n`;
   const source = overrides.logicSource
-    ?? `globalThis.MAESTRO_LOGIC = {\n    ${entries}\n  };`;
+    ?? `${plainLiteral}globalThis.MAESTRO_LOGIC = {\n    ${entries}\n  };`;
   const logicBlock = overrides.omitLogicBlock ? '' : `<script id="logic">\n${source}\n</script>`;
   const snapshotBody = overrides.snapshot === undefined
     ? '/* maestro:snapshot:start */\nglobalThis.MAESTRO_SNAPSHOT = null;\n/* maestro:snapshot:end */'
@@ -374,4 +389,77 @@ test('a region that names itself needs no heading', () => {
       '<section data-region="gates"><h2>gates</h2></section>'
       + '<div data-region="progress" data-region-label="Тумблеры"></div>');
   assert.deepEqual(checkDashboard(html, SPEC), []);
+});
+
+// --- the plain register ----------------------------------------------------
+
+test('a region explained in one register and silent in the other is reported', () => {
+  const found = messages(page({
+    logic: {
+      explain: "function (key, state, now, marks, register) {"
+        + " return register === 'plain' ? [] : ['что это', 'что сейчас']; }",
+    },
+  }));
+  assert.match(found, /region "progress" has no explanation behind it in the plain register/);
+  assert.doesNotMatch(found, /in the normal register/);
+});
+
+test('a plain explanation carrying banned shorthand is reported, with the word named', () => {
+  const found = messages(page({
+    plain: "progress: function () { return ['считается по медиана после гейта']; }",
+  }));
+  assert.match(found, /a plain string in the plain explanations says "медиана"/);
+  assert.match(found, /says "гейт"/);
+});
+
+// A branch a fixture never reaches still ships, and the empty state of a region
+// is exactly the branch a fixture forgets — so the block is read, not called.
+test('shorthand in a branch that is never taken is reported all the same', () => {
+  const found = messages(page({
+    plain: "progress: function (state) { return [state.tasks ? 'всё хорошо' : 'нет медиана']; }",
+  }));
+  assert.match(found, /says "медиана"/);
+});
+
+test('a label the screen shows is exempt, in its exact form and nowhere else', () => {
+  const spec: SpecSources = {
+    ...SPEC,
+    'vocabulary.md': SPEC['vocabulary.md']
+      .replace('| Ход разработки | The таски as they are being built |',
+        '| Ход разработки | The таски as they are being built |\n| Гейты | The checks |'),
+  };
+  const withLabel = (body: string): string =>
+    page({ plain: body }).replace('<h2>Ход разработки</h2>', '<h2>Ход разработки</h2><h2>Гейты</h2>');
+
+  // The block the reader just clicked on is called «Гейты» on the screen, and a
+  // popover forbidden from naming it could not teach it.
+  assert.deepEqual(
+    checkDashboard(withLabel("progress: function () { return ['Блок «Гейты» — это проверки']; }"), spec),
+    [],
+  );
+  // The same word as ordinary prose is still shorthand.
+  assert.match(
+    checkDashboard(withLabel("progress: function () { return ['сразу после гейта']; }"), spec)
+      .map(v => v.message).join('\n'),
+    /says "гейт"/,
+  );
+});
+
+test('a page with no plain-explanation block at all is reported', () => {
+  assert.match(messages(page({ plain: null })), /carries no EXPLAIN_PLAIN block to check/);
+});
+
+test('a specification with no Plain Words table is reported', () => {
+  const spec: SpecSources = {
+    ...SPEC,
+    'vocabulary.md': SPEC['vocabulary.md'].replace('| гейт, гейты | проверка |', ''),
+  };
+  // The table itself is what is missing, not one of its rows.
+  const stripped: SpecSources = {
+    ...spec,
+    'vocabulary.md': spec['vocabulary.md']
+      .replace(/## Plain Words[\s\S]*$/, ''),
+  };
+  assert.match(messages(page(), stripped),
+    /vocabulary\.md has no table with columns Shorthand and Say instead/);
 });

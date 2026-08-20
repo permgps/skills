@@ -329,6 +329,30 @@ globalThis.MAESTRO_LOGIC = (function () {
   var DEPTH = { strict: 'Строгая', normal: 'Обычная', deep: 'Глубокая' };
   var POLISH = { 'true': 'Включена', 'false': 'Выключена' };
 
+  /**
+   * The register's two values.
+   *
+   * Named REGISTER rather than EXPLAIN, which would have matched MODE/DEPTH/
+   * POLISH: `EXPLAIN`, `EXPLAIN_ORDER` and `explain()` below are the i-popover
+   * machinery, and two of those three are read by name from
+   * scripts/validate/dashboard-integrity.ts and dashboard-logic.test.ts.
+   * Renaming them to win a naming symmetry no contract asks for would touch two
+   * validators and nineteen tests.
+   */
+  var REGISTER = { plain: 'Простые', normal: 'Обычные' };
+
+  /**
+   * Which register this state asks for.
+   *
+   * Absent is `normal` for the purpose of choosing words, and that is the only
+   * thing it is treated as: the chip is not drawn for a state that carries no
+   * `explain`, so a прогон written before the register existed renders exactly
+   * as it did — the page never claims a choice nobody made.
+   */
+  function registerOf(state) {
+    return (state && state.explain === 'plain') ? 'plain' : 'normal';
+  }
+
   var REQUIREMENT_ORDER = ['in-spec', 'placeholder', 'deferred', 'dropped', 'open'];
   var TASK_ORDER = ['done', 'running', 'review', 'repair', 'queued', 'failed'];
 
@@ -859,21 +883,30 @@ globalThis.MAESTRO_LOGIC = (function () {
    * arithmetic nobody could see — so a session that died mid-стадия left the
    * clocks running and said nothing.
    */
-  function silenceNotice(state, now, marks) {
+  function silenceNotice(state, now, marks, register) {
     if (!state || isStopped(state)) return null;
     var last = lastWrite(state, marks);
     if (last === null) return null;
 
+    var plain = (register || registerOf(state)) === 'plain';
     var quiet = Math.max(0, now - last);
     var record = longestSilence(marks);
     if (record !== null && quiet > record) {
       return {
         alarming: true,
-        line: 'Тишина ' + formatGap(quiet) + ' — дольше, чем этот прогон молчал до сих пор ('
-          + formatGap(record) + ').'
+        line: plain
+          ? 'Ничего не менялось ' + formatGap(quiet) + ' — дольше, чем за весь прогон до сих пор ('
+            + formatGap(record) + '). Возможно, работа остановилась.'
+          : 'Тишина ' + formatGap(quiet) + ' — дольше, чем этот прогон молчал до сих пор ('
+            + formatGap(record) + ').'
       };
     }
-    return { alarming: false, line: 'Последняя запись — ' + formatGap(quiet) + ' назад.' };
+    return {
+      alarming: false,
+      line: plain
+        ? 'В последний раз что-то менялось ' + formatGap(quiet) + ' назад.'
+        : 'Последняя запись — ' + formatGap(quiet) + ' назад.'
+    };
   }
 
   /**
@@ -1074,14 +1107,225 @@ globalThis.MAESTRO_LOGIC = (function () {
     }
   };
 
+  /**
+   * The same fourteen regions, for a reader who has never built software.
+   *
+   * Built from the same functions as the entries above, for the same reason:
+   * an explanation that recomputed its own numbers could disagree with the one
+   * beside it, and the plain reader is the last person able to notice.
+   *
+   * Two rules, from docs/spec/vocabulary.md. Terms of the словарь stay and
+   * carry one clause of explanation — renaming таск to «шаг» would leave this
+   * reader looking at a screen whose words nothing here matches. Shorthand goes
+   * entirely, and a label the screen shows is not shorthand: «Гейты» and
+   * G1…G4 are on the page in both registers, and this popover is the thing
+   * that teaches them.
+   *
+   * A term is explained in each popover where it carries the meaning, rather
+   * than once across the page: these open one at a time, in any order, and a
+   * reader who opened the third one first was never shown the first.
+   */
+  var EXPLAIN_PLAIN = {
+    dials: function (state) {
+      var changes = (state.dialChanges || []).length;
+      var settings = 'Режим «' + label(MODE, state.mode) + '», глубина «'
+        + label(DEPTH, state.depth) + '», доводка '
+        + label(POLISH, state.polish).toLowerCase();
+      if (state.explain) settings += ', объяснения «' + label(REGISTER, state.explain) + '»';
+      return [
+        'Настройки, на которых идёт эта работа.',
+        settings + '.',
+        changes > 0
+          ? 'По ходу дела настройки меняли — ' + changes + ' '
+            + plural(changes, 'раз', 'раза', 'раз') + '. Записано, на каком шаге.'
+          : 'Настройки не меняли с самого начала.',
+        'Режим решает, о скольком у вас спрашивают. Глубина — насколько подробно прорабатывать то, что вы просили. Доводка — будет ли в конце круг наведения красоты. Ни одна настройка не отменяет проверок, которые идут после каждого шага.'
+      ];
+    },
+
+    progress: function (state) {
+      var p = overallProgress(state);
+      return [
+        'Сколько всего пути пройдено — одной цифрой.',
+        p.stagesTotal === 0
+          ? 'Этапы ещё не заведены, поэтому считать пока нечего.'
+          : 'Этапов пройдено ' + p.stagesDone + ' из ' + p.stagesTotal + ', тасков сделано '
+            + p.tasksDone + ' из ' + p.tasksTotal + ' — вместе ' + p.percent + '%.',
+        'Таск — это один кусок работы, который делает один исполнитель. Этапы весят по-разному: разработка длинная, подготовка короткая, поэтому полоска растёт неровно — так и задумано.'
+      ];
+    },
+
+    coverage: function (state) {
+      var share = coverage(state.requirements);
+      var counts = countRequirements(state.requirements);
+      return [
+        'Какая доля того, что вы просили, уже описана в спецификации.',
+        share.live === 0
+          ? 'Список того, что вы просили, ещё не составлен — его пишут на первом шаге.'
+          : share.inSpec + ' из ' + share.live + ' — это ' + share.percent + '%.',
+        'Требование — это один пункт вашей просьбы под своим номером. Снятых требований '
+          + counts.dropped + ', и в счёт они не идут: снятое вы отменили сами, это не пробел.'
+      ];
+    },
+
+    stage: function (state) {
+      var stage = currentStage(state);
+      var place = stagePosition(state);
+      return [
+        'Шаг, на котором работа стоит прямо сейчас.',
+        stage
+          ? 'Идёт «' + label(STAGE_LABEL, stage.id) + '», ' + place.position + '-й из '
+            + place.total + ', состояние — ' + label(STAGE_STATUS, stage.status).toLowerCase() + '.'
+          : 'Какой этап идёт сейчас, ещё не записано.',
+        'Часы идут от начала этапа и встают, когда он закрыт. Новый этап начинается ровно в тот момент, когда закончился предыдущий, поэтому времени «между этапами» не бывает.'
+      ];
+    },
+
+    elapsed: function (state, now, marks) {
+      var median = medianTaskMs(state, now, marks);
+      return [
+        'Сколько времени в работе — рабочего, а не по календарю.',
+        median === null
+          ? 'Серединное время на один таск появится, когда закончатся два таска: по одному считать нечего.'
+          : 'Серединное время на один таск — ' + formatMinutes(median) + '.',
+        'Если между двумя записями прошло больше ' + formatMinutes(IDLE_CEILING_MS)
+          + ', засчитывается только ' + formatMinutes(IDLE_CEILING_MS)
+          + ': работа, брошенная на ночь, не должна отчитаться за ночь труда.'
+      ];
+    },
+
+    estimate: function (state, now, marks) {
+      var what = 'Сколько ещё осталось — вилкой «от и до», а не одним числом.';
+      if (state.finishedAt) return [what, 'Работа закончена, оценивать больше нечего.'];
+
+      var estimate = estimateMs(state, now, marks);
+      var chain = criticalPath(state.tasks);
+      var median = medianTaskMs(state, now, marks);
+      return [
+        what,
+        estimate === null
+          ? 'Пока не из чего считать: нужно, чтобы закончились хотя бы два таска.'
+          : formatMinutes(estimate.low) + ' … ' + formatMinutes(estimate.high)
+            + ' при серединном времени ' + formatMinutes(median) + ' и цепочке в ' + chain + ' '
+            + plural(chain, 'таск', 'таска', 'тасков') + '.',
+        'Считается по самой длинной цепочке — по тем таскам, которые ждут друг друга. То, что делается одновременно, времени не добавляет. Одно точное число было бы выдумкой, вилка — нет.'
+      ];
+    },
+
+    tasks: function (state) {
+      var counts = countTasks(state.tasks);
+      return [
+        'Сколько кусков работы закончено из нарезанных.',
+        counts.total === 0
+          ? 'Работу ещё не нарезали на таски — это делают на шаге плана.'
+          : 'Готово ' + counts.done + ' из ' + counts.total + ', в работе ' + counts.active
+            + ': пишется ' + counts.running + ', на ревью ' + counts.review
+            + ', в ремонте ' + counts.repair + '.',
+        counts.retries > 0
+          ? 'Переделок ' + counts.retries + '. Таск, вернувшийся не готовым, идёт в ремонт, а не переписывается на месте.'
+          : 'Ревью — это когда написанное читает и проверяет другой исполнитель. Таск на ревью или в ремонте засчитан на три четверти: он уже написан, но ещё не принят.'
+      ];
+    },
+
+    debt: function (state) {
+      var debt = debtCounts(state);
+      return [
+        'Долг: то, что сделано не до конца, и о чём это сказано честно.',
+        debt.total === 0
+          ? 'Долга нет.'
+          : 'Всего ' + debt.total + ': заглушек ' + debt.placeholders + ', допущений '
+            + debt.assumptions + ', пустых переменных ' + debt.emptyEnv + '.',
+        'Заглушка — это место, где нужны были ваши данные, а их не было: телефон, адрес, цена. Допущение — то, что прогон решил за вас, никого не спросив. В пустых переменных лежат только имена — значение пароля не попадает в файлы никогда.'
+      ];
+    },
+
+    tests: function (state) {
+      var tests = testsOf(state);
+      return [
+        'Последняя проверка написанного кода.',
+        tests
+          ? 'Прошло ' + tests.passed + ', упало ' + tests.failed + '.'
+          : 'Тесты ещё не запускали. Пусто — это не «ноль упавших»: страница молчит, а не утверждает, что всё хорошо.',
+        'Тест — это маленькая программа, которая проверяет, что другая программа делает обещанное. Показан полный запуск, а если его не было — тесты последнего таска.'
+      ];
+    },
+
+    requirements: function (state) {
+      var counts = countRequirements(state.requirements);
+      return [
+        'Всё, что вы просили, посчитанное по состояниям.',
+        counts.total === 0
+          ? 'Список того, что вы просили, ещё не записан.'
+          : 'Всего ' + counts.total + ', живых ' + counts.live + ': в спецификации '
+            + counts['in-spec'] + ', открытых ' + counts.open + ', заглушкой '
+            + counts.placeholder + ', отложенных ' + counts.deferred + ', снятых '
+            + counts.dropped + '.',
+        'Требование — это один пункт вашей просьбы под своим номером. Ни один не пропадает молча: у снятого и у отложенного записана причина.'
+      ];
+    },
+
+    stages: function (state) {
+      var stages = orderedStages(state);
+      var closed = 0;
+      stages.forEach(function (stage) { if (stage.status === 'done') closed += 1; });
+      return [
+        'Все шаги по порядку, каждый со своим временем.',
+        stages.length === 0
+          ? 'Этапы ещё не заведены.'
+          : 'Записано ' + stages.length + ', закрыто ' + closed + '.',
+        'Упавший этап показан вместе с замечаниями своей проверки. Проверок четыре: после брифинга, после спецификации, после плана и в конце, на приёмке.'
+      ];
+    },
+
+    build: function (state, now) {
+      var tasks = state.tasks || [];
+      return [
+        'Таски так, как их делали: по волнам, с часами и состоянием каждого.',
+        tasks.length === 0
+          ? 'Работу ещё не нарезали на таски.'
+          : 'Волн ' + groupByWave(tasks).length + ', тасков ' + tasks.length
+            + ', больше всего одновременно шло — ' + peakParallel(tasks, state, now) + '.',
+        'Волна — это таски, которые можно было запустить вместе. Сколько шло вместе на самом деле, читается по часам, а не по размеру волны.'
+      ];
+    },
+
+    'requirement-list': function (state) {
+      var counts = countRequirements(state.requirements);
+      return [
+        'То, что вы просили, по одному пункту.',
+        counts.total === 0
+          ? 'Список ещё не записан.'
+          : 'Живых ' + counts.live + ' из ' + counts.total + '.',
+        'Это тот же список, что и в карточке наверху: там счёт, здесь строки.'
+      ];
+    },
+
+    gates: function (state) {
+      var gates = (state.gates || []).filter(Boolean);
+      var passed = 0, failed = 0;
+      gates.forEach(function (gate) {
+        if (gate.status === 'passed') passed += 1;
+        if (gate.status === 'failed') failed += 1;
+      });
+      return [
+        'Блок «Гейты» — это четыре проверки, каждая после своего шага: G1 после брифинга, G2 после спецификации, G3 после плана, G4 на приёмке.',
+        gates.length === 0
+          ? 'Проверки ещё не проходили.'
+          : 'Пройдено ' + passed + ', провалено ' + failed + ' из ' + gates.length + '.',
+        'Проверка сравнивает два документа работы, а не высказывает о ней мнение. На последней, G4, готовую работу читают против вашего списка — а спецификацию от читателя прячут, чтобы он не подтвердил её сам себе.'
+      ];
+    }
+  };
+
   /** The regions the page must be able to explain, in the order they appear. */
   var EXPLAIN_ORDER = [
     'dials', 'progress', 'coverage', 'stage', 'elapsed', 'estimate', 'tasks', 'debt',
     'tests', 'requirements', 'stages', 'build', 'requirement-list', 'gates'
   ];
 
-  function explain(key, state, now, marks) {
-    var make = EXPLAIN[key];
+  function explain(key, state, now, marks, register) {
+    var from = ((register || registerOf(state)) === 'plain') ? EXPLAIN_PLAIN : EXPLAIN;
+    var make = from[key];
     if (!make) return [];
     return make(state || {}, now, marks || []);
   }
@@ -1133,6 +1377,8 @@ globalThis.MAESTRO_LOGIC = (function () {
     MODE: MODE,
     DEPTH: DEPTH,
     POLISH: POLISH,
+    REGISTER: REGISTER,
+    registerOf: registerOf,
     label: label,
     plural: plural,
     formatDuration: formatDuration,
@@ -1164,6 +1410,8 @@ globalThis.MAESTRO_LOGIC = (function () {
     lastWrite: lastWrite,
     silenceNotice: silenceNotice,
     EXPLAIN_ORDER: EXPLAIN_ORDER,
+    EXPLAIN: EXPLAIN,
+    EXPLAIN_PLAIN: EXPLAIN_PLAIN,
     explain: explain,
     isStopped: isStopped,
     isStateShape: isStateShape,
@@ -1324,7 +1572,8 @@ globalThis.MAESTRO_SNAPSHOT = null;
     // Recomputed on every poll rather than on every tick: `apply` calls
     // `render` each time state.js is read, whether or not it changed, so the
     // silence advances on its own without a second timer.
-    var silence = L.silenceNotice(state, Date.now(), marks);
+    var register = L.registerOf(state);
+    var silence = L.silenceNotice(state, Date.now(), marks, register);
     if (silence) notices.push(silence.line);
     var notice = el('notice');
     notice.textContent = notices.join(' ');
@@ -1335,6 +1584,14 @@ globalThis.MAESTRO_SNAPSHOT = null;
     put(dials, 'span', L.label(L.MODE, state.mode), 'chip');
     put(dials, 'span', L.label(L.DEPTH, state.depth), 'chip');
     put(dials, 'span', 'Доводка: ' + L.label(L.POLISH, state.polish), 'chip');
+    // Named, never bare: the depth reads «Обычная» and this reads «Обычные»,
+    // and two bare chips a word apart would be read as one setting stated
+    // twice. Drawn only when the state carries the field — a прогон written
+    // before the register existed renders exactly as it did, and absent is not
+    // a choice the page may report as `normal`.
+    if (state.explain) {
+      put(dials, 'span', 'Объяснения: ' + L.label(L.REGISTER, state.explain), 'chip');
+    }
 
     renderProgress(state);
     renderCards(state);
@@ -1631,9 +1888,10 @@ globalThis.MAESTRO_SNAPSHOT = null;
 
     function fill(key) {
       clear(box);
-      L.explain(key, lastGood, Date.now(), marks).forEach(function (line, index) {
-        put(box, 'p', line, index === 0 ? 'what' : null);
-      });
+      L.explain(key, lastGood, Date.now(), marks, L.registerOf(lastGood))
+        .forEach(function (line, index) {
+          put(box, 'p', line, index === 0 ? 'what' : null);
+        });
     }
 
     function place(button) {

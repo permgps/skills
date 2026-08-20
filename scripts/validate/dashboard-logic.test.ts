@@ -34,10 +34,14 @@ interface Logic {
   longestSilence: (marks: number[]) => number | null;
   lastWrite: (state: unknown, marks: number[]) => number | null;
   silenceNotice: (
-    state: unknown, now: number, marks: number[],
+    state: unknown, now: number, marks: number[], register?: string,
   ) => { alarming: boolean; line: string } | null;
   EXPLAIN_ORDER: string[];
-  explain: (key: string, state: unknown, now: number, marks: number[]) => string[];
+  explain: (
+    key: string, state: unknown, now: number, marks: number[], register?: string,
+  ) => string[];
+  REGISTER: Record<string, string>;
+  registerOf: (state: unknown) => string;
   isStopped: (state: unknown) => boolean;
   isStateShape: (value: unknown) => boolean;
   readOutcome: (held: unknown, incoming: unknown) => string;
@@ -759,4 +763,74 @@ test('a region the page does not know explains nothing rather than throwing', ()
   // The array crosses out of the vm, so its prototype is not this realm's
   // Array and deepStrictEqual would compare realms rather than contents.
   assert.equal(L.explain('nonesuch', busy(), NOW, []).length, 0);
+});
+
+// --- the plain register ----------------------------------------------------
+
+test('a state with no register reads as normal without claiming one', () => {
+  // Absent is not a choice. The page words itself as it always did, and the
+  // chip that would name a register is not drawn — that part is in the view
+  // block, and what is testable here is the one function it asks.
+  assert.equal(L.registerOf(run()), 'normal');
+  assert.equal(L.registerOf({ explain: 'plain' }), 'plain');
+  assert.equal(L.registerOf({ explain: 'nonesuch' }), 'normal');
+  assert.equal(L.registerOf(null), 'normal');
+
+  const state = busy();
+  const marks = L.collectMarks(state);
+  assert.deepEqual(
+    L.explain('tasks', state, NOW, marks).join('|'),
+    L.explain('tasks', state, NOW, marks, 'normal').join('|'),
+  );
+});
+
+test('every region is explained in the plain register too, empty and busy alike', () => {
+  for (const state of [run(), busy(), run({ finishedAt: '2026-08-19T11:00:00.000Z' })]) {
+    const marks = L.collectMarks(state);
+    for (const key of L.EXPLAIN_ORDER) {
+      const lines = L.explain(key, state, NOW, marks, 'plain');
+      assert.ok(lines.length >= 2, `${key} says too little in the plain register`);
+      assert.ok(lines.every((line) => typeof line === 'string' && line.trim().length > 0),
+        `${key} produced a blank plain line`);
+    }
+  }
+});
+
+test('a plain explanation carries the same numbers as the normal one', () => {
+  // Both are built from the same functions. An explanation that recomputed its
+  // own figures could disagree with the one beside it, and the plain reader is
+  // the last person able to notice.
+  const state = busy();
+  const marks = L.collectMarks(state);
+  assert.match(L.explain('tasks', state, NOW, marks, 'plain')[1]!, /Готово 1 из 3/);
+  assert.match(L.explain('coverage', state, NOW, marks, 'plain')[1]!, /2 из 3/);
+  assert.match(L.explain('gates', state, NOW, marks, 'plain')[1]!, /Пройдено 1, провалено 1 из 2/);
+  assert.match(L.explain('debt', state, NOW, marks, 'plain')[1]!, /Всего 2/);
+  assert.match(L.explain('tests', state, NOW, marks, 'plain')[1]!, /Прошло 35/);
+  // The same figure the normal register calls a median, named in words.
+  assert.match(L.explain('estimate', state, NOW, marks, 'plain')[1]!, /при серединном времени/);
+});
+
+test('the register names the dials chip and nothing else', () => {
+  assert.equal(L.REGISTER['plain'], 'Простые');
+  assert.equal(L.REGISTER['normal'], 'Обычные');
+  const state = busy();
+  assert.match(L.explain('dials', { ...state, explain: 'plain' }, NOW, [], 'plain')[1]!,
+    /объяснения «Простые»/);
+  // A прогон that pinned nothing is described without one.
+  assert.doesNotMatch(L.explain('dials', state, NOW, [], 'plain')[1]!, /объяснения/);
+});
+
+test('the silence notice is worded in the register too', () => {
+  const state = run({ updatedAt: '2026-08-19T10:00:00.000Z' });
+  const quiet = L.silenceNotice(state, NOW, [], 'plain');
+  assert.match(quiet!.line, /В последний раз что-то менялось/);
+  assert.match(L.silenceNotice(state, NOW, [], 'normal')!.line, /Последняя запись/);
+
+  // Past the run's own record, the plain wording says what it means rather
+  // than naming a file the reader has never seen.
+  const marks = [AT('2026-08-19T09:50:00.000Z'), AT('2026-08-19T10:00:00.000Z')];
+  const alarming = L.silenceNotice(state, NOW, marks, 'plain');
+  assert.equal(alarming!.alarming, true);
+  assert.match(alarming!.line, /Возможно, работа остановилась/);
 });

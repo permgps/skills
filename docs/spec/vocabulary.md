@@ -126,6 +126,12 @@ term, and a term with two homes drifts.
 | Критический путь | The longest remaining chain of blocked таски, which is what the estimate is measured along |
 | Сейчас | The таски being worked on at this moment, named in one line |
 | Календарных | Wall-clock time from the start, pauses included — shown beside Прошло времени, never instead of it |
+| Объяснения | Which register the прогон is speaking in — the label that keeps `Обычные` from being read as the depth's `Обычная` |
+| Гейты | The four checks of the прогон, each after its own stage |
+| G1 | The gate after брифинг, shown as a row of Гейты |
+| G2 | The gate after спецификация |
+| G3 | The gate after план |
+| G4 | The gate at приёмка |
 
 **The build block is «Ход разработки», never «Ход сборки».** `сборка` is banned
 below, and the stage it shows is called `Разработка`, so the block is named after
@@ -177,11 +183,26 @@ The `Shorthand` column holds the words themselves, comma-separated where a
 family shares one replacement. It is read by a checker, so a word added here
 starts being enforced in the same change.
 
+**A label defined above is exempt, in its exact form and nowhere else.** The
+screen says «Гейты» and numbers the rows `G1`…`G4` in both registers — that is
+decision 2, and it is what keeps the documentation and the screen saying one
+word. The `i` beside such a block is the thing that teaches it, and a popover
+forbidden from naming what the reader just clicked on cannot. So «Блок „Гейты“ —
+это четыре проверки» is allowed and «после гейта» is not, in the same sentence.
+The checker removes every defined label from a plain string before it looks for
+shorthand, which is exactly this rule and no wider.
+
+**The chat has no such exemption**, and the rule for it in the bundle's
+`SKILL.md` is absolute: say «проверка спецификации», never `G2`. Nothing is on
+screen beside a sentence in the chat, so there is nothing there for a label to
+connect to.
+
 **The boundary between the two rules is where this is easiest to get wrong.**
 `Заглушка`, `Волна`, `Долг` and `Критический путь` are **labels**, defined in
 the tables above. They stay on the screen in both registers, and `plain`
-explains each of them once. `гейт` and `спека` appear in none of those tables —
-they are not labels, they are shorthand, and this section removes them.
+explains each of them once. `спека`, `коммит` and `стейт` appear in none of
+those tables — they are not labels, they are shorthand, and this section
+removes them.
 
 ### What Is Checked And What Is Not
 

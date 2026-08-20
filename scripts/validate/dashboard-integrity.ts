@@ -62,6 +62,13 @@ const VALUE_MAPS: Array<{ field: string; map: string }> = [
   { field: 'mode', map: 'MODE' },
   { field: 'depth', map: 'DEPTH' },
   { field: 'polish', map: 'POLISH' },
+  { field: 'explain', map: 'REGISTER' },
+];
+
+/** The two registers, and the map each one's explanations live in. */
+const REGISTERS: Array<{ register: string; map: string }> = [
+  { register: 'normal', map: 'EXPLAIN' },
+  { register: 'plain', map: 'EXPLAIN_PLAIN' },
 ];
 
 export class UnreadableAssetError extends Error {
@@ -94,6 +101,29 @@ export function scriptBlock(html: string, id: string): string | null {
 
 const findTable = (tables: Table[], required: string[]): Table | undefined =>
   tables.find(table => required.every(column => table.columns.includes(column)));
+
+/**
+ * The source text of one `var <name> = { … };` literal, braces balanced.
+ *
+ * Read rather than called, because a branch never taken still ships. The empty
+ * state of a region is exactly where a reader is least able to guess, and it is
+ * the branch a fixture forgets to reach.
+ */
+export function sliceObjectLiteral(source: string, name: string): string | null {
+  const start = source.indexOf(`var ${name} = {`);
+  if (start === -1) return null;
+
+  let depth = 0;
+  for (let at = source.indexOf('{', start); at < source.length; at += 1) {
+    const char = source[at];
+    if (char === '{') depth += 1;
+    else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(start, at + 1);
+    }
+  }
+  return null;
+}
 
 /** Evaluate the DOM-free block and hand back what it exports. */
 export function evaluateLogic(block: string): Record<string, unknown> {
@@ -264,12 +294,17 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
         continue;
       }
       // The registry may hold a key with nothing behind it, and an i that opens
-      // an empty popover is worse than no i at all.
-      const lines = typeof explain === 'function'
-        ? (explain as (...args: unknown[]) => unknown)(key, {}, 0, [])
-        : null;
-      if (!Array.isArray(lines) || lines.length === 0) {
-        add('explain', 0, `region "${key}" has no explanation behind it`);
+      // an empty popover is worse than no i at all. Both registers are called:
+      // a region explained in one and silent in the other ships an i that opens
+      // nothing for exactly the reader who needed it most.
+      for (const { register } of REGISTERS) {
+        const lines = typeof explain === 'function'
+          ? (explain as (...args: unknown[]) => unknown)(key, {}, 0, [], register)
+          : null;
+        if (!Array.isArray(lines) || lines.length === 0) {
+          add('explain', 0,
+            `region "${key}" has no explanation behind it in the ${register} register`);
+        }
       }
     }
 
@@ -338,6 +373,70 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     }
   }
   log.info('labels', 'labels compared with the vocabulary', { maps: VALUE_MAPS.length + 1 });
+
+  // --- the plain register says nothing only the trade understands -----------
+  //
+  // Every plain string this repository ships is here, and this is the whole of
+  // what a checker can hold to the list: the chat is composed at run time and
+  // no checker reads a word of it. vocabulary.md says so too, because a rule
+  // believed to be enforced and a rule that is enforced fail differently.
+  const plainWords = findTable(vocabularyTables, ['Shorthand', 'Say instead']);
+  if (!plainWords) {
+    add('plain', 0, 'vocabulary.md has no table with columns Shorthand and Say instead');
+  } else {
+    const banned = plainWords.rows
+      .flatMap(row => cleanCell(row['Shorthand']).split(','))
+      .map(word => word.trim())
+      .filter(word => word !== '');
+
+    // A label the screen shows is not shorthand. «Гейты» and G1…G4 stay on the
+    // page in both registers, and the i beside that block is the thing that
+    // teaches them — so the exact label is removed before the scan, and only
+    // the exact label. «после гейта» still fails in the same sentence.
+    const labels = vocabularyTables
+      .filter(table => table.columns.includes('Label'))
+      .flatMap(table => table.rows.map(row => cleanCell(row['Label'])))
+      .filter(label => label !== '')
+      .sort((a, b) => b.length - a.length);
+    const withoutLabels = (text: string): string =>
+      labels.reduce((left, label) => left.split(label).join(' '), text);
+
+    const scan = (where: string, text: string): void => {
+      const naked = withoutLabels(text).toLowerCase();
+      for (const word of banned) {
+        if (naked.includes(word.toLowerCase())) {
+          add('plain', 0,
+            `a plain string in ${where} says "${word}", which vocabulary.md forbids — `
+            + 'say it in words a reader who has never built software already has');
+        }
+      }
+    };
+
+    // The block is read as source rather than called, because a branch never
+    // taken still ships: the empty state of a region is exactly where the plain
+    // reader is least able to guess, and it is the branch a fixture forgets.
+    const literal = sliceObjectLiteral(stripComments(block), 'EXPLAIN_PLAIN');
+    if (literal === null) {
+      add('plain', 0, 'the page carries no EXPLAIN_PLAIN block to check');
+    } else {
+      scan('the plain explanations', literal);
+    }
+
+    // The silence notice lives in a function both registers share, so its
+    // plain wording is reached by calling it rather than by reading around it.
+    const notice = logic['silenceNotice'];
+    if (typeof notice === 'function') {
+      const call = notice as (...args: unknown[]) => { line?: unknown } | null;
+      const state = { runId: 'r', slug: 's', stages: [], updatedAt: '2026-08-20T09:00:00Z' };
+      const at = Date.parse('2026-08-20T10:00:00Z');
+      for (const marks of [[], [Date.parse('2026-08-20T08:00:00Z'), Date.parse(state.updatedAt)]]) {
+        const said = call(state, at, marks, 'plain');
+        if (said && typeof said.line === 'string') scan('the plain silence notice', said.line);
+      }
+    }
+
+    log.info('plain', 'plain strings scanned', { banned: banned.length, exempt: labels.length });
+  }
 
   // --- the stage order and the gate map are copies too ----------------------
   const phaseTable = findTable(parseTables(spec['phases.md']), ['Id', 'Stage']);

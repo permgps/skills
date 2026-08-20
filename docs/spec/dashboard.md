@@ -12,7 +12,7 @@ becomes a second source of truth, and the second one is silently wrong.
 
 | Key | Region | Shows | Source |
 |---|---|---|---|
-| `dials` | Dials | Mode, depth, доводка on/off, and any mid-run change | `mode`, `depth`, `polish`, `dialChanges[]` |
+| `dials` | Dials | Mode, depth, доводка on/off, the register when the state names one, and any mid-run change | `mode`, `depth`, `polish`, `explain`, `dialChanges[]` |
 | `progress` | Прогресс проекта | The whole road as one percentage and one bar | `stages[]`, `tasks[]` |
 | `coverage` | Покрытие брифа | The share of live требования that reached the specification | `requirements[]` |
 | `stage` | Этап сейчас | The stage, its position in the eight, and its own clock | `currentStage`, `stages[]` |
@@ -61,6 +61,29 @@ The texts live in the page's own logic block rather than in `vocabulary.md`. The
 vocabulary names terms; these are sentences, and a paragraph per region there
 would buy synchronisation work and nothing else.
 
+**Each region is explained twice, once per register.** A state carrying
+`explain: "plain"` gets explanations written for a reader who has never built
+software; anything else gets the ones written in the vocabulary's own terms. The
+plain variant is built from the same functions as the normal one, for the same
+reason both are built from the region's own: an explanation that recomputed its
+numbers could disagree with the figure beside it, and the plain reader is the
+last person able to notice. `scripts/validate/dashboard-integrity.ts` requires
+both, so a region cannot be explained in one register and left silent in the
+other.
+
+What the plain register may not say is in [`vocabulary.md`](vocabulary.md), and
+so is the one exemption: a label the screen shows is not shorthand. «Гейты» and
+`G1`…`G4` stay on the page in both registers, and the `i` beside that block is
+the thing that teaches them — a popover forbidden from naming what the reader
+just clicked on could not.
+
+**The dials row shows the register only when the state carries one.** Every
+прогон written before the field existed renders exactly as it did; absent is
+not `normal`, and a chip claiming a choice nobody made is the one thing the row
+must not do. The chip is named — «Объяснения: Простые» — because the depth's
+own label is «Обычная» and two bare chips a word apart read as one setting
+stated twice.
+
 ## Silence
 
 The state is written at transitions and nowhere else, so a прогон is quiet for
@@ -78,6 +101,10 @@ A fixed number would be wrong in both directions.
 
 Nothing is said about a finished or interrupted прогон. That silence is lawful,
 and the run notice already names it.
+
+The notice is worded in the register too. Plain, it says nothing has changed for
+however long; the normal wording names the write, which is a fact about the file
+rather than about the project.
 
 ## The Numbers Are Computed, Never Stored
 
