@@ -129,12 +129,13 @@ No mode, depth or finish removes any of them.
 | `docs/spec/` | the behavior specification — what the phases must do, and the authority when a phase file disagrees |
 | `docs/` | the documentation pages, starting with [installing](docs/install.md) and [the dashboard](docs/dashboard.md) |
 | `scripts/` | this repository's own tooling: validators, the state contract, the gate checks, the metrics tool |
+| `CHANGELOG.md` | every tagged release and what it shipped, newest first |
 
 The skill carries no runtime dependencies. The tooling needs Node.js 22.18 or
 newer, because it is TypeScript executed by Node's native type stripping.
 
 ```bash
-npm run check     # typecheck, seven validators, and their tests
+npm run check     # typecheck, eight validators, and their tests
 npm run metrics   # measure a finished run
 ```
 
