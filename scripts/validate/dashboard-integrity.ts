@@ -21,7 +21,13 @@ export type { Violation };
 
 const log = createLogger('dashboard-integrity');
 
-/** Ids the page must offer, one per region of the What It Renders table. */
+/**
+ * Ids the page must offer for a renderer to write into.
+ *
+ * Not the same list as the regions of the What It Renders table — a region is
+ * a block of the screen, and several of these are targets inside one. The
+ * regions themselves are checked against that table below.
+ */
 const REQUIRED_REGIONS = [
   'run-clock', 'stage-clock', 'dials',
   'progress', 'cards',
@@ -104,6 +110,7 @@ export interface SpecSources {
   'vocabulary.md': string;
   'phases.md': string;
   'gates.md': string;
+  'dashboard.md': string;
 }
 
 export function checkDashboard(html: string, spec: SpecSources): Violation[] {
@@ -219,6 +226,81 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     compare('labels', 'stage', owned, asMap('STAGE_LABEL'));
   }
 
+  // --- every region the specification names explains itself -----------------
+  //
+  // Three lists have to agree: the Key column of the What It Renders table, the
+  // `data-region` attributes in the markup, and `EXPLAIN_ORDER` in the logic
+  // block. A region in one and missing from another ships mute — either an `i`
+  // that opens nothing, or a number with no way left to ask what it means.
+  const regionTable = findTable(parseTables(spec['dashboard.md']), ['Key', 'Region']);
+  if (!regionTable) {
+    add('explain', 0, 'dashboard.md has no table with columns Key and Region');
+  } else {
+    const declared = regionTable.rows
+      .map(row => cleanCell(row['Key']).replace(/`/g, '').trim())
+      .filter(key => key !== '');
+    const order = logic['EXPLAIN_ORDER'];
+    const explained = Array.isArray(order) ? order.map(String) : [];
+    const marked = [...html.matchAll(/data-region="([^"]+)"/g)].map(hit => hit[1] ?? '');
+    const explain = logic['explain'];
+
+    for (const key of declared) {
+      if (!explained.includes(key)) {
+        add('explain', 0,
+          `dashboard.md names the region "${key}" and the page's EXPLAIN_ORDER does not carry it`);
+      }
+      const marks = marked.filter(name => name === key).length;
+      if (marks !== 1) {
+        add('explain', 0,
+          `region "${key}" carries ${marks} data-region attribute(s) in the markup — a region is `
+          + 'marked exactly once, and that is where its i is hung');
+      }
+    }
+
+    for (const key of explained) {
+      if (!declared.includes(key)) {
+        add('explain', 0,
+          `the page explains "${key}" and the What It Renders table does not name it`);
+        continue;
+      }
+      // The registry may hold a key with nothing behind it, and an i that opens
+      // an empty popover is worse than no i at all.
+      const lines = typeof explain === 'function'
+        ? (explain as (...args: unknown[]) => unknown)(key, {}, 0, [])
+        : null;
+      if (!Array.isArray(lines) || lines.length === 0) {
+        add('explain', 0, `region "${key}" has no explanation behind it`);
+      }
+    }
+
+    for (const name of marked) {
+      if (!declared.includes(name)) {
+        add('explain', 0,
+          `the markup marks "${name}" as a region and the What It Renders table does not name it`);
+      }
+    }
+
+    // A marked region still needs somewhere to hang its i: an h2 to sit beside,
+    // or a name of its own when it has no heading at all, as the dials do. A
+    // region with neither is skipped at mount time and ships silently mute,
+    // which is the one failure this whole check exists to prevent. Read to the
+    // next marked region rather than to a closing tag, because the regions nest
+    // and a tag match would pick the wrong one.
+    for (const hit of html.matchAll(/<[^>]*data-region="([^"]+)"[^>]*>/g)) {
+      const tag = hit[0];
+      const from = (hit.index ?? 0) + tag.length;
+      const next = html.indexOf('data-region="', from);
+      const inside = html.slice(from, next === -1 ? from + 400 : next);
+      if (!tag.includes('data-region-label=') && !inside.includes('<h2')) {
+        add('explain', 0,
+          `region "${hit[1]}" has neither an h2 to hang its i beside nor a data-region-label `
+          + 'to name itself by, so no i is mounted on it');
+      }
+    }
+    log.info('explain', 'regions compared with the specification',
+      { declared: declared.length, explained: explained.length, marked: marked.length });
+  }
+
   // --- the words on the page that belong to no field ------------------------
   // A card renamed on the page and nowhere else is drift the value maps cannot
   // see: these labels are static text, not the value of anything.
@@ -293,7 +375,7 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
 export async function checkDashboardFile(assetPath: string, specDir: string): Promise<Violation[]> {
   const html = await readFile(assetPath, 'utf8');
   const spec = {} as SpecSources;
-  for (const name of ['vocabulary.md', 'phases.md', 'gates.md'] as const) {
+  for (const name of ['vocabulary.md', 'phases.md', 'gates.md', 'dashboard.md'] as const) {
     spec[name] = await readFile(path.join(specDir, name), 'utf8');
   }
   return checkDashboard(html, spec);

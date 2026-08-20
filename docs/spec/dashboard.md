@@ -10,25 +10,74 @@ becomes a second source of truth, and the second one is silently wrong.
 
 ## What It Renders
 
-| Region | Shows | Source |
-|---|---|---|
-| Прогресс проекта | The whole road as one percentage and one bar | `stages[]`, `tasks[]` |
-| Покрытие брифа | The share of live требования that reached the specification | `requirements[]` |
-| Этап сейчас | The stage, its position in the eight, and its own clock | `currentStage`, `stages[]` |
-| Прошло времени | Working time since `startedAt`, the median таск beneath it, and the calendar span when the two differ | every timestamp in the state |
-| Осталось | The estimate as a range, and the critical path it was measured along | `tasks[]` |
-| Таски | Finished out of cut, with what is in motion and what was retried | `tasks[]` |
-| Долг | Заглушки, допущения and переменные as one number and three | `debt` |
-| Тесты | The last full suite | `tests`, or the last таск's own |
-| Требования | The манифест counted by status | `requirements[]` |
-| Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
-| Ход разработки | The таски grouped by волна, each with its status, phase and clock, and a line naming what is running now | `tasks[]` |
-| Dials | Mode, depth, доводка on/off, and any mid-run change | `mode`, `depth`, `polish`, `dialChanges[]` |
-| Gates | G1–G4 with status, and findings when failed | `gates[]` |
+| Key | Region | Shows | Source |
+|---|---|---|---|
+| `dials` | Dials | Mode, depth, доводка on/off, and any mid-run change | `mode`, `depth`, `polish`, `dialChanges[]` |
+| `progress` | Прогресс проекта | The whole road as one percentage and one bar | `stages[]`, `tasks[]` |
+| `coverage` | Покрытие брифа | The share of live требования that reached the specification | `requirements[]` |
+| `stage` | Этап сейчас | The stage, its position in the eight, and its own clock | `currentStage`, `stages[]` |
+| `elapsed` | Прошло времени | Working time since `startedAt`, the median таск beneath it, and the calendar span when the two differ | every timestamp in the state |
+| `estimate` | Осталось | The estimate as a range, and the critical path it was measured along | `tasks[]` |
+| `tasks` | Таски | Finished out of cut, with what is in motion and what was retried | `tasks[]` |
+| `debt` | Долг | Заглушки, допущения and переменные as one number and three | `debt` |
+| `tests` | Тесты | The last full suite | `tests`, or the last таск's own |
+| `requirements` | Требования (счёт) | The манифест counted by status | `requirements[]` |
+| `stages` | Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
+| `build` | Ход разработки | The таски grouped by волна, each with its status, phase and clock, and a line naming what is running now | `tasks[]` |
+| `requirement-list` | Требования (список) | The манифест one требование at a time | `requirements[]` |
+| `gates` | Gates | G1–G4 with status, and findings when failed | `gates[]` |
 
-Every visible word comes from `vocabulary.md`. The dashboard defines no term of
-its own; if it needs a word that is not there, the word is added to the
-vocabulary first.
+The `Key` column is the region's name in the page: it is the `data-region`
+attribute in the markup and the entry in `EXPLAIN_ORDER` in the logic block.
+`scripts/validate/dashboard-integrity.ts` checks all three against each other,
+so a region cannot be added to one and forgotten in the others.
+
+Every **term** the dashboard shows comes from `vocabulary.md`. The dashboard
+defines no term of its own; if it needs a word that is not there, the word is
+added to the vocabulary first.
+
+The rule governs terms, not prose. A region's explanation — see below — is built
+from the vocabulary's own labels and the numbers in the state, and the sentences
+joining them are not terms, in the same way that «Медиана появится после двух
+готовых тасков» has never been one. What may never happen is a region naming a
+status, a стадия, a dial or a требование in words of its own rather than
+resolving the label.
+
+## Every Region Explains Itself
+
+Each region above carries a small `i`. Pressing it opens **one** popover: the
+page holds a single node for all of them, so moving it is what closes the
+previous explanation, and no card shifts under the reader while they read about
+the number on it.
+
+An explanation is about *this* прогон rather than about dashboards in general.
+It names the region, then says what the region currently holds and what that was
+computed from — which median, how long a chain, how many требования are in the
+denominator and why. It is built by calling the same functions the region
+renders with, so an explanation cannot drift from the figure beside it. The
+empty state is explained too: that is when a reader is least able to guess.
+
+The texts live in the page's own logic block rather than in `vocabulary.md`. The
+vocabulary names terms; these are sentences, and a paragraph per region there
+would buy synchronisation work and nothing else.
+
+## Silence
+
+The state is written at transitions and nowhere else, so a прогон is quiet for
+long stretches by design. A прогон that has **stopped** is quiet in exactly the
+same way, and until the two could be told apart the page went on counting over a
+run nobody was driving: the стадия had no `finishedAt` to stop its clock, and a
+session that died set no `interruptedAt` either.
+
+`updatedAt` is what separates them, and this is what that field is read for. The
+notice says how long ago the state was last written, and raises the line once
+that exceeds the longest quiet interval the прогон has already survived. The
+threshold is the run's own: a манифест that legitimately said nothing for ten
+minutes has earned ten minutes, while a прогон writing at every таск has not.
+A fixed number would be wrong in both directions.
+
+Nothing is said about a finished or interrupted прогон. That silence is lawful,
+and the run notice already names it.
 
 ## The Numbers Are Computed, Never Stored
 

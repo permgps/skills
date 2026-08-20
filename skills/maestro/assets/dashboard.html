@@ -88,6 +88,26 @@
     border-left-color: var(--fail);
     color: var(--fail);
   }
+  /* --- the i beside a region, and the one popover they all fill --- */
+  .info {
+    margin-left: .45rem; padding: 0; width: 1.15em; height: 1.15em;
+    border: 1px solid var(--line); border-radius: 50%;
+    background: none; color: var(--muted);
+    font: inherit; font-size: .72rem; line-height: 1;
+    cursor: pointer; vertical-align: middle;
+  }
+  .info:hover, .info:focus-visible { color: var(--ink); border-color: var(--muted); }
+  #explain {
+    position: absolute; z-index: 10; max-width: 24rem;
+    padding: .7rem .85rem;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel); color: var(--ink);
+    font-size: .82rem; line-height: 1.5;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
+  }
+  #explain p { margin: 0 0 .5rem; }
+  #explain p:last-child { margin-bottom: 0; }
+  #explain .what { color: var(--muted); }
   #problem {
     padding: 1rem;
     border: 1px solid var(--fail);
@@ -171,7 +191,7 @@
 
 <header>
   <h1 id="run-title">Прогон</h1>
-  <div id="dials"></div>
+  <div id="dials" data-region="dials" data-region-label="Тумблеры прогона"></div>
   <p id="notice" hidden></p>
 </header>
 
@@ -179,7 +199,7 @@
 
 <main id="regions">
 
-  <section id="progress">
+  <section id="progress" data-region="progress">
     <div class="head">
       <h2>Прогресс проекта</h2>
       <b id="progress-percent">—</b>
@@ -189,7 +209,7 @@
   </section>
 
   <section id="cards">
-    <div class="card">
+    <div class="card" data-region="coverage">
       <h2>Покрытие брифа</h2>
       <svg class="ring" viewBox="0 0 80 80" width="72" height="72" aria-hidden="true">
         <circle cx="40" cy="40" r="34" stroke="var(--ghost)"></circle>
@@ -201,63 +221,65 @@
       <p class="sub" id="coverage-sub"></p>
     </div>
 
-    <div class="card">
+    <div class="card" data-region="stage">
       <h2>Этап сейчас</h2>
       <div class="stage-name" id="stage-name">—</div>
       <p class="sub"><span id="stage-position"></span> · <span id="stage-clock">—</span></p>
     </div>
 
-    <div class="card">
+    <div class="card" data-region="elapsed">
       <h2>Прошло времени</h2>
       <div class="value" id="run-clock">—</div>
       <p class="sub" id="run-median"></p>
       <p class="sub" id="run-calendar"></p>
     </div>
 
-    <div class="card">
+    <div class="card" data-region="estimate">
       <h2>Осталось (оценка)</h2>
       <div class="value" id="estimate">—</div>
       <p class="sub" id="estimate-sub"></p>
     </div>
 
-    <div class="card">
+    <div class="card" data-region="tasks">
       <h2>Таски</h2>
       <div class="value"><span id="tasks-done">—</span><small id="tasks-total"></small></div>
       <div class="bar"><i id="tasks-fill" style="width:0%"></i></div>
       <p class="sub" id="tasks-sub"></p>
     </div>
 
-    <div class="card">
+    <div class="card" data-region="debt">
       <h2>Долг</h2>
       <div class="value" id="debt-count">—</div>
       <p class="sub" id="debt-sub"></p>
     </div>
 
-    <div class="card">
+    <div class="card" data-region="tests">
       <h2>Тесты</h2>
       <div class="value" id="tests-count">—</div>
       <p class="sub" id="tests-sub"></p>
     </div>
 
-    <div class="card">
+    <div class="card" data-region="requirements">
       <h2>Требования</h2>
       <div class="value" id="req-count">—</div>
       <p class="sub" id="req-sub"></p>
     </div>
   </section>
 
-  <section><h2>Этапы</h2><div id="stages"></div></section>
+  <section data-region="stages"><h2>Этапы</h2><div id="stages"></div></section>
 
-  <section>
+  <section data-region="build">
     <h2>Ход разработки</h2>
     <div id="build-chips"></div>
     <div id="tasks"></div>
     <p id="now" hidden></p>
   </section>
 
-  <section><h2>Требования</h2><div id="requirements"></div></section>
-  <section><h2>Гейты</h2><div id="gates"></div></section>
+  <section data-region="requirement-list"><h2>Требования</h2><div id="requirements"></div></section>
+  <section data-region="gates"><h2>Гейты</h2><div id="gates"></div></section>
 </main>
+
+<div id="explain" hidden></div>
 
 <script id="logic">
 // Pure logic, no DOM. Kept separable on purpose: scripts/validate/dashboard-logic.test.ts
@@ -854,6 +876,216 @@ globalThis.MAESTRO_LOGIC = (function () {
     return { alarming: false, line: 'Последняя запись — ' + formatGap(quiet) + ' назад.' };
   }
 
+  /**
+   * What each region of the screen is, and what it is saying about this прогон.
+   *
+   * The second half is the point. A fixed sentence explaining that «Осталось»
+   * holds an estimate is read once and never again; the numbers it was built
+   * from — which median, how long a chain — are what a reader stops to ask
+   * about. Every entry recomputes them through the same functions the region
+   * renders with, so an explanation cannot drift from the figure above it.
+   *
+   * Each returns paragraphs: the first says what the region is, the rest say
+   * what it holds now. The empty state is explained too — that is exactly when
+   * a reader is least able to guess.
+   */
+  var EXPLAIN = {
+    dials: function (state) {
+      var changes = (state.dialChanges || []).length;
+      return [
+        'Три тумблера, на которых идёт прогон: режим, глубина и доводка.',
+        'Режим «' + label(MODE, state.mode) + '», глубина «' + label(DEPTH, state.depth)
+          + '», доводка ' + label(POLISH, state.polish).toLowerCase() + '.',
+        changes > 0
+          ? 'По ходу прогона тумблеры меняли: записано изменений ' + changes + '. Смена записывается вместе с фазой, на которой произошла.'
+          : 'Тумблеры не меняли с начала прогона.',
+        'Режим решает, сколько спрашивают у пользователя; глубина — насколько глубоко под бриф копать; доводка — идёт ли круг полировки после приёмки. Ни один тумблер не убирает гейт.'
+      ];
+    },
+
+    progress: function (state) {
+      var p = overallProgress(state);
+      return [
+        'Весь прогон одной цифрой: этапы, а внутри разработки — таски.',
+        p.stagesTotal === 0
+          ? 'Этапы ещё не заведены, поэтому считать нечего.'
+          : 'Пройдено этапов ' + p.stagesDone + ' из ' + p.stagesTotal + ', тасков сделано '
+            + p.tasksDone + ' из ' + p.tasksTotal + ' — вместе ' + p.percent + '%.',
+        'Этапы весят не поровну, и начатый этап никогда не считается нулём: разработка растёт по сделанным таскам, остальные дают половину своего веса.'
+      ];
+    },
+
+    coverage: function (state) {
+      var share = coverage(state.requirements);
+      var counts = countRequirements(state.requirements);
+      return [
+        'Какая доля живых требований манифеста дошла до спеки.',
+        share.live === 0
+          ? 'Требования ещё не записаны — манифест пишется в первой фазе, до неё круг пуст.'
+          : share.inSpec + ' из ' + share.live + ' живых требований в спеке, это ' + share.percent + '%.',
+        'Снятых требований ' + counts.dropped + ', и в знаменатель они не входят: снятое требование — не пробел в покрытии, его больше нет.'
+      ];
+    },
+
+    stage: function (state) {
+      var stage = currentStage(state);
+      var place = stagePosition(state);
+      return [
+        'Этап, на котором прогон стоит сейчас, и его место в дороге из восьми.',
+        stage
+          ? 'Идёт «' + label(STAGE_LABEL, stage.id) + '», ' + place.position + '-й из ' + place.total
+            + ', состояние — ' + label(STAGE_STATUS, stage.status).toLowerCase() + '.'
+          : 'Текущий этап ещё не записан в состояние.',
+        'Часы идут от начала этапа и встают, когда он закрыт. Этап открывается той же записью, которой закрылся предыдущий, поэтому между ними не остаётся времени, не принадлежащего никакому этапу.'
+      ];
+    },
+
+    elapsed: function (state, now, marks) {
+      var median = medianTaskMs(state, now, marks);
+      return [
+        'Рабочее время с начала прогона — не календарное.',
+        median === null
+          ? 'Медиана на таск появится, когда закончатся два таска: один — это анекдот, а не медиана.'
+          : 'Медиана на таск — ' + formatMinutes(median) + '.',
+        'Пауза между двумя отметками засчитывается не целиком, а не длиннее ' + formatMinutes(IDLE_CEILING_MS)
+          + ': прогон, брошенный на ночь, не должен отчитаться за ночь работы.'
+      ];
+    },
+
+    estimate: function (state, now, marks) {
+      var what = 'Сколько ещё осталось — вилкой, а не одним числом.';
+      if (state.finishedAt) return [what, 'Прогон завершён, оценивать больше нечего.'];
+
+      var estimate = estimateMs(state, now, marks);
+      var chain = criticalPath(state.tasks);
+      var median = medianTaskMs(state, now, marks);
+      return [
+        what,
+        estimate === null
+          ? 'Пока не из чего считать: нужна медиана, а она появляется после двух готовых тасков.'
+          : formatMinutes(estimate.low) + ' … ' + formatMinutes(estimate.high) + ' при медиане '
+            + formatMinutes(median) + ' и цепочке в ' + chain + ' '
+            + plural(chain, 'таск', 'таска', 'тасков') + '.',
+        'Считается по критическому пути — самой длинной цепочке зависимостей, а не по сумме оставшихся тасков: то, что идёт параллельно, времени не добавляет.'
+      ];
+    },
+
+    tasks: function (state) {
+      var counts = countTasks(state.tasks);
+      return [
+        'Сколько тасков закончено из нарезанных.',
+        counts.total === 0
+          ? 'Таски ещё не нарезаны — это делает фаза плана.'
+          : 'Готово ' + counts.done + ' из ' + counts.total + ', в работе ' + counts.active
+            + ': пишется ' + counts.running + ', на ревью ' + counts.review
+            + ', в ремонте ' + counts.repair + '.',
+        counts.retries > 0
+          ? 'Повторов ' + counts.retries + '. Таск, вернувшийся не готовым, идёт в ремонт, а не переписывается на месте.'
+          : 'Полоска считает ревью и ремонт как три четверти: такой таск уже написан, но ещё не принят.'
+      ];
+    },
+
+    debt: function (state) {
+      var debt = debtCounts(state);
+      return [
+        'Долг прогона: то, что сделано не до конца и о чём это записано честно.',
+        debt.total === 0
+          ? 'Долга нет.'
+          : 'Всего ' + debt.total + ': заглушек ' + debt.placeholders + ', допущений '
+            + debt.assumptions + ', пустых переменных ' + debt.emptyEnv + '.',
+        'В пустых переменных лежат только имена. Значение секрета не попадает в состояние никогда — это правило безопасности, а не договорённость.'
+      ];
+    },
+
+    tests: function (state) {
+      var tests = testsOf(state);
+      return [
+        'Последний прогон тестов.',
+        tests
+          ? 'Прошло ' + tests.passed + ', упало ' + tests.failed + '.'
+          : 'Прогон ещё не запускал тесты. Пусто — это не «ноль упавших»: страница молчит, а не утверждает, что всё зелено.',
+        'Показывается полный прогон, а если его не было — набор последнего таска.'
+      ];
+    },
+
+    requirements: function (state) {
+      var counts = countRequirements(state.requirements);
+      return [
+        'Манифест целиком, посчитанный по статусам.',
+        counts.total === 0
+          ? 'Требования ещё не записаны.'
+          : 'Всего ' + counts.total + ', живых ' + counts.live + ': в спеке ' + counts['in-spec']
+            + ', открытых ' + counts.open + ', заглушкой ' + counts.placeholder
+            + ', отложенных ' + counts.deferred + ', снятых ' + counts.dropped + '.',
+        'Требование — это слова пользователя под номером. Ни одно не исчезает молча: у снятого и у отложенного записана причина.'
+      ];
+    },
+
+    stages: function (state) {
+      var stages = orderedStages(state);
+      var closed = 0;
+      stages.forEach(function (stage) { if (stage.status === 'done') closed += 1; });
+      return [
+        'Все этапы по порядку, каждый со своей длительностью.',
+        stages.length === 0
+          ? 'Этапы ещё не заведены.'
+          : 'Записано ' + stages.length + ', закрыто ' + closed + '.',
+        'Упавший этап показывается вместе с замечаниями своего гейта: G1 после брифинга, G2 после спеки, G3 после плана, G4 на приёмке.'
+      ];
+    },
+
+    build: function (state, now) {
+      var tasks = state.tasks || [];
+      return [
+        'Таски так, как их строили: по волнам, с часами и состоянием каждого.',
+        tasks.length === 0
+          ? 'Таски ещё не нарезаны.'
+          : 'Волн ' + groupByWave(tasks).length + ', тасков ' + tasks.length
+            + ', наибольшая одновременность — ' + peakParallel(tasks, state, now) + '.',
+        'Одновременность читается по часам, а не по размеру волны: волна — это то, что можно было запустить вместе, а не то, что действительно шло вместе.'
+      ];
+    },
+
+    'requirement-list': function (state) {
+      var counts = countRequirements(state.requirements);
+      return [
+        'Требования по одному, каждое со своим статусом.',
+        counts.total === 0
+          ? 'Требования ещё не записаны.'
+          : 'Живых ' + counts.live + ' из ' + counts.total + '.',
+        'Это тот же манифест, что и в карточке наверху: там счёт, здесь строки.'
+      ];
+    },
+
+    gates: function (state) {
+      var gates = (state.gates || []).filter(Boolean);
+      var passed = 0, failed = 0;
+      gates.forEach(function (gate) {
+        if (gate.status === 'passed') passed += 1;
+        if (gate.status === 'failed') failed += 1;
+      });
+      return [
+        'Четыре гейта прогона: G1 после брифинга, G2 после спеки, G3 после плана, G4 на приёмке.',
+        gates.length === 0
+          ? 'Гейты ещё не проходили.'
+          : 'Пройдено ' + passed + ', провалено ' + failed + ' из ' + gates.length + '.',
+        'Гейт — это сравнение двух документов прогона, а не мнение о нём. G4 читает сборку против манифеста, и спека при этом от читателя скрыта.'
+      ];
+    }
+  };
+
+  /** The regions the page must be able to explain, in the order they appear. */
+  var EXPLAIN_ORDER = [
+    'dials', 'progress', 'coverage', 'stage', 'elapsed', 'estimate', 'tasks', 'debt',
+    'tests', 'requirements', 'stages', 'build', 'requirement-list', 'gates'
+  ];
+
+  function explain(key, state, now, marks) {
+    var make = EXPLAIN[key];
+    if (!make) return [];
+    return make(state || {}, now, marks || []);
+  }
+
   /** A frozen clock with no explanation is the failure mode this guards. */
   function isStopped(state) {
     return !!(state && (state.finishedAt || state.interruptedAt));
@@ -931,6 +1163,8 @@ globalThis.MAESTRO_LOGIC = (function () {
     longestSilence: longestSilence,
     lastWrite: lastWrite,
     silenceNotice: silenceNotice,
+    EXPLAIN_ORDER: EXPLAIN_ORDER,
+    explain: explain,
     isStopped: isStopped,
     isStateShape: isStateShape,
     readOutcome: readOutcome
@@ -974,6 +1208,7 @@ globalThis.MAESTRO_SNAPSHOT = null;
   var generation = 0;
   var lastGood = null;
   var pollTimer = null;
+  var refillOpenExplainer = function () {};
   var marks = [];
 
   function el(id) { return document.getElementById(id); }
@@ -1107,6 +1342,7 @@ globalThis.MAESTRO_SNAPSHOT = null;
     renderBuild(state);
     renderRequirements(state);
     renderGates(state);
+    refillOpenExplainer();
     tick();
   }
 
@@ -1373,6 +1609,84 @@ globalThis.MAESTRO_SNAPSHOT = null;
       calendar.hidden = true;
     }
   }
+
+  /**
+   * The i beside each region, and the single popover all thirteen fill.
+   *
+   * One node rather than thirteen. Moving it is what closes the previous
+   * explanation, so "at most one open" needs no state to keep it true, and the
+   * cards never shift: a reader stays looking at the number while reading about
+   * it. Filling it through `put` keeps the textContent rule by construction,
+   * and that matters here — the texts quote таск titles, which are the user's
+   * own words.
+   */
+  function mountExplainers() {
+    var box = el('explain');
+    var open = null;
+
+    function close() {
+      open = null;
+      box.hidden = true;
+    }
+
+    function fill(key) {
+      clear(box);
+      L.explain(key, lastGood, Date.now(), marks).forEach(function (line, index) {
+        put(box, 'p', line, index === 0 ? 'what' : null);
+      });
+    }
+
+    function place(button) {
+      box.hidden = false;
+      box.style.left = '0px';
+      var rect = button.getBoundingClientRect();
+      var left = rect.left + window.scrollX;
+      // Kept inside the viewport: against the right-hand edge the popover would
+      // open past it and need sideways scrolling to read.
+      var edge = window.scrollX + document.documentElement.clientWidth - 8;
+      var overflow = (left + box.offsetWidth) - edge;
+      if (overflow > 0) left = Math.max(8, left - overflow);
+      box.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+      box.style.left = left + 'px';
+    }
+
+    var regions = document.querySelectorAll('[data-region]');
+    for (var i = 0; i < regions.length; i += 1) {
+      (function (region) {
+        var key = region.getAttribute('data-region');
+        // Most regions are titled by an h2 and the i belongs beside it. The
+        // dials are not titled at all — they are the header's own row of chips
+        // — so the region names itself and carries the button directly.
+        var heading = region.querySelector('h2');
+        var name = heading ? heading.textContent.trim() : region.getAttribute('data-region-label');
+        if (!name) return;
+        var button = put(heading || region, 'button', 'i', 'info');
+        button.type = 'button';
+        button.setAttribute('aria-label', 'Что показывает: ' + name);
+        button.addEventListener('click', function (event) {
+          event.stopPropagation();
+          if (open === key) return close();
+          open = key;
+          fill(key);
+          place(button);
+        });
+      }(regions[i]));
+    }
+
+    document.addEventListener('click', function (event) {
+      if (open && !box.contains(event.target)) close();
+    });
+    document.addEventListener('keydown', function (event) {
+      if (open && event.key === 'Escape') close();
+    });
+
+    // An explanation is about the прогон, so it follows it: a popover left open
+    // while the state moves is refilled rather than left describing a moment
+    // that has passed.
+    refillOpenExplainer = function () { if (open) fill(open); };
+  }
+
+  mountExplainers();
 
   // The snapshot first, so a page opened without an address shows the прогон
   // instead of an error; then the file, which is what makes it move.

@@ -52,10 +52,21 @@ const GATES = `# Gates
 | G1 | preflight | something |
 `;
 
+const DASHBOARD = `# Dashboard
+
+## What It Renders
+
+| Key | Region | Shows | Source |
+|---|---|---|---|
+| \`progress\` | Прогресс проекта | the whole road | \`stages[]\` |
+| \`gates\` | Gates | G1-G4 | \`gates[]\` |
+`;
+
 const SPEC: SpecSources = {
   'vocabulary.md': VOCABULARY,
   'phases.md': PHASES,
   'gates.md': GATES,
+  'dashboard.md': DASHBOARD,
 };
 
 const LOGIC = {
@@ -69,7 +80,12 @@ const LOGIC = {
   DEPTH: "{ normal: 'Обычная' }",
   POLISH: "{ 'false': 'Выключена' }",
   GATE_AFTER: "{ G1: 'preflight' }",
+  EXPLAIN_ORDER: "['progress', 'gates']",
+  explain: "function (key) { return key === 'nothing' ? [] : ['what it is', 'what it holds']; }",
 };
+
+/** The regions of the What It Renders table, as the markup marks them. */
+const EXPLAINED = ['progress', 'gates'];
 
 const REGIONS = [
   'run-clock', 'stage-clock', 'dials', 'progress', 'cards',
@@ -80,6 +96,8 @@ const REGIONS = [
 function page(overrides: {
   logic?: Partial<Record<keyof typeof LOGIC, string>>;
   regions?: string[];
+  /** Regions marked with `data-region`, which is where each i is hung. */
+  explained?: string[];
   body?: string;
   omitLogicBlock?: boolean;
   logicSource?: string;
@@ -90,6 +108,8 @@ function page(overrides: {
   const entries = Object.entries(maps).map(([name, value]) => `${name}: ${value}`).join(',\n    ');
   const regions = (overrides.regions ?? REGIONS)
     .map(id => `<div id="${id}"></div>`).join('\n');
+  const explained = (overrides.explained ?? EXPLAINED)
+    .map(key => `<section data-region="${key}"><h2>${key}</h2></section>`).join('\n');
   const source = overrides.logicSource
     ?? `globalThis.MAESTRO_LOGIC = {\n    ${entries}\n  };`;
   const logicBlock = overrides.omitLogicBlock ? '' : `<script id="logic">\n${source}\n</script>`;
@@ -102,7 +122,7 @@ function page(overrides: {
   return [
     '<!doctype html>', '<html lang="ru">', '<head><title>Maestro</title></head>', '<body>',
     '<h2>Ход разработки</h2>',
-    regions, overrides.body ?? '', snapshotBlock, logicBlock, '</body>', '</html>',
+    regions, explained, overrides.body ?? '', snapshotBlock, logicBlock, '</body>', '</html>',
   ].join('\n');
 }
 
@@ -299,4 +319,59 @@ test('a vocabulary with no screen label table is reported', () => {
   const messages = checkDashboard(page(), spec)
     .filter(v => v.check === 'labels').map(v => v.message).join('\n');
   assert.match(messages, /no table with columns Label and What it names/);
+});
+
+test('a region the specification names and the page cannot explain is reported', () => {
+  const found = messages(page({ logic: { EXPLAIN_ORDER: "['progress']" } }));
+  assert.match(found, /names the region "gates" and the page's EXPLAIN_ORDER does not carry it/);
+});
+
+test('a region the page explains and the specification does not name is reported', () => {
+  const found = messages(page({ logic: { EXPLAIN_ORDER: "['progress', 'gates', 'weather']" } }));
+  assert.match(found, /the page explains "weather" and the What It Renders table does not name it/);
+});
+
+test('a region marked twice, or not at all, is reported', () => {
+  // The i is hung on the element carrying the attribute, so two of them means
+  // two i for one region, and none means a region nobody can ask about.
+  assert.match(
+    messages(page({ explained: ['progress', 'gates', 'gates'] })),
+    /region "gates" carries 2 data-region attribute\(s\)/,
+  );
+  assert.match(
+    messages(page({ explained: ['progress'] })),
+    /region "gates" carries 0 data-region attribute\(s\)/,
+  );
+});
+
+test('markup that marks a region the specification does not know is reported', () => {
+  const found = messages(page({ explained: ['progress', 'gates', 'weather'] }));
+  assert.match(found, /the markup marks "weather" as a region/);
+});
+
+test('a region whose explanation comes back empty is reported', () => {
+  // An i that opens an empty popover is worse than no i: it promises an answer
+  // and then has none.
+  const found = messages(page({
+    logic: { explain: "function () { return []; }" },
+  }));
+  assert.match(found, /region "progress" has no explanation behind it/);
+});
+
+test('a region with nothing to hang its i on is reported', () => {
+  // `page` gives every marked region an h2. A region built without one, and
+  // without naming itself, mounts no button at all.
+  const found = messages(page({
+    body: '<section data-region="progress"><p>без заголовка</p></section>',
+    explained: ['gates'],
+  }));
+  assert.match(found, /region "progress" has neither an h2 to hang its i beside/);
+});
+
+test('a region that names itself needs no heading', () => {
+  const html = page({ explained: ['gates'] })
+    .replace('<section data-region="gates"><h2>gates</h2></section>',
+      '<section data-region="gates"><h2>gates</h2></section>'
+      + '<div data-region="progress" data-region-label="Тумблеры"></div>');
+  assert.deepEqual(checkDashboard(html, SPEC), []);
 });

@@ -36,6 +36,8 @@ interface Logic {
   silenceNotice: (
     state: unknown, now: number, marks: number[],
   ) => { alarming: boolean; line: string } | null;
+  EXPLAIN_ORDER: string[];
+  explain: (key: string, state: unknown, now: number, marks: number[]) => string[];
   isStopped: (state: unknown) => boolean;
   isStateShape: (value: unknown) => boolean;
   readOutcome: (held: unknown, incoming: unknown) => string;
@@ -657,4 +659,104 @@ test('a прогон of contract 1 falls back to the newest instant it recorded'
   const state = run();
   assert.equal(state['updatedAt'], undefined);
   assert.equal(L.lastWrite(state, L.collectMarks(state)), AT('2026-08-19T10:30:00.000Z'));
+});
+
+/** A прогон far enough along that every region has something to say. */
+const busy = (): Record<string, unknown> => run({
+  contractVersion: 2,
+  updatedAt: '2026-08-19T10:30:00.000Z',
+  currentStage: 'build',
+  stages: [
+    { id: 'preflight', status: 'done', startedAt: STARTED, finishedAt: '2026-08-19T10:05:00.000Z' },
+    { id: 'manifest', status: 'done', startedAt: '2026-08-19T10:05:00.000Z', finishedAt: '2026-08-19T10:15:00.000Z' },
+    { id: 'build', status: 'active', startedAt: '2026-08-19T10:15:00.000Z' },
+  ],
+  tasks: [
+    {
+      id: 'T01', title: 'Движок', requirementIds: ['R01'], blockedBy: [], wave: 1,
+      status: 'done', retries: 0, repairs: 0, handoffs: 0, zone: [], files: [],
+      startedAt: '2026-08-19T10:15:00.000Z', finishedAt: '2026-08-19T10:21:00.000Z',
+      tests: { passed: 35, failed: 0 },
+    },
+    {
+      id: 'T02', title: 'Компьютер', requirementIds: ['R01'], blockedBy: ['T01'], wave: 2,
+      status: 'review', retries: 1, repairs: 0, handoffs: 0, zone: [], files: [],
+      startedAt: '2026-08-19T10:21:00.000Z', finishedAt: '2026-08-19T10:29:00.000Z',
+    },
+    {
+      id: 'T03', title: 'Страница', requirementIds: ['R02'], blockedBy: ['T01'], wave: 2,
+      status: 'running', retries: 0, repairs: 0, handoffs: 0, zone: [], files: [],
+      startedAt: '2026-08-19T10:29:00.000Z',
+    },
+  ],
+  requirements: [
+    { id: 'R01', status: 'in-spec' },
+    { id: 'R02', status: 'in-spec' },
+    { id: 'R03', status: 'deferred', reason: 'no copy supplied' },
+    { id: 'R04', status: 'dropped', reason: 'withdrawn in briefing' },
+  ],
+  gates: [
+    { id: 'G1', status: 'passed', findings: [] },
+    { id: 'G2', status: 'failed', findings: ['R02 — the spec never names the empty board'] },
+  ],
+  debt: { placeholders: ['the hard label'], assumptions: [], emptyEnv: ['TELEGRAM_BOT_TOKEN'] },
+});
+
+const NOW = AT('2026-08-19T10:35:00.000Z');
+
+test('the page can explain every region it renders', () => {
+  assert.equal(L.EXPLAIN_ORDER.length, 14);
+  for (const key of L.EXPLAIN_ORDER) {
+    const state = busy();
+    const lines = L.explain(key, state, NOW, L.collectMarks(state));
+    assert.ok(lines.length >= 2, `${key} explains itself in fewer than two lines`);
+    for (const line of lines) {
+      assert.equal(typeof line, 'string');
+      assert.ok(line.trim().length > 0, `${key} produced a blank line`);
+    }
+  }
+});
+
+test('an empty прогон is explained rather than left blank', () => {
+  // Before the манифест there is nothing to count, and that is exactly when a
+  // reader is least able to guess what a region is for.
+  for (const key of L.EXPLAIN_ORDER) {
+    const state = run();
+    const lines = L.explain(key, state, NOW, L.collectMarks(state));
+    assert.ok(lines.length >= 2, `${key} says nothing about an empty прогон`);
+    assert.ok(lines.every((line) => line.trim().length > 0), `${key} produced a blank line`);
+  }
+});
+
+test('a finished прогон is explained without pretending it still has an estimate', () => {
+  const state = run({ finishedAt: '2026-08-19T11:00:00.000Z' });
+  for (const key of L.EXPLAIN_ORDER) {
+    const lines = L.explain(key, state, AT('2026-08-19T11:30:00.000Z'), L.collectMarks(state));
+    assert.ok(lines.length >= 2, `${key} says nothing about a finished прогон`);
+  }
+  assert.match(L.explain('estimate', state, NOW, [])[1]!, /завершён/);
+});
+
+test('an explanation carries this прогон numbers, not a generic sentence', () => {
+  const state = busy();
+  const marks = L.collectMarks(state);
+
+  // Tasks: three cut, one done, one on review, one running.
+  assert.match(L.explain('tasks', state, NOW, marks)[1]!, /Готово 1 из 3/);
+  // Coverage: R04 is dropped, so the denominator is three rather than four.
+  assert.match(L.explain('coverage', state, NOW, marks)[1]!, /2 из 3/);
+  // Gates: one passed, one failed, out of the two recorded so far.
+  assert.match(L.explain('gates', state, NOW, marks)[1]!, /Пройдено 1, провалено 1 из 2/);
+  // Debt: a placeholder and an empty variable, and never the secret's value.
+  assert.match(L.explain('debt', state, NOW, marks)[1]!, /Всего 2/);
+  // Tests: the last таск's own suite, since the прогон recorded no full run.
+  assert.match(L.explain('tests', state, NOW, marks)[1]!, /Прошло 35/);
+  // Estimate: two таски finished, so a median exists and is named.
+  assert.match(L.explain('estimate', state, NOW, marks)[1]!, /при медиане/);
+});
+
+test('a region the page does not know explains nothing rather than throwing', () => {
+  // The array crosses out of the vm, so its prototype is not this realm's
+  // Array and deepStrictEqual would compare realms rather than contents.
+  assert.equal(L.explain('nonesuch', busy(), NOW, []).length, 0);
 });
