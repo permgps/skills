@@ -1035,6 +1035,29 @@ test('the silence notice is worded in the register too', () => {
   assert.match(alarming!.line, /Возможно, работа остановилась/);
 });
 
+test('an alarming silence says what restarts the прогон, in both registers and both languages', () => {
+  // The notice that named a stall and stopped there: the прогон this rule came
+  // from sat twenty-six minutes in брифинг with its clock running, and the page
+  // said only that the work may have stopped. A reader who knows something is
+  // wrong and not what to do about it is no better off than one who does not.
+  const state = run({ updatedAt: '2026-08-19T10:00:00.000Z' });
+  const marks = [AT('2026-08-19T09:50:00.000Z'), AT('2026-08-19T10:00:00.000Z')];
+
+  for (const language of ['ru', 'en'] as const) {
+    for (const register of ['plain', 'normal'] as const) {
+      const notice = L.silenceNotice(state, NOW, marks, register, language);
+      assert.equal(notice!.alarming, true);
+      assert.match(notice!.line, language === 'ru' ? /в чате?:? / : /in the chat/,
+        `the ${register} ${language} alarming notice never names the chat`);
+    }
+  }
+
+  // The calm notice stays calm: nothing has gone wrong, so nothing is proposed.
+  const calm = L.silenceNotice(state, NOW, [], 'plain');
+  assert.equal(calm!.alarming, false);
+  assert.doesNotMatch(calm!.line, /чат/);
+});
+
 test('a passed check with findings folds, and a failed one does not', () => {
   // The defect this replaced: findings were drawn at any status, in the colour
   // of failure, because the rule lived in a render no test could call.

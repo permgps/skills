@@ -186,9 +186,11 @@ that died sets no interruption to stop it.
 
 So the page says how long ago the state was last written, and raises the line
 once that is longer than the longest quiet stretch this run has already come
-through. The threshold is the run's own — ten minutes of silence is unremarkable
-in a прогон that has already been quiet for eleven, and alarming in one that
-writes at every таск. A finished or interrupted прогон is not nagged about it:
+through. A raised line also says what to do about it — a message in the chat
+resumes the run where it stands — because a reader who has just been told the
+work may have stopped needs the move, not only the diagnosis. The threshold is
+the run's own — ten minutes of silence is unremarkable in a прогон that has
+already been quiet for eleven, and alarming in one that writes at every таск. A finished or interrupted прогон is not nagged about it:
 that silence is accounted for, and the page already says so.
 
 ## What is checked

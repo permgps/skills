@@ -213,6 +213,13 @@ The notice is worded in the register too. Plain, it says nothing has changed for
 however long; the normal wording names the write, which is a fact about the file
 rather than about the project.
 
+**The raised notice names what restarts the прогон, and the calm one does not.**
+A reader told that the work may have stopped, and nothing else, is worse off than
+before: they now know something is wrong and still have no move. So the alarming
+wording adds the one that works — a message in the chat, which resumes the run at
+the стадия the state holds. The calm notice proposes nothing, because nothing has
+gone wrong yet and a suggestion there would invent a problem.
+
 ## The Numbers Are Computed, Never Stored
 
 Every percentage, every clock and the estimate are derived from the marks the

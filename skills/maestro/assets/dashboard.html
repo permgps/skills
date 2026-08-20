@@ -606,9 +606,10 @@ globalThis.MAESTRO_LOGIC = (function () {
         silenceAlarming: function (quiet, record, plain) {
           return plain
             ? 'Ничего не менялось ' + quiet + ' — дольше, чем за весь прогон до сих пор ('
-              + record + '). Возможно, работа остановилась.'
+              + record + '). Возможно, работа остановилась. Если это так, напишите '
+              + 'что-нибудь в чат: прогон продолжится с того места, где стоит.'
             : 'Тишина ' + quiet + ' — дольше, чем этот прогон молчал до сих пор ('
-              + record + ').';
+              + record + '). Если он встал, ответ в чате продолжит его с текущего этапа.';
         },
         silenceCalm: function (quiet, plain) {
           return plain
@@ -618,10 +619,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         themeLight: 'Светлая',
         themeDark: 'Тёмная',
         themeAria: 'Тема страницы',
-        languageAria: 'Язык страницы',
-        viewNote: 'Эти две кнопки меняют только эту страницу. На каком языке с вами '
-          + 'говорит сам прогон, решено в прогоне: страница читает то, что он пишет, '
-          + 'и ответить ему не может.'
+        languageAria: 'Язык страницы'
       }
     },
 
@@ -821,9 +819,10 @@ globalThis.MAESTRO_LOGIC = (function () {
         silenceAlarming: function (quiet, record, plain) {
           return plain
             ? 'Nothing has changed for ' + quiet + ' — longer than at any point in this work so far ('
-              + record + '). The work may have stopped.'
+              + record + '). The work may have stopped. If it has, write anything in the chat '
+              + 'and it will carry on from where it stands.'
             : 'Silent for ' + quiet + ' — longer than this run has been silent so far ('
-              + record + ').';
+              + record + '). If it has stopped, a message in the chat resumes it at the current stage.';
         },
         silenceCalm: function (quiet, plain) {
           return plain
@@ -833,10 +832,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         themeLight: 'Light',
         themeDark: 'Dark',
         themeAria: 'Page theme',
-        languageAria: 'Page language',
-        viewNote: 'These two buttons change this page and nothing else. Which language '
-          + 'the run itself speaks in was decided by the run; this page reads what the '
-          + 'run writes and has no way to answer back.'
+        languageAria: 'Page language'
       }
     }
   };
