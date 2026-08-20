@@ -145,8 +145,13 @@
   /* --- the whole road, in one bar --- */
   #progress .head { display: flex; justify-content: space-between; align-items: baseline; }
   #progress-percent { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .bar { background: var(--ghost); border-radius: 999px; height: .5rem; overflow: hidden; margin: .5rem 0 .4rem; }
-  .bar > i { display: block; height: 100%; background: var(--ink); border-radius: 999px; }
+  .bar { display: flex; background: var(--ghost); border-radius: 999px; height: .5rem; overflow: hidden; margin: .5rem 0 .4rem; }
+  /* The rounded ends belong to the track, which clips them, so a bar of two
+     segments meets in a flat seam instead of two facing bulges. */
+  .bar > i { display: block; height: 100%; background: var(--ink); }
+  /* Work in flight is not work accepted, and it takes the tone this page
+     already uses for everything not yet settled. */
+  .bar > i.flight { background: var(--muted); }
   .sub { color: var(--muted); font-size: .85rem; margin: 0; }
 
   /* --- the eight cards --- */
@@ -307,7 +312,7 @@
     <div class="card" data-region="tasks">
       <h2 data-label="tasks"></h2>
       <div class="value"><span id="tasks-done">—</span><small id="tasks-total"></small></div>
-      <div class="bar"><i id="tasks-fill" style="width:0%"></i></div>
+      <div class="bar"><i id="tasks-fill" style="width:0%"></i><i id="tasks-flight" class="flight" style="width:0%"></i></div>
       <p class="sub" id="tasks-sub"></p>
     </div>
 
@@ -471,8 +476,15 @@ globalThis.MAESTRO_LOGIC = (function () {
         progressSub: function (p) {
           var line = p.stagesDone + ' из ' + p.stagesTotal + ' этапов пройдено';
           if (p.tasksTotal > 0) {
-            line += ' · ' + p.tasksDone + ' из ' + p.tasksTotal + ' '
-              + plural(p.tasksTotal, 'таска', 'тасков', 'тасков');
+            // Not «0 из 6 тасков»: `done` is written by the review phase, so
+            // that figure stands at zero through the whole of разработки while
+            // five таски are visibly in motion just below it.
+            line += ' · ' + p.tasksTotal + ' ' + L10N.ru.UI.tasksWord(p.tasksTotal)
+              + ', ' + Math.round(p.tasksShare * 100) + '% пути';
+            if (p.tasksActive > 0) line += ' · в работе ' + p.tasksActive;
+            if (p.tasksOffContract > 0) {
+              line += ' · ' + L10N.ru.SCREEN.offContract + ' ' + p.tasksOffContract;
+            }
           }
           return line;
         },
@@ -505,9 +517,19 @@ globalThis.MAESTRO_LOGIC = (function () {
           return 'Критический путь: ' + chain + ' '
             + plural(chain, 'таск', 'таска', 'тасков') + ' в цепочке';
         },
+        // «готово» belongs to the figure above, which counts accepted таски.
+        // Calling the share «готово» is what made the card say «0 / 6» over
+        // «38% готово» — two numbers about one thing, disagreeing.
         tasksSub: function (counts, share) {
-          var line = counts.total > 0 ? share + '% готово' : 'Таски ещё не нарезаны';
-          if (counts.active > 0) line += ' · в работе ' + counts.active;
+          if (counts.total === 0) return 'Таски ещё не нарезаны';
+          var say = L10N.ru.TASK_STATUS;
+          var line = share + '% пути';
+          if (counts.running > 0) line += ' · ' + say.running + ' ' + counts.running;
+          if (counts.review > 0) line += ' · ' + say.review + ' ' + counts.review;
+          if (counts.repair > 0) line += ' · ' + say.repair + ' ' + counts.repair;
+          if (counts.offContract > 0) {
+            line += ' · ' + L10N.ru.SCREEN.offContract + ' ' + counts.offContract;
+          }
           if (counts.retries > 0) line += ' · повторов ' + counts.retries;
           return line;
         },
@@ -665,8 +687,14 @@ globalThis.MAESTRO_LOGIC = (function () {
         progressSub: function (p) {
           var line = p.stagesDone + ' of ' + p.stagesTotal + ' stages done';
           if (p.tasksTotal > 0) {
-            line += ' · ' + p.tasksDone + ' of ' + p.tasksTotal + ' '
-              + L10N.en.UI.tasksWord(p.tasksTotal);
+            // See the Russian note: `done` arrives with the review phase, so
+            // counting only it froze this half of the line for hours.
+            line += ' · ' + p.tasksTotal + ' ' + L10N.en.UI.tasksWord(p.tasksTotal)
+              + ', ' + Math.round(p.tasksShare * 100) + '% of the way';
+            if (p.tasksActive > 0) line += ' · in flight ' + p.tasksActive;
+            if (p.tasksOffContract > 0) {
+              line += ' · ' + L10N.en.SCREEN.offContract + ' ' + p.tasksOffContract;
+            }
           }
           return line;
         },
@@ -697,8 +725,15 @@ globalThis.MAESTRO_LOGIC = (function () {
             + L10N.en.UI.tasksWord(chain) + ' in the chain';
         },
         tasksSub: function (counts, share) {
-          var line = counts.total > 0 ? share + '% done' : 'No tasks cut yet';
-          if (counts.active > 0) line += ' · in flight ' + counts.active;
+          if (counts.total === 0) return 'No tasks cut yet';
+          var say = L10N.en.TASK_STATUS;
+          var line = share + '% of the way';
+          if (counts.running > 0) line += ' · ' + say.running + ' ' + counts.running;
+          if (counts.review > 0) line += ' · ' + say.review + ' ' + counts.review;
+          if (counts.repair > 0) line += ' · ' + say.repair + ' ' + counts.repair;
+          if (counts.offContract > 0) {
+            line += ' · ' + L10N.en.SCREEN.offContract + ' ' + counts.offContract;
+          }
           if (counts.retries > 0) line += ' · restarts ' + counts.retries;
           return line;
         },
@@ -1458,9 +1493,13 @@ globalThis.MAESTRO_LOGIC = (function () {
         'Весь прогон одной цифрой: этапы, а внутри разработки — таски.',
         p.stagesTotal === 0
           ? 'Этапы ещё не заведены, поэтому считать нечего.'
-          : 'Пройдено этапов ' + p.stagesDone + ' из ' + p.stagesTotal + ', тасков сделано '
-            + p.tasksDone + ' из ' + p.tasksTotal + ' — вместе ' + p.percent + '%.',
-        'Этапы весят не поровну, и начатый этап никогда не считается нулём: разработка растёт по сделанным таскам, остальные дают половину своего веса.'
+          : 'Пройдено этапов ' + p.stagesDone + ' из ' + p.stagesTotal + ', таски прошли '
+            + Math.round(p.tasksShare * 100) + '% пути (принято ' + p.tasksDone + ' из '
+            + p.tasksTotal + ') — вместе ' + p.percent + '%.',
+        'Этапы весят не поровну, и начатый этап никогда не считается нулём. Разработка растёт не по принятым таскам, а по пройденному пути: на ревью — 0,8 таска, в ремонте и в работе — 0,5, в очереди — ноль. Это та же шкала, по которой «Осталось» считает остаток, только с другого конца, поэтому две цифры на экране не спорят.'
+          + (p.tasksOffContract > 0
+            ? ' Тасков вне контракта ' + p.tasksOffContract + ': они в счёте, но пути не прошли.'
+            : '')
       ];
     },
 
@@ -1521,16 +1560,19 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     tasks: function (state) {
       var counts = countTasks(state.tasks);
+      var travelled = taskShare(state.tasks);
       return [
         'Сколько тасков закончено из нарезанных.',
         counts.total === 0
           ? 'Таски ещё не нарезаны — это делает фаза плана.'
           : 'Готово ' + counts.done + ' из ' + counts.total + ', в работе ' + counts.active
             + ': пишется ' + counts.running + ', на ревью ' + counts.review
-            + ', в ремонте ' + counts.repair + '.',
-        counts.retries > 0
-          ? 'Повторов ' + counts.retries + '. Таск, вернувшийся не готовым, идёт в ремонт, а не переписывается на месте.'
-          : 'Полоска считает ревью и ремонт как три четверти: такой таск уже написан, но ещё не принят.'
+            + ', в ремонте ' + counts.repair
+            + (counts.offContract > 0 ? ', вне контракта ' + counts.offContract : '') + '.',
+        'Цифра сверху — принятые таски, и полоска шире неё: второй отрезок — работа в полёте, ревью за 0,8 таска, ремонт и работа за 0,5. Пройдено ' + Math.round(travelled.share * 100) + '% пути. Полоска умеет и отступать: таск, отправленный с ревью в ремонт, теряет часть пути, потому что работа вернулась.'
+          + (counts.retries > 0
+            ? ' Повторов ' + counts.retries + '. Таск, вернувшийся не готовым, идёт в ремонт, а не переписывается на месте.'
+            : '')
       ];
     },
 
@@ -1673,9 +1715,16 @@ globalThis.MAESTRO_LOGIC = (function () {
         'Сколько всего пути пройдено — одной цифрой.',
         p.stagesTotal === 0
           ? 'Этапы ещё не заведены, поэтому считать пока нечего.'
-          : 'Этапов пройдено ' + p.stagesDone + ' из ' + p.stagesTotal + ', тасков сделано '
-            + p.tasksDone + ' из ' + p.tasksTotal + ' — вместе ' + p.percent + '%.',
-        'Таск — это один кусок работы, который делает один исполнитель. Этапы весят по-разному: разработка длинная, подготовка короткая, поэтому полоска растёт неровно — так и задумано.'
+          : 'Этапов пройдено ' + p.stagesDone + ' из ' + p.stagesTotal + ', таски прошли '
+            + Math.round(p.tasksShare * 100) + '% пути (полностью принято ' + p.tasksDone
+            + ' из ' + p.tasksTotal + ') — вместе ' + p.percent + '%.',
+        'Таск — это один кусок работы, который делает один исполнитель. Полоска считает не только доделанные таски, а весь пройденный путь: начатый таск — это уже половина, проверяемый — почти весь. Поэтому она движется, пока идёт работа, а не стоит и потом прыгает. Этапы весят по-разному: разработка длинная, подготовка короткая.'
+          + (p.tasksOffContract > 0
+            ? ' ' + p.tasksOffContract + ' ' + plural(p.tasksOffContract, 'таск', 'таска', 'тасков')
+              + ' ' + plural(p.tasksOffContract, 'записан', 'записаны', 'записаны')
+              + ' словом, которого страница не знает: ' + plural(p.tasksOffContract, 'он', 'они', 'они')
+              + ' на виду, но в пройденный путь не ' + plural(p.tasksOffContract, 'идёт', 'идут', 'идут') + '.'
+            : '')
       ];
     },
 
@@ -1738,16 +1787,22 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     tasks: function (state) {
       var counts = countTasks(state.tasks);
+      var travelled = taskShare(state.tasks);
       return [
         'Сколько кусков работы закончено из нарезанных.',
         counts.total === 0
           ? 'Работу ещё не нарезали на таски — это делают на шаге плана.'
           : 'Готово ' + counts.done + ' из ' + counts.total + ', в работе ' + counts.active
             + ': пишется ' + counts.running + ', на ревью ' + counts.review
-            + ', в ремонте ' + counts.repair + '.',
-        counts.retries > 0
-          ? 'Переделок ' + counts.retries + '. Таск, вернувшийся не готовым, идёт в ремонт, а не переписывается на месте.'
-          : 'Ревью — это когда написанное читает и проверяет другой исполнитель. Таск на ревью или в ремонте засчитан на три четверти: он уже написан, но ещё не принят.'
+            + ', в ремонте ' + counts.repair
+            + (counts.offContract > 0
+              ? ', и ещё ' + counts.offContract + ' ' + plural(counts.offContract, 'таск', 'таска', 'тасков')
+                + ' — со словом, которого страница не знает'
+              : '') + '.',
+        'Ревью — это когда написанное читает и проверяет другой исполнитель. Большая цифра считает только полностью принятые таски, а полоска — весь путь: начатый таск это половина, проверяемый — почти весь. Пройдено ' + Math.round(travelled.share * 100) + '% пути. Полоска умеет и отступать: если проверка вернула таск в исправление, часть пути пропала вместе с работой.'
+          + (counts.retries > 0
+            ? ' Переделок ' + counts.retries + '. Таск, вернувшийся не готовым, идёт в ремонт, а не переписывается на месте.'
+            : '')
       ];
     },
 
@@ -1880,9 +1935,13 @@ globalThis.MAESTRO_LOGIC = (function () {
         'The whole run as one number: stages, and inside development, tasks.',
         p.stagesTotal === 0
           ? 'No stages have been set up yet, so there is nothing to count.'
-          : 'Stages done ' + p.stagesDone + ' of ' + p.stagesTotal + ', tasks finished '
-            + p.tasksDone + ' of ' + p.tasksTotal + ' — ' + p.percent + '% together.',
-        'The stages do not weigh the same, and a stage that has started never counts as zero: development grows with its finished tasks, and every other stage contributes half its weight the moment it opens.'
+          : 'Stages done ' + p.stagesDone + ' of ' + p.stagesTotal + ', tasks '
+            + Math.round(p.tasksShare * 100) + '% of the way (accepted ' + p.tasksDone
+            + ' of ' + p.tasksTotal + ') — ' + p.percent + '% together.',
+        'The stages do not weigh the same, and a stage that has started never counts as zero. Development grows with the distance its tasks have covered rather than with the accepted ones: in review is 0.8 of a task, in repair and in progress 0.5, queued nothing. That is the same scale Remaining measures the rest by, read from the other end, so the two figures on this screen cannot disagree.'
+          + (p.tasksOffContract > 0
+            ? ' Off-contract tasks: ' + p.tasksOffContract + '. They are counted in the total and have covered no distance.'
+            : '')
       ];
     },
 
@@ -1947,16 +2006,19 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     tasks: function (state) {
       var counts = countTasks(state.tasks);
+      var travelled = taskShare(state.tasks);
       return [
         'How many tasks are finished out of the ones that were cut.',
         counts.total === 0
           ? 'No tasks cut yet — the plan stage does that.'
           : 'Finished ' + counts.done + ' of ' + counts.total + ', in flight ' + counts.active
             + ': being written ' + counts.running + ', in review ' + counts.review
-            + ', in repair ' + counts.repair + '.',
-        counts.retries > 0
-          ? 'Restarts: ' + counts.retries + '. A task that came back unfinished goes to repair rather than being rewritten where it stands.'
-          : 'The bar counts review and repair as three quarters: such a task is written already, and not accepted yet.'
+            + ', in repair ' + counts.repair
+            + (counts.offContract > 0 ? ', off-contract ' + counts.offContract : '') + '.',
+        'The figure above counts accepted tasks, and the bar runs wider than it: the second segment is the work in flight — review is 0.8 of a task, repair and writing 0.5. ' + Math.round(travelled.share * 100) + '% of the way so far. The bar can also fall back: a task sent from review to repair loses part of its distance, because the work returned.'
+          + (counts.retries > 0
+            ? ' Restarts: ' + counts.retries + '. A task that came back unfinished goes to repair rather than being rewritten where it stands.'
+            : '')
       ];
     },
 
@@ -2100,9 +2162,15 @@ globalThis.MAESTRO_LOGIC = (function () {
         'How much of the road has been travelled — in one number.',
         p.stagesTotal === 0
           ? 'The steps are not set up yet, so there is nothing to count.'
-          : 'Steps done ' + p.stagesDone + ' of ' + p.stagesTotal + ', tasks finished '
-            + p.tasksDone + ' of ' + p.tasksTotal + ' — ' + p.percent + '% together.',
-        'A task is one piece of work done by one worker. The steps are not the same size: development is long and setup is short, so the bar grows unevenly — that is on purpose.'
+          : 'Steps done ' + p.stagesDone + ' of ' + p.stagesTotal + ', tasks '
+            + Math.round(p.tasksShare * 100) + '% of the way (fully accepted ' + p.tasksDone
+            + ' of ' + p.tasksTotal + ') — ' + p.percent + '% together.',
+        'A task is one piece of work done by one worker. The bar counts more than the finished tasks: it counts the whole distance covered, so a task that has been started is already halfway and one being checked is nearly all the way. That is why it moves while the work is going on instead of standing still and then jumping. The steps are not the same size either: development is long and setup is short.'
+          + (p.tasksOffContract > 0
+            ? (p.tasksOffContract === 1
+                ? ' One task was written down with a word this page does not know: it is shown as it is, and it counts towards no distance.'
+                : ' ' + p.tasksOffContract + ' tasks were written down with a word this page does not know: they are shown as they are, and they count towards no distance.')
+            : '')
       ];
     },
 
@@ -2166,16 +2234,23 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     tasks: function (state) {
       var counts = countTasks(state.tasks);
+      var travelled = taskShare(state.tasks);
       return [
         'How many pieces of work are finished out of the ones that were cut.',
         counts.total === 0
           ? 'The work has not been cut into tasks yet — that happens on the plan step.'
           : 'Finished ' + counts.done + ' of ' + counts.total + ', being worked on ' + counts.active
             + ': being written ' + counts.running + ', in review ' + counts.review
-            + ', in repair ' + counts.repair + '.',
-        counts.retries > 0
-          ? 'Redone ' + counts.retries + ' times. A task that came back unfinished goes to repair rather than being rewritten where it stands.'
-          : 'Review is when another worker reads and checks what was written. A task in review or in repair counts as three quarters: it is written already, but not accepted yet.'
+            + ', in repair ' + counts.repair
+            + (counts.offContract > 0
+              ? ', and ' + counts.offContract + ' more '
+                + (counts.offContract === 1 ? 'task' : 'tasks')
+                + ' written down with a word this page does not know'
+              : '') + '.',
+        'Review is when another worker reads and checks what was written. The big figure counts only the pieces of work that were fully accepted, while the bar counts the whole distance: a piece that has been started is already halfway, one being checked is nearly all the way. ' + Math.round(travelled.share * 100) + '% of the way so far. The bar can also fall back: if a check sent a piece of work back to be fixed, part of the distance went with it.'
+          + (counts.retries > 0
+            ? ' Redone ' + counts.retries + ' times. A task that came back unfinished goes to repair rather than being rewritten where it stands.'
+            : '')
       ];
     },
 
@@ -2762,12 +2837,16 @@ globalThis.MAESTRO_SNAPSHOT = null;
 
     // --- таски ----------------------------------------------------------
     var tasks = L.countTasks(state.tasks);
+    var travelled = L.taskShare(state.tasks);
+    // The big figure stays the count of *accepted* таски, which is what the
+    // vocabulary says this card names. The bar is where the work in flight is
+    // shown, in a second segment, so the two can no longer contradict.
     text('tasks-done', tasks.total > 0 ? tasks.done : '—');
     text('tasks-total', tasks.total > 0 ? ' / ' + tasks.total : '');
-    var share = tasks.total > 0
-      ? Math.round((tasks.done + 0.75 * (tasks.review + tasks.repair)) / tasks.total * 100)
-      : 0;
-    el('tasks-fill').style.width = share + '%';
+    var settled = tasks.total > 0 ? tasks.done / tasks.total : 0;
+    var share = Math.round(travelled.share * 100);
+    el('tasks-fill').style.width = Math.round(settled * 100) + '%';
+    el('tasks-flight').style.width = Math.max(0, share - Math.round(settled * 100)) + '%';
     text('tasks-sub', T.UI.tasksSub(tasks, share));
 
     // --- долг -----------------------------------------------------------
