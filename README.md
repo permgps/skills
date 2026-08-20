@@ -20,9 +20,20 @@ to this repository. No selector is needed — the published tree holds exactly o
 skill. [`docs/install.md`](docs/install.md) shows that run and the
 local-checkout form with their real output.
 
-The first run in a project asks one thing: which mode it should start in when
-you do not name one. The answer goes to that project's `.maestro/config.json`,
-outside the bundle, where updating the skill cannot erase it.
+The first run in a project asks two things, and never asks them again. Both
+answers go to that project's `.maestro/config.json`, outside the bundle, where
+updating the skill cannot erase them.
+
+**How it should explain things** comes first — *по-простому* or *обычный* — and
+the second question is then asked in the register you chose. Choosing
+*по-простому* means every sentence you are shown, in every stage, is written for
+someone who has never built software: no `G2`, no shorthand, and a word like
+*таск* explained the first time it appears. It changes the wording and nothing
+else — the same questions are asked, the same checks run, the same work is done.
+Say «как обычно» at any point and it switches back, mid-run.
+
+**Which mode it should start in** when you do not name one is the second: how
+much it asks of you, from nothing to approving every step.
 
 ## The order is the product
 
@@ -145,6 +156,15 @@ The full glossary, and the rule that each term has exactly one name, are in
 Changing the interface language means editing the skill's phase files; it is not
 a dial, and nothing in the specification hard-codes Russian except the vocabulary
 itself.
+
+**How plainly it speaks is a dial**, and it does not change the words themselves.
+In *по-простому* a *таск* is still a *таск* — it simply arrives with one clause
+saying what a таск is. Renaming things for a beginner would leave them reading a
+dashboard whose words appear nowhere in what they were told. What does go is the
+trade's shorthand: `гейт`, `спека`, `коммит`, `стейт`. The list is in the
+vocabulary beside the labels, and
+[`scripts/validate/dashboard-integrity.ts`](scripts/validate/dashboard-integrity.ts)
+holds every plain sentence the dashboard ships to it.
 
 ## License
 

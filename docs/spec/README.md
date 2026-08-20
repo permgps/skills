@@ -82,6 +82,18 @@ that the stage sets in `phases.md` and `vocabulary.md` are identical, that the
 mode matrix has one row per stage and one column per mode with no cell left
 empty, and that no banned synonym appears in any defined label.
 
+`vocabulary.md`'s `Shorthand` column has its own reader:
+`scripts/validate/dashboard-integrity.ts` holds every plain string the dashboard
+ships against it, and requires each region to be explained in both registers
+rather than only in the one its author was reading in. It reads the plain block
+as source rather than calling it, because a branch never taken still ships. A
+label defined anywhere in `vocabulary.md` is exempt in its exact form, and only
+in that form — the popover beside «Гейты» is the thing that teaches the word,
+and one forbidden from naming it could not. **The chat has no such reader**:
+it is composed at run time, and the rule for it lives in the bundle's
+`SKILL.md`. That difference is stated in `vocabulary.md` rather than left to be
+discovered.
+
 ## Running The Checks
 
 ```bash

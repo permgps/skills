@@ -99,6 +99,24 @@ the empty state instead — which is when you are least able to guess. Each
 explanation is built by calling the same functions the region draws itself with,
 so it cannot tell you a story the number above it disagrees with.
 
+**In which words depends on how you answered the first question of the project.**
+If you chose *по-простому*, every one of the fourteen explanations is written for
+someone who has never built software — «Осталось» stops saying *медиана* and says
+*серединное время*, and the block called «Гейты» opens with what the four checks
+actually are. The figures are identical: both versions call the same functions,
+because an explanation that recomputed its own numbers could disagree with the
+one beside it, and the plain reader is the last person able to notice.
+
+The row of dials shows a fourth chip when the run recorded an answer —
+«Объяснения: Простые» — and shows nothing there when it did not. A прогон from
+before this question existed renders exactly as it always did; the page does not
+report a choice nobody made.
+
+The names on the screen do not change. A *таск* is a *таск* in both, «Гейты» is
+«Гейты» in both, and the rows are still numbered `G1`…`G4`. Renaming them for a
+beginner would leave you reading a page whose words appear nowhere in what you
+were told; the `i` beside each block is what teaches the word instead.
+
 ## When the page has nothing new to say
 
 A прогон writes its state at transitions and at no other time, so quiet
@@ -126,9 +144,19 @@ page holds those copies because the state stores ids; an unchecked copy drifts.
 
 It holds the regions to `spec/dashboard.md` as well. Every region named there
 must be marked once in the markup, must have somewhere to hang its `i`, and must
-have an explanation that answers when called — in both directions, so a region
-added to the page and forgotten in the table fails too. A region cannot ship
-mute.
+have an explanation that answers when called — **in both registers**, and in
+both directions, so a region added to the page and forgotten in the table fails
+too, and one explained only for the reader who did not need it fails as well. A
+region cannot ship mute.
+
+It also holds the plain explanations to the shorthand list in `vocabulary.md`:
+no plain sentence the page ships may contain `гейт`, `спека`, `коммит`, `стейт`
+or the rest of them. The block is read as source rather than called, because a
+branch never taken still ships — and a region's empty state, the branch a
+fixture is likeliest to forget, is exactly where the reader is least able to
+guess. A label the screen shows is exempt in its exact form: «Гейты» is on the
+page in both registers, and the popover that has to teach it cannot be forbidden
+from naming it. «после гейта» in the same sentence still fails.
 
 Its DOM-free logic is exercised separately by `scripts/validate/dashboard-logic.test.ts`,
 which evaluates the page's own `<script id="logic">` block in a VM rather than
