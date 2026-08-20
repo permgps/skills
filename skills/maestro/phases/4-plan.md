@@ -161,7 +161,7 @@ An array published only as таски start makes the dashboard state three fals
 things at once, at the moment the user is most likely to look: that the таски
 were never cut, while the files are on disk and the build is running; that there
 is no build to show; and a progress bar that cannot move with the work because
-the share of finished таски is zero out of zero.
+the share it measures is zero out of zero.
 
 ### 8. Show it, by mode
 
