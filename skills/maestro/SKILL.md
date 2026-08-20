@@ -120,10 +120,10 @@ where the прогон keeps its prose; the state carries what the dashboard sho
 
 ## The Dials
 
-Everything typed after `/maestro` splits into five parts: the register, the
-mode, the depth, the finish, and the бриф. Bare words, no dashes. **Anything not
-recognised as a dial is бриф text** — a word the user meant literally is never
-stolen by a dial.
+Everything typed after `/maestro` splits into six parts: the register, the
+language, the mode, the depth, the finish, and the бриф. Bare words, no dashes.
+**Anything not recognised as a dial is бриф text** — a word the user meant
+literally is never stolen by a dial.
 
 **Register** — how you word what the user reads. Built-in default for `explain`:
 `normal`; a project pins its own in `.maestro/config.json`, and the first прогон
@@ -134,6 +134,16 @@ whole of it.
 |---|---|
 | `plain` | every sentence the user reads is written for someone who has never built software |
 | `normal` | the terms of the словарь are used as they stand, unexplained |
+
+**Language** — which language you speak in. It has **no built-in default**: it
+is read off the бриф, overridden by a trigger word or by the `language` key of
+`.maestro/config.json`, and a бриф that is clearly neither takes `en`. Never ask
+for it; the section *Language* below is the whole of it.
+
+| Language | What changes |
+|---|---|
+| `ru` | every sentence the user reads and every label on the panel is Russian |
+| `en` | the same sentences and the same labels in English |
 
 **Mode** — how much is asked of the user. Built-in default for `mode`: `semi`;
 a project pins its own in `.maestro/config.json`, and the first прогон in a
@@ -162,11 +172,11 @@ against the user's own reference.
 A new capability always attaches to a parent требование. Depth buys thoroughness
 beneath the бриф; it never buys a direction away from it.
 
-**The register is the one dial that may change inside a phase.** It takes effect
-on the next sentence, it is recorded in no `dialChanges[]` entry, and it earns no
-write of its own — it produces no part of the build, so there is nothing for the
-отчёт to attribute to it. The new value reaches `state.js` at the next ordinary
-write.
+**The register and the language are the two dials that may change inside a
+phase.** Either takes effect on the next sentence, neither is recorded in a
+`dialChanges[]` entry, and neither earns a write of its own — they produce no
+part of the build, so there is nothing for the отчёт to attribute to them. The
+new value reaches `state.js` at the next ordinary write.
 
 **Every other dial may be changed mid-прогон, at a phase boundary and never
 inside one.**
@@ -315,9 +325,32 @@ preference, never from questions about consequence.
 
 ## Language
 
-Every file you write is English. The chat and the dashboard labels are Russian.
-The бриф is translated exactly once, in the Manifest phase, and the numbered
-манифест is shown to the user in Russian before any other work begins.
+**Every file you write is English.** `brief.md`, `spec.md`, the task files,
+`report.md`, the code and its comments — in both languages of the dial, with no
+exception. Those files are read by the next прогон and by whoever maintains the
+project afterwards, and one language across them is what keeps them readable.
+The dial does not touch this rule.
+
+**Everything the user reads is in the dial's language.** The chat, every
+question and every answer you offer with it, the манифест as it is shown, the
+panel's labels, and the отчёт as it is read out. `ru` takes the `Label` column
+of `vocabulary.md`; `en` takes `Label (en)` beside it. Never mix them in one
+sentence, and never leave a word untranslated because no label existed — if a
+word the user must read has no English twin in `vocabulary.md`, that is a gap in
+the vocabulary and it is filled there.
+
+**The бриф is translated into English exactly once**, in the Manifest phase, and
+only when it was not written in English already. When the dial's language and
+the бриф's agree, nothing is translated at all and the numbered манифест is the
+user's own words back. When they differ, the манифест is shown in the dial's
+language with the original line beneath each one, so what is being agreed is a
+translation the user can see rather than a substitution they cannot.
+
+**The chat is the part nothing checks.** Every label and every explanation this
+repository ships is held against `vocabulary.md` in both languages by a
+validator; not one sentence you compose at run time is. That makes this section
+the whole of the guarantee for the chat, the same way *Speaking Plainly* is for
+the register.
 
 ## Start
 

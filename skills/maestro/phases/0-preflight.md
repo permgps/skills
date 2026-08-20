@@ -119,6 +119,7 @@ Write `.maestro/state.js` through the state writer. It carries:
 | `updatedAt` | now, and restamped at every write from here on |
 | `mode`, `depth`, `polish` | as resolved by the dials phase |
 | `explain` | as resolved by the dials phase |
+| `language` | as resolved by the dials phase — the бриф's own, unless a token or the config said otherwise |
 | `dialChanges` | empty |
 | `stages` | all eight; `preflight` `active` carrying its `startedAt`, the rest `pending` carrying no stamps at all |
 | `currentStage` | `preflight` |

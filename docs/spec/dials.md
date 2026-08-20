@@ -1,7 +1,8 @@
 # Dials
 
-Everything typed after `/maestro` splits into five parts: the **register**, the
-**mode**, the **depth**, the **finish**, and the бриф. Bare words, no dashes.
+Everything typed after `/maestro` splits into six parts: the **register**, the
+**language**, the **mode**, the **depth**, the **finish**, and the бриф. Bare
+words, no dashes.
 Anything not recognised as a dial is бриф text — a word the user meant literally
 is never stolen by a dial.
 
@@ -65,6 +66,83 @@ then have nothing to say about.
 Because it produces nothing, it also earns no write of its own: the new value
 reaches `state.js` at the next ordinary write, at a phase boundary or a task
 transition, like everything else.
+
+## Language
+
+**Which language the прогон speaks in, not how it words a sentence.** The
+register decides whether a sentence is written for someone who has never built
+software; the language decides which words it is written in. The two are
+independent, and every combination is real: `plain` in `en` is a beginner's
+sentence in English.
+
+| Language | Russian triggers | English triggers | What changes |
+|---|---|---|---|
+| `ru` | по-русски, отвечай по-русски | in russian, russian | every sentence the user reads and every label on screen is Russian — the `Label` column of `vocabulary.md` |
+| `en` | по-английски, отвечай по-английски | in english, english | the same sentences and the same labels in English — the `Label (en)` column of the same tables |
+
+**This dial has no built-in default, and no row above is marked one.** Every
+other dial applies a value when the user named none; this one reads it off the
+бриф, which by then is already there — the бриф is what was typed after
+`/maestro`, and the dials are resolved from the same line. A language somebody
+has just written a paragraph in is a fact, not a guess, and a built-in default
+here would be a guess overruling a fact.
+
+### Where An Unset Language Comes From
+
+| Order | Source | Lives in |
+|---|---|---|
+| 1 | the arguments of this run | a trigger word the user typed |
+| 2 | the project's pinned language | `<project>/.maestro/config.json`, key `language` |
+| 3 | the language of the бриф | what the user just wrote |
+
+There is no fourth row. A бриф that is neither clearly Russian nor clearly
+English — two words, a URL, a filename — takes `en`, because English is the
+language every file this прогон writes is in anyway, and the fallback that
+matches the artifacts is the one that surprises least.
+
+The `language` key is read from the config file and **never written to it**. The
+first прогон in a project asks about the mode and the register and pins the
+answers; it does not ask about the language, because it can see the language.
+Pinning one is a thing the user does to the file by hand, for a project whose
+брифы will not always be written in the language its owner reads.
+
+### What The Language Does Not Change
+
+Every file the прогон writes stays English in both: `brief.md`, `spec.md`, the
+task files, `report.md`, the code and its comments. That rule is older than this
+dial and this dial does not touch it. The one Russian thing inside an artifact —
+the `Требование` column header of `manifest.md` — is the manifest's own shape and
+is covered where the manifest is specified, not here.
+
+The slug stays Latin in both, for the same reason it was Latin before: it is a
+directory name.
+
+`en` is not a second product. Nothing about the phases, the gates, the safety
+rules or the mode matrix reads differently in it; the same прогон is being
+narrated in another language.
+
+### Switching It Mid-Прогон
+
+Like the register, and for the register's reason. It may change **inside** a
+phase, it takes effect on the next sentence, and it is recorded in no
+`dialChanges[]` entry: it produces no part of the build, so the отчёт has
+nothing to attribute to it. The new value reaches `state.js` at the next
+ordinary write.
+
+The dashboard follows it at that write. What the reader may already have chosen
+in their own browser wins over what the state says — see
+[`dashboard.md`](dashboard.md) — because that choice is about the person looking
+at the page and not about the прогон.
+
+### The Boundary Of The Proof
+
+The same one the register has, inherited exactly. A validator reads every label
+and every explanation this repository ships and holds each of them to its own
+column of `vocabulary.md`, in both languages. The chat is composed at run time
+and no checker ever sees a word of it; it is covered by a rule in the bundle's
+`SKILL.md`, which is a weaker guarantee. Written down here rather than left to
+be discovered, because a rule believed to be enforced and a rule that is
+enforced fail differently.
 
 ## Modes
 
@@ -175,6 +253,8 @@ shows — and it keeps everything created under `.maestro/` with one writer.
    the choice is stated in the announcement, because that mode may not ask.
 4. An unset depth or finish takes its default. An unset mode or register
    resolves through the order in *Where An Unset Mode Or Register Comes From*.
+   An unset language resolves through *Where An Unset Language Comes From*,
+   which ends at the бриф rather than at a built-in value.
 5. A trigger phrase that appears inside a longer sentence of бриф text does not
    set a dial. Dials are typed as bare words, not detected by meaning.
 
@@ -186,9 +266,10 @@ the user is most likely to be surprised by (for `full`: that no questions will b
 asked; for `strict`: that nothing beyond the бриф will be added; for `manual`:
 that the run will wait for approval twice).
 
-The announcement itself is written in the register it names. A block explaining
-in the vocabulary's own terms that the прогон will from now on speak plainly is
-the first sentence of the plain register failing.
+The announcement itself is written in the register **and the language** it
+names. A block explaining in the vocabulary's own terms that the прогон will
+from now on speak plainly is the first sentence of the plain register failing,
+and the same block in the wrong language is that failure twice over.
 
 The announcement is shown in every mode, `full` included. It is a statement, not
 a question.
@@ -210,6 +291,7 @@ mode, the announcement says the override holds for this run only.
 - The change is recorded in the run state with the phase at which it took effect,
   so the final отчёт can say which parts of the run were produced under which
   settings.
-- **The register is the exception on both counts**: it may change inside a phase,
-  it takes effect at once, and it is not recorded. *Switching It Mid-Прогон*
-  under *Register* above says why.
+- **The register and the language are the exceptions on both counts**: either
+  may change inside a phase, either takes effect at once, and neither is
+  recorded. *Switching It Mid-Прогон*, under *Register* and under *Language*
+  above, says why.

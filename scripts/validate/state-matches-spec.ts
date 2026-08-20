@@ -28,6 +28,7 @@ const VALUE_SET_CONSTANTS: Record<string, string> = {
   'mode': 'MODES',
   'depth': 'DEPTHS',
   'explain': 'REGISTERS',
+  'language': 'LANGUAGES',
   'stages[].status': 'STAGE_STATUSES',
   'tasks[].status': 'TASK_STATUSES',
   'requirements[].status': 'REQUIREMENT_STATUSES',

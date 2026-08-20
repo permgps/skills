@@ -190,3 +190,11 @@ test('a missing RunState interface is reported once, not as every field', async 
   assert.equal(violations.length, 1);
   assert.match(violations[0]?.message ?? '', /no RunState interface found/);
 });
+
+// The real documents, not a fixture. Every test above proves the machinery on
+// a small pair; this one proves the pair this repository actually ships still
+// agrees — a field added to one side and forgotten on the other is the whole
+// defect, and it is cheapest to catch in the same run as the unit tests.
+test('the shipped contract and its specification agree on every field', async () => {
+  assert.deepEqual(await checkStateMatchesSpec(), []);
+});

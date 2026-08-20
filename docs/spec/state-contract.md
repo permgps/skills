@@ -17,6 +17,7 @@ input.
 | `depth` | `strict` \| `normal` \| `deep` | preflight | dashboard |
 | `polish` | boolean | preflight | dashboard |
 | `explain` | `plain` \| `normal` | preflight | dashboard |
+| `language` | `ru` \| `en` | preflight | dashboard |
 | `dialChanges[]` | list of `{ dial, from, to, atPhase }` | preflight | dashboard |
 | `stages[]` | list of `{ id, status, startedAt?, finishedAt?, note? }` | preflight | dashboard |
 | `currentStage` | stage id | preflight | dashboard |
@@ -28,6 +29,19 @@ input.
 | `tests` | `{ passed, failed }` | build | dashboard |
 | `finishedAt` | ISO 8601 string | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
+
+**`language` is the second such dial, and it is here for the same reason.** The
+dashboard has to paint its labels and its explanations in one of two languages,
+and `state.js` is the only thing the dashboard reads. It is **optional** on the
+same terms as `explain`: a state written before the dial existed carries no
+`language`, and a reader that met an absent one and supplied `ru` on the
+writer's behalf would be reporting a choice nobody made. What the page does with
+an absent value is the page's own rule, stated in [`dashboard.md`](dashboard.md);
+what the contract says is only that the field may not be there.
+
+`contractVersion` does not move for it. See *Version 2* below, where `explain`
+is recorded as having arrived later and raised nothing — an optional field that
+widens no existing value set is exactly the case that changes no version.
 
 **`explain` is the one dial the state carries that produces no part of the
 build.** It is here because the dashboard has to render its fourteen
@@ -231,6 +245,7 @@ The optional fields in the same version — `wave`, `zone`, the three counters,
 `files`, `tests`, `commit`, `note`, `debt`, `additions`, `updatedAt` — would
 have raised nothing on their own. **`explain` arrived later and still raised
 nothing**, for exactly that reason: it is an optional field and it widened no
-value set. **A state written under version 1 stays
+value set. **`language` arrived later still, on the same terms and with the same
+result.** **A state written under version 1 stays
 readable**: the dashboard renders what it can, and the fields it does not find
 render as absent rather than as zero.

@@ -98,6 +98,23 @@ test('the register is optional, checked when present, and absent is not normal',
   assert.deepEqual(fields(validateState(withPatch({ explain: null }))), ['explain']);
 });
 
+test('the language is optional, checked when present, and absent is not ru', () => {
+  // The register's own rule, inherited exactly: a state written before the
+  // language dial existed carries none, and supplying one on the writer's
+  // behalf would report a choice nobody made.
+  assert.deepEqual(validateState(baseline()), []);
+  assert.equal(baseline().language, undefined);
+
+  assert.deepEqual(validateState(withPatch({ language: 'ru' })), []);
+  assert.deepEqual(validateState(withPatch({ language: 'en' })), []);
+
+  const violations = validateState(withPatch({ language: 'de' }));
+  assert.deepEqual(fields(violations), ['language']);
+  assert.match(violations[0]?.message ?? '', /ru, en/);
+
+  assert.deepEqual(fields(validateState(withPatch({ language: null }))), ['language']);
+});
+
 test('an unknown depth, stage status and task status are each reported', () => {
   assert.deepEqual(fields(validateState(withPatch({ depth: 'shallow' }))), ['depth']);
   assert.deepEqual(

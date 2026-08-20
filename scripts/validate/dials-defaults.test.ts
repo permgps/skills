@@ -15,6 +15,8 @@ import {
 
 const MODE: DialSpec = { dial: 'mode', column: 'Mode', witness: 'Human gates' };
 const REGISTER: DialSpec = { dial: 'explain', column: 'Register', witness: 'What changes' };
+const LANGUAGE: DialSpec =
+  { dial: 'language', column: 'Language', witness: 'What changes', derived: true };
 
 // The fixtures are the three real files reduced to what this checker reads: a
 // table per dial, and the sentence naming the value that applies by default.
@@ -241,7 +243,7 @@ test('prose about the built-in default without a dial declares nothing', () => {
 });
 
 test('the shipped dial list is what the real files are held to', () => {
-  assert.deepEqual(DIALS.map(dial => dial.dial), ['mode', 'explain']);
+  assert.deepEqual(DIALS.map(dial => dial.dial), ['mode', 'explain', 'language']);
 });
 
 // These files are prose wrapped at eighty columns. A reflow that moved a word
@@ -251,4 +253,69 @@ test('a declaration wrapped across a line break is still found', () => {
     [{ dial: 'explain', value: 'normal', line: 1 }]);
   assert.deepEqual(findDeclarations('x\nBuilt-in default for `explain`:\n`normal`;'),
     [{ dial: 'explain', value: 'normal', line: 2 }]);
+});
+
+
+// --- a dial with no built-in default -------------------------------------
+//
+// The language is derived rather than chosen: it is read off the бриф, which
+// exists by the time the dials resolve. Its table therefore carries no
+// `Default` column and no file declares one — but the three homes still have to
+// name the same two values, which is the half of this check it keeps.
+
+const LANGUAGE_TABLE = `
+| Language | What changes |
+|---|---|
+| \`ru\` | every sentence the user reads is Russian |
+| \`en\` | the same sentences in English |
+`;
+
+const derived = (extra: Overrides = {}): Overrides => ({
+  spec: SPEC + LANGUAGE_TABLE,
+  phase: PHASE + LANGUAGE_TABLE,
+  skill: SKILL + LANGUAGE_TABLE,
+  dials: [MODE, LANGUAGE],
+  ...extra,
+});
+
+test('a derived dial passes with no Default column and no declaration anywhere', async () => {
+  assert.deepEqual(await violationsFor(derived()), []);
+});
+
+test('a derived dial the bundle disagrees with is reported in both directions', async () => {
+  const violations = await violationsFor(derived({
+    phase: PHASE + LANGUAGE_TABLE.replace('| `en` |', '| `de` |'),
+  }));
+  assert.deepEqual(checks(violations), ['language', 'language']);
+  assert.match(violations[0]?.message ?? '', /"en" is defined in .*dials\.md and missing here/);
+  assert.match(violations[1]?.message ?? '', /"de" is named here and defined nowhere/);
+});
+
+test('a value outside the derived dial\'s set is reported where it was invented', async () => {
+  const violations = await violationsFor(derived({
+    skill: SKILL + LANGUAGE_TABLE + '| `fr` | the same sentences in French |\n',
+  }));
+  assert.deepEqual(checks(violations), ['language']);
+  assert.match(violations[0]?.message ?? '', /"fr" is named here and defined nowhere/);
+});
+
+// A derived dial that grew a built-in default has stopped reading what it
+// derives from, and the two would then disagree silently: the бриф says one
+// thing and the declaration another.
+test('a built-in default declared for a derived dial is itself the finding', async () => {
+  const violations = await violationsFor(derived({
+    phase: PHASE + LANGUAGE_TABLE + '\nBuilt-in default for `language`: `ru`.\n',
+  }));
+  assert.deepEqual(checks(violations), ['default']);
+  assert.match(violations[0]?.message ?? '', /derives\s+rather than defaults/);
+});
+
+test('the two chosen dials are unaffected by the derived one beside them', async () => {
+  const violations = await violationsFor({
+    spec: TWO_DIAL_SPEC + LANGUAGE_TABLE,
+    phase: TWO_DIAL_PHASE + LANGUAGE_TABLE,
+    skill: TWO_DIAL_SKILL + LANGUAGE_TABLE,
+    dials: [MODE, REGISTER, LANGUAGE],
+  });
+  assert.deepEqual(violations, []);
 });

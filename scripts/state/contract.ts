@@ -50,6 +50,17 @@ export const DEPTHS: readonly Depth[] = ['strict', 'normal', 'deep'];
 export type Register = 'plain' | 'normal';
 export const REGISTERS: readonly Register[] = ['plain', 'normal'];
 
+/**
+ * Which language the прогон speaks in — the second dial here that produces no
+ * part of the build, and here for the register's reason exactly: the dashboard
+ * paints its labels and its fourteen explanations in one of two languages, and
+ * `state.js` is the only thing the dashboard reads.
+ *
+ * It appears in no `DialChange` for the same reason `Register` does not.
+ */
+export type Language = 'ru' | 'en';
+export const LANGUAGES: readonly Language[] = ['ru', 'en'];
+
 export type StageStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
 export const STAGE_STATUSES: readonly StageStatus[] =
   ['pending', 'active', 'done', 'failed', 'skipped'];
@@ -191,6 +202,12 @@ export interface RunState {
    * writer's behalf would report a choice nobody made.
    */
   explain?: Register;
+  /**
+   * Optional, and absent is not `ru`. A state written before the language dial
+   * existed lacks it, and the page's own rule decides what to paint then — the
+   * contract only says the field may be missing.
+   */
+  language?: Language;
   dialChanges: DialChange[];
   stages: StageEntry[];
   currentStage: StageId;

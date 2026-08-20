@@ -11,6 +11,7 @@ import {
   DEPTHS,
   GATE_IDS,
   GATE_STATUSES,
+  LANGUAGES,
   MODES,
   REGISTERS,
   REQUIREMENT_STATUSES,
@@ -127,6 +128,7 @@ export function validateState(value: unknown): StateViolation[] {
   // arrived after 2 was already in use, so a state that predates it is not a
   // state that lost a field.
   optionalOneOf('explain', value['explain'], REGISTERS);
+  optionalOneOf('language', value['language'], LANGUAGES);
   requireOneOf('currentStage', value['currentStage'], STAGE_IDS);
   optionalString('finishedAt', value['finishedAt']);
   optionalString('interruptedAt', value['interruptedAt']);

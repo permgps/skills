@@ -41,11 +41,23 @@ export interface DialSpec {
   column: string;
   /** A second column, so the dial's table cannot be confused with another. */
   witness: string;
+  /**
+   * A dial with no built-in default, because its value is derived rather than
+   * chosen: the language is read off the бриф, which exists by the time the
+   * dials resolve. Its table carries no `Default` column, no row is marked, and
+   * a file declaring a built-in default for it is itself the finding — a
+   * derived dial that grew a default has stopped reading the бриф.
+   *
+   * The value sets are still held to one answer across the three files. That is
+   * the half of this check a derived dial keeps.
+   */
+  derived?: boolean;
 }
 
 export const DIALS: readonly DialSpec[] = [
   { dial: 'mode', column: 'Mode', witness: 'Human gates' },
   { dial: 'explain', column: 'Register', witness: 'What changes' },
+  { dial: 'language', column: 'Language', witness: 'What changes', derived: true },
 ];
 
 /**
@@ -116,10 +128,12 @@ export async function checkDialsDefaults(options: CheckOptions = {}): Promise<Vi
 
   // --- the specification is the authority on every dial's values -----------
   const specMarkdown = await readFile(specFile, 'utf8');
-  const authority = new Map<string, { values: string[]; builtIn: string }>();
+  const authority = new Map<string, { values: string[]; builtIn: string; derived?: boolean }>();
 
   for (const spec of dials) {
-    const columns = [spec.column, spec.witness, 'Default'];
+    const columns = spec.derived
+      ? [spec.column, spec.witness]
+      : [spec.column, spec.witness, 'Default'];
     const table = findTable(parseTables(specMarkdown), columns);
     if (!table) {
       add(spec.dial, specFile, 0, `no table with columns ${columns.join(', ')}`);
@@ -127,6 +141,13 @@ export async function checkDialsDefaults(options: CheckOptions = {}): Promise<Vi
     }
 
     const values = table.rows.map(row => clean(row[spec.column])).filter(v => v !== '');
+
+    if (spec.derived) {
+      authority.set(spec.dial, { values, builtIn: '', derived: true });
+      log.info(spec.dial, 'specification read', { values: values.length, derived: true });
+      continue;
+    }
+
     const marked = table.rows
       .filter(row => clean(row['Default']).toLowerCase() === 'yes')
       .map(row => ({ value: clean(row[spec.column]), line: row.__line }));
@@ -184,6 +205,15 @@ export async function checkDialsDefaults(options: CheckOptions = {}): Promise<Vi
       }
 
       const mine = declarations.filter(entry => entry.dial === spec.dial);
+      if (known.derived) {
+        for (const declared of mine) {
+          add('default', file, declared.line,
+            `declares a built-in default for "${spec.dial}", which ${specFile} derives `
+            + 'rather than defaults — a derived dial with a default has stopped reading '
+            + 'what it derives from');
+        }
+        continue;
+      }
       if (mine.length === 0) {
         add('default', file, 0,
           `no built-in default declared for "${spec.dial}"; expected a line reading `

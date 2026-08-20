@@ -6,8 +6,9 @@ and none of them re-resolves.
 
 ## What The Arguments Contain
 
-Everything typed after `/maestro` is five things: a **register**, a **mode**, a
-**depth**, a **finish**, and the бриф. Dials are bare words, no dashes.
+Everything typed after `/maestro` is six things: a **register**, a **language**,
+a **mode**, a **depth**, a **finish**, and the бриф. Dials are bare words, no
+dashes.
 
 **Anything you do not recognise as a dial is бриф text.** A word the user meant
 literally is never taken as a dial.
@@ -37,6 +38,39 @@ effect on the next sentence. It is not recorded in `dialChanges[]` and it earns
 no write of its own: it produces no part of the build, so there is nothing for
 the отчёт to attribute to it. The new value reaches `state.js` at the next
 ordinary write.
+
+## Language
+
+Which language you speak in — not how you word a sentence. The register decides
+whether a sentence is written for a beginner; this decides which words it is
+written in. **This dial has no built-in default**: it is read off the бриф,
+which you already have.
+
+| Language | Russian triggers | English triggers | What changes |
+|---|---|---|---|
+| `ru` | по-русски, отвечай по-русски | in russian, russian | every sentence the user reads and every label on the panel is Russian |
+| `en` | по-английски, отвечай по-английски | in english, english | the same sentences and the same labels in English |
+
+Take the first of these that supplies a value:
+
+1. a trigger word in the arguments,
+2. the `language` key of `.maestro/config.json`, when its value is `ru` or `en`,
+3. the language the бриф is written in.
+
+A бриф that is neither clearly one nor the other — two words, a URL, a
+filename — takes `en`. Every file you write is English anyway, so that is the
+fallback that surprises least. **Do not ask** which language: you are holding
+the answer, and a question whose answer is already on screen reads as a tool
+that did not look.
+
+Write the resolved value into `state.js` as `language`, so the panel paints
+itself in it. Everything else about the dial is in `SKILL.md`, under *Language*.
+
+### Changing It Mid-Прогон
+
+Like the register: it may change **inside** a phase, it takes effect on the next
+sentence, it is recorded in no `dialChanges[]` entry, and it earns no write of
+its own. The new value reaches `state.js` at the next ordinary write.
 
 ## Modes
 
@@ -89,6 +123,10 @@ Each of the two comes from the first of these that supplies it:
 1. a token for that dial in the arguments,
 2. its key in the file, when the value is one of the set,
 3. `semi` for the mode, `normal` for the register.
+
+A file may also carry `"language": "ru"` or `"language": "en"`, added by hand by
+a user whose брифы will not always be in the language they read. Read it if it
+is there; **never write it** — nothing asked for it.
 
 Ignore a key whose value is outside its set, **one key at a time**: an
 unreadable `explain` does not throw away a good `mode`. Ignore the file whole if
@@ -159,7 +197,8 @@ which creates everything under `.maestro/`.
    - in `full` — the first token wins, and say so in the announcement, because
      that mode may not ask.
 4. An unset depth or finish takes its default. An unset mode or register comes
-   from *The Project's Defaults* above.
+   from *The Project's Defaults* above. An unset language comes from the бриф,
+   through the three steps under *Language*.
 5. A trigger phrase inside a longer sentence of бриф text does **not** set a
    dial. Dials are typed as bare words; they are not detected by meaning.
 
@@ -176,9 +215,10 @@ After resolution and before the manifest phase, state in one block:
   of the config file, or the built-in default. An argument that overrode a
   pinned value is said to hold for this прогон only.
 
-**Write the announcement in the register it names.** A block explaining, in the
-словарь's own terms, that the прогон will speak plainly from now on is the
-plain register failing in its first sentence.
+**Write the announcement in the register and the language it names.** A block
+explaining, in the словарь's own terms, that the прогон will speak plainly from
+now on is the plain register failing in its first sentence — and the same block
+in a language the user did not choose fails before it is read at all.
 
 Use these:
 
@@ -203,13 +243,14 @@ not a question. Do not wait for a reply.
 - Record the change in the run state as a `dialChanges[]` entry with the phase at
   which it took effect, so the отчёт can say which parts of the run were produced
   under which settings.
-- **The register is the exception to all three.** It may change inside a phase,
-  it takes effect on the next sentence, and it is recorded nowhere — see
-  *Changing It Mid-Прогон* under *Register* above.
+- **The register and the language are the exceptions to all three.** Either may
+  change inside a phase, either takes effect on the next sentence, and neither
+  is recorded anywhere — see *Changing It Mid-Прогон* under *Register* and under
+  *Language* above.
 
 ## Output Of This Phase
 
-- `explain`, `mode`, `depth` and `polish`, resolved.
+- `explain`, `language`, `mode`, `depth` and `polish`, resolved.
 - The announcement text, composed and ready, in the resolved register.
 - The config decision, when this is a first прогон: the values to pin, each of
   them or `null`.
