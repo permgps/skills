@@ -146,6 +146,16 @@ export function validateState(value: unknown): StateViolation[] {
   if (atLeastV2) requireString('updatedAt', value['updatedAt']);
   else optionalString('updatedAt', value['updatedAt']);
 
+  /**
+   * Whether this state promises the rename version 3 made.
+   *
+   * Below it a таск carries `commit`, a single string, and nothing here demands
+   * `commits` of a прогон written before the list existed — the same courtesy
+   * contract 1 is shown above, and for the same reason: a run that predates a
+   * field is not a run that lost one.
+   */
+  const atLeastV3 = typeof version === 'number' && version >= 3;
+
   // --- heldBy ---------------------------------------------------------------
   // Optional at every version, and absent means unclaimed rather than free: the
   // field arrived after 2 was already in use, and a прогон nobody claimed never
@@ -381,7 +391,22 @@ export function validateState(value: unknown): StateViolation[] {
       optionalString(`${at}.startedAt`, entry['startedAt']);
       optionalString(`${at}.finishedAt`, entry['finishedAt']);
       optionalTests(`${at}.tests`, entry['tests']);
-      optionalString(`${at}.commit`, entry['commit']);
+
+      // A таск that has not landed yet carries an empty list, not a missing
+      // one: the array is written with the таск, like every other list here, so
+      // nothing downstream increments it from `undefined`. Each entry is named
+      // by its own index, because a list reported as a whole makes the caller
+      // count the elements to find the one that is wrong.
+      const commits = entry['commits'];
+      if (atLeastV3 || commits !== undefined) {
+        if (requireArray(`${at}.commits`, commits)) {
+          (commits as unknown[]).forEach((sha, position) => {
+            if (typeof sha !== 'string' || sha === '') {
+              add(`${at}.commits[${position}]`, 'commit must be a non-empty string');
+            }
+          });
+        }
+      }
 
       if (atLeastV2) {
         // The wave is a layer, and a layer starts at one. A таск carrying zero

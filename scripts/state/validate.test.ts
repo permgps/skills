@@ -25,6 +25,7 @@ function baseline(): RunState {
         id: '01', title: 'Build the hero section', requirementIds: ['R01'],
         status: 'queued', blockedBy: [],
         wave: 1, zone: ['src/hero/'], retries: 0, repairs: 0, handoffs: 0, files: [],
+        commits: [],
       },
     ],
     requirements: [
@@ -231,6 +232,54 @@ test('a task tracing to no requirement is reported', () => {
   }));
   assert.deepEqual(fields(violations), ['tasks[0].requirementIds']);
   assert.match(violations[0]?.message ?? '', /traces to no/);
+});
+
+test('a repaired таск carries both its commits, and an unfinished one carries none', () => {
+  // Two commits is the case the field exists for: the таск landed, came back,
+  // and landed again, and the first is what its original review was written
+  // against.
+  const twice = { ...baseline().tasks[0], commits: ['a1b2c3d', '9f8e7d6'] };
+  assert.deepEqual(validateState(withPatch({ tasks: [twice] })), []);
+
+  // Empty is the ordinary state of a таск that has not landed. The list is
+  // written when the таск is cut, like every other list here, so nothing
+  // downstream increments it from `undefined`.
+  const none = { ...baseline().tasks[0], commits: [] };
+  assert.deepEqual(validateState(withPatch({ tasks: [none] })), []);
+});
+
+test('a таск carrying no commits list at all is reported at contract 3', () => {
+  const state: Record<string, unknown> = { ...baseline() };
+  const task: Record<string, unknown> = { ...baseline().tasks[0] };
+  delete task['commits'];
+  state['tasks'] = [task];
+
+  assert.deepEqual(fields(validateState(state)), ['tasks[0].commits']);
+});
+
+test('a commit that is not a non-empty string is reported by its own index', () => {
+  const violations = validateState(withPatch({
+    tasks: [{ ...baseline().tasks[0], commits: ['a1b2c3d', 7, ''] }],
+  }));
+
+  // Named one by one: a list reported as a whole makes the caller count the
+  // elements to find the one that is wrong.
+  assert.deepEqual(fields(violations), ['tasks[0].commits[1]', 'tasks[0].commits[2]']);
+  assert.deepEqual(fields(validateState(withPatch({
+    tasks: [{ ...baseline().tasks[0], commits: 'a1b2c3d' }],
+  }))), ['tasks[0].commits']);
+});
+
+test('a таск written before the list existed is not a таск that lost it', () => {
+  // Contract 2 named a single `commit`. Demanding the list of a прогон that
+  // predates it would turn "this run is older" into "this run is corrupt" —
+  // the same courtesy contract 1 is shown above.
+  const state: Record<string, unknown> = { ...baseline(), contractVersion: 2 };
+  const task: Record<string, unknown> = { ...baseline().tasks[0], commit: 'a1b2c3d' };
+  delete task['commits'];
+  state['tasks'] = [task];
+
+  assert.deepEqual(validateState(state), []);
 });
 
 test('a non-string requirement id inside a task is reported by position', () => {

@@ -38,6 +38,10 @@ const VALUE_SET_CONSTANTS: Record<string, string> = {
 /** Stage ids belong to phases.md; the contract only mirrors them. */
 const STAGE_IDS_CONSTANT = 'STAGE_IDS';
 
+/** The contract version, and the dashboard's own copy of it, by name. */
+const VERSION_CONSTANT = 'CONTRACT_VERSION';
+const DASHBOARD_VERSION_CONSTANT = 'KNOWN_CONTRACT_VERSION';
+
 /**
  * The four sets `sync.py` carries, field name → the constant that holds it.
  *
@@ -80,6 +84,21 @@ export function parsePythonListConst(source: string, name: string): string[] | n
   const pattern = new RegExp(`^${name}\\s*=\\s*\\[([^\\]]*)\\]`, 'm');
   const match = pattern.exec(source);
   return match === null ? null : stringLiterals(match[1] ?? '');
+}
+
+/**
+ * Read an integer constant out of the source, whichever keyword declares it.
+ *
+ * The two files that must agree on this number are written in different
+ * dialects — `export const` here, `var` inside the dashboard's single script —
+ * so the keyword is what varies and the number is what does not.
+ */
+export function parseNumberConst(source: string, name: string): number | null {
+  const pattern = new RegExp(
+    `(?:export\\s+const|const|let|var)\\s+${name}\\s*(?::[^=]*)?=\\s*(\\d+)`,
+  );
+  const match = pattern.exec(source);
+  return match?.[1] === undefined ? null : Number(match[1]);
 }
 
 /** The quoted strings inside a list body, in order. */
@@ -130,6 +149,7 @@ export interface CheckOptions {
   contractFile?: string;
   phasesFile?: string;
   syncFile?: string;
+  dashboardFile?: string;
 }
 
 export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise<Violation[]> {
@@ -138,6 +158,7 @@ export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise
   const contractFile = options.contractFile ?? 'scripts/state/contract.ts';
   const phasesFile = options.phasesFile ?? path.join(specDir, 'phases.md');
   const syncFile = options.syncFile ?? 'skills/maestro/tools/sync.py';
+  const dashboardFile = options.dashboardFile ?? 'skills/maestro/assets/dashboard.html';
 
   const violations: Violation[] = [];
   const add = (check: string, file: string, line: number, message: string): void => {
@@ -273,6 +294,43 @@ export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise
     log.info('sync', 'the run-side copies compared', {
       file: path.basename(syncFile),
       sets: compared,
+    });
+  }
+
+  // --- the dashboard's copy of the contract version ------------------------
+  // The dashboard is the contract's only reader outside this process, and it
+  // keeps its own copy of this number so it can tell the user when a прогон
+  // used a contract it does not know. A copy left behind says exactly that
+  // about a version it does know: the notice fires on every run, over fields
+  // the page renders perfectly well. Compared here for `sync.py`'s reason — a
+  // copy nothing compares is a copy that goes stale in silence.
+  //
+  // Silent when the contract declares no version at all. Nothing can lose that
+  // constant quietly: every module here imports it, so `npm run typecheck` is
+  // already the check, and demanding it of a fixture would make this rule
+  // about the shape of a test rather than about the two files it holds.
+  const statedVersion = parseNumberConst(source, VERSION_CONSTANT);
+  if (statedVersion !== null) {
+    const dashboardSource = await readFile(dashboardFile, 'utf8').catch(() => null);
+    const knownVersion = dashboardSource === null
+      ? null
+      : parseNumberConst(dashboardSource, DASHBOARD_VERSION_CONSTANT);
+
+    if (dashboardSource === null) {
+      add('version', dashboardFile, 0,
+        `the dashboard could not be read, so ${DASHBOARD_VERSION_CONSTANT} is unchecked`);
+    } else if (knownVersion === null) {
+      add('version', dashboardFile, 0,
+        `${DASHBOARD_VERSION_CONSTANT} is absent, so the page cannot tell a newer contract `
+        + 'from the one it knows');
+    } else if (knownVersion !== statedVersion) {
+      add('version', dashboardFile, 0,
+        `${DASHBOARD_VERSION_CONSTANT} is ${knownVersion} and the contract is ${statedVersion} — `
+        + 'the page will call every прогон newer than itself');
+    }
+    log.info('version', 'the contract version and the page\'s copy compared', {
+      contract: statedVersion,
+      dashboard: knownVersion,
     });
   }
 

@@ -10,6 +10,7 @@ import {
   parseUnionCell,
   parseStringArrayConst,
   parsePythonListConst,
+  parseNumberConst,
   type Violation,
 } from './state-matches-spec.ts';
 
@@ -56,13 +57,26 @@ export interface RunState {
 const SYNC = `STAGE_STATUSES = ['pending', 'active']
 `;
 
+/** The same contract, declaring the version the page is meant to mirror. */
+const VERSIONED_CONTRACT = `export const CONTRACT_VERSION = 3;
+${CONTRACT}`;
+
+/** The page's own copy of the contract version, and nothing else it needs. */
+const DASHBOARD = `<script>
+  var KNOWN_CONTRACT_VERSION = 3;
+</script>
+`;
+
 type Overrides = {
   spec?: string;
   phases?: string;
   contract?: string;
   sync?: string;
+  dashboard?: string;
   /** Write no sync.py at all, so the checker is handed a path that is not there. */
   dropSync?: boolean;
+  /** The same for the dashboard: a path that is not there. */
+  dropDashboard?: boolean;
 };
 
 async function violationsFor(overrides: Overrides = {}): Promise<Violation[]> {
@@ -81,10 +95,16 @@ async function violationsFor(overrides: Overrides = {}): Promise<Violation[]> {
       await writeFile(syncFile, overrides.sync ?? SYNC, 'utf8');
     }
 
+    const dashboardFile = path.join(root, 'dashboard.html');
+    if (overrides.dropDashboard !== true) {
+      await writeFile(dashboardFile, overrides.dashboard ?? DASHBOARD, 'utf8');
+    }
+
     return await checkStateMatchesSpec({
       specDir,
       contractFile,
       syncFile,
+      dashboardFile,
       phasesFile: path.join(specDir, 'phases.md'),
     });
   } finally {
@@ -253,4 +273,48 @@ test('a missing RunState interface is reported once, not as every field', async 
 // defect, and it is cheapest to catch in the same run as the unit tests.
 test('the shipped contract and its specification agree on every field', async () => {
   assert.deepEqual(await checkStateMatchesSpec(), []);
+});
+
+test('parseNumberConst reads the number whichever keyword declares it', () => {
+  assert.equal(parseNumberConst('export const CONTRACT_VERSION = 3;', 'CONTRACT_VERSION'), 3);
+  assert.equal(parseNumberConst('  var KNOWN = 12;', 'KNOWN'), 12);
+  assert.equal(parseNumberConst('const N: number = 7;', 'N'), 7);
+  assert.equal(parseNumberConst('export const CONTRACT_VERSION = 3;', 'MISSING'), null);
+});
+
+test('the contract version and the page\'s copy of it are compared', async () => {
+  // The two agree, so nothing is said.
+  assert.deepEqual(await violationsFor({ contract: VERSIONED_CONTRACT }), []);
+});
+
+test('a dashboard left behind calls every прогон newer than itself', async () => {
+  const violations = await violationsFor({
+    contract: VERSIONED_CONTRACT,
+    dashboard: '<script>\n  var KNOWN_CONTRACT_VERSION = 2;\n</script>\n',
+  });
+
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'version');
+  assert.match(violations[0]?.message ?? '', /is 2 and the contract is 3/);
+});
+
+test('a dashboard with no copy of the version cannot tell a newer contract at all', async () => {
+  const violations = await violationsFor({
+    contract: VERSIONED_CONTRACT,
+    dashboard: '<script>\n  var SOMETHING_ELSE = 3;\n</script>\n',
+  });
+
+  assert.equal(violations.length, 1);
+  assert.match(violations[0]?.message ?? '', /is absent/);
+
+  const unreadable = await violationsFor({ contract: VERSIONED_CONTRACT, dropDashboard: true });
+  assert.equal(unreadable.length, 1);
+  assert.match(unreadable[0]?.message ?? '', /could not be read/);
+});
+
+test('a contract that declares no version says nothing about the page', async () => {
+  // Nothing can lose that constant quietly — every module imports it, so the
+  // typecheck is already the check. Demanding it of a fixture would make this
+  // rule about the shape of a test rather than about the two files it holds.
+  assert.deepEqual(await violationsFor({ dropDashboard: true }), []);
 });

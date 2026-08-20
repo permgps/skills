@@ -28,15 +28,18 @@ function baseline(): RunState {
         id: '01', title: 'a', requirementIds: ['R01'], status: 'done', blockedBy: [],
         startedAt: '2026-08-19T09:10:00Z', finishedAt: '2026-08-19T09:40:00Z',
         wave: 1, zone: ['src/a/'], retries: 0, repairs: 0, handoffs: 0, files: ['src/a/index.ts'],
+        commits: ['a1b2c3d'],
       },
       {
         id: '02', title: 'b', requirementIds: ['R02'], status: 'done', blockedBy: [],
         startedAt: '2026-08-19T09:20:00Z', finishedAt: '2026-08-19T09:50:00Z',
         wave: 1, zone: ['src/b/'], retries: 0, repairs: 0, handoffs: 0, files: ['src/b/index.ts'],
+        commits: ['e4f5a6b'],
       },
       {
         id: '03', title: 'c', requirementIds: ['R03'], status: 'repair', blockedBy: [],
         wave: 1, zone: ['src/c/'], retries: 0, repairs: 1, handoffs: 0, files: [],
+        commits: [],
       },
     ],
     requirements: [

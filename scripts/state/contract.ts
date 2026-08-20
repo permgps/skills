@@ -14,8 +14,15 @@
  * The optional fields that arrived with them — waves, counters, debt — would
  * have raised nothing on their own, and neither did `explain`, `language` or
  * `heldBy`, each of which arrived later on the same terms.
+ *
+ * Version 3 renamed one field: `tasks[].commit` became `tasks[].commits`. A
+ * repaired таск lands twice, and a field holding one commit records the last
+ * and loses the first — which is the one its original review was written
+ * against. The dashboard has no handling to add because it never read the field
+ * under either name, but it does carry its own copy of this number, and
+ * `scripts/validate/state-matches-spec.ts` holds the two together.
  */
-export const CONTRACT_VERSION = 2;
+export const CONTRACT_VERSION = 3;
 
 /** The stage ids from docs/spec/phases.md, in run order. */
 export type StageId =
@@ -165,8 +172,16 @@ export interface TaskEntry {
   startedAt?: string;
   finishedAt?: string;
   tests?: TestResult;
-  /** The commit the таск landed in, once it has one. */
-  commit?: string;
+  /**
+   * The commits this таск landed in, in the order they landed.
+   *
+   * A list rather than one commit because a repaired таск lands twice, and the
+   * first is what its original review was written against. `commits[0]^..` to
+   * the last, over this таск's own files, is therefore the whole of what it did
+   * and nothing another таск did — which is what makes reviewing it possible
+   * once later waves are in the tree.
+   */
+  commits?: string[];
 }
 
 export interface RequirementEntry {

@@ -22,7 +22,7 @@ input.
 | `dialChanges[]` | list of `{ dial, from, to, atPhase }` | preflight | dashboard |
 | `stages[]` | list of `{ id, status, startedAt?, finishedAt?, note? }` | preflight | dashboard |
 | `currentStage` | stage id | preflight | dashboard |
-| `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commit? }` | plan | dashboard |
+| `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason? }` | manifest | dashboard |
 | `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
@@ -110,6 +110,16 @@ rows jump between groups on the dashboard, and a user with no way to know the
 numbers were rewritten reads that as a lost plan. The build is still free to
 launch anything whose blockers are done; what it may not do is rewrite the
 number.
+
+**`tasks[].commits` is a list because a repaired таск has more than one.**
+A таск lands in one commit, and that commit's diff is the whole of what it did —
+which is what makes a review of it possible at all. A таск that came back and was
+repaired lands in a second one, and a field holding a single commit records the
+last and loses the first. The first is exactly what the original review was
+written against, so losing it loses what the re-review has to be measured by. The
+entries are in the order they landed, so a таск's own work is
+`git diff <first>^..<last>` over that таск's own files; see
+[`phases.md`](phases.md) for what a re-review reads, and why it is not the tree.
 
 **The whole `tasks[]` array is written when the таски are cut**, every entry
 `queued`, with its `blockedBy`, `wave`, `zone`, and the three counters at zero.
@@ -296,10 +306,27 @@ because of the fields that arrived with them:
 | `requirements[].status` gains `placeholder` | Safety rule `S3` already produces требования delivered as visible placeholders. The status gives the thing a name the отчёт and the dashboard can count, instead of `in-spec` claiming it was met |
 
 The optional fields in the same version — `wave`, `zone`, the three counters,
-`files`, `tests`, `commit`, `note`, `debt`, `additions`, `updatedAt` — would
+`files`, `tests`, `commit` (renamed in version 3, below), `note`, `debt`,
+`additions`, `updatedAt` — would
 have raised nothing on their own. **`explain` arrived later and still raised
 nothing**, for exactly that reason: it is an optional field and it widened no
 value set. **`language` arrived later still, on the same terms and with the same
 result.** **A state written under version 1 stays
 readable**: the dashboard renders what it can, and the fields it does not find
 render as absent rather than as zero.
+
+**Version 3** raised the number for one rename:
+
+| Change | Why it was needed |
+|---|---|
+| `tasks[].commit` becomes `tasks[].commits`, a list of strings in the order they landed | A repaired таск lands twice, and one field records the last and loses the first — which is the commit its original review was written against |
+
+The rule above says a rename "must land in the same change as the dashboard
+update that handles it", and this one is named rather than skipped, because a
+change that quietly does not honour the clause is indistinguishable from one that
+forgot. **The dashboard has no handling to add: it never read this field**, under
+either name. What it does carry is its own `KNOWN_CONTRACT_VERSION`, a copy of
+the number that moves with it — a dashboard left behind at `2` tells the user
+their прогон "used a newer contract" over a field it does not render.
+`scripts/validate/state-matches-spec.ts` compares the two, so the copy cannot be
+left behind quietly.
