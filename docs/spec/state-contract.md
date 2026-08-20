@@ -133,7 +133,22 @@ from one that was met.
   next, so the стадии account for the whole прогон and no interval belongs to
   none of them. `skipped` стадии are stepped over — they carry a `note` and need
   no timestamps of their own — and `polish` is outside the stage order and
-  outside the chain. `scripts/state/validate.ts` enforces this.
+  outside the chain. `scripts/state/validate.ts` enforces this as three rules:
+  the two stamps meet, no more than one стадия is `active`, and no стадия is
+  left open behind one that has already started. The last of those is the half
+  of the write that gets forgotten — the next стадия is opened and the previous
+  one is never closed — and until it was written down the chain gave up on that
+  pair rather than reporting it, because one of the two stamps it compares was
+  not there to compare.
+
+  **The enforcement reaches the state where this repository's own tooling reads
+  and writes it** — `scripts/state/read.ts`, and `scripts/state/write.ts`, which
+  refuses to write a state that fails. A прогон writes `state.js` itself and
+  runs `.maestro/sync.py` after every write, and that tool checks that the file
+  parses as JSON and nothing beyond it. So a broken chain is caught when the
+  прогон is measured, not at the moment it is written. A specification that
+  names an enforcer is read as a claim about coverage, which is why the edge of
+  the coverage is written beside it.
 - Every write is a whole-file write of a valid state. A partially written state
   is a broken dashboard, so the file is written to a temporary name and moved
   into place.

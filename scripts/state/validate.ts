@@ -177,6 +177,18 @@ export function validateState(value: unknown): StateViolation[] {
       }
     });
 
+    // Two стадии open at once is the same forgotten write as the rule below
+    // catches, arriving in a state that has nothing to compare. A прогон can
+    // open the next стадия without stamping it, and then the chain has no
+    // `startedAt` to measure the abandoned one against — so this counts
+    // statuses rather than clocks, and it names every open стадия, because
+    // which one was meant to be closed is not derivable from the state.
+    const open = STAGE_IDS.filter((id) => stages.some(
+      (entry) => isRecord(entry) && entry['id'] === id && entry['status'] === 'active'));
+    if (open.length > 1) {
+      add('stages', `${open.length} стадии are active at once: ${open.map(id => `"${id}"`).join(', ')}`);
+    }
+
     // A стадия opens in the same write that closes the one before it, so
     // `finishedAt` of one is `startedAt` of the next. Anything else is an
     // interval belonging to no стадия: on screen it is a stopped clock on a
@@ -201,8 +213,24 @@ export function validateState(value: unknown): StateViolation[] {
 
       const closed = Date.parse(String(before['finishedAt'] ?? ''));
       const opened = Date.parse(String(entry['startedAt'] ?? ''));
-      // A стадия still running has no `finishedAt`, and the one after it has not
-      // started. Neither is a defect; there is simply nothing to compare yet.
+
+      // The стадия that is running now has no `finishedAt` — but the one after
+      // it has not started either, and that pair is what the give-up below is
+      // for. An earlier стадия left open while a later one has already been
+      // stamped is the other case, and it is the defect itself: the write that
+      // opened the next стадия was supposed to close this one, and half of it
+      // was forgotten. Nothing downstream notices — the стадия keeps a running
+      // clock on a phase that ended, and `scripts/metrics/` attributes the
+      // interval to neither.
+      if (Number.isNaN(closed) && !Number.isNaN(opened)) {
+        add(
+          `stages[${String(before['id'])}].finishedAt`,
+          `"${String(before['id'])}" is still open, and "${id}" has already started`,
+        );
+        continue;
+      }
+
+      // Nothing to compare yet: the run has not reached this pair.
       if (Number.isNaN(closed) || Number.isNaN(opened) || closed === opened) continue;
 
       const ids = `"${String(before['id'])}" and "${String(id)}"`;

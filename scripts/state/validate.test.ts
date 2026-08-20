@@ -389,6 +389,75 @@ test('стадии written out of order are reported as an overlap, not as a gap
   assert.match(violations[0]!.message, /overlap by 6m/);
 });
 
+// Closing the one that ended and opening the one that begins is a single write,
+// and the half that gets forgotten is the closing one. It arrives on screen as a
+// second lit стадия and a clock running on a phase that finished; downstream it
+// arrives as an interval `scripts/metrics/` attributes to nobody.
+test('two стадии active at once are reported, and both are named', () => {
+  // `acceptance` was opened without a stamp, so the chain has nothing to
+  // measure `review` against — this is the case the count exists for.
+  const stages = chain();
+  stages.push({ id: 'acceptance', status: 'active' });
+
+  const violations = validateState(withPatch({ stages, currentStage: 'acceptance' }));
+  assert.deepEqual(fields(violations), ['stages']);
+  assert.match(violations[0]!.message, /2 стадии are active at once/);
+  assert.match(violations[0]!.message, /"review"/);
+  assert.match(violations[0]!.message, /"acceptance"/);
+});
+
+test('three стадии active at once are one finding, not two', () => {
+  const stages = chain();
+  stages[4] = { id: 'plan', status: 'active', startedAt: '2026-08-19T19:04:10Z' };
+  stages[5] = { id: 'build', status: 'active' };
+
+  const counted = validateState(withPatch({ stages, currentStage: 'build' }))
+    .filter(violation => violation.field === 'stages');
+  assert.equal(counted.length, 1);
+  assert.match(counted[0]!.message, /3 стадии are active at once/);
+  assert.match(counted[0]!.message, /"plan", "build", "review"/);
+});
+
+test('a прогон whose стадии are all closed says nothing about how many are open', () => {
+  const stages = chain();
+  stages[6] = { id: 'review', status: 'done', startedAt: '2026-08-19T19:56:51Z', finishedAt: '2026-08-19T20:10:00Z' };
+
+  assert.deepEqual(validateState(withPatch({ stages, currentStage: 'review' })), []);
+});
+
+test('a стадия left open behind one that has already started is reported', () => {
+  // The defect itself: `spec` never got its `finishedAt`, and the write that
+  // was supposed to add it opened `plan` instead. Both timestamps used to be
+  // unparseable on one side, and the chain gave up rather than reporting it.
+  const stages = chain();
+  stages[3] = { id: 'spec', status: 'active', startedAt: '2026-08-19T18:52:40Z' };
+  stages[6] = { id: 'review', status: 'done', startedAt: '2026-08-19T19:56:51Z', finishedAt: '2026-08-19T20:10:00Z' };
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[spec].finishedAt']);
+  assert.match(violations[0]!.message, /"spec" is still open/);
+  assert.match(violations[0]!.message, /"plan" has already started/);
+});
+
+test('an open стадия is overtaken across a skipped one just the same', () => {
+  const stages = chain();
+  stages[2] = { id: 'briefing', status: 'active', startedAt: '2026-08-19T18:52:40Z' };
+  stages[3] = { id: 'spec', status: 'skipped', note: 'the бриф was already a specification' };
+  stages[6] = { id: 'review', status: 'done', startedAt: '2026-08-19T19:56:51Z', finishedAt: '2026-08-19T20:10:00Z' };
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[briefing].finishedAt']);
+  assert.match(violations[0]!.message, /"plan" has already started/);
+});
+
+test('a стадия with no startedAt overtakes nothing', () => {
+  // The baseline's own shape: `preflight` is done without a `finishedAt` and
+  // `manifest` is active without a `startedAt`. Nothing has been overtaken —
+  // there is no stamp on the later стадия to overtake it with — and reading
+  // this as the defect above would report every прогон written that way.
+  assert.deepEqual(validateState(baseline()), []);
+});
+
 test('a стадия missing from the list breaks the chain rather than inventing a hole', () => {
   // A fixture that records preflight and build and nothing between them says
   // nothing about where the four стадии in the middle went. Reporting the span
