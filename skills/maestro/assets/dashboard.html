@@ -440,6 +440,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         now: 'Сейчас',
         calendar: 'Календарных',
         register: 'Объяснения',
+        offContract: 'Вне контракта',
         gates: 'Гейты',
         G1: 'G1', G2: 'G2', G3: 'G3', G4: 'G4'
       },
@@ -633,6 +634,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         now: 'Now',
         calendar: 'Calendar',
         register: 'Wording',
+        offContract: 'Off-contract',
         gates: 'Checks',
         G1: 'G1', G2: 'G2', G3: 'G3', G4: 'G4'
       },
@@ -802,12 +804,32 @@ globalThis.MAESTRO_LOGIC = (function () {
   var TASK_ORDER = ['done', 'running', 'review', 'repair', 'queued', 'failed'];
 
   /**
+   * How much of a таск's road each status has behind it.
+   *
+   * The mirror image of the scale `estimateMs` already grades unfinished таски
+   * by — `review` owes 0.2 of a median, so it has travelled 0.8 — because two
+   * figures on one screen must not disagree about the same таск. A status the
+   * contract does not define is worth nothing here and is counted in
+   * `offContract` instead of being guessed at.
+   *
+   * `running` is a flat half rather than measured against its own clock: the
+   * estimate has to look at the clock, a bar does not, and making it do so would
+   * turn a pure function into one that depends on the clock, the median and the
+   * pause arithmetic — so a bar could creep. Eighteen transitions across six
+   * таски is movement enough. Considered, not overlooked.
+   */
+  var SHARE_BY_STATUS = {
+    done: 1, review: 0.8, repair: 0.5, running: 0.5, queued: 0, failed: 0
+  };
+
+  /**
    * How much of the прогон each stage is worth.
    *
    * Not one eighth apiece: разработка runs for hours and подготовка for minutes,
    * so equal weights make the bar stand still through the longest stage and then
-   * jump. Inside разработки the share is subdivided by finished таски, which is
-   * what makes it creep with the work.
+   * jump. Inside разработки the share is subdivided by how far the таски have
+   * travelled — see `SHARE_BY_STATUS` — which is what makes it creep with the
+   * work rather than wait for the review phase to write the first `done`.
    */
   var STAGE_WEIGHT = {
     preflight: 1, manifest: 1, briefing: 1, spec: 2,
@@ -1022,19 +1044,48 @@ globalThis.MAESTRO_LOGIC = (function () {
   }
 
   function countTasks(tasks) {
-    var counts = { total: 0, queued: 0, running: 0, review: 0, repair: 0, done: 0, failed: 0, retries: 0 };
+    var counts = { total: 0, queued: 0, running: 0, review: 0, repair: 0, done: 0, failed: 0,
+                   offContract: 0, retries: 0 };
     var list = tasks || [];
     for (var i = 0; i < list.length; i += 1) {
       var task = list[i] || {};
       counts.total += 1;
+      // A status the contract does not define lands here rather than nowhere.
+      // Dropping it left the chips summing to less than the total, which is the
+      // page quietly losing a таск it was handed — the same failure as printing
+      // `[object Object]` for a finding, and forbidden for the same reason.
       if (TASK_ORDER.indexOf(task.status) !== -1) counts[task.status] += 1;
+      else counts.offContract += 1;
       if (typeof task.retries === 'number') counts.retries += task.retries;
     }
     // Written, then checked, then sometimes repaired — and review and repair run
     // while the next таск is already flying. Collapsing them into «not done» is
     // what makes the screen answer «готово 2 из 6» with four таски in motion.
+    // An off-contract таск stays out of it: unknown is not known to be moving.
     counts.active = counts.running + counts.review + counts.repair;
     return counts;
+  }
+
+  /**
+   * How far the таски have travelled, as a share of the whole plan.
+   *
+   * Weighted by status through `SHARE_BY_STATUS`, so the figure moves eighteen
+   * times across six таски instead of once at the very end. It may go
+   * backwards — a таск sent from `review` to `repair` drops from 0.8 to 0.5
+   * because work reappeared — and that is the point: a bar that only ever rises
+   * lies once, quietly, at the moment a review fails.
+   */
+  function taskShare(tasks) {
+    var counts = countTasks(tasks);
+    var got = 0;
+    TASK_ORDER.forEach(function (status) {
+      got += counts[status] * SHARE_BY_STATUS[status];
+    });
+    return {
+      share: counts.total > 0 ? got / counts.total : 0,
+      done: counts.done,
+      total: counts.total
+    };
   }
 
   function countRequirements(requirements) {
@@ -1064,6 +1115,7 @@ globalThis.MAESTRO_LOGIC = (function () {
   function overallProgress(state) {
     var stages = orderedStages(state);
     var tasks = countTasks(state && state.tasks);
+    var share = taskShare(state && state.tasks);
     var got = 0, total = 0, stagesDone = 0;
 
     stages.forEach(function (stage) {
@@ -1073,10 +1125,12 @@ globalThis.MAESTRO_LOGIC = (function () {
         got += weight;
         stagesDone += 1;
       } else if (stage.status === 'active') {
-        // A stage that has begun is never zero, and the build reports what it
-        // has actually landed rather than a flat half.
+        // A stage that has begun is never zero, and the build reports how far
+        // its таски have travelled rather than a flat half. Counting only
+        // `done` froze this figure for the whole of разработка, because `done`
+        // is written by the review phase and that phase has not run yet.
         got += weight * (stage.id === 'build' && tasks.total > 0
-          ? Math.max(0.05, tasks.done / tasks.total)
+          ? Math.max(0.05, share.share)
           : 0.5);
       }
     });
@@ -1086,7 +1140,13 @@ globalThis.MAESTRO_LOGIC = (function () {
       stagesDone: stagesDone,
       stagesTotal: stages.length,
       tasksDone: tasks.done,
-      tasksTotal: tasks.total
+      tasksTotal: tasks.total,
+      // The sub-line and both registers of the explanation read these rather
+      // than counting again: a region and its explanation may not arrive at two
+      // different numbers for one прогон.
+      tasksActive: tasks.active,
+      tasksOffContract: tasks.offContract,
+      tasksShare: share.share
     };
   }
 
@@ -2295,7 +2355,9 @@ globalThis.MAESTRO_LOGIC = (function () {
     worked: worked,
     currentStage: currentStage,
     stagePosition: stagePosition,
+    SHARE_BY_STATUS: SHARE_BY_STATUS,
     countTasks: countTasks,
+    taskShare: taskShare,
     countRequirements: countRequirements,
     coverage: coverage,
     overallProgress: overallProgress,
@@ -2776,6 +2838,9 @@ globalThis.MAESTRO_SNAPSHOT = null;
     if (counts.repair > 0) chip(chips, L.label(T.TASK_STATUS, 'repair'), counts.repair, 'repair');
     chip(chips, L.label(T.TASK_STATUS, 'queued'), counts.queued);
     if (counts.failed > 0) chip(chips, L.label(T.TASK_STATUS, 'failed'), counts.failed, 'failed');
+    // Said out loud rather than dropped: without this chip the chips sum to
+    // less than the total, and the page is losing a таск in front of the reader.
+    if (counts.offContract > 0) chip(chips, T.SCREEN.offContract, counts.offContract);
 
     L.groupByWave(tasks).forEach(function (group) {
       // The claim of parallelism is read from the clocks, never from the size
@@ -2795,6 +2860,12 @@ globalThis.MAESTRO_SNAPSHOT = null;
         // Colour says the таск is not ordinary work; the word says which kind.
         if (task.status === 'review' || task.status === 'repair' || task.status === 'failed') {
           put(fill, 'span', L.label(T.TASK_STATUS, task.status), 'phase');
+        } else if (L.TASK_ORDER.indexOf(task.status) === -1) {
+          // A status the contract does not define is printed as it was written,
+          // through the same reader that keeps a finding from becoming
+          // `[object Object]`. The row keeps its neutral colour: the page does
+          // not invent a status, it reports the one it was handed.
+          put(fill, 'span', L.lineOf(task.status), 'phase');
         }
 
         var clock = put(row, 'span', '—', 'mins');
