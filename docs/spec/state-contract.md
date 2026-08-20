@@ -126,6 +126,14 @@ cannot.
 | `requirements[].status` | `open`, `in-spec`, `deferred`, `dropped`, `placeholder` |
 | `gates[].status` | `pending`, `passed`, `failed` |
 
+**`pending` is a стадия's word and a гейт's, and never a таск's.** The three
+sets sit one under another above and the middle one is the odd column out, which
+is exactly how a real прогон came to write six таски with `pending` on one of
+them: the phase file two steps earlier says the стадии are written `pending`,
+and nothing said the таски were different. A cut таск is written `queued`. The
+dashboard cannot count what it cannot name — it shows such a таск as written
+rather than dropping it, and grades its progress at nothing.
+
 `requirements[].reason` is required whenever the status is `deferred`, `dropped`,
 `placeholder`, or still `open` at G1 — which is exactly what G1 checks. For a
 `placeholder` the reason names what is still missing, because a требование

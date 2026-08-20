@@ -187,9 +187,23 @@ Two of them are worth stating outright, because both are places where a page
 could flatter its прогон:
 
 - **Прогресс weights the stages by how long they take** — разработка six,
-  спецификация and ревью two, the rest one — and subdivides разработка by
-  finished таски. Equal weights make the bar stand still through the longest
-  stage and then jump, which reads as a stuck прогон.
+  спецификация and ревью two, the rest one — and subdivides разработка by how
+  far its таски have got. Equal weights make the bar stand still through the
+  longest stage and then jump, which reads as a stuck прогон.
+- **A таск's share of the road is graded by its status**, and the scale is the
+  mirror of the one `Осталось` grades the remainder by: `done` 1, `review` 0.8,
+  `repair` and `running` 0.5, `queued` and `failed` 0. Two figures on one screen
+  must not disagree about the same таск, which is what taking the numbers from
+  anywhere else would buy. Counting only `done` was worse than imprecise: `done`
+  is written by the ревью phase, so the bar stood at its floor through the whole
+  of разработки — hours of work, and the one stretch a user watches.
+  **`running` is a flat half rather than measured against its own clock.** The
+  estimate has to look at the clock; a bar does not, and making it would turn a
+  pure function into one depending on the clock, the median and the pause
+  arithmetic. Eighteen transitions across six таски is movement enough.
+  **The bar may fall, and that is correct.** A таск sent from ревью back to
+  ремонт drops from 0.8 to 0.5 because work reappeared. A bar that only ever
+  rises lies once, quietly, at the moment a review fails.
 - **Осталось is the median of finished таски along the remaining critical path,
   shown as a range**, and says *рано считать* below two finished таски rather
   than guessing. A precise wall-clock prediction is a fabrication; a range built
@@ -243,6 +257,12 @@ same number, which is the whole run's elapsed time wearing a stage's label.
 - A page that has already shown a state and then loses the file keeps showing
   it and says the clocks stopped. Reporting an unreadable state there would be
   false: one was read, and it is on the screen.
+- A таск carrying a status the contract does not define is counted in the total,
+  shown with its status as written, and worth nothing on the bar. Silently
+  dropping it is what let a real прогон put six таски on the screen and chips
+  that summed to five: a page whose own numbers do not add up has stopped being
+  a record. It is never repainted into a status the contract does define —
+  guessing which one is the writer's job, and the page is the reader.
 - A list item the contract declares a string and the state wrote as something
   else is shown as it was written, never as `[object Object]`. The page is the
   reader, not the writer: it cannot repair the state, and printing the name of a

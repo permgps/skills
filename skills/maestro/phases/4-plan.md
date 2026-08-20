@@ -139,9 +139,15 @@ genuinely has to change, that is a re-cut: one line to the user saying why, and 
 ### 7. Write the таски into the run state
 
 **The whole `tasks[]` array is written now, when the таски are cut** — not as
-each one starts. Every entry carries its id, title, `requirementIds`,
+each one starts. Every entry carries its id, title, `status`, `requirementIds`,
 `blockedBy`, `wave`, `zone`, and the three counters at zero.
 
+- `status` is **`queued`**, and that is the only status a cut таск may be
+  written with. `pending` is a стадия's word and a гейт's — `0-preflight.md` two
+  files back writes the стадии that way, and that analogy is exactly how a real
+  прогон came to write a таск `pending`. The dashboard cannot count a status it
+  cannot name: it shows such a таск as written and grades its progress at
+  nothing, which is honest and is not what you meant.
 - `requirementIds` is never empty. That is half of G3, and the state validator
   refuses a таск without it.
 - `blockedBy` holds the таск ids that must finish first.

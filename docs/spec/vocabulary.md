@@ -136,12 +136,12 @@ term, and a term with two homes drifts.
 
 | Label | Label (en) | What it names |
 |---|---|---|
-| Прогресс проекта | Project progress | The share of the whole прогон travelled — stages weighted by how long they take, the build subdivided by finished таски |
+| Прогресс проекта | Project progress | The share of the whole прогон travelled — stages weighted by how long they take, the build subdivided by how far its таски have got |
 | Покрытие брифа | Brief coverage | The share of live требования that reached the specification. A different number from прогресс on purpose: one measures the road, the other the value |
 | Этап сейчас | Current stage | The stage the прогон is in, with its own clock |
 | Прошло времени | Time worked | Time the прогон has been worked on |
 | Осталось | Remaining | The estimate, always a range, and only once enough таски have finished to build it from |
-| Таски | Tasks | How many таски are done out of how many were cut |
+| Таски | Tasks | How many таски are accepted out of how many were cut, with the work in flight shown behind them |
 | Долг | Debt | What the прогон owes the user and has not settled, counted as one number |
 | Допущения | Assumptions | Decisions the прогон made for the user because nobody was asked |
 | Переменные | Variables | Environment variables the build needs and nobody has filled — names only, never values |
@@ -154,6 +154,7 @@ term, and a term with two homes drifts.
 | Сейчас | Now | The таски being worked on at this moment, named in one line |
 | Календарных | Calendar | Wall-clock time from the start, pauses included — shown beside Прошло времени, never instead of it |
 | Объяснения | Wording | Which register the прогон is speaking in — the label that keeps `Обычные` from being read as the depth's `Обычная` |
+| Вне контракта | Off-contract | Таски whose status is not one the contract defines — counted, shown as written, and worth nothing on the bar |
 | Гейты | Checks | The four checks of the прогон, each after its own stage |
 | G1 | G1 | The gate after брифинг, shown as a row of Гейты |
 | G2 | G2 | The gate after спецификация |
