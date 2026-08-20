@@ -60,11 +60,15 @@ interface Logic {
   activeSpan: (from: number, to: number, marks: number[]) => number;
   worked: (from: string, state: unknown, now: number, until?: string, marks?: number[]) => number | null;
   stagePosition: (state: unknown) => { position: number; total: number };
+  TASK_ORDER: string[];
+  SHARE_BY_STATUS: Record<string, number>;
   countTasks: (tasks: unknown) => Record<string, number>;
+  taskShare: (tasks: unknown) => { share: number; done: number; total: number };
   coverage: (list: unknown) => { percent: number; inSpec: number; live: number };
   overallProgress: (state: unknown) => {
     percent: number; stagesDone: number; stagesTotal: number;
     tasksDone: number; tasksTotal: number;
+    tasksActive: number; tasksOffContract: number; tasksShare: number;
   };
   taskDurations: (state: unknown, now: number, marks?: number[]) => number[];
   medianTaskMs: (state: unknown, now: number, marks?: number[]) => number | null;
@@ -485,6 +489,138 @@ test('inside the build the bar moves with the таски', () => {
   assert.ok(half.percent > none.percent, 'a finished таск must move the bar');
   assert.equal(half.tasksDone, 1);
   assert.equal(half.tasksTotal, 2);
+});
+
+// --- the counters, and the прогон that exposed them --------------------------
+
+// Three review, two running, one `pending` — the run behind the screenshots in
+// docs/, read out of ~/Projects/My/test2/.maestro/state.js. `pending` is a
+// стадия's status and a гейт's; it is not one a таск may carry.
+const STALLED = [
+  task('01', { status: 'review' }), task('02', { status: 'review' }),
+  task('03', { status: 'review' }),
+  task('04', { status: 'running' }), task('05', { status: 'running' }),
+  task('06', { status: 'pending' }),
+];
+
+const BUILDING = [
+  { id: 'preflight', status: 'done' }, { id: 'manifest', status: 'done' },
+  { id: 'briefing', status: 'done' }, { id: 'spec', status: 'done' },
+  { id: 'plan', status: 'done' }, { id: 'build', status: 'active' },
+];
+
+test('every таск lands in a bucket, so the chips add up to the total', () => {
+  const counts = L.countTasks(STALLED);
+  const buckets = [...L.TASK_ORDER, 'offContract']
+    .reduce((sum, key) => sum + (counts[key] ?? 0), 0);
+  assert.equal(counts['total'], 6);
+  assert.equal(buckets, 6);
+  assert.equal(counts['offContract'], 1);
+  // Unknown is not known to be moving: the off-contract таск stays out of this.
+  assert.equal(counts['active'], 5);
+});
+
+test('a hole in the list is counted rather than skipped', () => {
+  const counts = L.countTasks([null, undefined, task('01', { status: 'done' })]);
+  assert.equal(counts['total'], 3);
+  assert.equal(counts['offContract'], 2);
+  assert.equal(counts['done'], 1);
+});
+
+test('a status weighs what the scale says, and an unknown one weighs nothing', () => {
+  const weigh = (status: string): number => L.taskShare([task('01', { status })]).share;
+  assert.equal(weigh('done'), 1);
+  assert.equal(weigh('review'), 0.8);
+  assert.equal(weigh('repair'), 0.5);
+  assert.equal(weigh('running'), 0.5);
+  assert.equal(weigh('queued'), 0);
+  assert.equal(weigh('failed'), 0);
+  assert.equal(weigh('pending'), 0);
+  assert.deepEqual({ ...L.taskShare([]) }, { share: 0, done: 0, total: 0 });
+});
+
+test('the scale is the mirror of the one Осталось grades the remainder by', () => {
+  // estimateMs owes 0.2 of a median for review and 0.5 for repair. Two figures
+  // on one screen must not disagree about the same таск, so this is the same
+  // table read from the other end — not a second opinion about progress.
+  for (const [status, remaining] of [['review', 0.2], ['repair', 0.5], ['done', 0]] as const) {
+    assert.equal(L.SHARE_BY_STATUS[status], 1 - remaining, status);
+  }
+});
+
+test('the run behind the screenshots no longer reads as stalled', () => {
+  const progress = L.overallProgress(bare({ stages: BUILDING, tasks: STALLED }));
+  const share = L.taskShare(STALLED);
+
+  // 3 × 0.8 + 2 × 0.5 = 3.4 of six.
+  assert.equal(Math.round(share.share * 100), 57);
+  // Six stages of fifteen weight units behind it, plus 3.4/6 of разработка's six.
+  assert.equal(progress.percent, 63);
+  // The two numbers the screenshots showed while five таски were in motion.
+  assert.notEqual(progress.percent, 42);
+  assert.notEqual(Math.round(share.share * 100), 38);
+  assert.equal(progress.tasksDone, 0);
+  assert.equal(progress.tasksOffContract, 1);
+  assert.equal(progress.tasksActive, 5);
+});
+
+test('the bar falls when a review sends a таск back, and that is the point', () => {
+  // A bar that only ever rises lies once, quietly, at the moment a review
+  // fails. This test exists so nobody "fixes" the fall into a monotonic clamp.
+  const before = L.overallProgress(bare({ stages: BUILDING, tasks: STALLED }));
+  const after = L.overallProgress(bare({
+    stages: BUILDING,
+    tasks: STALLED.map(t => (t['id'] === '01' ? { ...t, status: 'repair' } : t)),
+  }));
+  assert.ok(after.percent < before.percent,
+    `expected a fall from ${before.percent}, got ${after.percent}`);
+});
+
+test('an open build with nothing finished still clears its floor', () => {
+  const progress = L.overallProgress(bare({
+    stages: BUILDING,
+    tasks: [task('01'), task('02'), task('03')],
+  }));
+  assert.equal(progress.tasksShare, 0);
+  // 6 of 15 behind it, plus the 5% floor of разработка's six.
+  assert.equal(progress.percent, 42);
+});
+
+test('both registers of both languages name the share they were built from', () => {
+  const state = bare({ stages: BUILDING, tasks: STALLED });
+  const marks = L.collectMarks(state);
+  const now = AT('2026-08-19T14:00:00.000Z');
+  const share = String(Math.round(L.taskShare(STALLED).share * 100));
+
+  for (const language of ['ru', 'en']) {
+    for (const register of ['normal', 'plain']) {
+      for (const key of ['progress', 'tasks']) {
+        const said = L.explain(key, state, now, marks, register, language).join(' ');
+        assert.match(said, new RegExp(share + '%'),
+          `${language}/${register}/${key} must name the share the region shows`);
+        assert.ok(!/три четверти|three quarters/.test(said),
+          `${language}/${register}/${key} still describes the scale it no longer uses`);
+      }
+    }
+  }
+});
+
+test('an off-contract таск is named in every explanation that counts it', () => {
+  const state = bare({ stages: BUILDING, tasks: STALLED });
+  const clean = bare({ stages: BUILDING, tasks: STALLED.slice(0, 5) });
+  const marks = L.collectMarks(state);
+  const now = AT('2026-08-19T14:00:00.000Z');
+
+  for (const language of ['ru', 'en']) {
+    for (const register of ['normal', 'plain']) {
+      for (const key of ['progress', 'tasks']) {
+        const said = L.explain(key, state, now, marks, register, language).join(' ');
+        const quiet = L.explain(key, clean, now, marks, register, language).join(' ');
+        assert.ok(said.length > quiet.length,
+          `${language}/${register}/${key} says nothing about the таск it could not count`);
+      }
+    }
+  }
 });
 
 test('a stage nobody skipped and nobody started contributes nothing', () => {
