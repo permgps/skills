@@ -101,9 +101,9 @@ page was opened on, and the language follows what the run decided.
 
 A press is remembered by the browser and nothing else. Neither control reaches
 the run: the page reads `state.js` and has no way back, so the language button
-repaints this page and cannot change the language the run speaks in. The line
-beside the buttons says so, because a control that looks like it does more than
-it does is worse than no control.
+repaints this page and cannot change the language the run speaks in. The header
+does not say so — a paragraph of caveat standing there permanently cost more
+than the misreading it prevented, and one press settles the question anyway.
 
 ## The fixtures behind these images
 

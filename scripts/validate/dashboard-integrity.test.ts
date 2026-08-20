@@ -123,7 +123,7 @@ const RU = {
     + " build: function () { return ['разработка пишет код']; } }",
   STAGE_EXPLAIN_PLAIN: "{ preflight: function () { return ['самое начало']; },"
     + " build: function () { return ['тут пишут код проекта']; } }",
-  UI: "{ viewNote: 'Кнопки меняют только эту страницу.' }",
+  UI: "{ themeAria: 'Тема страницы' }",
 };
 
 const EN = {
@@ -141,7 +141,7 @@ const EN = {
     + " build: function () { return ['development writes the code']; } }",
   STAGE_EXPLAIN_PLAIN: "{ preflight: function () { return ['the very beginning']; },"
     + " build: function () { return ['where the code gets written']; } }",
-  UI: "{ viewNote: 'These buttons change this page and nothing else.' }",
+  UI: "{ themeAria: 'Page theme' }",
 };
 
 /**
@@ -628,11 +628,6 @@ test('a colour defined in one theme and not the other is reported', () => {
   assert.match(found, /"--ink" is declared in the "chosen dark" theme block and not in the light one/);
 });
 
-test('a language control with nothing said beside it is reported', () => {
-  const found = messages(page({ en: { UI: "{ }" } }));
-  assert.match(found, /the en branch carries no viewNote/);
-});
-
 test('customProperties reads a block and nothing past its brace', () => {
   const css = ':root { --a: 1; --b: 2; }\n:root[data-theme="dark"] { --c: 3; }';
   assert.deepEqual(customProperties(css, ':root {'), ['--a', '--b']);
@@ -678,7 +673,7 @@ test('a banned word in the composed sentences is reported', () => {
   // is shared by both registers and read as source, so a branch never taken
   // still ships. This is the check that was silently doing nothing.
   const found = messages(page({
-    ru: { UI: "{ viewNote: 'Кнопки меняют страницу.', gap: 'после гейта' }" },
+    ru: { UI: "{ themeAria: 'Тема страницы', gap: 'после гейта' }" },
   }));
   assert.match(found, /the composed sentences \(ru\) says "гейт"/);
 });

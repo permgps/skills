@@ -245,7 +245,6 @@
     cursor: pointer;
   }
   .switch button[aria-pressed="true"] { background: var(--ghost); color: var(--ink); }
-  #view-note { margin: 0; color: var(--muted); font-size: .78rem; flex: 1 1 14rem; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -263,7 +262,6 @@
       <button type="button" data-language-choice="ru">RU</button>
       <button type="button" data-language-choice="en">EN</button>
     </div>
-    <p id="view-note"></p>
   </div>
   <p id="notice" hidden></p>
 </header>
@@ -2781,7 +2779,6 @@ globalThis.MAESTRO_SNAPSHOT = null;
     }
     el('theme-switch').setAttribute('aria-label', T.UI.themeAria);
     el('language-switch').setAttribute('aria-label', T.UI.languageAria);
-    el('view-note').textContent = T.UI.viewNote;
   }
 
   function mountSwitches() {

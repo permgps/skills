@@ -79,13 +79,15 @@ watching one прогон may legitimately want different ones, so a single stor
 answer would be wrong for one of them. `contractVersion` does not move for it,
 `state-contract.md` does not mention it, and neither does `config.json`.
 
-**The language control changes the view and nothing else, and it says so.** It
-cannot change the language the прогон speaks in: the page reads `state.js` and
-has no channel back — that is the *Input* rule above, working as intended. So a
-sentence beside the control says what it does not do, in the language being
-shown. Without it the button quietly promises the one thing this page cannot
-deliver, and `scripts/validate/dashboard-integrity.ts` fails the build when a
-language branch stops carrying that sentence.
+**The language control changes the view and nothing else, and the header does
+not explain that.** It cannot change the language the прогон speaks in: the page
+reads `state.js` and has no channel back — that is the *Input* rule above,
+working as intended. The page once carried a sentence beside the control saying
+so, and it was removed: a paragraph of caveat sat permanently in the header for
+a misreading that costs one press to discover and undo, and the reader who
+pressed the button and saw only the page change has learned the whole of it.
+Nothing checks for that sentence any more; the table above is where the *never*
+is recorded.
 
 ## The Language It Paints In
 

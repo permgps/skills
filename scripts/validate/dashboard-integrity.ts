@@ -413,19 +413,6 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     }
   }
 
-  for (const { language } of LANGUAGES) {
-    const branch = branches[language];
-    const ui = (branch && typeof branch === 'object')
-      ? (branch as Record<string, unknown>)['UI'] : undefined;
-    const note = (ui && typeof ui === 'object')
-      ? (ui as Record<string, unknown>)['viewNote'] : undefined;
-    if (typeof note !== 'string' || note.trim() === '') {
-      add('view', 0,
-        `the ${language} branch carries no viewNote — the language control has to say, `
-        + 'beside itself, that it changes the page and not what the прогон speaks in');
-    }
-  }
-
   /** One language's map inside `L10N`, or an empty one so the loop reports it. */
   const branchMap = (language: string, name: string): Record<string, string> => {
     const branch = branches[language];
