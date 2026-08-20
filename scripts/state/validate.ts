@@ -36,6 +36,15 @@ export interface StateViolation {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/** A gap between two стадии, in the coarsest unit that still names it. */
+const describeGap = (ms: number): string => {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`;
+};
+
 /** Statuses whose meaning is incomplete without a reason. */
 const REASON_REQUIRED = ['open', 'deferred', 'dropped', 'placeholder'];
 
@@ -158,6 +167,43 @@ export function validateState(value: unknown): StateViolation[] {
         add(`${at}.note`, `stage "${String(entry['id'])}" is skipped with no recorded reason`);
       }
     });
+
+    // A стадия opens in the same write that closes the one before it, so
+    // `finishedAt` of one is `startedAt` of the next. Anything else is an
+    // interval belonging to no стадия: on screen it is a stopped clock on a
+    // phase that already finished, and `scripts/metrics/` cannot see it at all,
+    // because it measures `stages[]`.
+    //
+    // Two things break the comparison rather than failing it. A `skipped`
+    // стадия is stepped over — it is explained by a note and owns no clock. A
+    // стадия absent from the list breaks the chain outright: whether time
+    // belonged to it is unknowable from a record that does not mention it, and
+    // a missing стадия is a different defect than a misplaced one.
+    let previous: Record<string, unknown> | null = null;
+
+    for (const id of STAGE_IDS) {
+      const entry = stages.find((candidate) => isRecord(candidate) && candidate['id'] === id);
+      if (!isRecord(entry)) { previous = null; continue; }
+      if (entry['status'] === 'skipped') continue;
+
+      const before = previous;
+      previous = entry;
+      if (!before) continue;
+
+      const closed = Date.parse(String(before['finishedAt'] ?? ''));
+      const opened = Date.parse(String(entry['startedAt'] ?? ''));
+      // A стадия still running has no `finishedAt`, and the one after it has not
+      // started. Neither is a defect; there is simply nothing to compare yet.
+      if (Number.isNaN(closed) || Number.isNaN(opened) || closed === opened) continue;
+
+      const ids = `"${String(before['id'])}" and "${String(id)}"`;
+      add(
+        `stages[${String(id)}].startedAt`,
+        opened > closed
+          ? `${describeGap(opened - closed)} between ${ids} belongs to no стадия`
+          : `${ids} overlap by ${describeGap(closed - opened)}`,
+      );
+    }
   }
 
   // --- tasks[] --------------------------------------------------------------

@@ -292,3 +292,97 @@ test('a suite result is optional, null, or two counts', () => {
     ['tests.passed'],
   );
 });
+
+/**
+ * The стадии of a прогон that ran without a hole, as far as `review`.
+ *
+ * Each entry closes exactly where the next one opens, which is what the state
+ * contract asks of a стадия opened by the same write that closed the one before.
+ */
+function chain(): Record<string, unknown>[] {
+  return [
+    { id: 'preflight', status: 'done', startedAt: '2026-08-19T18:39:12Z', finishedAt: '2026-08-19T18:42:30Z' },
+    { id: 'manifest', status: 'done', startedAt: '2026-08-19T18:42:30Z', finishedAt: '2026-08-19T18:52:40Z' },
+    { id: 'briefing', status: 'done', startedAt: '2026-08-19T18:52:40Z', finishedAt: '2026-08-19T18:52:40Z' },
+    { id: 'spec', status: 'done', startedAt: '2026-08-19T18:52:40Z', finishedAt: '2026-08-19T19:04:10Z' },
+    { id: 'plan', status: 'done', startedAt: '2026-08-19T19:04:10Z', finishedAt: '2026-08-19T19:06:52Z' },
+    { id: 'build', status: 'done', startedAt: '2026-08-19T19:06:52Z', finishedAt: '2026-08-19T19:56:51Z' },
+    { id: 'review', status: 'active', startedAt: '2026-08-19T19:56:51Z' },
+  ];
+}
+
+test('стадии that meet exactly are not a finding', () => {
+  assert.deepEqual(
+    validateState(withPatch({ stages: chain(), currentStage: 'review' })),
+    [],
+  );
+});
+
+test('an interval belonging to no стадия is reported with both ids and its length', () => {
+  // The real hole, from the board-sizes прогон: build closed at 19:56:51 and
+  // review did not open until 20:31:24. Nothing owned the 34 minutes between.
+  const stages = chain();
+  stages[6] = { id: 'review', status: 'active', startedAt: '2026-08-19T20:31:24Z' };
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[review].startedAt']);
+  assert.match(violations[0]!.message, /34m 33s/);
+  assert.match(violations[0]!.message, /"build"/);
+  assert.match(violations[0]!.message, /"review"/);
+});
+
+test('a skipped стадия is stepped over rather than breaking the chain', () => {
+  const stages = chain();
+  // Briefing asked nothing, so it was skipped rather than run: spec opens where
+  // manifest closed, and the стадия between them owns no time at all.
+  stages[2] = { id: 'briefing', status: 'skipped', note: 'no genuine fork to ask about' };
+
+  assert.deepEqual(
+    validateState(withPatch({ stages, currentStage: 'review' })),
+    [],
+  );
+
+  // Stepping over it does not excuse the neighbours from meeting.
+  stages[3] = { id: 'spec', status: 'done', startedAt: '2026-08-19T19:00:00Z', finishedAt: '2026-08-19T19:04:10Z' };
+  assert.deepEqual(
+    fields(validateState(withPatch({ stages, currentStage: 'review' }))),
+    ['stages[spec].startedAt'],
+  );
+});
+
+test('a стадия still running is compared against nothing', () => {
+  // `review` is active and has no `finishedAt`; `acceptance` has not started.
+  // There is no interval yet, so there is nothing to report.
+  const stages = chain();
+  stages.push({ id: 'acceptance', status: 'pending' });
+
+  assert.deepEqual(
+    validateState(withPatch({ stages, currentStage: 'review' })),
+    [],
+  );
+});
+
+test('стадии written out of order are reported as an overlap, not as a gap', () => {
+  const stages = chain();
+  stages[6] = { id: 'review', status: 'active', startedAt: '2026-08-19T19:50:51Z' };
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[review].startedAt']);
+  assert.match(violations[0]!.message, /overlap by 6m/);
+});
+
+test('a стадия missing from the list breaks the chain rather than inventing a hole', () => {
+  // A fixture that records preflight and build and nothing between them says
+  // nothing about where the four стадии in the middle went. Reporting the span
+  // as an interval owned by nobody would be a guess, and the wrong defect.
+  assert.deepEqual(
+    validateState(withPatch({
+      stages: [
+        { id: 'preflight', status: 'done', startedAt: '2026-08-19T09:00:00Z', finishedAt: '2026-08-19T09:02:00Z' },
+        { id: 'build', status: 'done', startedAt: '2026-08-19T09:10:00Z', finishedAt: '2026-08-19T09:40:00Z' },
+      ],
+      currentStage: 'build',
+    })),
+    [],
+  );
+});

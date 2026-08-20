@@ -36,6 +36,12 @@ small and the run is planned. What it does is put a later phase's rules into the
 context an earlier phase is thinking in, and leave them there for the rest of the
 run.
 
+**The стадия opens first.** A phase's rules are read at the moment that phase
+starts, and that moment is itself a write: the previous стадия is closed and this
+one opened together, before the file is opened. Read first and open after, and
+the preparation — the rules, the diffs, the briefs handed to subagents — falls
+into the gap between two стадии and is counted by neither.
+
 ## Recovery
 
 After a context compaction, a resuming session re-reads **the state, not the

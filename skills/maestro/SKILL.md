@@ -55,6 +55,25 @@ After a compaction, re-read **the state, not the rules**: the run state,
 Re-opening earlier phase files to recover the thread spends context on rules
 already executed, and the thread was never in them.
 
+## Opening A Стадия
+
+**A стадия opens before its file is read.** Closing the one that ended and
+opening the one that begins is a **single write**, performed the moment the
+previous phase's output is complete — before this phase's rules are loaded,
+before its diffs are gathered, before a subagent is briefed.
+
+That preparation is the beginning of the new стадия, and it is not small. Written
+the other way round it belongs to no стадия at all: the dashboard shows a stopped
+clock on a phase that has already finished, and the tool that measures the прогон
+cannot see the interval either, because it measures `stages[]`.
+
+So `finishedAt` of one стадия and `startedAt` of the next are the same instant.
+`scripts/state/validate.ts` rejects a state where they are not.
+
+**This is here rather than in the phase files because every phase begins**, for
+the same reason the line below is: a rule copied into nine files is nine rules
+that drift apart.
+
 ## The Dashboard
 
 Raised in preflight and never opened a second time. What it needs from you for

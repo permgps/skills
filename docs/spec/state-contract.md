@@ -113,6 +113,12 @@ from one that was met.
 
 - The state is written at **phase boundaries and task transitions only**, never
   on a timer. A run with no state changes produces no writes.
+- A стадия is opened by the same write that closes the one before it. For
+  consecutive non-`skipped` стадии, `finishedAt` of one is `startedAt` of the
+  next, so the стадии account for the whole прогон and no interval belongs to
+  none of them. `skipped` стадии are stepped over — they carry a `note` and need
+  no timestamps of their own — and `polish` is outside the stage order and
+  outside the chain. `scripts/state/validate.ts` enforces this.
 - Every write is a whole-file write of a valid state. A partially written state
   is a broken dashboard, so the file is written to a temporary name and moved
   into place.
