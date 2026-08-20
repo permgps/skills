@@ -120,7 +120,7 @@ Write `.maestro/state.js` through the state writer. It carries:
 | `mode`, `depth`, `polish` | as resolved by the dials phase |
 | `explain` | as resolved by the dials phase |
 | `dialChanges` | empty |
-| `stages` | all eight, `preflight` active, the rest `pending` |
+| `stages` | all eight; `preflight` `active` carrying its `startedAt`, the rest `pending` carrying no stamps at all |
 | `currentStage` | `preflight` |
 | `tasks`, `requirements` | empty |
 | `gates` | all four — `G1`, `G2`, `G3`, `G4` — `pending`, with no findings |

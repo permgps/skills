@@ -175,6 +175,65 @@ export function validateState(value: unknown): StateViolation[] {
       if (entry['status'] === 'skipped' && (typeof note !== 'string' || note.trim() === '')) {
         add(`${at}.note`, `stage "${String(entry['id'])}" is skipped with no recorded reason`);
       }
+
+      // What a стадия's own stamps must say, given its own status. The chain
+      // below compares neighbours and can only speak when both sides carry a
+      // clock — so a half-written стадия stays invisible there until a later
+      // one arrives to be measured against it. This speaks about one entry
+      // alone, which is what makes the hole visible while it is still the only
+      // thing wrong.
+      //
+      // `skipped` is left out on purpose: the contract says such a стадия needs
+      // no timestamps of its own, and needing none is not the same as being
+      // forbidden them. `failed` is asked for a `startedAt` and nothing more —
+      // a стадия cannot fail before it begins, but no phase in the bundle
+      // writes one, and the contract does not say whether a failed стадия
+      // closes.
+      const status = entry['status'];
+      const named = `стадия "${String(entry['id'])}"`;
+      const present = (field: string): boolean =>
+        typeof entry[field] === 'string' && entry[field] !== '';
+
+      // A stamp is a moment, not a note. `Date.parse` is what every reader of
+      // this state uses — the chain rule below, `scripts/metrics/`, the page —
+      // so a string none of them can read is a стадия with no clock wearing the
+      // shape of one, and the rules below would take it for a clock. Said
+      // separately from a missing stamp because the repair differs: one field
+      // has to be written, the other has to be corrected.
+      const unreadable = (field: string): void => {
+        if (present(field) && Number.isNaN(Date.parse(String(entry[field])))) {
+          add(`${at}.${field}`,
+            `${named} carries a ${field} that is not a moment: ${JSON.stringify(entry[field])}`);
+        }
+      };
+
+      if (status === 'pending') {
+        // Presence is the whole finding here, and what the stamp says does not
+        // change the repair: a стадия that has not begun owns no clock, so the
+        // field goes rather than gets corrected.
+        if (present('startedAt')) {
+          add(`${at}.startedAt`, `${named} has not begun and carries a startedAt`);
+        }
+        if (present('finishedAt')) {
+          add(`${at}.finishedAt`, `${named} has not begun and carries a finishedAt`);
+        }
+      } else {
+        unreadable('startedAt');
+        unreadable('finishedAt');
+      }
+
+      if ((status === 'active' || status === 'done' || status === 'failed') && !present('startedAt')) {
+        add(`${at}.startedAt`, `${named} is "${String(status)}" and carries no startedAt`);
+      }
+      // The other half of the forgotten write: the closing stamp was made and
+      // the status was never moved off `active`, so the clock on screen keeps
+      // running on a phase that has a recorded end.
+      if (status === 'active' && present('finishedAt')) {
+        add(`${at}.finishedAt`, `${named} is still active and already carries a finishedAt`);
+      }
+      if (status === 'done' && !present('finishedAt')) {
+        add(`${at}.finishedAt`, `${named} is done and carries no finishedAt`);
+      }
     });
 
     // Two стадии open at once is the same forgotten write as the rule below
@@ -187,6 +246,26 @@ export function validateState(value: unknown): StateViolation[] {
       (entry) => isRecord(entry) && entry['id'] === id && entry['status'] === 'active'));
     if (open.length > 1) {
       add('stages', `${open.length} стадии are active at once: ${open.map(id => `"${id}"`).join(', ')}`);
+    }
+
+    // `currentStage` is where the прогон says it stands, and the page believes
+    // it over the search for the active стадия — `currentStage()` in
+    // `dashboard.html` takes the entry with this id and only falls back to the
+    // search when no entry has it. A value naming a стадия that has not begun
+    // therefore puts the wrong phase on screen, at the wrong position in the
+    // eight, under the word «ожидает», and nothing anywhere complains.
+    //
+    // Only `pending` is a contradiction. `done` is what a finished прогон
+    // carries, and a `currentStage` that names a стадия some other one has
+    // overtaken is the truthful half of that defect — the lie is in `stages[]`,
+    // and the rule above is what says so. A стадия absent from the list is not
+    // a finding either, for the reason the chain gives below: a record that
+    // does not mention a стадия says nothing about it.
+    const current = stages.find(
+      (entry) => isRecord(entry) && entry['id'] === value['currentStage']);
+    if (isRecord(current) && current['status'] === 'pending') {
+      add('currentStage',
+        `currentStage is "${String(value['currentStage'])}", a стадия that has not begun`);
     }
 
     // A стадия opens in the same write that closes the one before it, so

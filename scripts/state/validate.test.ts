@@ -16,8 +16,8 @@ function baseline(): RunState {
     polish: false,
     dialChanges: [{ dial: 'depth', from: 'normal', to: 'deep', atPhase: 'spec' }],
     stages: [
-      { id: 'preflight', status: 'done', startedAt: '2026-08-19T09:00:00Z' },
-      { id: 'manifest', status: 'active' },
+      { id: 'preflight', status: 'done', startedAt: '2026-08-19T09:00:00Z', finishedAt: '2026-08-19T09:03:40Z' },
+      { id: 'manifest', status: 'active', startedAt: '2026-08-19T09:03:40Z' },
     ],
     currentStage: 'manifest',
     tasks: [
@@ -116,7 +116,8 @@ test('an unknown depth, stage status and task status are each reported', () => {
 
 test('a stage id outside the phase set is reported', () => {
   assert.deepEqual(
-    fields(validateState(withPatch({ stages: [{ id: 'bootstrap', status: 'done' }] }))),
+    fields(validateState(withPatch({ stages: [{ id: 'bootstrap', status: 'done',
+      startedAt: '2026-08-19T09:00:00Z', finishedAt: '2026-08-19T09:03:40Z' }] }))),
     ['stages[0].id'],
   );
 });
@@ -396,14 +397,21 @@ test('стадии written out of order are reported as an overlap, not as a gap
 test('two стадии active at once are reported, and both are named', () => {
   // `acceptance` was opened without a stamp, so the chain has nothing to
   // measure `review` against — this is the case the count exists for.
+  //
+  // The unstamped стадия is two findings, not one, and they are two sentences
+  // rather than a repetition: `acceptance` carries no `startedAt`, and two
+  // стадии are open at once. Either could be true without the other, and the
+  // repair differs — one is a missing stamp, the other a missing close.
   const stages = chain();
   stages.push({ id: 'acceptance', status: 'active' });
 
   const violations = validateState(withPatch({ stages, currentStage: 'acceptance' }));
-  assert.deepEqual(fields(violations), ['stages']);
-  assert.match(violations[0]!.message, /2 стадии are active at once/);
-  assert.match(violations[0]!.message, /"review"/);
-  assert.match(violations[0]!.message, /"acceptance"/);
+  assert.deepEqual(fields(violations), ['stages[7].startedAt', 'stages']);
+
+  const counted = violations.find(violation => violation.field === 'stages')!;
+  assert.match(counted.message, /2 стадии are active at once/);
+  assert.match(counted.message, /"review"/);
+  assert.match(counted.message, /"acceptance"/);
 });
 
 test('three стадии active at once are one finding, not two', () => {
@@ -451,11 +459,178 @@ test('an open стадия is overtaken across a skipped one just the same', () 
 });
 
 test('a стадия with no startedAt overtakes nothing', () => {
-  // The baseline's own shape: `preflight` is done without a `finishedAt` and
-  // `manifest` is active without a `startedAt`. Nothing has been overtaken —
-  // there is no stamp on the later стадия to overtake it with — and reading
-  // this as the defect above would report every прогон written that way.
-  assert.deepEqual(validateState(baseline()), []);
+  // Two стадии missing the stamps their statuses claim. Each is a finding of
+  // its own — that is the rule below this one — but neither has overtaken the
+  // other, and the overtake rule must stay quiet: there is no stamp on the
+  // later стадия to overtake the earlier one with. Reading this shape as an
+  // overtake would name `stages[preflight].finishedAt` as the defect and send
+  // the repair to the wrong стадия.
+  const violations = validateState(withPatch({
+    stages: [
+      { id: 'preflight', status: 'done', startedAt: '2026-08-19T09:00:00Z' },
+      { id: 'manifest', status: 'active' },
+    ],
+  }));
+
+  assert.deepEqual(fields(violations), ['stages[0].finishedAt', 'stages[1].startedAt']);
+});
+
+// A стадия's status is a claim about its clock, and the two are written by the
+// same hand. The chain rules above compare neighbours and need both sides
+// stamped before they can speak; these speak about one стадия alone, which is
+// what makes a half-written entry visible while it is still the only thing
+// wrong with the прогон.
+test('a done стадия with no finishedAt is reported', () => {
+  const stages = chain();
+  stages[6] = { id: 'review', status: 'done', startedAt: '2026-08-19T19:56:51Z' };
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[6].finishedAt']);
+  assert.match(violations[0]!.message, /"review" is done and carries no finishedAt/);
+});
+
+test('an active стадия with no startedAt is reported', () => {
+  const stages = chain();
+  stages[6] = { id: 'review', status: 'active' };
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[6].startedAt']);
+  assert.match(violations[0]!.message, /"review" is "active" and carries no startedAt/);
+});
+
+test('an active стадия that already carries a finishedAt is reported', () => {
+  // The other half of the forgotten write, arriving the other way round: the
+  // closing stamp was made and the status was never moved. On screen the clock
+  // keeps running on a phase with a recorded end.
+  const stages = chain();
+  stages[6] = {
+    id: 'review', status: 'active',
+    startedAt: '2026-08-19T19:56:51Z', finishedAt: '2026-08-19T20:10:00Z',
+  };
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[6].finishedAt']);
+  assert.match(violations[0]!.message, /still active and already carries a finishedAt/);
+});
+
+test('a стадия that has not begun carrying a clock is reported', () => {
+  const stages = chain();
+  stages[6] = {
+    id: 'review', status: 'done',
+    startedAt: '2026-08-19T19:56:51Z', finishedAt: '2026-08-19T20:10:00Z',
+  };
+  stages.push({ id: 'acceptance', status: 'pending', startedAt: '2026-08-19T20:10:00Z' });
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[7].startedAt']);
+  assert.match(violations[0]!.message, /"acceptance" has not begun and carries a startedAt/);
+});
+
+test('a failed стадия is asked for its startedAt and nothing more', () => {
+  // Nothing in the bundle writes a failed стадия and the contract does not say
+  // whether one closes, so `finishedAt` is not demanded of it. That it began
+  // is not in question: a стадия cannot fail before it starts.
+  const stages = chain();
+  stages[6] = { id: 'review', status: 'failed' };
+  assert.deepEqual(
+    fields(validateState(withPatch({ stages, currentStage: 'review' }))),
+    ['stages[6].startedAt'],
+  );
+
+  stages[6] = { id: 'review', status: 'failed', startedAt: '2026-08-19T19:56:51Z' };
+  assert.deepEqual(validateState(withPatch({ stages, currentStage: 'review' })), []);
+});
+
+test('a stamp that is not a moment is reported as such, not as a missing one', () => {
+  // The rules above take a present stamp for a clock. `Date.parse` is what
+  // every reader of this state uses, so a string it returns NaN for is a стадия
+  // with no readable clock — and saying "carries no startedAt" would send the
+  // repair to a field that is already there.
+  const stages = chain();
+  stages[6] = { id: 'review', status: 'done', startedAt: 'вчера', finishedAt: 'потом' };
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[6].startedAt', 'stages[6].finishedAt']);
+  assert.match(violations[0]!.message, /carries a startedAt that is not a moment: "вчера"/);
+  assert.match(violations[1]!.message, /carries a finishedAt that is not a moment: "потом"/);
+});
+
+test('a стадия that has not begun is told once, whatever its stamp says', () => {
+  // Two findings on one field would be one finding too many: the стадия owns no
+  // clock at all, so the repair is to drop the field rather than correct it.
+  const stages = chain();
+  stages[6] = {
+    id: 'review', status: 'done',
+    startedAt: '2026-08-19T19:56:51Z', finishedAt: '2026-08-19T20:10:00Z',
+  };
+  stages.push({ id: 'acceptance', status: 'pending', startedAt: 'скоро' });
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[7].startedAt']);
+  assert.match(violations[0]!.message, /has not begun and carries a startedAt/);
+});
+
+test('a стадия that only looks unstamped keeps the meeting rule honest', () => {
+  // An empty string is not a stamp. Before this was said, it satisfied the
+  // presence rules and then reached `Date.parse` as NaN, where the chain gave
+  // up — so a стадия could claim to be closed and own no closing moment.
+  const stages = chain();
+  stages[5] = {
+    id: 'build', status: 'done',
+    startedAt: '2026-08-19T19:06:52Z', finishedAt: '',
+  };
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[5].finishedAt', 'stages[build].finishedAt']);
+  assert.match(violations[0]!.message, /is done and carries no finishedAt/);
+  assert.match(violations[1]!.message, /"build" is still open, and "review" has already started/);
+});
+
+test('a skipped стадия is asked for no stamps, and is allowed the ones it has', () => {
+  // The contract says a skipped стадия needs no timestamps of its own. Needing
+  // none is not the same as being forbidden them, and inventing the stricter
+  // reading here would fail прогоны that recorded when they stepped over it.
+  const stages = chain();
+  stages[2] = {
+    id: 'briefing', status: 'skipped', note: 'no genuine fork to ask about',
+    startedAt: '2026-08-19T18:52:40Z', finishedAt: '2026-08-19T18:52:40Z',
+  };
+
+  assert.deepEqual(validateState(withPatch({ stages, currentStage: 'review' })), []);
+});
+
+// `currentStage` is what the page shows: `currentStage()` in `dashboard.html`
+// takes the entry with this id and searches for the active стадия only when no
+// entry has it. A value naming a стадия that has not begun therefore chooses
+// the wrong phase on screen, and used to do it in silence.
+test('currentStage naming a стадия that has not begun is reported', () => {
+  const stages = chain();
+  stages.push({ id: 'acceptance', status: 'pending' });
+
+  const violations = validateState(withPatch({ stages, currentStage: 'acceptance' }));
+  assert.deepEqual(fields(violations), ['currentStage']);
+  assert.match(violations[0]!.message, /"acceptance", a стадия that has not begun/);
+});
+
+test('currentStage naming the стадия that is running, or one that is finished, is not', () => {
+  const stages = chain();
+  assert.deepEqual(validateState(withPatch({ stages, currentStage: 'review' })), []);
+
+  // The shape of a прогон that reached the end: nothing is open, and the field
+  // names the стадия it stopped at.
+  const closed = chain();
+  closed[6] = {
+    id: 'review', status: 'done',
+    startedAt: '2026-08-19T19:56:51Z', finishedAt: '2026-08-19T20:10:00Z',
+  };
+  assert.deepEqual(validateState(withPatch({ stages: closed, currentStage: 'review' })), []);
+});
+
+test('currentStage naming a стадия absent from the list says nothing', () => {
+  // The same stance the chain takes on a стадия it cannot find: a record that
+  // does not mention a стадия says nothing about it, and a fixture listing two
+  // of the eight is not a прогон that lost six.
+  assert.deepEqual(validateState(withPatch({ currentStage: 'build' })), []);
 });
 
 test('a стадия missing from the list breaks the chain rather than inventing a hole', () => {

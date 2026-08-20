@@ -17,7 +17,7 @@ function baseline(): RunState {
     depth: 'normal',
     polish: false,
     dialChanges: [],
-    stages: [{ id: 'preflight', status: 'active' }],
+    stages: [{ id: 'preflight', status: 'active', startedAt: '2026-08-19T09:00:00Z' }],
     currentStage: 'preflight',
     tasks: [],
     requirements: [],

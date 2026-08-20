@@ -70,6 +70,14 @@ cannot see the interval either, because it measures `stages[]`.
 So `finishedAt` of one стадия and `startedAt` of the next are the same instant.
 `scripts/state/validate.ts` rejects a state where they are not.
 
+**A стадия's status and its stamps are written in the same breath**, because the
+status is a claim about the clock. `active` means a `startedAt` and no
+`finishedAt`; `done` means both; `pending` means neither; `skipped` means a
+`note` instead. The validator rejects a стадия whose status and stamps disagree,
+and it does so on the стадия alone — the rule above needs two стадии before it
+can speak, and a стадия opened without a stamp would otherwise stay invisible
+until the next one arrived.
+
 **This is here rather than in the phase files because every phase begins**, for
 the same reason the line below is: a rule copied into nine files is nine rules
 that drift apart.

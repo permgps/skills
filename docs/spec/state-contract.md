@@ -141,6 +141,23 @@ from one that was met.
   pair rather than reporting it, because one of the two stamps it compares was
   not there to compare.
 
+  **A стадия's status is a claim about its own clock**, and the same validator
+  holds it to that claim: a `done` стадия carries both stamps, an `active` one
+  carries a `startedAt` and no `finishedAt`, a `pending` one carries neither,
+  and a `failed` one carries a `startedAt` — nothing writes a failed стадия yet,
+  and whether it closes is not settled here. `skipped` is asked for no stamps
+  and refused none: it needs no timestamps of its own, which is not the same as
+  being forbidden them. The three chain rules compare neighbours and can only
+  speak once both sides are stamped, so a half-written стадия stays invisible to
+  them until a later one arrives to be measured against it; these rules speak
+  about one стадия alone, and catch it while it is still the only thing wrong.
+
+  **A stamp is a moment, not a note.** Whatever a стадия carries must be
+  readable by `Date.parse`, which is what every reader of this state uses — the
+  chain rule, `scripts/metrics/`, and the page alike. A string none of them can
+  read is reported as its own finding rather than as a missing stamp, because
+  the repair differs: one field has to be written, the other corrected.
+
   **The enforcement reaches the state where this repository's own tooling reads
   and writes it** — `scripts/state/read.ts`, and `scripts/state/write.ts`, which
   refuses to write a state that fails. A прогон writes `state.js` itself and
@@ -149,6 +166,17 @@ from one that was met.
   прогон is measured, not at the moment it is written. A specification that
   names an enforcer is read as a claim about coverage, which is why the edge of
   the coverage is written beside it.
+- **`currentStage` may not name a стадия that has not begun.** The dashboard
+  believes this field over the стадии themselves — `currentStage()` in
+  `dashboard.html` takes the entry carrying this id and searches for the
+  `active` стадия only when no entry has it — so a value pointing at a `pending`
+  стадия puts the wrong phase on screen, at the wrong position in the eight,
+  under the word «ожидает». Only `pending` is a contradiction: `done` is what a
+  прогон that reached the end carries, and a `currentStage` naming a стадия that
+  another one has overtaken is the truthful half of that defect, which the rules
+  above attribute to `stages[]` where it belongs. A стадия absent from `stages[]`
+  is not a finding here, for the same reason the chain steps around one: a record
+  that does not mention a стадия says nothing about it.
 - Every write is a whole-file write of a valid state. A partially written state
   is a broken dashboard, so the file is written to a temporary name and moved
   into place.
