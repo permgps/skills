@@ -49,6 +49,31 @@ rules**: the run state, `manifest.md`, `interfaces.md`, and the file of the phas
 it is actually in. Re-opening earlier phase files to "recover the thread" spends
 the context on rules already being executed, and the thread was never in them.
 
+**A прогон that stopped without finishing is recovered the same way, and never
+restarted.** A compaction is not the only thing a session does not survive, and
+the other one leaves the same evidence: an open стадия with a `startedAt` and no
+`finishedAt`, and artifacts saying how far it actually got. So a session that
+meets a live `.maestro/state.js` and is told anything that is not an answer to a
+stop — «продолжай», a question, a correction — reads the state first and resumes
+at `currentStage`. Starting over would charge the user again for стадии already
+paid for, over a directory that already holds their answers.
+
+**And it says who is holding the прогон before it drives one.** `heldBy` in
+[`state-contract.md`](state-contract.md) carries the token of the session that
+claimed the run. A session opening a прогон that carries none mints one and keeps
+it for the whole run; a session meeting a token that is **not its own** says so
+and asks. It does not take the прогон, and it does not step away from it either:
+it cannot tell a live holder from a dead one, and both answers are the user's to
+give. That is the whole of what this rule does — a second orchestrator is
+**detected, not prevented**, for the reasons written where the field is defined.
+
+The check that makes the detection real is the one in the update ritual: a writer
+re-reads the state immediately before writing and compares `updatedAt` with the
+value it last read. A stamp that moved means somebody else wrote in between, and
+that is reported rather than overwritten. Two sessions drove `board-sizes` on
+2026-08-20 and neither had a way to notice; only an unrelated pause kept them off
+the same write.
+
 ## Task Granularity
 
 The plan phase cuts таски. These numbers are a first guess, never a target: a

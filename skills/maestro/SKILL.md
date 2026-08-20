@@ -64,6 +64,45 @@ truer than your memory of it. Starting the прогон over would take a run th
 three стадии in and charge the user for all three again, over a directory that
 already holds their answers.
 
+**Claim the прогон, then check the claim before every write.**
+
+1. **Mint a token when you open a прогон whose `heldBy` is absent** — four or
+   five random characters, written with the moment as
+   `heldBy: { token, since }` at the next ordinary write. Keep the same token
+   for the whole run. It says nothing about who you are; it says only that the
+   run you are looking at is the run you claimed.
+2. **Remember the `updatedAt` you last read**, and **re-read `.maestro/state.js`
+   immediately before every write.** A стадия boundary or a таск transition can
+   be minutes after the read that preceded it.
+3. **If `updatedAt` moved, do not write.** Somebody else wrote in between, and
+   laying your version over theirs loses their work silently — which is exactly
+   what almost happened when two sessions reviewed one таск of `board-sizes` on
+   2026-08-20.
+4. **If `heldBy` carries a token that is not yours, do not take the прогон.**
+   You cannot tell a live holder from a dead one, so this is not yours to
+   decide.
+
+Say it in the прогон's own language and ask:
+
+> «Этот прогон уже кто-то ведёт: в `state.js` стоит чужая метка `k7f2` от
+> 21:27. Я мог бы продолжить его — но если та сессия ещё жива, мы будем писать
+> в один файл и затирать друг друга. Продолжаю или подождём?»
+
+> «Состояние прогона изменилось, пока я работал: я читал его в 20:59, а на диске
+> запись от 21:27. Значит, кто-то писал параллельно. Я ничего не перезаписал.
+> Перечитать и продолжить с того, что там сейчас?»
+
+The sentence is the point. Both прогоны that hit this had nothing to say, so
+neither said anything, and the user found out from the file.
+
+`scripts/state/write.ts` refuses a write whose expected `updatedAt` has moved —
+but a прогон writes `state.js` itself and does not go through that module, so
+for you the re-read is a **step you perform**, not a property you may assume.
+
+This is here rather than in each phase file for the reason the rule below is:
+every phase writes the state, and a rule copied into nine files is nine rules
+that drift apart.
+
 ## Opening A Стадия
 
 **A стадия opens before its file is read.** Closing the one that ended and
