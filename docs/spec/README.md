@@ -91,8 +91,9 @@ empty, and that no banned synonym appears in any defined label.
 
 `vocabulary.md`'s `Shorthand` column has its own reader:
 `scripts/validate/dashboard-integrity.ts` holds every plain string the dashboard
-ships against it, and requires each region to be explained in both registers
-rather than only in the one its author was reading in. It reads the plain block
+ships against it, and requires each region — and each of the eight стадии of the
+timeline — to be explained in both registers rather than only in the one its
+author was reading in. It reads the plain block
 as source rather than calling it, because a branch never taken still ships. A
 label defined anywhere in `vocabulary.md` is exempt in its exact form, and only
 in that form — the popover beside «Гейты» is the thing that teaches the word,
@@ -100,6 +101,14 @@ and one forbidden from naming it could not. **The chat has no such reader**:
 it is composed at run time, and the rule for it lives in the bundle's
 `SKILL.md`. That difference is stated in `vocabulary.md` rather than left to be
 discovered.
+
+The `Banned` column has **two** readers, and they cover different surfaces.
+`spec-integrity` holds it against every label defined in this directory;
+`dashboard-integrity` holds it against every sentence the page ships, in both
+registers. The second is not a duplicate of the plain-word scan above it:
+shorthand is a rule about the plain reader and a banned synonym is a rule about
+everyone, because a second name for a thing already named leaves the reader who
+meets both with no way to know they are one thing.
 
 ## Running The Checks
 
@@ -131,6 +140,10 @@ defaults to both paths above. It proves the page is self-contained and that the
 labels, stage order and gate map it copies still match `vocabulary.md`,
 `phases.md` and `gates.md` — the page holds those copies because the state
 stores ids and labels are resolved at render time, and an unchecked copy drifts.
+It also proves that nothing the page shows is mute: every region and every
+стадия must answer in both registers and both languages, and the стадия rows —
+which are drawn at run time and so cannot be read statically — must be built
+with the button that opens them.
 
 `host-degradation` takes the same two paths and proves that a capability
 [`hosts.md`](hosts.md) marks as degrading has both of its halves inside the

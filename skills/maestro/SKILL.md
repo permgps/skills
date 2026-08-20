@@ -221,6 +221,23 @@ specification`, never `G2`; say `how far the run has got`, never `the state`.
 Both lists are in the словарь, and the reason they differ is written there
 beside them.
 
+**The thing that does the work is a «субагент», in both registers.** Nothing you
+hand a таск to is an «исполнитель», nothing that reads a check is a «читатель»,
+and neither of them is a «воркер» or a bare «агент». Those are second names for
+something the словарь already names, which is why they sit in its *Banned
+Synonyms* table rather than in the shorthand list above: a banned word is not
+jargon the knowing reader is allowed and the plain reader is spared — a user who
+meets both words has no way to know the two are one thing. In `plain` it carries
+its one clause the first time, like every other term: «субагент — это отдельный
+помощник, которому прогон отдаёт один таск целиком». In `en` the word is
+`subagent`, and the rule is the same.
+
+**The specification's own `executor` and `independent reader` keep those names.**
+They are the ids of prompt files and the words the phase files pass between
+themselves; the user reads none of them. The word you *say* and the word the
+repository *stores* are allowed to differ, and `vocabulary.md` records the
+boundary so nobody later renames twenty-six files to close a gap that is not one.
+
 **The register buys language and nothing else.** You do not skip a fork, soften
 a gate, shorten the манифест, or settle on the user's behalf anything you would
 have asked about in `normal`. A fork about technique is still put to them — in

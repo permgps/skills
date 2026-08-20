@@ -135,6 +135,20 @@ popover on the page: moving it is what closes the previous explanation, so
 nothing shifts under you while you read about the number you are looking at.
 Escape closes it, so does a click anywhere else.
 
+**Every стадия of the timeline carries one too**, and what it holds is two
+things: what that стадия is responsible for — Разработка writes the project code
+against the таски, Ревью has it read back by a субагент that did not write it —
+and where it stands in *this* прогон: its status, the clock its own row shows,
+the note it left, and the findings of the check that failed after it. The first
+half is the same in every прогон; the second is why the `i` is on the row rather
+than in this page.
+
+Those rows are rebuilt from the state every two seconds, so the popover cannot
+hold on to the button it was opened from — a few seconds later that button is a
+node that has left the document. It remembers which стадия is open instead and
+finds the row again after each redraw. When the row is gone, the explanation
+closes rather than hovering over nothing.
+
 What it says is about **your прогон**, not about dashboards. «Осталось» does not
 explain that it holds an estimate; it says the estimate is 18…31 минуты, that
 the median behind it came from two finished таски, and that the chain it was
@@ -144,10 +158,11 @@ explanation is built by calling the same functions the region draws itself with,
 so it cannot tell you a story the number above it disagrees with.
 
 **In which words depends on how you answered the first question of the project.**
-If you chose *по-простому*, every one of the fourteen explanations is written for
-someone who has never built software — «Осталось» stops saying *медиана* and says
-*серединное время*, and the block called «Гейты» opens with what the four checks
-actually are. The figures are identical: both versions call the same functions,
+If you chose *по-простому*, every one of the twenty-two explanations — fourteen
+regions and eight стадии — is written for someone who has never built software:
+«Осталось» stops saying *медиана* and says *серединное время*, the block called
+«Гейты» opens with what the four checks actually are, and Ревью says a субагент
+reads the work back rather than naming a role nobody introduced. The figures are identical: both versions call the same functions,
 because an explanation that recomputed its own numbers could disagree with the
 one beside it, and the plain reader is the last person able to notice.
 
@@ -192,6 +207,24 @@ have an explanation that answers when called — **in both registers**, and in
 both directions, so a region added to the page and forgotten in the table fails
 too, and one explained only for the reader who did not need it fails as well. A
 region cannot ship mute.
+
+**The eight стадии are held to the same standard by a check of their own.** They
+are not regions — a стадия is a row drawn from state, named in no table and
+marked with no attribute — so the check walks `STAGE_ORDER` instead: every id
+must have an explanation that answers in both registers and both languages,
+every registry key must be an id the timeline actually draws, and the render
+function must attach the button at all. That last one is the half a source read
+would otherwise miss: the registries can be complete and the rows still ship
+without an `i`, and eight explanations nobody can reach look exactly like eight
+explanations from outside.
+
+**A banned synonym now fails in either register.** Shorthand is a rule about the
+plain reader — `гейт` is spared them and allowed to everyone else. A banned word
+is not: «исполнитель» is a second name for something the словарь already calls a
+субагент, and a user who meets both has no way to know the two are one thing. So
+that list is scanned across all four maps of sentences the page ships, in both
+languages, with the same label exemption and no wider. It caught two words that
+had been on the page all along.
 
 It also holds the plain explanations to the shorthand list in `vocabulary.md`:
 no plain sentence the page ships may contain `гейт`, `спека`, `коммит`, `стейт`
