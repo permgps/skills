@@ -1,9 +1,9 @@
 {
   "name": "maestro-skills",
-  "version": "0.0.1-alpha",
+  "version": "0.0.2-alpha",
   "private": true,
   "type": "module",
-  "description": "Maestro \u2014 an orchestrator skill that turns a dictated idea into a verified project",
+  "description": "Maestro — an orchestrator skill that turns a dictated idea into a verified project",
   "license": "MIT",
   "engines": {
     "node": ">=22.18"
