@@ -14,6 +14,30 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**A прогон says who is holding it, and a writer that lost a race says so instead
+of overwriting.** `state.js` carries an optional `heldBy` — a token the session
+mints when it opens a прогон that has none, and the moment it minted it — and
+`SKILL.md` tells the orchestrator to re-read the state immediately before every
+write and compare `updatedAt` with the value it last read. `scripts/state/write.ts`
+refuses such a write outright. It **detects** a second orchestrator rather than
+preventing one, and that limit is written where the field is defined: nothing
+here can expire a lease, and a claim that refused would strand the next session
+in front of a прогон it cannot touch. Two sessions drove one прогон on
+2026-08-20 and neither had a way to notice.
+
+**A таск's commits are a list, because a repaired таск has two.**
+`tasks[].commit` became `tasks[].commits` and `contractVersion` went to `3`. A
+review reads the union of a таск's commits over that таск's own files —
+`git diff <first>^..<last>` — and explicitly not the tree, which by the time a
+repair lands carries every wave that followed the original. The repair phase
+appends rather than replaces, so the commit the first review was written against
+stays findable. The plan phase closes the cheap half: a *done means* item is
+answerable against the таск's own diff, which three items of a real таск were
+not. The dashboard needed no field handling — it never read that field — but its
+own copy of the version number moved with the contract, and
+`state-matches-spec.ts` now holds the two together so the copy cannot be left
+behind quietly.
+
 **The прогон owns exactly one page on the user's screen, and it is the
 dashboard.** No субагент opens a page or raises a server on a port of its own, a
 question that can only be answered by looking at a rendered page is either
