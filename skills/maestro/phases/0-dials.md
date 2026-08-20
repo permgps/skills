@@ -14,7 +14,7 @@ literally is never taken as a dial.
 
 ## Modes
 
-Built-in default: `semi`. A project may pin its own — see below.
+Built-in default for `mode`: `semi`. A project may pin its own — see below.
 
 | Mode | Russian triggers | English triggers | Human gates |
 |---|---|---|---|

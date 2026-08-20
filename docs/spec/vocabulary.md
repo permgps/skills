@@ -85,6 +85,8 @@ called "задача" fails the build exactly like a stage would.
 | `depth` | `deep` | Глубокая |
 | `polish` | `true` | Включена |
 | `polish` | `false` | Выключена |
+| `explain` | `plain` | Простые |
+| `explain` | `normal` | Обычные |
 
 `Готово` and `Готов` differ because one describes a stage and the other a таск,
 and Russian will not let one form serve both without reading as a mistake. They
@@ -93,6 +95,11 @@ are two labels for two fields, not a synonym pair.
 `Сбой` and `Упал` are the same distinction: a stage fails on something the user
 has to resolve, a таск fails after its retries are spent. One word for both would
 make «сбой» mean either «прогон остановился» or «один таск из шести не вышел».
+
+`Обычная` and `Обычные` are two labels for two fields — the depth and the
+register — and Russian gives them different forms because they agree with
+different nouns. On screen neither is ever shown bare: the register's chip reads
+«Объяснения: Простые», so the two can never be read as one setting stated twice.
 
 ## Screen Labels
 
@@ -127,6 +134,66 @@ the stage rather than after the activity.
 `Осталось` is a range and says so. A single wall-clock number would be a
 fabrication dressed as a measurement; a range built from таски that already
 finished is neither.
+
+## Plain Words
+
+The register ([`dials.md`](dials.md)) has two values. In `normal` the terms above
+are used as they stand. In `plain` two further rules hold, and they pull in
+opposite directions on purpose.
+
+**A term defined above stays.** The plain register does not rename прогон to
+«процесс» or таск to «шаг». One concept, one word is the rule this document
+opens with, and a register that renamed things would leave the user reading a
+screen whose words appear nowhere in what they were told. What `plain` adds is
+**one clause of explanation the first time a term appears**, in the same
+sentence — «таск — это один кусок работы, который делает один исполнитель».
+Once, and then never again in that прогон: a term re-explained every time reads
+as a tool that does not remember it already said it.
+
+**Shorthand goes.** The words below are not terms of this specification. They
+are the trade's own abbreviations, and no gloss redeems them for a reader who
+has never built software. In `plain` they may not appear at all — not
+explained, not in brackets, not once.
+
+| Shorthand | Say instead |
+|---|---|
+| G1, G2, G3, G4 | name the check in words: «проверка требований», «проверка спецификации», «проверка плана», «проверка готовой работы» |
+| гейт, гейты | проверка |
+| спека, спек | спецификация |
+| коммит | сохранение в истории проекта |
+| репозиторий | папка проекта с историей изменений |
+| ворктри | отдельная копия проекта |
+| слаг | короткое имя латинскими буквами |
+| стейт | состояние прогона |
+| валидатор | проверка |
+| артефакт | файл, который делает прогон |
+| деплой | публикация |
+| рантайм | во время работы |
+| парсинг | чтение файла |
+| медиана | серединное значение |
+| хендофф | передача таска свежему исполнителю |
+
+The `Shorthand` column holds the words themselves, comma-separated where a
+family shares one replacement. It is read by a checker, so a word added here
+starts being enforced in the same change.
+
+**The boundary between the two rules is where this is easiest to get wrong.**
+`Заглушка`, `Волна`, `Долг` and `Критический путь` are **labels**, defined in
+the tables above. They stay on the screen in both registers, and `plain`
+explains each of them once. `гейт` and `спека` appear in none of those tables —
+they are not labels, they are shorthand, and this section removes them.
+
+### What Is Checked And What Is Not
+
+`scripts/validate/dashboard-integrity.ts` reads the `Shorthand` column and holds
+every plain string the dashboard ships against it. That is every plain sentence
+this repository can see. The chat is composed at run time by the прогон itself;
+no checker reads a word of it, and it is governed by the rule in the bundle's
+`SKILL.md` instead.
+
+The two guarantees are not equal. The difference is written down here rather
+than left to be discovered by a user who was promised plain words and was shown
+`G2`.
 
 ## Banned Synonyms
 

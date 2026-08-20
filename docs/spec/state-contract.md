@@ -16,6 +16,7 @@ input.
 | `mode` | `full` \| `semi` \| `interview` \| `manual` | preflight | dashboard |
 | `depth` | `strict` \| `normal` \| `deep` | preflight | dashboard |
 | `polish` | boolean | preflight | dashboard |
+| `explain` | `plain` \| `normal` | preflight | dashboard |
 | `dialChanges[]` | list of `{ dial, from, to, atPhase }` | preflight | dashboard |
 | `stages[]` | list of `{ id, status, startedAt?, finishedAt?, note? }` | preflight | dashboard |
 | `currentStage` | stage id | preflight | dashboard |
@@ -27,6 +28,14 @@ input.
 | `tests` | `{ passed, failed }` | build | dashboard |
 | `finishedAt` | ISO 8601 string | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
+
+**`explain` is the one dial the state carries that produces no part of the
+build.** It is here because the dashboard has to render its fourteen
+explanations in the register the user chose, and `state.js` is the only thing
+the dashboard reads. It is **optional**: every state written before the register
+existed has no `explain`, and the page renders such a state exactly as it
+rendered it then. A reader that met an absent `explain` and supplied `normal` on
+the writer's behalf would be reporting a choice nobody made.
 
 **`Written in` names the phase that creates a field, not every phase that later
 changes it.** `stages[]` is the example: preflight writes all eight entries and
@@ -113,6 +122,12 @@ from one that was met.
 
 - The state is written at **phase boundaries and task transitions only**, never
   on a timer. A run with no state changes produces no writes.
+- **A register change earns no write of its own.** It takes effect in the chat
+  at once and reaches the state at the next ordinary write. It is not recorded
+  in `dialChanges[]` either: that list says which part of the build was produced
+  under which settings, and the register produces no part of the build. This is
+  what keeps `contractVersion` at `2` — `dialChanges[].dial` keeps its three
+  values, and `explain` arrives as an optional field, which raises nothing.
 - A стадия is opened by the same write that closes the one before it. For
   consecutive non-`skipped` стадии, `finishedAt` of one is `startedAt` of the
   next, so the стадии account for the whole прогон and no interval belongs to
@@ -171,6 +186,8 @@ because of the fields that arrived with them:
 
 The optional fields in the same version — `wave`, `zone`, the three counters,
 `files`, `tests`, `commit`, `note`, `debt`, `additions`, `updatedAt` — would
-have raised nothing on their own. **A state written under version 1 stays
+have raised nothing on their own. **`explain` arrived later and still raised
+nothing**, for exactly that reason: it is an optional field and it widened no
+value set. **A state written under version 1 stays
 readable**: the dashboard renders what it can, and the fields it does not find
 render as absent rather than as zero.

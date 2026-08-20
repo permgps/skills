@@ -80,6 +80,24 @@ test('an unknown mode is reported with the allowed set', () => {
   assert.match(violations[0]?.message ?? '', /full, semi, interview, manual/);
 });
 
+test('the register is optional, checked when present, and absent is not normal', () => {
+  // Absent: every прогон finished before the register existed looks like this,
+  // and calling one of those corrupt is the wrong sentence.
+  assert.deepEqual(validateState(baseline()), []);
+  assert.equal(baseline().explain, undefined);
+
+  assert.deepEqual(validateState(withPatch({ explain: 'plain' })), []);
+  assert.deepEqual(validateState(withPatch({ explain: 'normal' })), []);
+
+  const violations = validateState(withPatch({ explain: 'simple' }));
+  assert.deepEqual(fields(violations), ['explain']);
+  assert.match(violations[0]?.message ?? '', /plain, normal/);
+
+  // `null` is a pinned-nothing answer in the project's config file, never a
+  // value of the field itself.
+  assert.deepEqual(fields(validateState(withPatch({ explain: null }))), ['explain']);
+});
+
 test('an unknown depth, stage status and task status are each reported', () => {
   assert.deepEqual(fields(validateState(withPatch({ depth: 'shallow' }))), ['depth']);
   assert.deepEqual(

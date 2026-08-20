@@ -12,6 +12,7 @@ import {
   GATE_IDS,
   GATE_STATUSES,
   MODES,
+  REGISTERS,
   REQUIREMENT_STATUSES,
   STAGE_IDS,
   STAGE_STATUSES,
@@ -70,6 +71,10 @@ export function validateState(value: unknown): StateViolation[] {
       add(field, `${field} must be one of ${allowed.join(', ')} — got ${JSON.stringify(raw)}`);
     }
   };
+  const optionalOneOf = (field: string, raw: unknown, allowed: readonly string[]): void => {
+    if (raw === undefined) return;
+    requireOneOf(field, raw, allowed);
+  };
   const requireArray = (field: string, raw: unknown): raw is unknown[] => {
     if (!Array.isArray(raw)) {
       add(field, `${field} must be an array`);
@@ -118,6 +123,10 @@ export function validateState(value: unknown): StateViolation[] {
   requireOneOf('mode', value['mode'], MODES);
   requireOneOf('depth', value['depth'], DEPTHS);
   if (typeof value['polish'] !== 'boolean') add('polish', 'polish must be a boolean');
+  // Absent is lawful at every contract version, including this one: the register
+  // arrived after 2 was already in use, so a state that predates it is not a
+  // state that lost a field.
+  optionalOneOf('explain', value['explain'], REGISTERS);
   requireOneOf('currentStage', value['currentStage'], STAGE_IDS);
   optionalString('finishedAt', value['finishedAt']);
   optionalString('interruptedAt', value['interruptedAt']);

@@ -61,17 +61,20 @@ manifest whose numbering shifts cannot be checked against anything.
 | `phases.md` | Phases | `Id`, `Name`, `Stage`, `Reads`, `Produces` |
 | `phases.md` | Mode Matrix | `Phase`, then one column per mode defined in `dials.md` |
 | `dials.md` | Modes | `Mode`, `Default`, `Human gates` |
+| `dials.md` | Register | `Register`, `Default`, `What changes` |
 | `gates.md` | Gates | `Gate`, `After phase`, `Pass condition` |
 | `artifacts.md` | Run artifacts | `Artifact`, `Writer`, `Readers`, `Mutable` |
 | `state-contract.md` | State fields | `Field`, `Type`, `Written in`, `Read by` |
 
 `dials.md`'s `Default` column has a second reader:
-`scripts/validate/dials-defaults.ts` holds the mode set and the marked default
-to the same answer in this document, the bundle's `phases/0-dials.md` and its
-`SKILL.md`. The bundle has no column to put a default in, so it declares one in
-a sentence — «Built-in default `semi`» — and that phrasing is the contract the
-checker reads. A project's own pinned default lives in the user's
-`.maestro/config.json` and is outside anything this repository can check.
+`scripts/validate/dials-defaults.ts` holds each dial's value set and its marked
+default to the same answer in this document, the bundle's `phases/0-dials.md`
+and its `SKILL.md`. The bundle has no column to put a default in, so it declares
+one in a sentence — «Built-in default for `mode`: `semi`» — and that phrasing is
+the contract the checker reads. **The sentence names the dial**, because a file
+declaring two of them would otherwise read as one dial's default stated twice.
+A project's own pinned default lives in the user's `.maestro/config.json` and is
+outside anything this repository can check.
 
 The validator enforces that gates point at phases that exist, that every
 artifact has exactly one writer, that every state field is produced and consumed,

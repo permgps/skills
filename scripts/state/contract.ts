@@ -12,7 +12,8 @@
  * Version 2 changed three value sets at once: a таск can now be `failed`, a
  * stage can be `skipped`, and a требование can be delivered as a `placeholder`.
  * The optional fields that arrived with them — waves, counters, debt — would
- * have raised nothing on their own.
+ * have raised nothing on their own, and neither did `explain`, which arrived
+ * later on the same terms.
  */
 export const CONTRACT_VERSION = 2;
 
@@ -37,6 +38,17 @@ export const MODES: readonly Mode[] = ['full', 'semi', 'interview', 'manual'];
 
 export type Depth = 'strict' | 'normal' | 'deep';
 export const DEPTHS: readonly Depth[] = ['strict', 'normal', 'deep'];
+
+/**
+ * How the прогон words what it shows the user — not how much it asks.
+ *
+ * It is the one dial in this file that produces no part of the build, which is
+ * why it appears in no `DialChange`: there is nothing for the отчёт to attribute
+ * to it. It is here at all because the dashboard renders its explanations in the
+ * chosen register and `state.js` is the only thing the dashboard reads.
+ */
+export type Register = 'plain' | 'normal';
+export const REGISTERS: readonly Register[] = ['plain', 'normal'];
 
 export type StageStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
 export const STAGE_STATUSES: readonly StageStatus[] =
@@ -173,6 +185,12 @@ export interface RunState {
   mode: Mode;
   depth: Depth;
   polish: boolean;
+  /**
+   * Optional, and absent is not `normal`. Every state written before the
+   * register existed lacks it, and a reader that supplied a value on the
+   * writer's behalf would report a choice nobody made.
+   */
+  explain?: Register;
   dialChanges: DialChange[];
   stages: StageEntry[];
   currentStage: StageId;

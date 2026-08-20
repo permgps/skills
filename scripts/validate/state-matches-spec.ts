@@ -27,6 +27,7 @@ const log = createLogger('state-matches-spec');
 const VALUE_SET_CONSTANTS: Record<string, string> = {
   'mode': 'MODES',
   'depth': 'DEPTHS',
+  'explain': 'REGISTERS',
   'stages[].status': 'STAGE_STATUSES',
   'tasks[].status': 'TASK_STATUSES',
   'requirements[].status': 'REQUIREMENT_STATUSES',
