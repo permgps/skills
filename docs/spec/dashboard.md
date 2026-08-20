@@ -38,12 +38,25 @@ like to look at it.
 | `stages` | Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
 | `build` | Ход разработки | The таски grouped by волна, each with its status, phase and clock, and a line naming what is running now | `tasks[]` |
 | `requirement-list` | Требования (список) | The манифест one требование at a time | `requirements[]` |
-| `gates` | Gates | G1–G4 with status, and findings when failed | `gates[]` |
+| `gates` | Gates | G1–G4 with status, findings when failed, and a folded count of them when passed | `gates[]` |
 
 The `Key` column is the region's name in the page: it is the `data-region`
 attribute in the markup and the entry in `EXPLAIN_ORDER` in the logic block.
 `scripts/validate/dashboard-integrity.ts` checks all three against each other,
 so a region cannot be added to one and forgotten in the others.
+
+**Findings under a check that passed are a record, not an alarm.** A gate is
+never passed with notes left standing — `SKILL.md` and `phases/4-plan.md` both
+say so — which makes a finding under a passed gate a line about something that
+was already dealt with. It is shown folded: one line saying how many there are,
+opening the list on a press, in the muted tone this page uses for everything
+settled. The colour of failure stays with failure, where it means what it says.
+A passed gate with an empty list shows nothing at all.
+
+The decision — whether to show, whether folded, in which tone — is made in the
+logic block and not inside the render, so that it can be called by a test. The
+defect this rule replaced shipped because the rule was written in a branch no
+test in the repository could reach.
 
 ## The Reader's Own Two Controls
 

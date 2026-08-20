@@ -186,7 +186,18 @@
   .stage-skipped .name, .stage-skipped .status { color: var(--muted); }
   .gate-passed .status { color: var(--accent); }
   .note { color: var(--muted); font-size: .85rem; margin: -.1rem 0 .3rem 0; }
-  .findings { margin: .25rem 0 .75rem 1rem; color: var(--fail); font-size: .9rem; }
+  /* Geometry only. The tone is the render's decision and it is always stated:
+     a list that fell through to the quiet colour would be a failure drawn as
+     settled, which is the defect this pair replaced, inverted. */
+  .findings { margin: .25rem 0 .75rem 1rem; font-size: .9rem; }
+  .findings-fail { color: var(--fail); }
+  .findings-quiet { color: var(--muted); }
+  .findings-toggle {
+    display: block; margin: .25rem 0 .6rem 1rem; padding: 0;
+    background: none; border: 0; font: inherit; font-size: .9rem;
+    color: var(--muted); text-align: left; cursor: pointer;
+  }
+  .findings-toggle:hover, .findings-toggle:focus-visible { color: var(--ink); }
   .empty, .total { color: var(--muted); margin: .25rem 0 0; }
 
   /* --- the build, grouped by wave --- */
@@ -502,6 +513,13 @@ globalThis.MAESTRO_LOGIC = (function () {
           if (!tests) return 'Прогон ещё не запускал тесты';
           return tests.failed > 0 ? 'Упало ' + tests.failed : 'После последнего таска';
         },
+        findingsFolded: function (count, plain) {
+          return plain
+            ? 'Проверка оставила ' + count + ' '
+              + plural(count, 'замечание', 'замечания', 'замечаний') + ' — все уже исправлены'
+            : 'Гейт оставил ' + count + ' '
+              + plural(count, 'находку', 'находки', 'находок') + ' — все отработаны';
+        },
         noFindings: 'Гейт не оставил замечаний.',
         noTasks: 'Таски ещё не нарезаны.',
         noRequirements: 'Требования ещё не записаны.',
@@ -677,6 +695,12 @@ globalThis.MAESTRO_LOGIC = (function () {
           if (!tests) return 'The run has not started the tests yet';
           return tests.failed > 0 ? 'Failed ' + tests.failed : 'After the last task';
         },
+        findingsFolded: function (count, plain) {
+          var one = count === 1;
+          return plain
+            ? 'The check left ' + count + (one ? ' note' : ' notes') + ' — every one already dealt with'
+            : 'The check left ' + count + (one ? ' finding' : ' findings') + ' — all acted on';
+        },
         noFindings: 'The check left no findings.',
         noTasks: 'No tasks cut yet.',
         noRequirements: 'No requirements written down yet.',
@@ -821,6 +845,33 @@ globalThis.MAESTRO_LOGIC = (function () {
       if (gates[i] && GATE_AFTER[gates[i].id] === stageId) return gates[i];
     }
     return null;
+  }
+
+  /**
+   * Whether a gate's findings are drawn, folded, and in which tone.
+   *
+   * A gate is never passed with notes left standing — `SKILL.md` and
+   * `phases/4-plan.md` both say so — so a finding under a passed gate is a line
+   * about something that was already dealt with. Painting it in the colour of
+   * failure is not merely loud, it is false: a real прогон passed G3 carrying
+   * twenty-one of them and the reader read the screen as a breakage.
+   *
+   * The decision lives here rather than inside the render because the render is
+   * the half no test in this repository executes, and that is the direct reason
+   * the defect shipped. Nothing here reads a finding: the contract says plain
+   * strings and the page is the reader, never the writer.
+   */
+  function findingsView(gate) {
+    var findings = (gate && gate.findings) || [];
+    var count = Array.isArray(findings) ? findings.length : 0;
+    if (count === 0) return { show: false, folded: false, tone: 'quiet', count: 0 };
+    var failed = gate.status === 'failed';
+    return { show: true, folded: !failed, tone: failed ? 'fail' : 'quiet', count: count };
+  }
+
+  /** The folded line's wording, in the прогон's language and its register. */
+  function findingsLine(count, register, language) {
+    return words(language).UI.findingsFolded(count, register === 'plain');
   }
 
   /** The stage entries in specification order, so a reordered state still reads correctly. */
@@ -2180,6 +2231,8 @@ globalThis.MAESTRO_LOGIC = (function () {
     IDLE_CEILING_MS: IDLE_CEILING_MS,
     gateFor: gateFor,
     lineOf: lineOf,
+    findingsView: findingsView,
+    findingsLine: findingsLine,
     orderedStages: orderedStages,
     registerOf: registerOf,
     label: label,
@@ -2252,6 +2305,9 @@ globalThis.MAESTRO_SNAPSHOT = null;
   var L = globalThis.MAESTRO_LOGIC;
   var STATE_FILE = 'state.js';
   var POLL_MS = 2000;
+
+  /** Which gates' findings the reader has opened, kept across the redraw. */
+  var openFindings = {};
   var TICK_MS = 1000;
   var LANGUAGE_KEY = 'maestro.language';
 
@@ -2644,9 +2700,9 @@ globalThis.MAESTRO_SNAPSHOT = null;
         var gate = L.gateFor(state, stage.id);
         var findings = (gate && gate.findings) || [];
         if (findings.length === 0) {
-          put(host, 'p', T.UI.noFindings, 'findings');
+          put(host, 'p', T.UI.noFindings, 'findings findings-fail');
         } else {
-          var list = put(host, 'ul', null, 'findings');
+          var list = put(host, 'ul', null, 'findings findings-fail');
           findings.forEach(function (finding) { put(list, 'li', L.lineOf(finding)); });
         }
       }
@@ -2740,17 +2796,38 @@ globalThis.MAESTRO_SNAPSHOT = null;
       return;
     }
 
+    var register = L.registerOf(state);
+
     gates.forEach(function (gate) {
       var row = put(host, 'div', null, 'row gate gate-' + gate.status);
       put(row, 'span', gate.id, 'id');
       put(row, 'span', L.label(T.STAGE_LABEL, L.GATE_AFTER[gate.id]) || '', 'name');
       put(row, 'span', L.label(T.GATE_STATUS, gate.status), 'status');
 
+      var view = L.findingsView(gate);
+      if (!view.show) return;
+
       var findings = gate.findings || [];
-      if (findings.length > 0) {
-        var list = put(host, 'ul', null, 'findings');
+      var drawList = function () {
+        var list = put(host, 'ul', null, 'findings findings-' + view.tone);
         findings.forEach(function (finding) { put(list, 'li', L.lineOf(finding)); });
-      }
+      };
+
+      if (!view.folded) { drawList(); return; }
+
+      // The region is cleared and rebuilt every poll, so an opened list is
+      // remembered by gate id rather than by the node that held it. Re-folding
+      // on the redraw was the other option and it is the wrong one: the list
+      // would snap shut every two seconds, which is less time than it takes to
+      // read one finding.
+      var toggle = put(host, 'button', L.findingsLine(view.count, register, lang), 'findings-toggle');
+      toggle.type = 'button';
+      toggle.setAttribute('aria-expanded', openFindings[gate.id] ? 'true' : 'false');
+      toggle.addEventListener('click', function () {
+        openFindings[gate.id] = !openFindings[gate.id];
+        renderGates(state);
+      });
+      if (openFindings[gate.id]) drawList();
     });
   }
 
