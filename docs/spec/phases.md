@@ -136,6 +136,23 @@ being contradicted after the fact. It is reported against the plan, because
 resolving it means deciding what the project's code should say, and that is the
 one thing the orchestrator does not do ([`safety.md`](safety.md), `S5`).
 
+### The User's Viewer Is Not A Субагент's To Use
+
+**A субагент opens nothing in front of the user and raises no server on a port
+it chose.** Isolation above is about what a таск may write; this is about what it
+may show. The user's screen is carrying the прогон, and the panel is the whole of
+what the run puts there ([`dashboard.md`](dashboard.md)) — a page arriving beside
+it mid-таск is read as a fault, and has twice cost the panel its place in the
+pane.
+
+A question that can only be answered by looking at a rendered page is answered
+without a viewer — headlessly, by running the assertions, by reading what the
+code produces — or it is written down unanswered and carried to whoever
+exercises the build next. An item of *done means* is phrased so that this is
+possible; one that cannot be is a finding against the task file, caught by the
+reader standing where the executor will stand, which is the last moment it is
+free.
+
 ### Commits
 
 **One commit per finished таск.** A прогон survives a compaction, a crash and a

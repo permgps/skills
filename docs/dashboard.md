@@ -105,6 +105,22 @@ repaints this page and cannot change the language the run speaks in. The header
 does not say so — a paragraph of caveat standing there permanently cost more
 than the misreading it prevented, and one press settles the question anyway.
 
+## It is the only page the прогон opens
+
+Nothing else lands on your screen while a run is going: not a checks page, not a
+coverage report, not a log. That is deliberate, and it was learned the hard way —
+twice a субагент opened its own page in the pane the dashboard was in, and the
+dashboard was gone from the tab strip afterwards while the run carried on
+writing state nobody could see. The page it opened was misleading as well as
+uninvited: loaded from a worktree over `file://`, it reported ninety-six failed
+checks that were failures of the way it had been opened, not of the build.
+
+If the panel does disappear, the прогон brings it back rather than describing it
+to you: it raises the page again and says the address in the chat. And if the
+address has changed — another program can take the port between one write and
+the next — the line above it says the old one is dead, because otherwise you are
+left pressing a link that will never tick again.
+
 ## The fixtures behind these images
 
 `docs/assets/state-running.fixture.js` and `state-finished.fixture.js` are the

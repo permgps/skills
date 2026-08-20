@@ -49,6 +49,18 @@ directory exists afterwards. The install is correct; it is the preview that is
 wrong, and it is wrong in exactly the direction that makes a Claude Code user
 think the skill landed somewhere their agent will not look.
 
+If the dashboard itself is what looks wrong — no address, an address that
+changed, a page that will not tick — run its tool with `MAESTRO_SYNC_DEBUG=1`:
+
+```bash
+MAESTRO_SYNC_DEBUG=1 python3 .maestro/sync.py
+```
+
+It adds one line on `stderr` saying which port it remembered, whether that port
+was still free, what was holding it, which port it chose and why. The address on
+`stdout` is unchanged, so the line a прогон reads to the user stays the only
+thing on that channel.
+
 The `skills-lock.json` written beside it records `"source": "permgps/skills"`
 with `"sourceType": "github"`; the local form below records a relative path and
 `"sourceType": "local"`. The `computedHash` is the same in both, which is the

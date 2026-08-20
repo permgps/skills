@@ -313,6 +313,41 @@ same number, which is the whole run's elapsed time wearing a stage's label.
   reader, not the writer: it cannot repair the state, and printing the name of a
   JavaScript type in place of a finding hides both the finding and the fault.
 
+## The Only Page The Прогон Opens
+
+The panel is raised once, in preflight, and no second page joins it. That is a
+rule about the user's attention before it is a rule about the viewer: their
+screen is showing a run in progress, and a page arriving on it mid-таск is read
+as something going wrong — by the one person with no way to check.
+
+**The pane costs more than attention.** Two прогоны put a second page in the pane
+the panel was in — a субагент's own checks, served on a port it raised for
+itself — and afterwards the panel was gone from the tab strip while the run went
+on writing state nobody could see. Whether an in-app viewer keeps only one
+preview session at a time is a property of that viewer and is not established
+here; creating the situation is the прогон's own doing and is what stops.
+
+**And a page opened the wrong way lies about the build.** The same file with
+ninety-six assertions answers «Прошло проверок: 96» over http and «Не прошло
+проверок: 96» opened over `file://` out of a worktree, because the module beside
+it is unreachable from a `null` origin. That number is not noise on the user's
+screen; it contradicts an отчёт about to call the build finished, and the
+failure belongs to the route rather than to the code.
+
+**A page that must be seen is seen once, and by arrangement.** If something
+other than the panel truly has to be looked at, the orchestrator shows it —
+never a субагент — in a browser window of its own rather than in the pane
+holding the panel, and says in one line what it is and why. Everything else is
+checked without a viewer, or written down as unchecked and carried to the
+section that already exists for it: *What You Could Not Check* at приёмка, the
+отчёт's assumptions elsewhere.
+
+**A moved address is announced.** The panel's server can lose its port to
+another process between one state write and the next. When that happens the
+tool that raised it says so above the new address, naming the dead one, and the
+прогон repeats the new address in the chat once. The alternative is a user
+holding a link that will never tick again, with nothing anywhere explaining it.
+
 ## Constraints
 
 - One self-contained HTML file. No CDN, no external stylesheet, no font fetch,
@@ -330,3 +365,7 @@ same number, which is the whole run's elapsed time wearing a stage's label.
   to that file or older than it — never newer, and never in disagreement. A
   missed synchronisation costs a stale view, never a wrong one.
 - Readable in both light and dark, since it is opened in whatever the user has.
+- **It is the only page the прогон opens.** Nothing else — a project's checks
+  page, a coverage report, a built page, a log — is put in front of the user by
+  the orchestrator or by anything it launches. The panel is what the run owns on
+  their screen, and it owns nothing else there.
