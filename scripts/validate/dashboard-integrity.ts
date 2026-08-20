@@ -86,16 +86,27 @@ const LANGUAGES: Array<{
   language: string;
   label: string;
   shorthand: [string, string];
+  banned: [string, string];
   wordwise: boolean;
 }> = [
-  { language: 'ru', label: 'Label', shorthand: ['Shorthand', 'Say instead'], wordwise: false },
+  {
+    language: 'ru',
+    label: 'Label',
+    shorthand: ['Shorthand', 'Say instead'],
+    banned: ['Banned', 'Use instead'],
+    wordwise: false,
+  },
   {
     language: 'en',
     label: 'Label (en)',
     shorthand: ['Shorthand (en)', 'Say instead (en)'],
+    banned: ['Banned (en)', 'Use instead (en)'],
     wordwise: true,
   },
 ];
+
+/** The four maps of sentences a banned synonym must not survive in. */
+const SAID = ['EXPLAIN', 'EXPLAIN_PLAIN', 'STAGE_EXPLAIN', 'STAGE_EXPLAIN_PLAIN'];
 
 /**
  * The three theme blocks, and the selector each one is reached by.
@@ -153,7 +164,7 @@ const findTable = (tables: Table[], required: string[]): Table | undefined =>
  * the branch a fixture forgets to reach.
  */
 export function sliceObjectLiteral(source: string, name: string): string | null {
-  const direct = braced(source, source.indexOf(`${name} = {`));
+  const direct = braced(source, opens(source, name, '='));
   if (direct !== null) return direct;
 
   // A map nested inside another literal is never assigned by its full name:
@@ -166,10 +177,25 @@ export function sliceObjectLiteral(source: string, name: string): string | null 
   let slice: string | null = source;
   for (let at = 0; at < path.length; at += 1) {
     const key = path[at]!;
-    slice = braced(slice, slice.indexOf(at === 0 ? `${key} = {` : `${key}: {`));
+    slice = braced(slice, opens(slice, key, at === 0 ? '=' : ':'));
     if (slice === null) return null;
   }
   return slice;
+}
+
+/**
+ * Where `<key> = {` or `<key>: {` opens, with the key whole.
+ *
+ * A plain `indexOf` finds `EXPLAIN_PLAIN: {` inside `STAGE_EXPLAIN_PLAIN: {`,
+ * and then every scan of the register's own sentences reads the стадии instead
+ * and reports OK. One map is a name that ends in another map's name, and that
+ * is enough — so the character before the key has to be one an identifier
+ * cannot contain.
+ */
+function opens(source: string, key: string, sign: string): number {
+  const safe = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const hit = new RegExp(`(?:^|[^A-Za-z0-9_$.])${safe}\\s*${sign}\\s*\\{`).exec(source);
+  return hit === null ? -1 : hit.index;
 }
 
 /** The object literal opening at or after `start`, brace-balanced. */
@@ -521,6 +547,88 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
       { declared: declared.length, explained: explained.length, marked: marked.length });
   }
 
+  // --- every стадия explains itself too -------------------------------------
+  //
+  // A стадия is a row inside the `stages` region, not a region of its own: it
+  // is drawn from state, rebuilt on every poll, and named in no `Key` column.
+  // So it is checked here rather than added to the three lists above — but to
+  // the same standard, and for the same reason. An `i` that opens nothing is
+  // worse than no `i`, and eight of them is eight times worse.
+  {
+    const held = Array.isArray(logic['STAGE_ORDER']) ? (logic['STAGE_ORDER'] as string[]) : [];
+    const explainStage = logic['explainStage'];
+    const l10n = logic['L10N'] as Record<string, Record<string, unknown>> | undefined;
+    let calls = 0;
+
+    if (typeof explainStage !== 'function') {
+      add('stages', 0,
+        'the page exports no explainStage, so the i on every стадия row ships unchecked — '
+        + 'a check silently not running and a check that passes look the same from outside');
+    } else {
+      const say = explainStage as (...args: unknown[]) => unknown;
+      for (const id of held) {
+        for (const { language } of LANGUAGES) {
+          for (const { register } of REGISTERS) {
+            calls += 1;
+            const lines = say(id, {}, 0, [], register, language);
+            if (!Array.isArray(lines) || lines.length === 0) {
+              add('stages', 0,
+                `стадия "${id}" has no explanation behind it in the ${register} register `
+                + `in ${language}`);
+            }
+          }
+        }
+      }
+    }
+
+    // Both directions, because the two failures are different: a стадия the
+    // timeline draws and no registry holds ships a mute row, and a registry key
+    // STAGE_ORDER does not know is text nobody can ever reach.
+    for (const { language } of LANGUAGES) {
+      for (const { register, map } of REGISTERS) {
+        const name = `STAGE_${map}`;
+        const registry = l10n?.[language]?.[name];
+        if (!registry || typeof registry !== 'object') {
+          add('stages', 0,
+            `the page carries no L10N.${language}.${name}, so its стадии are mute in the `
+            + `${register} register`);
+          continue;
+        }
+        const keys = Object.keys(registry as Record<string, unknown>);
+        for (const id of held) {
+          if (!keys.includes(id)) {
+            add('stages', 0, `L10N.${language}.${name} does not hold the стадия "${id}"`);
+          }
+        }
+        for (const id of keys) {
+          if (!held.includes(id)) {
+            add('stages', 0,
+              `L10N.${language}.${name} holds "${id}", which STAGE_ORDER does not know — `
+              + 'no row will ever open it');
+          }
+        }
+      }
+    }
+
+    // The rows are built at run time, so the static half of this check is that
+    // the render function attaches the button at all. A page whose стадии are
+    // drawn without one ships eight explanations nobody can reach.
+    const from = html.indexOf('function renderStages(');
+    if (from === -1) {
+      add('stages', 0, 'the page has no renderStages, so no стадия row can carry an i');
+    } else {
+      const end = html.indexOf('\n  function ', from + 1);
+      const body = html.slice(from, end === -1 ? from + 4000 : end);
+      if (!body.includes('data-explains') || !body.includes('stage:')) {
+        add('stages', 0,
+          'renderStages draws its rows without a data-explains="stage:…" button, so every '
+          + 'стадия explanation ships unreachable');
+      }
+    }
+
+    log.info('stages', 'стадия explanations checked', { stages: held.length, calls });
+  }
+
   // --- the words on the page that belong to no field ------------------------
   // A card renamed on the page and nowhere else is drift the value maps cannot
   // see: these labels are static text, not the value of anything.
@@ -571,7 +679,7 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
   // what a checker can hold to the list: the chat is composed at run time and
   // no checker reads a word of it. vocabulary.md says so too, because a rule
   // believed to be enforced and a rule that is enforced fail differently.
-  for (const { language, label, shorthand, wordwise } of LANGUAGES) {
+  for (const { language, label, shorthand, banned: bannedColumns, wordwise } of LANGUAGES) {
     const plainWords = findTable(vocabularyTables, [...shorthand]);
     if (!plainWords) {
       add('plain', 0, `vocabulary.md has no table with columns ${shorthand.join(' and ')}`);
@@ -630,6 +738,16 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
       scan('the plain explanations', stringLiterals(literal));
     }
 
+    // The стадия explanations are the same kind of thing and are read the same
+    // way. What each стадия is *doing* comes from `stageStanding` through `UI`,
+    // which is scanned below; what each стадия *is* lives here.
+    const stages = sliceObjectLiteral(stripComments(block), `L10N.${language}.STAGE_EXPLAIN_PLAIN`);
+    if (stages === null) {
+      add('plain', 0, `the page carries no L10N.${language}.STAGE_EXPLAIN_PLAIN block to check`);
+    } else {
+      scan('the plain стадия explanations', stringLiterals(stages));
+    }
+
     // The silence notice lives in a function both registers share, so its
     // plain wording is reached by calling it rather than by reading around it.
     const notice = logic['silenceNotice'];
@@ -669,6 +787,48 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
 
     log.info('plain', 'plain strings scanned',
       { language, banned: banned.length, exempt: labels.length, sources: scanned });
+
+    // --- and no banned synonym, in either register --------------------------
+    //
+    // Shorthand is a rule about the plain reader; a banned synonym is a rule
+    // about everyone. «исполнитель» is not a word the trade may keep for the
+    // reader who knows it — it is a second name for something the словарь
+    // already calls a субагент, and a reader who meets both has no way to know
+    // they are the same thing. So this scan reads all four maps and does not
+    // ask which register they belong to. The label exemption is the same and
+    // no wider: a word that survives only inside a label the screen shows is
+    // the label, not the synonym.
+    const synonyms = findTable(vocabularyTables, [...bannedColumns]);
+    if (!synonyms) {
+      add('synonyms', 0,
+        `vocabulary.md has no table with columns ${bannedColumns.join(' and ')}`);
+    } else {
+      const forbidden = synonyms.rows
+        .map(row => ({
+          word: cleanCell(row[bannedColumns[0]]).trim().toLowerCase(),
+          instead: cleanCell(row[bannedColumns[1]]).trim(),
+        }))
+        .filter(entry => entry.word !== '');
+      let maps = 0;
+      for (const name of SAID) {
+        const said = sliceObjectLiteral(stripComments(block), `L10N.${language}.${name}`);
+        if (said === null) {
+          add('synonyms', 0, `the page carries no L10N.${language}.${name} to check`);
+          continue;
+        }
+        maps += 1;
+        const naked = withoutLabels(stringLiterals(said)).toLowerCase();
+        for (const { word, instead } of forbidden) {
+          if (says(naked, word)) {
+            add('synonyms', 0,
+              `L10N.${language}.${name} says "${word}", which vocabulary.md bans — `
+              + `say "${instead}" instead, in every register`);
+          }
+        }
+      }
+      log.info('synonyms', 'banned synonyms scanned',
+        { language, terms: forbidden.length, maps });
+    }
   }
 
   // --- the stage order and the gate map are copies too ----------------------

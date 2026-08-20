@@ -49,6 +49,18 @@ const VOCABULARY = `# Vocabulary
 |---|---|
 | gate, gates | check |
 | median | middle value |
+
+## Banned Synonyms
+
+| Banned | Use instead |
+|---|---|
+| сборк | прогон |
+| исполнител | субагент |
+
+| Banned (en) | Use instead (en) |
+|---|---|
+| build | run |
+| session | run |
 `;
 
 const PHASES = `# Phases
@@ -90,6 +102,7 @@ const LOGIC = {
   GATE_AFTER: "{ G1: 'preflight' }",
   EXPLAIN_ORDER: "['progress', 'gates']",
   explain: "function (key) { return key === 'nothing' ? [] : ['what it is', 'what it holds']; }",
+  explainStage: "function (id) { return id === 'nothing' ? [] : ['what it does', 'where it is']; }",
   findingsLine: "function (count, register) { return register === 'plain'"
     + " ? 'Проверка оставила ' + count : 'Гейт оставил ' + count; }",
 };
@@ -105,6 +118,11 @@ const RU = {
   DEPTH: "{ normal: 'Обычная' }",
   POLISH: "{ 'false': 'Выключена' }",
   REGISTER: "{ plain: 'Простые' }",
+  EXPLAIN: "{ progress: function () { return ['что это', 'что показывает']; } }",
+  STAGE_EXPLAIN: "{ preflight: function () { return ['подготовка заводит прогон']; },"
+    + " build: function () { return ['разработка пишет код']; } }",
+  STAGE_EXPLAIN_PLAIN: "{ preflight: function () { return ['самое начало']; },"
+    + " build: function () { return ['тут пишут код проекта']; } }",
   UI: "{ viewNote: 'Кнопки меняют только эту страницу.' }",
 };
 
@@ -118,8 +136,24 @@ const EN = {
   DEPTH: "{ normal: 'Normal' }",
   POLISH: "{ 'false': 'Off' }",
   REGISTER: "{ plain: 'Plain' }",
+  EXPLAIN: "{ progress: function () { return ['what it is', 'what it holds']; } }",
+  STAGE_EXPLAIN: "{ preflight: function () { return ['setup opens the run']; },"
+    + " build: function () { return ['development writes the code']; } }",
+  STAGE_EXPLAIN_PLAIN: "{ preflight: function () { return ['the very beginning']; },"
+    + " build: function () { return ['where the code gets written']; } }",
   UI: "{ viewNote: 'These buttons change this page and nothing else.' }",
 };
+
+/**
+ * The render the стадия check reads: the rows are built at run time, so the
+ * static half of that check is that the function attaches the button at all.
+ */
+const RENDER = `<script>
+  function renderStages(state) {
+    var info = put(row, 'button', 'i', 'info');
+    info.setAttribute('data-explains', 'stage:' + stage.id);
+  }
+</script>`;
 
 /** The regions of the What It Renders table, as the markup marks them. */
 const EXPLAINED = ['progress', 'gates'];
@@ -157,6 +191,8 @@ function page(overrides: {
   /** Regions marked with `data-region`, which is where each i is hung. */
   explained?: string[];
   body?: string;
+  /** The renderStages source the стадия check reads. `null` leaves it out. */
+  render?: string | null;
   omitLogicBlock?: boolean;
   logicSource?: string;
   /** The body of the page's plain-explanation literal, read as source. */
@@ -201,7 +237,9 @@ function page(overrides: {
     overrides.style ?? STYLE, '</head>', '<body>',
     '<h2>Ход разработки</h2>', '<h2>Development progress</h2>',
     overrides.switches ?? SWITCHES,
-    regions, explained, overrides.body ?? '', snapshotBlock, logicBlock, '</body>', '</html>',
+    regions, explained,
+    overrides.render === undefined ? RENDER : (overrides.render ?? ''),
+    overrides.body ?? '', snapshotBlock, logicBlock, '</body>', '</html>',
   ].join('\n');
 }
 
