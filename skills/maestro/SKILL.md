@@ -112,9 +112,20 @@ where the прогон keeps its prose; the state carries what the dashboard sho
 
 ## The Dials
 
-Everything typed after `/maestro` splits into four parts: the mode, the depth,
-the finish, and the бриф. Bare words, no dashes. **Anything not recognised as a
-dial is бриф text** — a word the user meant literally is never stolen by a dial.
+Everything typed after `/maestro` splits into five parts: the register, the
+mode, the depth, the finish, and the бриф. Bare words, no dashes. **Anything not
+recognised as a dial is бриф text** — a word the user meant literally is never
+stolen by a dial.
+
+**Register** — how you word what the user reads. Built-in default for `explain`:
+`normal`; a project pins its own in `.maestro/config.json`, and the first прогон
+in a project asks this **before** it asks the mode. The section below is the
+whole of it.
+
+| Register | What changes |
+|---|---|
+| `plain` | every sentence the user reads is written for someone who has never built software |
+| `normal` | the terms of the словарь are used as they stand, unexplained |
 
 **Mode** — how much is asked of the user. Built-in default for `mode`: `semi`;
 a project pins its own in `.maestro/config.json`, and the first прогон in a
@@ -143,7 +154,14 @@ against the user's own reference.
 A new capability always attaches to a parent требование. Depth buys thoroughness
 beneath the бриф; it never buys a direction away from it.
 
-**A dial may be changed mid-прогон, at a phase boundary and never inside one.**
+**The register is the one dial that may change inside a phase.** It takes effect
+on the next sentence, it is recorded in no `dialChanges[]` entry, and it earns no
+write of its own — it produces no part of the build, so there is nothing for the
+отчёт to attribute to it. The new value reaches `state.js` at the next ordinary
+write.
+
+**Every other dial may be changed mid-прогон, at a phase boundary and never
+inside one.**
 The new value applies to phases not yet started; phases already passed are not
 re-run, because a прогон does not go backwards when the user changes their mind
 about how much to be asked. Switching to a mode with more gates adds them for
@@ -155,6 +173,37 @@ what you do.
 
 No dial removes a gate below, and no dial removes a safety rule. The mode matrix
 changes who is asked and when — never what is checked.
+
+## Speaking Plainly
+
+**When the register is `plain`, every sentence you put in front of the user —
+in any phase — is written for someone who has never built software.** Two rules,
+pulling in opposite directions.
+
+**Keep every term of the словарь.** прогон stays прогон, таск stays таск,
+Заглушка stays Заглушка. What you add is **one clause of explanation the first
+time each term appears** in this прогон, and never again after that. Renaming a
+term would leave the user reading a dashboard whose words appear nowhere in what
+you told them: the page resolves its labels from the словарь and has no idea
+what register you are speaking in.
+
+**Drop the shorthand entirely.** `G2`, «гейт», «спека», «коммит», «слаг»,
+«стейт», «валидатор», «артефакт» — these are not terms of the словарь but the
+trade's own abbreviations, and no gloss redeems them for this reader. Say
+«проверка спецификации», not «G2». The full list lives in the словарь, beside
+the labels.
+
+**The register buys language and nothing else.** You do not skip a fork, soften
+a gate, shorten the манифест, or settle on the user's behalf anything you would
+have asked about in `normal`. A fork about technique is still put to them — in
+words they can answer. `S3` still holds.
+
+**This is here rather than in the phase files because every phase speaks to the
+user**, which is the same reason as the two rules above it: a rule copied into
+nine files is nine rules that drift apart. It is also the only guarantee the
+chat has. The dashboard's plain strings are held to the banned list by
+`scripts/validate/dashboard-integrity.ts`; nothing reads a sentence you compose
+here, so this rule is the whole of it.
 
 ## The Gates
 

@@ -45,6 +45,7 @@ export interface DialSpec {
 
 export const DIALS: readonly DialSpec[] = [
   { dial: 'mode', column: 'Mode', witness: 'Human gates' },
+  { dial: 'explain', column: 'Register', witness: 'What changes' },
 ];
 
 /**
@@ -55,7 +56,8 @@ export const DIALS: readonly DialSpec[] = [
  * naturally with it — «Built-in default for `mode`: `semi`.» and «Built-in
  * default for `mode`: `semi`; a project pins its own».
  */
-const DEFAULT_PHRASE = /built-in default for\s+`([a-z][a-z-]*)`\s*[:,]?\s+`([a-z][a-z-]*)`/gi;
+const DEFAULT_PHRASE =
+  /built-in\s+default\s+for\s+`([a-z][a-z-]*)`\s*[:,]?\s*`([a-z][a-z-]*)`/gi;
 
 const findTable = (tables: Table[], required: string[]): Table | undefined =>
   tables.find(table => required.every(column => table.columns.includes(column)));
@@ -70,16 +72,21 @@ export function readValues(markdown: string, spec: DialSpec): string[] | null {
   return table.rows.map(row => clean(row[spec.column])).filter(value => value !== '');
 }
 
-/** Every declaration of a built-in default in one file, with the dial and line. */
+/**
+ * Every declaration of a built-in default in one file, with the dial and line.
+ *
+ * The whole text is scanned rather than each line on its own, because these
+ * files are prose wrapped at eighty columns and a reflow that moved «for» onto
+ * the next line would otherwise delete a declaration silently.
+ */
 export function findDeclarations(
   markdown: string,
 ): Array<{ dial: string; value: string; line: number }> {
   const found: Array<{ dial: string; value: string; line: number }> = [];
-  markdown.split('\n').forEach((text, index) => {
-    for (const match of text.matchAll(DEFAULT_PHRASE)) {
-      found.push({ dial: match[1] ?? '', value: match[2] ?? '', line: index + 1 });
-    }
-  });
+  for (const match of markdown.matchAll(DEFAULT_PHRASE)) {
+    const line = markdown.slice(0, match.index).split('\n').length;
+    found.push({ dial: match[1] ?? '', value: match[2] ?? '', line });
+  }
   return found;
 }
 

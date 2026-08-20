@@ -79,10 +79,13 @@ async function violationsFor(overrides: Overrides = {}): Promise<Violation[]> {
     await writeFile(path.join(specDir, 'dials.md'), overrides.spec ?? SPEC, 'utf8');
     await writeFile(path.join(bundleDir, 'phases', '0-dials.md'), overrides.phase ?? PHASE, 'utf8');
     await writeFile(path.join(bundleDir, 'SKILL.md'), overrides.skill ?? SKILL, 'utf8');
+    // The fixtures carry one dial unless a test says otherwise. The shipped
+    // `DIALS` list is asserted on its own below, and held to the real files by
+    // `npm run dials`.
     return await checkDialsDefaults({
       specDir,
       bundleDir,
-      ...(overrides.dials ? { dials: overrides.dials } : {}),
+      dials: overrides.dials ?? [MODE],
     });
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -238,5 +241,14 @@ test('prose about the built-in default without a dial declares nothing', () => {
 });
 
 test('the shipped dial list is what the real files are held to', () => {
-  assert.deepEqual(DIALS.map(dial => dial.dial), ['mode']);
+  assert.deepEqual(DIALS.map(dial => dial.dial), ['mode', 'explain']);
+});
+
+// These files are prose wrapped at eighty columns. A reflow that moved a word
+// onto the next line used to delete the declaration without a word said.
+test('a declaration wrapped across a line break is still found', () => {
+  assert.deepEqual(findDeclarations('Built-in default\nfor `explain`: `normal`.'),
+    [{ dial: 'explain', value: 'normal', line: 1 }]);
+  assert.deepEqual(findDeclarations('x\nBuilt-in default for `explain`:\n`normal`;'),
+    [{ dial: 'explain', value: 'normal', line: 2 }]);
 });

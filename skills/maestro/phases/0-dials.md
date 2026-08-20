@@ -6,11 +6,37 @@ and none of them re-resolves.
 
 ## What The Arguments Contain
 
-Everything typed after `/maestro` is four things: a **mode**, a **depth**, a
-**finish**, and the бриф. Dials are bare words, no dashes.
+Everything typed after `/maestro` is five things: a **register**, a **mode**, a
+**depth**, a **finish**, and the бриф. Dials are bare words, no dashes.
 
 **Anything you do not recognise as a dial is бриф text.** A word the user meant
 literally is never taken as a dial.
+
+## Register
+
+How you word what the user reads — not how much you ask them. Built-in default
+for `explain`: `normal`. A project may pin its own — see below.
+
+| Register | Russian triggers | English triggers | What changes |
+|---|---|---|---|
+| `plain` | по-простому, простыми словами, объясняй проще | plain, simple, explain simply | every sentence the user reads is written for someone who has never built software |
+| `normal` | как обычно, обычным языком | usual, as usual | the terms of the словарь are used as they stand, unexplained |
+
+`normal` is **not** a trigger word. It is the built-in value of this dial and of
+the depth at once, and a bare word setting two dials would be ambiguous by
+construction.
+
+**What `plain` requires of you is in `SKILL.md`, under *Speaking Plainly***,
+because every phase speaks to the user and this file is closed after preflight.
+Resolve the dial here; obey it everywhere.
+
+### Changing It Mid-Прогон
+
+Unlike every other dial, this one may change **inside** a phase, and it takes
+effect on the next sentence. It is not recorded in `dialChanges[]` and it earns
+no write of its own: it produces no part of the build, so there is nothing for
+the отчёт to attribute to it. The new value reaches `state.js` at the next
+ordinary write.
 
 ## Modes
 
@@ -50,31 +76,50 @@ Default: off.
 `polish` asks nothing and approves nothing with the user. It changes no mode
 cell.
 
-## The Project's Default Mode
+## The Project's Defaults
 
 Read `.maestro/config.json` before resolving, if it is there.
 
 ```json
-{ "configVersion": 1, "mode": "full" }
+{ "configVersion": 1, "mode": "full", "explain": "plain" }
 ```
 
-The mode comes from the first of these that supplies one:
+Each of the two comes from the first of these that supplies it:
 
-1. a mode token in the arguments,
-2. `mode` in the file, when it is one of the four,
-3. `semi`.
+1. a token for that dial in the arguments,
+2. its key in the file, when the value is one of the set,
+3. `semi` for the mode, `normal` for the register.
 
-Ignore the file if it will not parse or carries a `mode` outside the set:
-continue on `semi` and say in the announcement that it was unreadable. Ignore
-keys you do not recognise — a later version may pin more than the mode. A
-setting never stops a прогон.
+Ignore a key whose value is outside its set, **one key at a time**: an
+unreadable `explain` does not throw away a good `mode`. Ignore the file whole if
+it will not parse, continue on `semi` and `normal`, and say in the announcement
+that it was unreadable. Ignore keys you do not recognise — a later version may
+pin more than these two. A setting never stops a прогон.
 
 ### When The File Is Not There
 
 This is the first прогон in this project. Ask once, before anything else runs.
 
-**If the arguments named no mode**, show all four and let the user choose. Mark
-`semi` so a user who does not care can take it without reading the rest:
+**Ask the register first**, and put the mode question in the register just
+chosen. Asked the other way round, the one user who most needs plain words meets
+a table with a `Human gates` column before anything has offered to speak
+plainly, and the question that would have fixed it arrives too late.
+
+| What the arguments named | What you ask |
+|---|---|
+| neither | the two registers, then the four modes |
+| a register | pin that register? then the four modes, in it |
+| a mode | the two registers, then pin that mode? |
+| both | pin them? |
+
+**The two registers**, marked so a user who does not care can take the default:
+
+| Register | What you get |
+|---|---|
+| `plain` — по-простому | всё объясняется простыми словами, без сокращений |
+| `normal` — обычный, built-in | рабочие термины как есть |
+
+**The four modes.** In `normal`, this table:
 
 | Mode | You are asked | The прогон decides |
 |---|---|---|
@@ -83,17 +128,24 @@ This is the first прогон in this project. Ask once, before anything else r
 | `interview` | every question the брифинг opens | nothing about the бриф |
 | `manual` | the same, and you approve the spec and the plan | nothing before you have seen it |
 
-**If the arguments named a mode**, ask one question instead: pin it as this
-project's default?
+In `plain`, the same four choices in ordinary words, with no column called
+`Human gates` and no term left unexplained:
 
-**Ask this in `full` as well.** It is the one question that mode does not
-remove. `full` frees the user from questions about what is being built; this one
-is about the tool, and it is asked once in a project's lifetime rather than once
-a прогон.
+| Mode | По-русски |
+|---|---|
+| `full` | ничего не спрашиваю — решаю всё сам и в конце показываю, что решил |
+| `semi` — по умолчанию | спрашиваю только там, где без вас не решить |
+| `interview` | спрашиваю подробно обо всём, что важно для вашего проекта |
+| `manual` | спрашиваю то же самое, и вы ещё утверждаете, что и как я буду делать |
 
-Either answer produces a file: the chosen mode, or `"mode": null` for a user who
-declined. **You do not write it here** — hand the decision to preflight, which
-creates everything under `.maestro/`.
+**Ask these in `full` as well.** They are the questions that mode does not
+remove. `full` frees the user from questions about what is being built; these
+are about the tool, and they are asked once in a project's lifetime rather than
+once a прогон.
+
+Either answer produces a file: the chosen values, or `null` for a dial the user
+declined to pin. **You do not write it here** — hand the decision to preflight,
+which creates everything under `.maestro/`.
 
 ## Resolution
 
@@ -106,8 +158,8 @@ creates everything under `.maestro/`.
      which was meant;
    - in `full` — the first token wins, and say so in the announcement, because
      that mode may not ask.
-4. An unset depth or finish takes its default. An unset mode comes from *The
-   Project's Default Mode* above.
+4. An unset depth or finish takes its default. An unset mode or register comes
+   from *The Project's Defaults* above.
 5. A trigger phrase inside a longer sentence of бриф text does **not** set a
    dial. Dials are typed as bare words; they are not detected by meaning.
 
@@ -115,13 +167,18 @@ creates everything under `.maestro/`.
 
 After resolution and before the manifest phase, state in one block:
 
+- the register,
 - the mode,
 - the depth,
 - whether доводка is on,
 - the one consequence the user is most likely to be surprised by.
-- where the mode came from, whenever it was not typed: the path of the config
-  file, or the built-in default. An argument that overrode a pinned mode is
-  said to hold for this прогон only.
+- where the mode or the register came from, whenever it was not typed: the path
+  of the config file, or the built-in default. An argument that overrode a
+  pinned value is said to hold for this прогон only.
+
+**Write the announcement in the register it names.** A block explaining, in the
+словарь's own terms, that the прогон will speak plainly from now on is the
+plain register failing in its first sentence.
 
 Use these:
 
@@ -131,6 +188,7 @@ Use these:
 | `strict` | nothing beyond the бриф will be added |
 | `manual` | the run will wait for your approval twice |
 | `polish` | up to three доводка rounds run after приёмка |
+| `plain` | всё объясняется простыми словами; сказать «как обычно» — и вернётся обычный язык |
 
 The announcement is shown in **every** mode, `full` included. It is a statement,
 not a question. Do not wait for a reply.
@@ -145,12 +203,16 @@ not a question. Do not wait for a reply.
 - Record the change in the run state as a `dialChanges[]` entry with the phase at
   which it took effect, so the отчёт can say which parts of the run were produced
   under which settings.
+- **The register is the exception to all three.** It may change inside a phase,
+  it takes effect on the next sentence, and it is recorded nowhere — see
+  *Changing It Mid-Прогон* under *Register* above.
 
 ## Output Of This Phase
 
-- `mode`, `depth` and `polish`, resolved.
-- The announcement text, composed and ready.
-- The config decision, when this is a first прогон: the mode to pin, or `null`.
+- `explain`, `mode`, `depth` and `polish`, resolved.
+- The announcement text, composed and ready, in the resolved register.
+- The config decision, when this is a first прогон: the values to pin, each of
+  them or `null`.
 
 The announcement is **shown by preflight**, once the run state exists — a dial
 announced before there is a run to announce it for is a promise with nothing

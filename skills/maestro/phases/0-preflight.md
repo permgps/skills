@@ -79,17 +79,23 @@ first two files.
 
 ### 3b. Write the project config, if the dials phase produced a decision
 
-Only on a first прогон — the dials phase asked, and handed back the mode to pin
-or `null`. Write `.maestro/config.json`:
+Only on a first прогон — the dials phase asked, and handed back the values to
+pin, each of them or `null`. Write `.maestro/config.json`:
 
 ```json
 {
   "configVersion": 1,
-  "mode": "full"
+  "mode": "full",
+  "explain": "plain"
 }
 ```
 
-Whole file, once, `null` included. Nothing else in it.
+Whole file, once, both keys, `null` included. Nothing else in it.
+
+**Both keys in the one write.** They were asked in the same breath, and a file
+carrying only the answer that happened to be non-`null` would send the next
+прогон back to ask the other. `configVersion` stays `1`: the shape gained a key,
+and a reader that does not know it ignores it.
 
 **Before the run state, and never conditional on it.** A prior write is a prior
 promise: the question was answered, and a прогон that then failed on something
@@ -112,6 +118,7 @@ Write `.maestro/state.js` through the state writer. It carries:
 | `startedAt` | now, ISO 8601, written once and never again |
 | `updatedAt` | now, and restamped at every write from here on |
 | `mode`, `depth`, `polish` | as resolved by the dials phase |
+| `explain` | as resolved by the dials phase |
 | `dialChanges` | empty |
 | `stages` | all eight, `preflight` active, the rest `pending` |
 | `currentStage` | `preflight` |
@@ -226,8 +233,9 @@ anything.
 ### 6. Announce the dials
 
 Show the announcement composed by the dials phase, in Russian, in one block:
-mode, depth, whether доводка is on, and the one consequence most likely to
-surprise.
+register, mode, depth, whether доводка is on, and the one consequence most
+likely to surprise. It was composed in the register it names; show it as it
+came.
 
 **Add what step 1b found**, if anything was missing: name the capability and what
 it costs, one line each. A прогон that quietly ran its таски one at a time
