@@ -13,6 +13,7 @@ input.
 | `slug` | string | preflight | dashboard |
 | `startedAt` | ISO 8601 string | preflight | dashboard |
 | `updatedAt` | ISO 8601 string | preflight | dashboard |
+| `heldBy` | optional `{ token, since }` | preflight | — |
 | `mode` | `full` \| `semi` \| `interview` \| `manual` | preflight | dashboard |
 | `depth` | `strict` \| `normal` \| `deep` | preflight | dashboard |
 | `polish` | boolean | preflight | dashboard |
@@ -58,13 +59,42 @@ seeds G1–G4 as `pending`, and the phase each gate follows fills in that gate's
 own status and findings. The column has room for one phase because there is one
 writer; a field with two creators would have no owner.
 
-**`Read by` names readers outside the orchestrator, which is why every row says
-`dashboard` and nothing else.** The orchestrator reads its own state constantly —
-on recovery after a compaction, and in the repair phase, which learns from
-`tasks[].status` which таск arrived and by which entrance. Listing itself as a
-reader of what it writes would turn a column about the integration point into a
-list of everywhere the state is opened, and the one thing that column has to say
-is that the dashboard is the only party outside this process that reads it.
+**`Read by` names readers outside the orchestrator, which is why every row but
+one says `dashboard` and nothing else.** The orchestrator reads its own state
+constantly — on recovery after a compaction, and in the repair phase, which
+learns from `tasks[].status` which таск arrived and by which entrance. Listing
+itself as a reader of what it writes would turn a column about the integration
+point into a list of everywhere the state is opened, and the one thing that
+column has to say is that the dashboard is the only party outside this process
+that reads it.
+
+`heldBy` is the row that says nothing there, and a dash is the honest cell: its
+only reader is the orchestrator. Writing `dashboard` to keep the column's shape
+would make the column lie about the one thing it exists to say.
+
+**`heldBy` says which session is driving this прогон, and it is a claim rather
+than a lock.** It carries a short random token the session mints when it opens a
+прогон that carries none, and `since`, the moment that token was written —
+`Date.parse`-able like every other stamp here. It is **optional**: a прогон
+nobody claimed has no `heldBy`, and so does every state written before the field
+existed.
+
+The token is **minted, not discovered.** There is no session identity this
+bundle can rely on across Claude Code, Codex and Gemini CLI, and a pid or a
+hostname would name the machine instead — two sessions on one laptop would look
+like one holder, and one session that outlived a restart would look like two.
+
+**It detects a second orchestrator; it does not prevent one.** Nothing available
+here prevents it honestly: there is no daemon, no lease that expires, and a
+session dies without releasing anything, so a claim that refused would strand
+the next session in front of a прогон it cannot touch — a failure worse than the
+one being fixed, and silent besides. What the field buys is that the second
+session finds out. A session meeting a token that is not its own says so and
+asks: it cannot tell a live holder from a dead one, and deciding that on the
+user's behalf is the one thing it is not equipped to do.
+
+`contractVersion` does not move for it, on the same terms as `explain` and
+`language` — an optional field that widens no value set raises nothing.
 
 `stages[].id` is the stage id set defined in `phases.md`; it is not re-listed
 here, because two lists of the same thing drift. Labels come from
@@ -199,6 +229,22 @@ from one that was met.
   above attribute to `stages[]` where it belongs. A стадия absent from `stages[]`
   is not a finding here, for the same reason the chain steps around one: a record
   that does not mention a стадия says nothing about it.
+- **A writer re-reads the file immediately before writing and compares
+  `updatedAt` with the value it last read.** A stamp that moved means somebody
+  else wrote in between, and that write is refused and reported rather than laid
+  over the top. This is the whole of the concurrency rule, and it takes two
+  fields to say it: `heldBy` names who claimed the прогон, `updatedAt` says
+  whether the claim still held at the moment it mattered. A `heldBy` token that
+  belongs to another session is reported with the refusal, because *who* is the
+  first thing the user will ask.
+
+  `scripts/state/write.ts` enforces it — `writeState` accepts the `updatedAt`
+  the caller last read and refuses when the file on disk carries a different one.
+  A прогон writes `state.js` itself and does not go through that module, so for
+  a real run the re-read is a step the orchestrator performs rather than a
+  property it can assume. That is why [`../../skills/maestro/SKILL.md`](../../skills/maestro/SKILL.md)
+  states it as a step, and why the edge of the enforcement is written here beside
+  the enforcer, as it is for the стадия chain above.
 - Every write is a whole-file write of a valid state. A partially written state
   is a broken dashboard, so the file is written to a temporary name and moved
   into place.

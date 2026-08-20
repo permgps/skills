@@ -146,6 +146,30 @@ export function validateState(value: unknown): StateViolation[] {
   if (atLeastV2) requireString('updatedAt', value['updatedAt']);
   else optionalString('updatedAt', value['updatedAt']);
 
+  // --- heldBy ---------------------------------------------------------------
+  // Optional at every version, and absent means unclaimed rather than free: the
+  // field arrived after 2 was already in use, and a прогон nobody claimed never
+  // carries one. What is checked is that a claim which is there is a claim that
+  // can be acted on — a token to name the holder, and a `since` a reader can
+  // turn into a moment.
+  const heldBy = value['heldBy'];
+  if (heldBy !== undefined) {
+    if (!isRecord(heldBy)) {
+      add('heldBy', 'heldBy must be an object');
+    } else {
+      requireString('heldBy.token', heldBy['token']);
+      requireString('heldBy.since', heldBy['since']);
+
+      // A stamp is a moment, not a note — the same rule the стадии are held to
+      // below, and reported separately from a missing `since` for the same
+      // reason: one field has to be written, the other has to be corrected.
+      const since = heldBy['since'];
+      if (typeof since === 'string' && since !== '' && Number.isNaN(Date.parse(since))) {
+        add('heldBy.since', `heldBy.since is not a moment: ${JSON.stringify(since)}`);
+      }
+    }
+  }
+
   // --- dialChanges[] --------------------------------------------------------
   const dialChanges = value['dialChanges'];
   if (requireArray('dialChanges', dialChanges)) {

@@ -115,6 +115,38 @@ test('the language is optional, checked when present, and absent is not ru', () 
   assert.deepEqual(fields(validateState(withPatch({ language: null }))), ['language']);
 });
 
+test('a well-formed claim on the прогон passes, and absent is unclaimed', () => {
+  // Absent means nobody claimed this прогон, not that it is free to take
+  // silently: the field arrived after contract 2 was in use, so every state
+  // written before it lacks one.
+  assert.equal(baseline().heldBy, undefined);
+  assert.deepEqual(validateState(baseline()), []);
+
+  assert.deepEqual(
+    validateState(withPatch({ heldBy: { token: 'k7f2', since: '2026-08-20T20:59:00Z' } })),
+    [],
+  );
+});
+
+test('a claim with no token names nobody and is reported', () => {
+  const violations = validateState(withPatch({ heldBy: { since: '2026-08-20T20:59:00Z' } }));
+  assert.deepEqual(fields(violations), ['heldBy.token']);
+});
+
+test('a claim whose since no reader can parse is its own finding', () => {
+  // Said separately from a missing `since` because the repair differs: one
+  // field has to be written, the other has to be corrected.
+  const violations = validateState(withPatch({ heldBy: { token: 'k7f2', since: 'yesterday' } }));
+  assert.deepEqual(fields(violations), ['heldBy.since']);
+  assert.match(violations[0]?.message ?? '', /not a moment/);
+
+  assert.deepEqual(
+    fields(validateState(withPatch({ heldBy: { token: 'k7f2' } }))),
+    ['heldBy.since'],
+  );
+  assert.deepEqual(fields(validateState(withPatch({ heldBy: 'k7f2' }))), ['heldBy']);
+});
+
 test('an unknown depth, stage status and task status are each reported', () => {
   assert.deepEqual(fields(validateState(withPatch({ depth: 'shallow' }))), ['depth']);
   assert.deepEqual(

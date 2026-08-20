@@ -12,8 +12,8 @@
  * Version 2 changed three value sets at once: a таск can now be `failed`, a
  * stage can be `skipped`, and a требование can be delivered as a `placeholder`.
  * The optional fields that arrived with them — waves, counters, debt — would
- * have raised nothing on their own, and neither did `explain`, which arrived
- * later on the same terms.
+ * have raised nothing on their own, and neither did `explain`, `language` or
+ * `heldBy`, each of which arrived later on the same terms.
  */
 export const CONTRACT_VERSION = 2;
 
@@ -60,6 +60,30 @@ export const REGISTERS: readonly Register[] = ['plain', 'normal'];
  */
 export type Language = 'ru' | 'en';
 export const LANGUAGES: readonly Language[] = ['ru', 'en'];
+
+/**
+ * Which session is driving this прогон — a claim, not a lock.
+ *
+ * `token` is short and random and the session mints it when it opens a прогон
+ * that carries none. It is minted rather than discovered because no session
+ * identity survives across Claude Code, Codex and Gemini CLI, and a pid or a
+ * hostname would name the machine: two sessions on one laptop would look like
+ * one holder, and one session outliving a restart would look like two.
+ *
+ * `since` is when that token was written, `Date.parse`-able like every other
+ * stamp in this file.
+ *
+ * The field **detects** a second orchestrator; it does not prevent one. Nothing
+ * here can expire a lease, and a session dies without releasing anything, so a
+ * claim that refused would strand the next session in front of a прогон it
+ * cannot touch. What it buys is that the second session finds out — and says so
+ * to the user rather than deciding, because it cannot tell a live holder from a
+ * dead one.
+ */
+export interface Holder {
+  token: string;
+  since: string;
+}
 
 export type StageStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
 export const STAGE_STATUSES: readonly StageStatus[] =
@@ -208,6 +232,12 @@ export interface RunState {
    * contract only says the field may be missing.
    */
   language?: Language;
+  /**
+   * Optional, and absent means unclaimed rather than free: a прогон nobody
+   * claimed carries none, and so does every state written before the field
+   * existed. See {@link Holder} for why it detects rather than prevents.
+   */
+  heldBy?: Holder;
   dialChanges: DialChange[];
   stages: StageEntry[];
   currentStage: StageId;
