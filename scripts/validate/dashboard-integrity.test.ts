@@ -687,3 +687,111 @@ test('a page with no composed sentences at all is reported', () => {
   const found = messages(page().replace('UI: {', 'UNUSED: {'));
   assert.match(found, /carries no L10N\.ru\.UI block to check/);
 });
+
+
+// --- the стадия explanations, and the synonyms that reach both registers ----
+
+test('a стадия the registries do not hold is reported', () => {
+  const found = messages(page({
+    ru: { STAGE_EXPLAIN: "{ preflight: function () { return ['подготовка']; } }" },
+  }));
+  assert.match(found, /L10N\.ru\.STAGE_EXPLAIN does not hold the стадия "build"/);
+});
+
+test('a стадия explained in one register and silent in the other is reported', () => {
+  const found = messages(page({
+    ru: { STAGE_EXPLAIN_PLAIN: "{ preflight: function () { return ['начало']; } }" },
+  }));
+  assert.match(found, /L10N\.ru\.STAGE_EXPLAIN_PLAIN does not hold the стадия "build"/);
+  assert.doesNotMatch(found, /STAGE_EXPLAIN does not hold/);
+});
+
+test('a registry key no стадия will ever open is reported', () => {
+  const found = messages(page({
+    en: {
+      STAGE_EXPLAIN: "{ preflight: function () { return ['a']; },"
+        + " build: function () { return ['b']; }, polish: function () { return ['c']; } }",
+    },
+  }));
+  assert.match(found, /holds "polish", which STAGE_ORDER does not know/);
+});
+
+test('a page whose explainStage answers nothing is reported, not skipped', () => {
+  const found = messages(page({ logic: { explainStage: 'function () { return []; }' } }));
+  assert.match(found, /стадия "preflight" has no explanation behind it in the normal register/);
+});
+
+test('a page that exports no explainStage at all is reported', () => {
+  const found = messages(page({ logic: { explainStage: 'undefined' } }));
+  assert.match(found, /exports no explainStage/);
+});
+
+test('rows drawn without an i are reported even though every text is there', () => {
+  // The registries can be complete and the стадии still mute: the button is
+  // built at run time, and this is the only half of it a source read can see.
+  const found = messages(page({ render: null }));
+  assert.match(found, /renderStages/);
+});
+
+test('shorthand in a стадия plain text is reported with the word named', () => {
+  const found = messages(page({
+    ru: {
+      STAGE_EXPLAIN_PLAIN: "{ preflight: function () { return ['начало, потом гейт']; },"
+        + " build: function () { return ['тут пишут код']; } }",
+    },
+  }));
+  assert.match(found, /the plain стадия explanations \(ru\) says "гейт"/);
+});
+
+test('a banned synonym is reported in the normal register too', () => {
+  // The case that used to pass: shorthand is a rule about the plain reader, a
+  // banned synonym is a rule about everyone.
+  const found = messages(page({
+    ru: { EXPLAIN: "{ progress: function () { return ['доля сборки']; } }" },
+  }));
+  assert.match(found, /L10N\.ru\.EXPLAIN says "сборк".*say "прогон" instead/);
+});
+
+test('a banned synonym is reported in a стадия explanation as well', () => {
+  const found = messages(page({
+    en: {
+      STAGE_EXPLAIN: "{ preflight: function () { return ['it opens the session']; },"
+        + " build: function () { return ['b']; } }",
+    },
+  }));
+  assert.match(found, /L10N\.en\.STAGE_EXPLAIN says "session"/);
+});
+
+test('a banned word that survives only inside a defined label is not reported', () => {
+  // «Ход разработки» is a Screen Label, so it is removed before the scan — and
+  // only in its exact form. A label that happened to contain a banned stem
+  // must not fail the page that shows it.
+  const spec: SpecSources = {
+    ...SPEC,
+    'vocabulary.md': VOCABULARY.replace('| сборк | прогон |', '| разработк | прогон |'),
+  };
+  const quiet = "{ preflight: function () { return ['начало']; },"
+    + " build: function () { return ['тут пишут код']; } }";
+  const withLabel = page({
+    ru: {
+      EXPLAIN: "{ progress: function () { return ['Ход разработки']; } }",
+      STAGE_EXPLAIN: quiet,
+    },
+  });
+  assert.doesNotMatch(messages(withLabel, spec), /says "разработк"/);
+  const naked = page({
+    ru: {
+      EXPLAIN: "{ progress: function () { return ['так идёт разработка']; } }",
+      STAGE_EXPLAIN: quiet,
+    },
+  });
+  assert.match(messages(naked, spec), /says "разработк"/);
+});
+
+test('a specification with no Banned Synonyms table is reported', () => {
+  const spec: SpecSources = {
+    ...SPEC,
+    'vocabulary.md': VOCABULARY.slice(0, VOCABULARY.indexOf('## Banned Synonyms')),
+  };
+  assert.match(messages(page(), spec), /no table with columns Banned and Use instead/);
+});

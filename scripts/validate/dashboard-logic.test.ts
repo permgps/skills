@@ -41,6 +41,13 @@ interface Logic {
     state: unknown, now: number, marks: number[], register?: string, language?: string,
   ) => { alarming: boolean; line: string } | null;
   EXPLAIN_ORDER: string[];
+  explainStage: (
+    id: string, state: unknown, now: number, marks: number[],
+    register?: string, language?: string,
+  ) => string[];
+  stageStanding: (
+    stage: unknown, state: unknown, now: number, marks: number[], language?: string,
+  ) => string[];
   explain: (
     key: string, state: unknown, now: number, marks: number[],
     register?: string, language?: string,
@@ -1111,4 +1118,81 @@ test('the checks explain their findings in every language and register', () => {
   const clean = { gates: [{ id: 'G1', status: 'passed', findings: [] }] };
   assert.match(L.explain('gates', clean, NOW, [], 'normal', 'ru')[2]!, /Находок гейты пока не оставили/);
   assert.match(L.explain('gates', clean, NOW, [], 'plain', 'en')[2]!, /have left no notes yet/);
+});
+
+
+// --- every row of the timeline explains itself too --------------------------
+
+test('every стадия explains itself in both languages and both registers', () => {
+  for (const language of L.LANGUAGE_ORDER) {
+    for (const register of ['normal', 'plain']) {
+      for (const id of L.STAGE_ORDER) {
+        for (const state of [run(), busy()]) {
+          const lines = L.explainStage(id, state, NOW, L.collectMarks(state), register, language);
+          assert.ok(lines.length >= 2,
+            `${id} says fewer than two lines in ${register}/${language}`);
+          for (const line of lines) {
+            assert.equal(typeof line, 'string');
+            assert.ok(line.trim().length > 0, `${id} produced a blank line`);
+          }
+        }
+      }
+    }
+  }
+});
+
+test('a стадия explanation says what the стадия does before what it is doing', () => {
+  // The first line is the job and is the same in every прогон; everything after
+  // it is read from this one. A стадия that opened with its own clock would be
+  // an i that answers a question nobody pressed it to ask.
+  const state = busy();
+  const [what, standing] = L.explainStage('build', state, NOW, L.collectMarks(state), 'normal', 'ru');
+  assert.match(what!, /Разработка/);
+  assert.match(standing!, /Этап «Разработка»/);
+  assert.match(L.explainStage('build', state, NOW, [], 'normal', 'en')[0]!, /Development/);
+});
+
+test('a стадия quotes the clock its own row shows', () => {
+  const state = busy();
+  const marks = L.collectMarks(state);
+  const stage = L.orderedStages(state).find((row) => row.id === 'plan') as
+    { id: string; status: string; startedAt?: string; finishedAt?: string };
+  const drawn = L.formatDuration(
+    L.worked(stage.startedAt!, state, NOW, stage.finishedAt, marks));
+  // The row and the popover are two readings of one number, and a page whose
+  // own two answers differ has stopped being a record.
+  assert.ok(L.explainStage('plan', state, NOW, marks, 'normal', 'ru')[1]!.includes(drawn));
+});
+
+test('a failed стадия carries the findings of the check that failed after it', () => {
+  const state = run({
+    stages: [
+      { id: 'preflight', status: 'done', startedAt: STARTED, finishedAt: '2026-08-19T10:05:00.000Z' },
+      { id: 'briefing', status: 'failed', startedAt: '2026-08-19T10:05:00.000Z',
+        finishedAt: '2026-08-19T10:20:00.000Z', note: 'ответы не сошлись' },
+    ],
+    gates: [{ id: 'G1', status: 'failed', findings: ['R03 остался без ответа', { id: 'R04' }] }],
+  });
+  const said = L.explainStage('briefing', state, NOW, L.collectMarks(state), 'normal', 'ru');
+  assert.match(said.join(' | '), /Заметка этапа: ответы не сошлись/);
+  assert.match(said.join(' | '), /R03 остался без ответа/);
+  // A finding written as a record rather than a string is shown as written —
+  // never as [object Object], which is the one thing a findings list must not say.
+  assert.match(said.join(' | '), /\{"id":"R04"\}/);
+  assert.doesNotMatch(said.join(' | '), /\[object Object\]/);
+});
+
+test('a стадия the прогон never wrote is explained as waiting, not as missing', () => {
+  // orderedStages fills the gaps, so the eight rows are always eight rows —
+  // and an i on a row the state has not reached yet still has to open.
+  const lines = L.explainStage('acceptance', run(), NOW, [], 'plain', 'ru');
+  assert.ok(lines.length >= 2);
+  assert.match(lines[1]!, /Ожидает|ожидает/);
+});
+
+test('an id no registry holds returns nothing rather than throwing', () => {
+  // `polish` is a phase and not a стадия: phases.md marks it `Stage: no`, so
+  // the timeline never draws it and no registry holds it.
+  assert.equal(L.explainStage('polish', run(), NOW, [], 'normal', 'ru').length, 0);
+  assert.equal(L.explainStage('', run(), NOW, [], 'plain', 'en').length, 0);
 });
