@@ -80,7 +80,12 @@ R02 — …
 
 - This is the translated contract being agreed rather than substituted.
 - In `semi`, `interview` and `manual`: ask whether anything is missing or
-  misread, and wait.
+  misread, and wait. **Offer the answers** — see *Asking A Question* in
+  `SKILL.md`. Three of them, at least: that it is right and the брифинг may
+  begin, that a требование is wrong or missing and here is which, and their own
+  words for anything neither covers. Say which requirement they would be
+  naming — `R02`, not «одно из них» — and say that this is the last moment the
+  манифест is open to you, because after this phase only they can change it.
 - In `full`: show it anyway, **without a question**, and continue. Any wording
   whose translation was uncertain goes to Assumptions in `report.md`.
 - If the user corrects a требование, correct `manifest.md` before it is

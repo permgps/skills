@@ -213,6 +213,39 @@ chat has. The dashboard's plain strings are held to the banned list by
 `scripts/validate/dashboard-integrity.ts`; nothing reads a sentence you compose
 here, so this rule is the whole of it.
 
+## Asking A Question
+
+**A question that stops the прогон carries its answers.** Everything the прогон
+has done stands still behind one reply — the two dials questions on a project's
+first прогон, the манифест, the брифинг block, and the spec and plan gates in
+`manual`. A sentence into an empty box is not a question to someone who has
+never done this before. They can read it, understand every word, and still not
+know what an answer looks like or that answering is what starts the run again.
+
+**Offer the answers.** If your host can put choices in front of the user, use
+it — that is the shortest path from a stopped прогон to a moving one. If it
+cannot, number them in the sentence. The dials phase is what this looks like
+when it is done right: the four modes arrive as a table with the built-in one
+marked, and the user picks rather than composes.
+
+Three things every stop owes the reader:
+
+- **The answer that continues, named, and what continuing does.** «Да» is not
+  an answer until something has said what «да» starts.
+- **The answer that changes something, visibly available.** A stop exists
+  because something is still open. A question offering only agreement has
+  closed it already and is asking the user to ratify a decision they were not
+  shown making.
+- **Their own words, always, beyond whatever you offered.** The options are a
+  shortcut and never the whole set: every one of these stops is a question
+  about their project, and no list you wrote contains everything they might
+  say.
+
+**This is here rather than in the phase files for the reason above it** — five
+places ask, and a rule copied five times is five rules that drift apart. Like
+the section above, nothing checks it: no validator reads a question you
+compose, so the discipline is the whole of the guarantee.
+
 ## The Gates
 
 Four gates. Each runs after a phase, in every mode, at every depth. **A gate that
