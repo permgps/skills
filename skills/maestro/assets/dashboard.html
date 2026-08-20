@@ -84,6 +84,10 @@
     background: var(--panel);
     color: var(--warn);
   }
+  #notice.alarm {
+    border-left-color: var(--fail);
+    color: var(--fail);
+  }
   #problem {
     padding: 1rem;
     border: 1px solid var(--fail);
@@ -785,6 +789,71 @@ globalThis.MAESTRO_LOGIC = (function () {
     return null;
   }
 
+  /** Coarse on purpose, and never rounded up to a minute it has not reached. */
+  function formatGap(ms) {
+    if (typeof ms !== 'number' || !isFinite(ms) || ms < 0) return '—';
+    if (ms < 60000) return Math.floor(ms / 1000) + ' сек';
+    return formatMinutes(ms);
+  }
+
+  /**
+   * The longest interval this прогон has already spent without a write.
+   *
+   * The threshold for "too quiet" is not a number chosen here. A прогон writes
+   * at transitions and nowhere else, so how long it goes quiet is a property of
+   * the work it is doing: a манифест can take ten minutes and say nothing,
+   * while a build writes at every таск. The run's own longest completed pause
+   * is the only evidence there is about its rhythm, and it is what the notice
+   * measures against. Fewer than two marks is not evidence, and returns null.
+   */
+  function longestSilence(marks) {
+    if (!marks || marks.length < 2) return null;
+    var longest = 0;
+    for (var i = 1; i < marks.length; i += 1) {
+      var gap = marks[i] - marks[i - 1];
+      if (gap > longest) longest = gap;
+    }
+    return longest;
+  }
+
+  /** When the state was last written, for a прогон of either contract. */
+  function lastWrite(state, marks) {
+    if (state && typeof state.updatedAt === 'string') {
+      var at = Date.parse(state.updatedAt);
+      if (!isNaN(at)) return at;
+    }
+    // Contract 1 carried no `updatedAt`. The newest instant the state records
+    // is the closest thing to it that such a прогон has.
+    return (marks && marks.length > 0) ? marks[marks.length - 1] : null;
+  }
+
+  /**
+   * How long the state has been silent, and whether that is unusual for it.
+   *
+   * Null when the прогон is stopped: a finished or interrupted run is silent
+   * lawfully, and `runNotice` already says which. Otherwise this is the one
+   * place `updatedAt` becomes visible to a reader. The contract names the
+   * dashboard as that field's reader, and until now the page spent it only on
+   * arithmetic nobody could see — so a session that died mid-стадия left the
+   * clocks running and said nothing.
+   */
+  function silenceNotice(state, now, marks) {
+    if (!state || isStopped(state)) return null;
+    var last = lastWrite(state, marks);
+    if (last === null) return null;
+
+    var quiet = Math.max(0, now - last);
+    var record = longestSilence(marks);
+    if (record !== null && quiet > record) {
+      return {
+        alarming: true,
+        line: 'Тишина ' + formatGap(quiet) + ' — дольше, чем этот прогон молчал до сих пор ('
+          + formatGap(record) + ').'
+      };
+    }
+    return { alarming: false, line: 'Последняя запись — ' + formatGap(quiet) + ' назад.' };
+  }
+
   /** A frozen clock with no explanation is the failure mode this guards. */
   function isStopped(state) {
     return !!(state && (state.finishedAt || state.interruptedAt));
@@ -858,6 +927,10 @@ globalThis.MAESTRO_LOGIC = (function () {
     testsOf: testsOf,
     contractNotice: contractNotice,
     runNotice: runNotice,
+    formatGap: formatGap,
+    longestSilence: longestSilence,
+    lastWrite: lastWrite,
+    silenceNotice: silenceNotice,
     isStopped: isStopped,
     isStateShape: isStateShape,
     readOutcome: readOutcome
@@ -1013,9 +1086,15 @@ globalThis.MAESTRO_SNAPSHOT = null;
 
     var notices = [L.runNotice(state), L.contractNotice(state.contractVersion)]
       .filter(function (line) { return !!line; });
+    // Recomputed on every poll rather than on every tick: `apply` calls
+    // `render` each time state.js is read, whether or not it changed, so the
+    // silence advances on its own without a second timer.
+    var silence = L.silenceNotice(state, Date.now(), marks);
+    if (silence) notices.push(silence.line);
     var notice = el('notice');
     notice.textContent = notices.join(' ');
     notice.hidden = notices.length === 0;
+    notice.className = silence && silence.alarming ? 'alarm' : '';
 
     var dials = clear(el('dials'));
     put(dials, 'span', L.label(L.MODE, state.mode), 'chip');

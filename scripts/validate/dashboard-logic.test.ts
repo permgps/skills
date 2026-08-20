@@ -30,6 +30,12 @@ interface Logic {
   countRequirements: (list: unknown) => Record<string, number>;
   contractNotice: (version: unknown) => string | null;
   runNotice: (state: unknown) => string | null;
+  formatGap: (ms: unknown) => string;
+  longestSilence: (marks: number[]) => number | null;
+  lastWrite: (state: unknown, marks: number[]) => number | null;
+  silenceNotice: (
+    state: unknown, now: number, marks: number[],
+  ) => { alarming: boolean; line: string } | null;
   isStopped: (state: unknown) => boolean;
   isStateShape: (value: unknown) => boolean;
   readOutcome: (held: unknown, incoming: unknown) => string;
@@ -585,4 +591,70 @@ test('the stage position counts from one and does not run past the road', () => 
   assert.equal(inBuild.position, 6);
   assert.equal(inBuild.total, 8);
   assert.equal(L.stagePosition(bare({ stages: [] })).position, 8);
+});
+
+test('a gap reads in seconds below a minute and in minutes above one', () => {
+  assert.equal(L.formatGap(0), '0 сек');
+  assert.equal(L.formatGap(12_000), '12 сек');
+  assert.equal(L.formatGap(59_999), '59 сек');
+  assert.equal(L.formatGap(90_000), '2 мин');
+  assert.equal(L.formatGap(-1), '—');
+  assert.equal(L.formatGap('soon'), '—');
+});
+
+test('the longest silence is the прогон own, and unknown before it has two marks', () => {
+  assert.equal(L.longestSilence([]), null);
+  assert.equal(L.longestSilence([AT(STARTED)]), null);
+  assert.equal(
+    L.longestSilence([AT('2026-08-19T10:00:00.000Z'), AT('2026-08-19T10:04:00.000Z'), AT('2026-08-19T10:30:00.000Z')]),
+    26 * 60_000,
+  );
+});
+
+test('a stopped прогон is silent lawfully and says nothing about it', () => {
+  // runNotice already names both of these; a second line would say the same
+  // thing in worse words.
+  const finished = run({ finishedAt: '2026-08-19T11:00:00.000Z' });
+  const interrupted = run({ interruptedAt: '2026-08-19T10:40:00.000Z' });
+  const later = AT('2026-08-20T00:00:00.000Z');
+  assert.equal(L.silenceNotice(finished, later, L.collectMarks(finished)), null);
+  assert.equal(L.silenceNotice(interrupted, later, L.collectMarks(interrupted)), null);
+});
+
+test('an ordinary quiet reports the fact without raising it', () => {
+  // The fixture's marks are 10:00 and 10:30, so this прогон has already gone
+  // half an hour without a word. Five minutes is nothing to it.
+  const state = run();
+  const notice = L.silenceNotice(state, AT('2026-08-19T10:35:00.000Z'), L.collectMarks(state));
+  assert.ok(notice);
+  assert.equal(notice.alarming, false);
+  assert.match(notice.line, /Последняя запись — 5 мин назад/);
+});
+
+test('silence longer than the прогон has ever kept is raised, and names both', () => {
+  const state = run();
+  const notice = L.silenceNotice(state, AT('2026-08-19T11:15:00.000Z'), L.collectMarks(state));
+  assert.ok(notice);
+  assert.equal(notice.alarming, true);
+  assert.match(notice.line, /Тишина 45 мин/);
+  assert.match(notice.line, /30 мин/);
+});
+
+test('the silence is measured from updatedAt when the прогон records one', () => {
+  // A стадия stamp says when something happened; `updatedAt` says when the
+  // state was last written, and it is the second one this notice is about.
+  const state = run({ contractVersion: 2, updatedAt: '2026-08-19T10:45:00.000Z' });
+  const marks = L.collectMarks(state);
+  assert.equal(L.lastWrite(state, marks), AT('2026-08-19T10:45:00.000Z'));
+
+  const notice = L.silenceNotice(state, AT('2026-08-19T10:50:00.000Z'), marks);
+  assert.ok(notice);
+  assert.equal(notice.alarming, false);
+  assert.match(notice.line, /5 мин назад/);
+});
+
+test('a прогон of contract 1 falls back to the newest instant it recorded', () => {
+  const state = run();
+  assert.equal(state['updatedAt'], undefined);
+  assert.equal(L.lastWrite(state, L.collectMarks(state)), AT('2026-08-19T10:30:00.000Z'));
 });
