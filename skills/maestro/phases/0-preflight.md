@@ -217,14 +217,20 @@ pane varies — sometimes beside the chat, sometimes as a card the user still ha
 to press — and one printed line covers every case and leaves them independent of
 a button.
 
-**And say that a folded one opens with a press.** What you checked is that the
-page works; whether anyone is looking at it is a second claim and not one you
-can see. A pane may land as a row in the chat rather than as an open panel, and
-from where you sit the two are indistinguishable — your tool reported success
-either way. So name the address, and add in the same breath that the row opens
-when pressed. The прогон that produced this rule announced «панель живая, часы
-идут» to a user who was looking at a closed card and found the panel by
-pressing it themselves, some minutes later.
+**And say that a folded one opens with a press — the tool prints that sentence
+for you.** What you checked is that the page works; whether anyone is looking at
+it is a second claim and not one you can see. A pane may land as a row in the
+chat rather than as an open panel, and from where you sit the two are
+indistinguishable: your tool reported success either way. `sync.py` prints the
+line under the address, in the прогон's language, and relaying both is the whole
+of the requirement.
+
+It prints it rather than leaving it here because leaving it here did not work.
+Two прогоны have now announced a live panel to a user looking at a collapsed
+row, who found the dashboard minutes later by pressing it themselves — and the
+rule was written in this file both times. A phase file is read once, several
+steps before the sentence is needed; the tool's output is read at the moment of
+saying it.
 
 **Do not open anything in a remote session.** If `SSH_CONNECTION` or `CI` is
 set, print the path and move on: a window on someone else's machine helps nobody.
@@ -267,6 +273,7 @@ nothing yet to check against the user's words.
 | `.maestro/state.js` | written, `preflight` active |
 | `.maestro/dashboard.html` | copied, mirrored, and opened |
 | `.maestro/sync.py`, `index.html` | copied and placed |
+| the dashboard address | said in the chat, with the tool's folded-pane line beside it |
 | the announcement | shown, with any missing host capability named |
 
 Then read the manifest phase file.

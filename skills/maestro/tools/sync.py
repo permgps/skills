@@ -81,6 +81,29 @@ def debug(message):
         print('debug: ' + message, file=sys.stderr)
 
 
+# What the прогон relays to the user, beside the address. It lives here rather
+# than in the phase file because a phase file is read once, minutes before the
+# sentence is needed, and twice now it was read and the sentence not said. What
+# the orchestrator relays is what this tool printed.
+FOLDED = {
+    'ru': 'sync: скажите адрес в чате и добавьте, что панель, если она свернулась '
+          'в строку, открывается нажатием на неё.',
+    'en': 'sync: say the address in the chat, and add that the panel opens on a '
+          'press if it landed folded into a row.',
+}
+
+
+def spoken(text):
+    """The run's language, or Russian — the same fallback the page makes."""
+    try:
+        state = json.loads(text)
+    except ValueError:
+        return 'ru'
+    if not isinstance(state, dict):
+        return 'ru'
+    return 'en' if state.get('language') == 'en' else 'ru'
+
+
 def literal(source):
     """The object literal out of state.js, exactly as the page would see it."""
     start = source.find(ASSIGNMENT)
@@ -225,6 +248,7 @@ def main():
         print('sync: no server — open %s directly; it shows the snapshot and will not tick' % PAGE)
     else:
         print('http://localhost:%d/dashboard.html' % port)
+    print(FOLDED[spoken(text)])
     debug('mirrored=%s linked=%s port=%s reused=%s' % (mirrored, linked, port, reused))
 
     # Last, and deliberately after the address: the page works either way, and

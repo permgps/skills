@@ -83,6 +83,34 @@ test('a state whose statuses are all the contract\'s passes', { skip: python ===
   assert.match(done.out, /http:\/\/localhost:\d+\/dashboard\.html/);
 });
 
+test('the address is followed by the line that says a folded pane opens',
+  { skip: python === null }, async () => {
+    // Twice now a прогон has raised the panel, reported it live, and left the
+    // user looking at a collapsed row they had to find by pressing it. The
+    // instruction to say so was already written in the phase file both times,
+    // which is what makes it a bad place for it: what the прогон relays is what
+    // the tool printed, so the sentence belongs beside the address.
+    const done = await sync(STATE);
+    assert.equal(done.status, 0, done.out);
+    const address = done.out.indexOf('http://localhost');
+    const hint = done.out.search(/нажат|press/);
+    assert.ok(hint !== -1, `nothing tells the user a folded pane opens: ${done.out}`);
+    assert.ok(address < hint, `the address must come first: ${done.out}`);
+  });
+
+test('the folded-pane line is in the language the прогон speaks',
+  { skip: python === null }, async () => {
+    const russian = await sync({ ...STATE, language: 'ru' });
+    assert.match(russian.out, /нажат/);
+    const english = await sync({ ...STATE, language: 'en' });
+    assert.match(english.out, /press/);
+    assert.doesNotMatch(english.out, /нажат/);
+    // A прогон written before the language field existed is Russian, which is
+    // what the page falls back to as well.
+    const older = await sync(STATE);
+    assert.match(older.out, /нажат/);
+  });
+
 test('a таск written `pending` is named, and the run is told', { skip: python === null }, async () => {
   // The defect exactly as a real прогон wrote it: `pending` is a стадия's word
   // and a гейт's, and the phase file that cuts таски never said otherwise.
