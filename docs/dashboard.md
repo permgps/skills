@@ -61,6 +61,26 @@ and each stage shows its own duration rather than the run's. A frozen clock with
 no explanation is the one failure mode the header notice exists to prevent: an
 interrupted run says it was interrupted and when.
 
+Under `G3` in the checks block is the line a passed check shows when it left
+findings behind: how many there were, and that they were acted on. It opens the
+list on a press and it is not painted in the colour of failure — a check is
+never passed with a finding still standing, so what is folded there is a record
+of work already done, not a list of problems.
+
+## The two switches in the header
+
+Beside the dials are two controls that belong to whoever is reading, not to the
+run: the theme and the language of the page. Each has three states — light,
+dark, and *neither chosen*; `ru`, `en`, and *neither chosen* — and until a
+button is pressed there is no choice at all: the theme follows the screen the
+page was opened on, and the language follows what the run decided.
+
+A press is remembered by the browser and nothing else. Neither control reaches
+the run: the page reads `state.js` and has no way back, so the language button
+repaints this page and cannot change the language the run speaks in. The line
+beside the buttons says so, because a control that looks like it does more than
+it does is worse than no control.
+
 ## The fixtures behind these images
 
 `docs/assets/state-running.fixture.js` and `state-finished.fixture.js` are the
@@ -157,6 +177,17 @@ fixture is likeliest to forget, is exactly where the reader is least able to
 guess. A label the screen shows is exempt in its exact form: «Гейты» is on the
 page in both registers, and the popover that has to teach it cannot be forbidden
 from naming it. «после гейта» in the same sentence still fails.
+
+**Reading the block is not the whole of it.** Some plain wording lives in a
+function shared by both registers rather than in the explanations — the silence
+notice, and the line a passed check shows above its folded findings. Source
+reading cannot see those: what is written there is a template and a branch, and
+the sentence the user reads does not exist until the function runs. So the check
+**calls** them, with each register and each language, and holds the answer to
+the same list. The folded findings line is called at several counts as well,
+because Russian takes three plural forms and any one number exercises only one
+of them. A function the page stops exporting is reported rather than skipped: a
+check silently not running is indistinguishable from a check that passes.
 
 Its DOM-free logic is exercised separately by `scripts/validate/dashboard-logic.test.ts`,
 which evaluates the page's own `<script id="logic">` block in a VM rather than

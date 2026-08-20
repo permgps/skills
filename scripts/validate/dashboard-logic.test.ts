@@ -51,6 +51,8 @@ interface Logic {
   readOutcome: (held: unknown, incoming: unknown) => string;
   gateFor: (state: unknown, stageId: string) => { id: string; findings: string[] } | null;
   lineOf: (value: unknown) => string;
+  findingsView: (gate: unknown) => { show: boolean; folded: boolean; tone: string; count: number };
+  findingsLine: (count: number, register?: string, language?: string) => string;
   IDLE_CEILING_MS: number;
   plural: (n: number, one: string, few: string, many: string) => string;
   formatMinutes: (ms: unknown, language?: string) => string;
@@ -888,4 +890,86 @@ test('the silence notice is worded in the register too', () => {
   const alarming = L.silenceNotice(state, NOW, marks, 'plain');
   assert.equal(alarming!.alarming, true);
   assert.match(alarming!.line, /Возможно, работа остановилась/);
+});
+
+test('a passed check with findings folds, and a failed one does not', () => {
+  // The defect this replaced: findings were drawn at any status, in the colour
+  // of failure, because the rule lived in a render no test could call.
+  assert.deepEqual({ ...L.findingsView({ id: 'G1', status: 'passed', findings: [] }) },
+    { show: false, folded: false, tone: 'quiet', count: 0 });
+  assert.deepEqual({ ...L.findingsView({ id: 'G3', status: 'passed', findings: ['a', 'b'] }) },
+    { show: true, folded: true, tone: 'quiet', count: 2 });
+  assert.deepEqual({ ...L.findingsView({ id: 'G3', status: 'failed', findings: ['a'] }) },
+    { show: true, folded: false, tone: 'fail', count: 1 });
+  // A failed gate that recorded nothing shows nothing here — the sentence for
+  // that case belongs to the failed стадия, which draws it a few rows above.
+  assert.deepEqual({ ...L.findingsView({ id: 'G3', status: 'failed', findings: [] }) },
+    { show: false, folded: false, tone: 'quiet', count: 0 });
+  // Anything not failed is read as settled: a гейт still waiting cannot have
+  // findings to answer for, and folding is the safe way to be wrong.
+  assert.equal(L.findingsView({ id: 'G4', status: 'pending', findings: ['a'] }).folded, true);
+});
+
+test('the findings view survives a state that wrote nonsense', () => {
+  // The page is the reader, never the writer. None of these may throw.
+  for (const gate of [null, undefined, {}, { status: 'passed' },
+    { status: 'passed', findings: null }, { status: 'passed', findings: 'oops' },
+    { status: 'passed', findings: [{ id: 'T01' }] }]) {
+    const view = L.findingsView(gate);
+    assert.equal(typeof view.count, 'number');
+    assert.equal(typeof view.show, 'boolean');
+  }
+  // A findings list holding a record is still a list, and it is still counted.
+  assert.equal(L.findingsView({ status: 'passed', findings: [{ id: 'T01' }] }).count, 1);
+  // A list that is not a list counts as nothing rather than as its length.
+  assert.equal(L.findingsView({ status: 'passed', findings: 'oops' }).count, 0);
+});
+
+test('the folded line counts in the language and the register it is given', () => {
+  assert.equal(L.findingsLine(1, 'normal', 'ru'), 'Гейт оставил 1 находку — все отработаны');
+  assert.equal(L.findingsLine(1, 'plain', 'ru'), 'Проверка оставила 1 замечание — все уже исправлены');
+  assert.equal(L.findingsLine(1, 'normal', 'en'), 'The check left 1 finding — all acted on');
+  assert.equal(L.findingsLine(2, 'normal', 'en'), 'The check left 2 findings — all acted on');
+  assert.equal(L.findingsLine(1, 'plain', 'en'), 'The check left 1 note — every one already dealt with');
+  // The plain register may not say «гейт», and this is the line that would.
+  assert.doesNotMatch(L.findingsLine(21, 'plain', 'ru'), /[Гг]ейт/);
+});
+
+test('the Russian count reads correctly at 1, 2, 5, 11 and 21', () => {
+  // 21 is the number the real прогон produced, and it is the one a naive
+  // plural gets wrong: it takes the singular, not the many.
+  const line = (n: number): string => L.findingsLine(n, 'normal', 'ru');
+  assert.match(line(1), /1 находку/);
+  assert.match(line(2), /2 находки/);
+  assert.match(line(5), /5 находок/);
+  assert.match(line(11), /11 находок/);
+  assert.match(line(21), /21 находку/);
+  const plain = (n: number): string => L.findingsLine(n, 'plain', 'ru');
+  assert.match(plain(1), /1 замечание/);
+  assert.match(plain(2), /2 замечания/);
+  assert.match(plain(5), /5 замечаний/);
+  assert.match(plain(21), /21 замечание/);
+});
+
+test('the checks explain their findings in every language and register', () => {
+  const state = {
+    gates: [
+      { id: 'G1', status: 'passed', findings: ['T01 — …; acted on: …', 'T02 — …; acted on: …'] },
+      { id: 'G2', status: 'failed', findings: ['T03 — …'] },
+    ],
+  };
+  assert.match(L.explain('gates', state, NOW, [], 'normal', 'ru')[2]!,
+    /Находок 3: под пройденными 2, под проваленными 1/);
+  assert.match(L.explain('gates', state, NOW, [], 'plain', 'ru')[2]!,
+    /Замечаний 3: под пройденными 2, под непройденными 1/);
+  assert.match(L.explain('gates', state, NOW, [], 'normal', 'en')[2]!,
+    /Findings in all: 3 — 2 under checks that passed, 1 under checks that did not/);
+  assert.match(L.explain('gates', state, NOW, [], 'plain', 'en')[2]!,
+    /Notes in all: 3 — 2 under checks that passed, 1 under checks that did not/);
+
+  // Nothing found anywhere is an answer too, and it is the branch a fixture
+  // forgets: every gate in both docs fixtures passed with an empty list.
+  const clean = { gates: [{ id: 'G1', status: 'passed', findings: [] }] };
+  assert.match(L.explain('gates', clean, NOW, [], 'normal', 'ru')[2]!, /Находок гейты пока не оставили/);
+  assert.match(L.explain('gates', clean, NOW, [], 'plain', 'en')[2]!, /have left no notes yet/);
 });

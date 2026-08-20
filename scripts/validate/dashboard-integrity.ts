@@ -587,7 +587,9 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
       return new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(naked);
     };
 
+    let scanned = 0;
     const scan = (where: string, text: string): void => {
+      scanned += 1;
       const naked = withoutLabels(text).toLowerCase();
       for (const word of banned) {
         if (says(naked, word)) {
@@ -621,13 +623,28 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
       }
     }
 
+    // The folded findings line is the second such function, and it is reached
+    // the same way. Several counts, because Russian takes three plural forms
+    // and any single number exercises exactly one of them.
+    const folded = logic['findingsLine'];
+    if (typeof folded === 'function') {
+      const say = folded as (...args: unknown[]) => unknown;
+      for (const count of [1, 2, 5, 21]) {
+        const line = say(count, 'plain', language);
+        if (typeof line === 'string') scan('the folded findings line', line);
+      }
+    } else {
+      add('plain', 0, 'the page exports no findingsLine, so the folded findings '
+        + 'line ships unscanned — the wording a passed check shows its reader');
+    }
+
     // The sentences the view composes are words too, and they are the half a
     // scan of the explanations alone would miss.
     const ui = sliceObjectLiteral(stripComments(block), `L10N.${language}.UI`);
     if (ui !== null) scan('the composed sentences', stringLiterals(ui));
 
     log.info('plain', 'plain strings scanned',
-      { language, banned: banned.length, exempt: labels.length });
+      { language, banned: banned.length, exempt: labels.length, sources: scanned });
   }
 
   // --- the stage order and the gate map are copies too ----------------------

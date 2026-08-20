@@ -89,6 +89,8 @@ const LOGIC = {
   GATE_AFTER: "{ G1: 'preflight' }",
   EXPLAIN_ORDER: "['progress', 'gates']",
   explain: "function (key) { return key === 'nothing' ? [] : ['what it is', 'what it holds']; }",
+  findingsLine: "function (count, register) { return register === 'plain'"
+    + " ? 'Проверка оставила ' + count : 'Гейт оставил ' + count; }",
 };
 
 /** One language's branch of `L10N`, which is where every word lives. */
@@ -597,4 +599,22 @@ test('customProperties reads a block and nothing past its brace', () => {
   assert.deepEqual(customProperties(css, ':root {'), ['--a', '--b']);
   assert.deepEqual(customProperties(css, ':root[data-theme="dark"] {'), ['--c']);
   assert.equal(customProperties(css, ':root[data-theme="sepia"] {'), null);
+});
+
+test('a folded findings line that says «гейт» in the plain register is reported', () => {
+  // The line lives in a shared function, so reading the block as source cannot
+  // see it. It is scanned by being called, and this is the proof that it is.
+  const found = messages(page({
+    logic: {
+      findingsLine: "function (count) { return 'Гейт оставил ' + count + ' находок'; }",
+    },
+  }));
+  assert.match(found, /the folded findings line \(ru\) says "гейт"/);
+});
+
+test('a page with no folded findings line at all is reported', () => {
+  // Silently skipping an absent function is how a check comes to be believed
+  // rather than enforced — which is the defect this whole block answers.
+  const found = messages(page().replace('findingsLine:', 'unusedLine:'));
+  assert.match(found, /exports no findingsLine/);
 });
