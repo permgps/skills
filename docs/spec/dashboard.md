@@ -32,9 +32,23 @@ attribute in the markup and the entry in `EXPLAIN_ORDER` in the logic block.
 `scripts/validate/dashboard-integrity.ts` checks all three against each other,
 so a region cannot be added to one and forgotten in the others.
 
-Every **term** the dashboard shows comes from `vocabulary.md`. The dashboard
-defines no term of its own; if it needs a word that is not there, the word is
-added to the vocabulary first.
+## The Language It Paints In
+
+The page carries **both** label sets and paints one of them. `state.language`
+is what the прогон decided and is what a page shows on first sight; a reader's
+own choice, kept in their browser, overrides it for that browser and reaches the
+прогон never. Absent both, Russian — that is what a state written before the
+language dial existed means, and the only reading that invents no choice.
+
+Inside the page the two sets live under one root nested by language, and
+`scripts/validate/dashboard-integrity.ts` walks that root rather than naming a
+map per language. That is the point of the nesting: a language can be
+incomplete, and it is then reported; it cannot be silently absent, because there
+is no constant name to forget.
+
+Every **term** the dashboard shows comes from `vocabulary.md`, in the column its
+language owns. The dashboard defines no term of its own; if it needs a word that
+is not there, the word is added to the vocabulary first.
 
 The rule governs terms, not prose. A region's explanation — see below — is built
 from the vocabulary's own labels and the numbers in the state, and the sentences

@@ -71,6 +71,32 @@ const REGISTERS: Array<{ register: string; map: string }> = [
   { register: 'plain', map: 'EXPLAIN_PLAIN' },
 ];
 
+/**
+ * The languages the page carries, and the column of vocabulary.md that owns
+ * each one's words.
+ *
+ * Everything below walks this list rather than naming a map. That is the whole
+ * reason `L10N` is nested by language in the page: a checker that knew
+ * `STAGE_LABEL` and `STAGE_LABEL_EN` by name would go on printing OK the day a
+ * third pair was added and only the first was wired up. Here a language is
+ * either in the list and checked, or absent from the list and reported by the
+ * comparison against `Object.keys(L10N)` below.
+ */
+const LANGUAGES: Array<{
+  language: string;
+  label: string;
+  shorthand: [string, string];
+  wordwise: boolean;
+}> = [
+  { language: 'ru', label: 'Label', shorthand: ['Shorthand', 'Say instead'], wordwise: false },
+  {
+    language: 'en',
+    label: 'Label (en)',
+    shorthand: ['Shorthand (en)', 'Say instead (en)'],
+    wordwise: true,
+  },
+];
+
 export class UnreadableAssetError extends Error {
   constructor(file: string, reason: string) {
     super(`${file}: ${reason}`);
@@ -110,7 +136,7 @@ const findTable = (tables: Table[], required: string[]): Table | undefined =>
  * the branch a fixture forgets to reach.
  */
 export function sliceObjectLiteral(source: string, name: string): string | null {
-  const start = source.indexOf(`var ${name} = {`);
+  const start = source.indexOf(`${name} = {`);
   if (start === -1) return null;
 
   let depth = 0;
@@ -123,6 +149,22 @@ export function sliceObjectLiteral(source: string, name: string): string | null 
     }
   }
   return null;
+}
+
+/**
+ * Every single-quoted string inside a slice of the page's source.
+ *
+ * The scan reads the literal rather than calling it, because a branch never
+ * taken still ships — but the literal is source, and source carries
+ * identifiers. `function (state)` and `var median` are the page's own variable
+ * names, and holding an English plain string to a list containing `state` and
+ * `median` would report every one of them. The Russian list never noticed,
+ * because its words are Cyrillic and no identifier is.
+ */
+export function stringLiterals(source: string): string {
+  const found: string[] = [];
+  for (const hit of source.matchAll(/'((?:[^'\\]|\\.)*)'/g)) found.push(hit[1] ?? '');
+  return found.join(' \n ');
 }
 
 /** Evaluate the DOM-free block and hand back what it exports. */
@@ -228,6 +270,33 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     return value && typeof value === 'object' ? value as Record<string, string> : {};
   };
 
+  // --- the page carries exactly the languages this checker knows ------------
+  const l10n = logic['L10N'];
+  const branches = (l10n && typeof l10n === 'object') ? l10n as Record<string, unknown> : {};
+  const carried = Object.keys(branches);
+  for (const { language } of LANGUAGES) {
+    if (!carried.includes(language)) {
+      add('labels', 0,
+        `the page carries no "${language}" branch in L10N — every word the user reads `
+        + 'exists in both languages, and a missing branch is a screen half in the other one');
+    }
+  }
+  for (const language of carried) {
+    if (!LANGUAGES.some(known => known.language === language)) {
+      add('labels', 0,
+        `the page carries a "${language}" branch in L10N that this checker holds to no `
+        + 'column of vocabulary.md — an unchecked language ships its labels unread');
+    }
+  }
+
+  /** One language's map inside `L10N`, or an empty one so the loop reports it. */
+  const branchMap = (language: string, name: string): Record<string, string> => {
+    const branch = branches[language];
+    if (!branch || typeof branch !== 'object') return {};
+    const value = (branch as Record<string, unknown>)[name];
+    return value && typeof value === 'object' ? value as Record<string, string> : {};
+  };
+
   /** Report both directions: a word the page invented, and one it forgot. */
   const compare = (check: string, what: string, owned: Map<string, string>, held: Record<string, string>): void => {
     for (const [key, label] of owned) {
@@ -247,13 +316,15 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
 
   const vocabularyTables = parseTables(spec['vocabulary.md']);
 
-  const stageLabels = findTable(vocabularyTables, ['Stage id', 'Label']);
-  if (!stageLabels) {
-    add('labels', 0, 'vocabulary.md has no table with columns Stage id and Label');
-  } else {
+  for (const { language, label } of LANGUAGES) {
+    const stageLabels = findTable(vocabularyTables, ['Stage id', label]);
+    if (!stageLabels) {
+      add('labels', 0, `vocabulary.md has no table with columns Stage id and ${label}`);
+      continue;
+    }
     const owned = new Map(stageLabels.rows.map(row =>
-      [cleanCell(row['Stage id']), cleanCell(row['Label'])] as const));
-    compare('labels', 'stage', owned, asMap('STAGE_LABEL'));
+      [cleanCell(row['Stage id']), cleanCell(row[label])] as const));
+    compare('labels', `stage (${language})`, owned, branchMap(language, 'STAGE_LABEL'));
   }
 
   // --- every region the specification names explains itself -----------------
@@ -297,13 +368,16 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
       // an empty popover is worse than no i at all. Both registers are called:
       // a region explained in one and silent in the other ships an i that opens
       // nothing for exactly the reader who needed it most.
-      for (const { register } of REGISTERS) {
-        const lines = typeof explain === 'function'
-          ? (explain as (...args: unknown[]) => unknown)(key, {}, 0, [], register)
-          : null;
-        if (!Array.isArray(lines) || lines.length === 0) {
-          add('explain', 0,
-            `region "${key}" has no explanation behind it in the ${register} register`);
+      for (const { language } of LANGUAGES) {
+        for (const { register } of REGISTERS) {
+          const lines = typeof explain === 'function'
+            ? (explain as (...args: unknown[]) => unknown)(key, {}, 0, [], register, language)
+            : null;
+          if (!Array.isArray(lines) || lines.length === 0) {
+            add('explain', 0,
+              `region "${key}" has no explanation behind it in the ${register} register `
+              + `in ${language}`);
+          }
         }
       }
     }
@@ -339,40 +413,46 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
   // --- the words on the page that belong to no field ------------------------
   // A card renamed on the page and nowhere else is drift the value maps cannot
   // see: these labels are static text, not the value of anything.
-  const screenLabels = findTable(vocabularyTables, ['Label', 'What it names']);
-  if (!screenLabels) {
-    add('labels', 0, 'vocabulary.md has no table with columns Label and What it names');
-  } else {
+  for (const { language, label } of LANGUAGES) {
+    const screenLabels = findTable(vocabularyTables, [label, 'What it names']);
+    if (!screenLabels) {
+      add('labels', 0, `vocabulary.md has no table with columns ${label} and What it names`);
+      continue;
+    }
     let missing = 0;
     for (const row of screenLabels.rows) {
-      const label = cleanCell(row['Label']);
-      if (label === '') continue;
-      if (!html.includes(label)) {
+      const word = cleanCell(row[label]);
+      if (word === '') continue;
+      if (!html.includes(word)) {
         missing += 1;
         add('labels', 0,
-          `the specification names "${label}" as a word the dashboard shows, `
+          `the specification names "${word}" as a word the dashboard shows in ${language}, `
           + 'and the page does not carry it');
       }
     }
-    log.info('labels', 'screen labels checked', { labels: screenLabels.rows.length, missing });
+    log.info('labels', 'screen labels checked',
+      { language, labels: screenLabels.rows.length, missing });
   }
 
-  const valueLabels = findTable(vocabularyTables, ['Field', 'Value', 'Label']);
-  if (!valueLabels) {
-    add('labels', 0, 'vocabulary.md has no table with columns Field, Value and Label');
-  } else {
+  for (const { language, label } of LANGUAGES) {
+    const valueLabels = findTable(vocabularyTables, ['Field', 'Value', label]);
+    if (!valueLabels) {
+      add('labels', 0, `vocabulary.md has no table with columns Field, Value and ${label}`);
+      continue;
+    }
     for (const { field, map } of VALUE_MAPS) {
       const owned = new Map(valueLabels.rows
         .filter(row => cleanCell(row['Field']) === field)
-        .map(row => [cleanCell(row['Value']), cleanCell(row['Label'])] as const));
+        .map(row => [cleanCell(row['Value']), cleanCell(row[label])] as const));
       if (owned.size === 0) {
-        add('labels', 0, `vocabulary.md defines no labels for "${field}"`);
+        add('labels', 0, `vocabulary.md defines no ${label} entries for "${field}"`);
         continue;
       }
-      compare('labels', field, owned, asMap(map));
+      compare('labels', `${field} (${language})`, owned, branchMap(language, map));
     }
   }
-  log.info('labels', 'labels compared with the vocabulary', { maps: VALUE_MAPS.length + 1 });
+  log.info('labels', 'labels compared with the vocabulary',
+    { maps: (VALUE_MAPS.length + 1) * LANGUAGES.length });
 
   // --- the plain register says nothing only the trade understands -----------
   //
@@ -380,12 +460,14 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
   // what a checker can hold to the list: the chat is composed at run time and
   // no checker reads a word of it. vocabulary.md says so too, because a rule
   // believed to be enforced and a rule that is enforced fail differently.
-  const plainWords = findTable(vocabularyTables, ['Shorthand', 'Say instead']);
-  if (!plainWords) {
-    add('plain', 0, 'vocabulary.md has no table with columns Shorthand and Say instead');
-  } else {
+  for (const { language, label, shorthand, wordwise } of LANGUAGES) {
+    const plainWords = findTable(vocabularyTables, [...shorthand]);
+    if (!plainWords) {
+      add('plain', 0, `vocabulary.md has no table with columns ${shorthand.join(' and ')}`);
+      continue;
+    }
     const banned = plainWords.rows
-      .flatMap(row => cleanCell(row['Shorthand']).split(','))
+      .flatMap(row => cleanCell(row[shorthand[0]]).split(','))
       .map(word => word.trim())
       .filter(word => word !== '');
 
@@ -393,21 +475,34 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     // page in both registers, and the i beside that block is the thing that
     // teaches them — so the exact label is removed before the scan, and only
     // the exact label. «после гейта» still fails in the same sentence.
+    //
+    // Only this language's labels are removed. An English label is no excuse
+    // for a Russian shorthand and the other way round, and the two lists are
+    // not translations of one another — vocabulary.md says why.
     const labels = vocabularyTables
-      .filter(table => table.columns.includes('Label'))
-      .flatMap(table => table.rows.map(row => cleanCell(row['Label'])))
-      .filter(label => label !== '')
+      .filter(table => table.columns.includes(label))
+      .flatMap(table => table.rows.map(row => cleanCell(row[label])))
+      .filter(word => word !== '')
       .sort((a, b) => b.length - a.length);
     const withoutLabels = (text: string): string =>
-      labels.reduce((left, label) => left.split(label).join(' '), text);
+      labels.reduce((left, word) => left.split(word).join(' '), text);
+
+    // Substring for Russian, whole word for English. The reason is in
+    // vocabulary.md under *Plain Words*: «гейта» has to fail and `mitigate`
+    // must not.
+    const says = (naked: string, word: string): boolean => {
+      const term = word.toLowerCase();
+      if (!wordwise) return naked.includes(term);
+      return new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(naked);
+    };
 
     const scan = (where: string, text: string): void => {
       const naked = withoutLabels(text).toLowerCase();
       for (const word of banned) {
-        if (naked.includes(word.toLowerCase())) {
+        if (says(naked, word)) {
           add('plain', 0,
-            `a plain string in ${where} says "${word}", which vocabulary.md forbids — `
-            + 'say it in words a reader who has never built software already has');
+            `a plain string in ${where} (${language}) says "${word}", which vocabulary.md `
+            + 'forbids — say it in words a reader who has never built software already has');
         }
       }
     };
@@ -415,11 +510,11 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     // The block is read as source rather than called, because a branch never
     // taken still ships: the empty state of a region is exactly where the plain
     // reader is least able to guess, and it is the branch a fixture forgets.
-    const literal = sliceObjectLiteral(stripComments(block), 'EXPLAIN_PLAIN');
+    const literal = sliceObjectLiteral(stripComments(block), `L10N.${language}.EXPLAIN_PLAIN`);
     if (literal === null) {
-      add('plain', 0, 'the page carries no EXPLAIN_PLAIN block to check');
+      add('plain', 0, `the page carries no L10N.${language}.EXPLAIN_PLAIN block to check`);
     } else {
-      scan('the plain explanations', literal);
+      scan('the plain explanations', stringLiterals(literal));
     }
 
     // The silence notice lives in a function both registers share, so its
@@ -430,12 +525,18 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
       const state = { runId: 'r', slug: 's', stages: [], updatedAt: '2026-08-20T09:00:00Z' };
       const at = Date.parse('2026-08-20T10:00:00Z');
       for (const marks of [[], [Date.parse('2026-08-20T08:00:00Z'), Date.parse(state.updatedAt)]]) {
-        const said = call(state, at, marks, 'plain');
+        const said = call(state, at, marks, 'plain', language);
         if (said && typeof said.line === 'string') scan('the plain silence notice', said.line);
       }
     }
 
-    log.info('plain', 'plain strings scanned', { banned: banned.length, exempt: labels.length });
+    // The sentences the view composes are words too, and they are the half a
+    // scan of the explanations alone would miss.
+    const ui = sliceObjectLiteral(stripComments(block), `L10N.${language}.UI`);
+    if (ui !== null) scan('the composed sentences', stringLiterals(ui));
+
+    log.info('plain', 'plain strings scanned',
+      { language, banned: banned.length, exempt: labels.length });
   }
 
   // --- the stage order and the gate map are copies too ----------------------

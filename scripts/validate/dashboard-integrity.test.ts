@@ -12,29 +12,29 @@ const VOCABULARY = `# Vocabulary
 
 ## Stage Labels
 
-| Stage id | Label |
-|---|---|
-| preflight | Подготовка |
-| build | Разработка |
+| Stage id | Label | Label (en) |
+|---|---|---|
+| preflight | Подготовка | Setup |
+| build | Разработка | Development |
 
 ## Value Labels
 
-| Field | Value | Label |
-|---|---|---|
-| \`stages[].status\` | \`pending\` | Ожидает |
-| \`tasks[].status\` | \`queued\` | В очереди |
-| \`requirements[].status\` | \`open\` | Открыто |
-| \`gates[].status\` | \`pending\` | Ожидает |
-| \`mode\` | \`semi\` | Полуавтомат |
-| \`depth\` | \`normal\` | Обычная |
-| \`polish\` | \`false\` | Выключена |
-| \`explain\` | \`plain\` | Простые |
+| Field | Value | Label | Label (en) |
+|---|---|---|---|
+| \`stages[].status\` | \`pending\` | Ожидает | Waiting |
+| \`tasks[].status\` | \`queued\` | В очереди | Queued |
+| \`requirements[].status\` | \`open\` | Открыто | Open |
+| \`gates[].status\` | \`pending\` | Ожидает | Waiting |
+| \`mode\` | \`semi\` | Полуавтомат | Semi |
+| \`depth\` | \`normal\` | Обычная | Normal |
+| \`polish\` | \`false\` | Выключена | Off |
+| \`explain\` | \`plain\` | Простые | Plain |
 
 ## Screen Labels
 
-| Label | What it names |
-|---|---|
-| Ход разработки | The таски as they are being built |
+| Label | Label (en) | What it names |
+|---|---|---|
+| Ход разработки | Development progress | The таски as they are being built |
 
 ## Plain Words
 
@@ -42,6 +42,11 @@ const VOCABULARY = `# Vocabulary
 |---|---|
 | гейт, гейты | проверка |
 | медиана | серединное значение |
+
+| Shorthand (en) | Say instead (en) |
+|---|---|
+| gate, gates | check |
+| median | middle value |
 `;
 
 const PHASES = `# Phases
@@ -77,8 +82,16 @@ const SPEC: SpecSources = {
   'dashboard.md': DASHBOARD,
 };
 
+/** What the page exports beside its words: the lists no language owns. */
 const LOGIC = {
   STAGE_ORDER: "['preflight', 'build']",
+  GATE_AFTER: "{ G1: 'preflight' }",
+  EXPLAIN_ORDER: "['progress', 'gates']",
+  explain: "function (key) { return key === 'nothing' ? [] : ['what it is', 'what it holds']; }",
+};
+
+/** One language's branch of `L10N`, which is where every word lives. */
+const RU = {
   STAGE_LABEL: "{ preflight: 'Подготовка', build: 'Разработка' }",
   STAGE_STATUS: "{ pending: 'Ожидает' }",
   TASK_STATUS: "{ queued: 'В очереди' }",
@@ -88,9 +101,18 @@ const LOGIC = {
   DEPTH: "{ normal: 'Обычная' }",
   POLISH: "{ 'false': 'Выключена' }",
   REGISTER: "{ plain: 'Простые' }",
-  GATE_AFTER: "{ G1: 'preflight' }",
-  EXPLAIN_ORDER: "['progress', 'gates']",
-  explain: "function (key) { return key === 'nothing' ? [] : ['what it is', 'what it holds']; }",
+};
+
+const EN = {
+  STAGE_LABEL: "{ preflight: 'Setup', build: 'Development' }",
+  STAGE_STATUS: "{ pending: 'Waiting' }",
+  TASK_STATUS: "{ queued: 'Queued' }",
+  REQUIREMENT_STATUS: "{ open: 'Open' }",
+  GATE_STATUS: "{ pending: 'Waiting' }",
+  MODE: "{ semi: 'Semi' }",
+  DEPTH: "{ normal: 'Normal' }",
+  POLISH: "{ 'false': 'Off' }",
+  REGISTER: "{ plain: 'Plain' }",
 };
 
 /** The regions of the What It Renders table, as the markup marks them. */
@@ -104,6 +126,9 @@ const REGIONS = [
 /** A page shaped like the real one, small enough that a test can bend one part of it. */
 function page(overrides: {
   logic?: Partial<Record<keyof typeof LOGIC, string>>;
+  /** One language's maps, overridden the way the real page nests them. */
+  ru?: Partial<Record<keyof typeof RU, string>>;
+  en?: Partial<Record<keyof typeof EN, string>>;
   regions?: string[];
   /** Regions marked with `data-region`, which is where each i is hung. */
   explained?: string[];
@@ -112,11 +137,16 @@ function page(overrides: {
   logicSource?: string;
   /** The body of the page's plain-explanation literal, read as source. */
   plain?: string | null;
+  plainEn?: string | null;
   /** The body of the snapshot block. `null` leaves the block out entirely. */
   snapshot?: string | null;
 } = {}): string {
-  const maps = { ...LOGIC, ...(overrides.logic ?? {}) };
-  const entries = Object.entries(maps).map(([name, value]) => `${name}: ${value}`).join(',\n    ');
+  const root = { ...LOGIC, ...(overrides.logic ?? {}) };
+  const entries = Object.entries(root).map(([name, value]) => `${name}: ${value}`).join(',\n    ');
+  const branch = (maps: Record<string, string>): string =>
+    Object.entries(maps).map(([name, value]) => `${name}: ${value}`).join(',\n      ');
+  const l10n = `var L10N = {\n    ru: {\n      ${branch({ ...RU, ...(overrides.ru ?? {}) })}\n    },`
+    + `\n    en: {\n      ${branch({ ...EN, ...(overrides.en ?? {}) })}\n    }\n  };\n`;
   const regions = (overrides.regions ?? REGIONS)
     .map(id => `<div id="${id}"></div>`).join('\n');
   const explained = (overrides.explained ?? EXPLAINED)
@@ -124,9 +154,14 @@ function page(overrides: {
   const plainBody = overrides.plain === undefined
     ? "progress: function () { return ['простыми словами']; }"
     : overrides.plain;
-  const plainLiteral = plainBody === null ? '' : `var EXPLAIN_PLAIN = {\n    ${plainBody}\n  };\n`;
+  const plainEnBody = overrides.plainEn === undefined
+    ? "progress: function () { return ['in words anyone has']; }"
+    : overrides.plainEn;
+  const plainLiteral =
+    (plainBody === null ? '' : `L10N.ru.EXPLAIN_PLAIN = {\n    ${plainBody}\n  };\n`)
+    + (plainEnBody === null ? '' : `L10N.en.EXPLAIN_PLAIN = {\n    ${plainEnBody}\n  };\n`);
   const source = overrides.logicSource
-    ?? `${plainLiteral}globalThis.MAESTRO_LOGIC = {\n    ${entries}\n  };`;
+    ?? `${l10n}${plainLiteral}globalThis.MAESTRO_LOGIC = {\n    ${entries},\n    L10N: L10N\n  };`;
   const logicBlock = overrides.omitLogicBlock ? '' : `<script id="logic">\n${source}\n</script>`;
   const snapshotBody = overrides.snapshot === undefined
     ? '/* maestro:snapshot:start */\nglobalThis.MAESTRO_SNAPSHOT = null;\n/* maestro:snapshot:end */'
@@ -136,7 +171,7 @@ function page(overrides: {
 
   return [
     '<!doctype html>', '<html lang="ru">', '<head><title>Maestro</title></head>', '<body>',
-    '<h2>Ход разработки</h2>',
+    '<h2>Ход разработки</h2>', '<h2>Development progress</h2>',
     regions, explained, overrides.body ?? '', snapshotBlock, logicBlock, '</body>', '</html>',
   ].join('\n');
 }
@@ -207,35 +242,51 @@ test('a logic block that exports nothing is reported', () => {
 });
 
 test('a stage label the page words differently is reported with both wordings', () => {
-  const found = messages(page({
-    logic: { STAGE_LABEL: "{ preflight: 'Подготовка', build: 'Сборка' }" },
-  }));
+  const found = messages(page({ ru: { STAGE_LABEL: "{ preflight: 'Подготовка', build: 'Сборка' }" } }));
   assert.match(found, /"build" is labelled "Сборка" in the page and "Разработка" in the specification/);
 });
 
 test('a stage the vocabulary labels and the page forgot is reported', () => {
-  const found = messages(page({ logic: { STAGE_LABEL: "{ preflight: 'Подготовка' }" } }));
-  assert.match(found, /stage "build" has a label in the specification and none in the page/);
+  const found = messages(page({ ru: { STAGE_LABEL: "{ preflight: 'Подготовка' }" } }));
+  assert.match(found, /stage \(ru\) "build" has a label in the specification and none in the page/);
+});
+
+// The whole point of nesting the words by language: the same defect in the
+// other branch is found by the same loop, and names the language it is in.
+test('the same drift in the English branch is reported and names the language', () => {
+  const found = messages(page({ en: { STAGE_LABEL: "{ preflight: 'Setup' }" } }));
+  assert.match(found, /stage \(en\) "build" has a label in the specification and none in the page/);
+});
+
+test('a language the page carries and this checker does not know is reported', () => {
+  const html = page().replace('en: {', 'de: {}, en: {');
+  assert.match(messages(html), /carries a "de" branch in L10N/);
+});
+
+test('a language the page has stopped carrying is reported', () => {
+  const html = page().replace(/\n    en: \{[\s\S]*?\n    \}/, '')
+    .replace('L10N.en.EXPLAIN_PLAIN', 'var UNUSED_EN');
+  assert.match(messages(html), /carries no "en" branch in L10N/);
 });
 
 test('a label the page invented is reported', () => {
   const found = messages(page({
-    logic: { STAGE_LABEL: "{ preflight: 'Подготовка', build: 'Разработка', ghost: 'Призрак' }" },
+    ru: { STAGE_LABEL: "{ preflight: 'Подготовка', build: 'Разработка', ghost: 'Призрак' }" },
   }));
-  assert.match(found, /stage "ghost" is labelled in the page and defined nowhere/);
+  assert.match(found, /stage \(ru\) "ghost" is labelled in the page and defined nowhere/);
 });
 
 test('a value label is checked the same way as a stage label', () => {
-  const found = messages(page({ logic: { TASK_STATUS: "{ queued: 'В работе' }" } }));
-  assert.match(found, /tasks\[\]\.status "queued" is labelled "В работе" in the page/);
+  const found = messages(page({ ru: { TASK_STATUS: "{ queued: 'В работе' }" } }));
+  assert.match(found, /tasks\[\]\.status \(ru\) "queued" is labelled "В работе" in the page/);
 });
 
 test('every value map is compared, not just the first', () => {
   const found = messages(page({
-    logic: { MODE: "{ semi: 'Ручной' }", DEPTH: "{ normal: 'Глубокая' }" },
+    ru: { MODE: "{ semi: 'Ручной' }", DEPTH: "{ normal: 'Глубокая' }" },
   }));
-  assert.match(found, /mode "semi"/);
-  assert.match(found, /depth "normal"/);
+  assert.match(found, /mode \(ru\) "semi"/);
+  assert.match(found, /depth \(ru\) "normal"/);
 });
 
 test('a stage order that differs from phases.md is reported', () => {
@@ -260,8 +311,10 @@ test('a vocabulary with no value table is reported once, not as every field', ()
   // rather than seven.
   const violations = checkDashboard(page(), spec)
     .filter(v => v.check === 'labels')
-    .filter(v => v.message.includes('Field, Value and Label'));
-  assert.equal(violations.length, 1);
+    .filter(v => /no table with columns Field, Value and Label/.test(v.message));
+  // One per language rather than one in all: the table is missing for both, and
+  // each language is a repair of its own column.
+  assert.equal(violations.length, 2);
 });
 
 test('stripComments keeps every line number in place', () => {
@@ -408,7 +461,7 @@ test('a plain explanation carrying banned shorthand is reported, with the word n
   const found = messages(page({
     plain: "progress: function () { return ['считается по медиана после гейта']; }",
   }));
-  assert.match(found, /a plain string in the plain explanations says "медиана"/);
+  assert.match(found, /a plain string in the plain explanations \(ru\) says "медиана"/);
   assert.match(found, /says "гейт"/);
 });
 
@@ -425,11 +478,13 @@ test('a label the screen shows is exempt, in its exact form and nowhere else', (
   const spec: SpecSources = {
     ...SPEC,
     'vocabulary.md': SPEC['vocabulary.md']
-      .replace('| Ход разработки | The таски as they are being built |',
-        '| Ход разработки | The таски as they are being built |\n| Гейты | The checks |'),
+      .replace('| Ход разработки | Development progress | The таски as they are being built |',
+        '| Ход разработки | Development progress | The таски as they are being built |'
+        + '\n| Гейты | Checks | The four checks |'),
   };
   const withLabel = (body: string): string =>
-    page({ plain: body }).replace('<h2>Ход разработки</h2>', '<h2>Ход разработки</h2><h2>Гейты</h2>');
+    page({ plain: body })
+      .replace('<h2>Ход разработки</h2>', '<h2>Ход разработки</h2><h2>Гейты</h2><h2>Checks</h2>');
 
   // The block the reader just clicked on is called «Гейты» on the screen, and a
   // popover forbidden from naming it could not teach it.
@@ -446,7 +501,10 @@ test('a label the screen shows is exempt, in its exact form and nowhere else', (
 });
 
 test('a page with no plain-explanation block at all is reported', () => {
-  assert.match(messages(page({ plain: null })), /carries no EXPLAIN_PLAIN block to check/);
+  assert.match(messages(page({ plain: null })),
+    /carries no L10N\.ru\.EXPLAIN_PLAIN block to check/);
+  assert.match(messages(page({ plainEn: null })),
+    /carries no L10N\.en\.EXPLAIN_PLAIN block to check/);
 });
 
 test('a specification with no Plain Words table is reported', () => {

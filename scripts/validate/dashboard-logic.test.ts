@@ -13,11 +13,15 @@ import { evaluateLogic, scriptBlock } from './dashboard-integrity.ts';
 
 const ASSET = 'skills/maestro/assets/dashboard.html';
 
+type Words = Record<string, Record<string, string>>;
+
 interface Logic {
   KNOWN_CONTRACT_VERSION: number;
   STAGE_ORDER: string[];
-  STAGE_LABEL: Record<string, string>;
-  TASK_STATUS: Record<string, string>;
+  L10N: { ru: Words; en: Words } & Record<string, Words>;
+  LANGUAGE_ORDER: string[];
+  languageOf: (state: unknown) => string;
+  words: (language?: string) => Words;
   REQUIREMENT_ORDER: string[];
   GATE_AFTER: Record<string, string>;
   label: (map: Record<string, string>, value: unknown) => string;
@@ -28,19 +32,19 @@ interface Logic {
   currentStage: (state: unknown) => { id: string; status: string } | null;
   orderedStages: (state: unknown) => Array<{ id: string; status: string }>;
   countRequirements: (list: unknown) => Record<string, number>;
-  contractNotice: (version: unknown) => string | null;
-  runNotice: (state: unknown) => string | null;
-  formatGap: (ms: unknown) => string;
+  contractNotice: (version: unknown, language?: string) => string | null;
+  runNotice: (state: unknown, language?: string) => string | null;
+  formatGap: (ms: unknown, language?: string) => string;
   longestSilence: (marks: number[]) => number | null;
   lastWrite: (state: unknown, marks: number[]) => number | null;
   silenceNotice: (
-    state: unknown, now: number, marks: number[], register?: string,
+    state: unknown, now: number, marks: number[], register?: string, language?: string,
   ) => { alarming: boolean; line: string } | null;
   EXPLAIN_ORDER: string[];
   explain: (
-    key: string, state: unknown, now: number, marks: number[], register?: string,
+    key: string, state: unknown, now: number, marks: number[],
+    register?: string, language?: string,
   ) => string[];
-  REGISTER: Record<string, string>;
   registerOf: (state: unknown) => string;
   isStopped: (state: unknown) => boolean;
   isStateShape: (value: unknown) => boolean;
@@ -49,7 +53,7 @@ interface Logic {
   lineOf: (value: unknown) => string;
   IDLE_CEILING_MS: number;
   plural: (n: number, one: string, few: string, many: string) => string;
-  formatMinutes: (ms: unknown) => string;
+  formatMinutes: (ms: unknown, language?: string) => string;
   collectMarks: (state: unknown) => number[];
   activeSpan: (from: number, to: number, marks: number[]) => number;
   worked: (from: string, state: unknown, now: number, until?: string, marks?: number[]) => number | null;
@@ -115,14 +119,64 @@ test('a duration that cannot be measured is a dash, never a zero', () => {
 });
 
 test('an unknown id renders as itself rather than as a blank', () => {
-  assert.equal(L.label(L.STAGE_LABEL, 'build'), 'Разработка');
-  assert.equal(L.label(L.STAGE_LABEL, 'polish'), 'polish');
-  assert.equal(L.label(L.TASK_STATUS, undefined), 'undefined');
+  assert.equal(L.label(L.L10N.ru['STAGE_LABEL']!, 'build'), 'Разработка');
+  assert.equal(L.label(L.L10N.en['STAGE_LABEL']!, 'build'), 'Development');
+  assert.equal(L.label(L.L10N.ru['STAGE_LABEL']!, 'polish'), 'polish');
+  assert.equal(L.label(L.L10N.ru['TASK_STATUS']!, undefined), 'undefined');
 });
 
 test('a label lookup does not fall through to Object.prototype', () => {
-  assert.equal(L.label(L.STAGE_LABEL, 'toString'), 'toString');
-  assert.equal(L.label(L.STAGE_LABEL, 'constructor'), 'constructor');
+  assert.equal(L.label(L.L10N.ru['STAGE_LABEL']!, 'toString'), 'toString');
+  assert.equal(L.label(L.L10N.ru['STAGE_LABEL']!, 'constructor'), 'constructor');
+});
+
+// The two branches carry the same key set, which is what lets the checker walk
+// the languages instead of learning a map name per language.
+test('both languages carry the same words under the same keys', () => {
+  assert.deepEqual([...L.LANGUAGE_ORDER], ['ru', 'en']);
+  assert.deepEqual(Object.keys(L.L10N), ['ru', 'en']);
+  const ru = Object.keys(L.L10N.ru).sort();
+  const en = Object.keys(L.L10N.en).sort();
+  assert.deepEqual(ru, en);
+  for (const map of ru) {
+    assert.deepEqual(
+      Object.keys(L.L10N.ru[map]!).sort(),
+      Object.keys(L.L10N.en[map]!).sort(),
+      `${map} holds different keys in the two languages`,
+    );
+  }
+});
+
+// Absent is `ru`, and absent is what every прогон written before the dial
+// carries. Painting one of those in English would report a choice nobody made.
+test('a state with no language paints Russian', () => {
+  assert.equal(L.languageOf(run()), 'ru');
+  assert.equal(L.languageOf({ language: 'en' }), 'en');
+  assert.equal(L.languageOf({ language: 'de' }), 'ru');
+  assert.equal(L.languageOf(null), 'ru');
+  assert.equal(L.words('de'), L.words('ru'));
+});
+
+test('every region is explained in both languages and both registers', () => {
+  for (const language of L.LANGUAGE_ORDER) {
+    for (const register of ['normal', 'plain']) {
+      for (const key of L.EXPLAIN_ORDER) {
+        const lines = L.explain(key, run(), NOW, [], register, language);
+        assert.ok(lines.length > 0, `${key} is silent in ${register}/${language}`);
+      }
+    }
+  }
+});
+
+test('the same region reads in the language it was asked for', () => {
+  assert.match(L.explain('tests', run(), NOW, [], 'normal', 'ru')[0]!, /тест/i);
+  assert.match(L.explain('tests', run(), NOW, [], 'normal', 'en')[0]!, /test/i);
+});
+
+test('a duration carries the units of the language it is printed in', () => {
+  assert.equal(L.formatMinutes(4 * MIN, 'en'), '4 min');
+  assert.equal(L.formatMinutes(65 * MIN, 'en'), '1 h 05 min');
+  assert.equal(L.formatGap(12_000, 'en'), '12 sec');
 });
 
 test('the run clock stops at finishedAt', () => {
@@ -812,8 +866,9 @@ test('a plain explanation carries the same numbers as the normal one', () => {
 });
 
 test('the register names the dials chip and nothing else', () => {
-  assert.equal(L.REGISTER['plain'], 'Простые');
-  assert.equal(L.REGISTER['normal'], 'Обычные');
+  assert.equal(L.L10N.ru['REGISTER']!['plain'], 'Простые');
+  assert.equal(L.L10N.ru['REGISTER']!['normal'], 'Обычные');
+  assert.equal(L.L10N.en['REGISTER']!['plain'], 'Plain');
   const state = busy();
   assert.match(L.explain('dials', { ...state, explain: 'plain' }, NOW, [], 'plain')[1]!,
     /объяснения «Простые»/);
