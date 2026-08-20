@@ -22,7 +22,8 @@ hits the gap cannot even guess what was meant.
 |---|---|---|---|
 | прогон | run | The whole cycle, from the brief to acceptance | сборка, билд, сессия, запуск |
 | Разработка | Development | The one stage where project code is written | сборка |
-| таск | task | One unit of work, cut in the plan phase, executed by one executor | задача, тикет, issue, стори |
+| таск | task | One unit of work, cut in the plan phase, handed whole to one субагент | задача, тикет, issue, стори |
+| субагент | subagent | An agent the прогон hands one таск or one check to, which works in its own context and reports back | исполнитель, читатель, воркер, агент |
 | бриф | brief | What the user originally asked for, in their own words | задача, ТЗ |
 | требование | requirement | One numbered line of the manifest, `R##` | пункт, пожелание |
 | манифест | manifest | The numbered list of requirements | список требований, чеклист |
@@ -188,7 +189,7 @@ opposite directions on purpose.
 opens with, and a register that renamed things would leave the user reading a
 screen whose words appear nowhere in what they were told. What `plain` adds is
 **one clause of explanation the first time a term appears**, in the same
-sentence — «таск — это один кусок работы, который делает один исполнитель».
+sentence — «таск — это один кусок работы, который делает один субагент».
 Once, and then never again in that прогон: a term re-explained every time reads
 as a tool that does not remember it already said it.
 
@@ -213,7 +214,7 @@ explained, not in brackets, not once.
 | рантайм | во время работы |
 | парсинг | чтение файла |
 | медиана | серединное значение |
-| хендофф | передача таска свежему исполнителю |
+| хендофф | передача таска свежему субагенту |
 
 The `Shorthand` column holds the words themselves, comma-separated where a
 family shares one replacement. It is read by a checker, so a word added here
@@ -317,18 +318,39 @@ than left to be discovered by a user who was promised plain words and was shown
 
 | Banned | Use instead |
 |---|---|
-| сборка | прогон |
+| сборк | прогон |
 | билд | прогон |
-| задача | таск |
+| задач | таск |
 | тикет | таск |
 | issue | таск |
 | ТЗ | бриф |
-| полировка | доводка |
+| полировк | доводка |
+| исполнител | субагент |
+| читател | субагент |
 
 A banned word may not appear in any label defined anywhere in this
 specification. `scripts/validate/spec-integrity.ts` enforces this against every
 `Label` column, which is why the labels above are the enforcement surface rather
-than a style suggestion.
+than a style suggestion. `scripts/validate/dashboard-integrity.ts` holds the
+dashboard's own explanations to the same list, in **both** registers — a banned
+word is not shorthand a plain reader is spared and a normal reader is allowed,
+it is a second name for something already named here, and the reader who meets
+it has no way to know the two are the same thing.
+
+**The `Banned` column holds stems, not whole words**, for the reason the English
+list is matched differently: Russian inflects, the column is matched as a
+substring, and a row reading «читатель» would let «читателя» through in the very
+sentence it was written to catch. So the row reads «читател» and every ending is
+caught by the one entry. The `Use instead` column is prose for a human and
+carries the whole word.
+
+**«исполнитель» and «читатель» are banned on the screen and in the chat, and
+nowhere else.** The specification's own `executor` and `independent reader` —
+the prompt files, the phase files, the ids they pass around — keep those names.
+They are internal English identifiers the user never reads, and the Russian word
+the user *does* read is allowed to differ from them. This paragraph is here so
+that the next reader finds the asymmetry recorded rather than mistaking it for a
+rename someone left half-finished.
 
 ### Banned Synonyms (en)
 

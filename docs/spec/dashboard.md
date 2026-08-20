@@ -153,6 +153,42 @@ must not do. The chip is named — «Объяснения: Простые» — 
 own label is «Обычная» and two bare chips a word apart read as one setting
 stated twice.
 
+## Every Стадия Explains Itself Too
+
+The eight rows of the `stages` region carry the same small `i` the regions do,
+and they open the same single popover. What a row's explanation holds is two
+things: what that стадия is responsible for, and where it stands in *this*
+прогон — its status, its clock, the note it left, and the findings of the gate
+that failed after it. The first half is the same sentence in every прогон; the
+second is read from the state, and is why the `i` is on the row rather than in
+the documentation.
+
+The texts live in `STAGE_EXPLAIN` and `STAGE_EXPLAIN_PLAIN` in the page's logic
+block, keyed by the стадия ids of [`phases.md`](phases.md) — the same ids the
+timeline already renders from. **Both registers are required**, exactly as for a
+region, and for the same reason: a стадия explained only for the reader who did
+not need it is a стадия that ships mute. Every status, стадия and dial in those
+sentences is resolved through the page's own label lookup rather than worded
+inline, so a стадия's popover cannot say «Готово» about a row the vocabulary has
+renamed. `scripts/validate/dashboard-integrity.ts` holds both maps against
+`STAGE_ORDER` in both directions and calls every entry, the way it already does
+for the regions.
+
+**A стадия is not a region, and must never be added to the table above.** A
+region is a block of the screen: declared in the `Key` column, marked exactly
+once with `data-region` in the markup, listed in `EXPLAIN_ORDER`, and held to all
+three by the checker. A стадия is a row inside the `stages` region, drawn from
+state and rebuilt on every poll — it satisfies none of the three. The `stages`
+region keeps its own `i` and its own text, which explains the timeline; the eight
+new ones explain the стадии in it.
+
+**The popover is opened by key, not by node.** Because the rows are rebuilt on
+every successful poll, a button captured when the popover opened is a node that
+has left the document seconds later. So the page remembers which стадия is open
+and re-finds its button after each render through a `data-explains` attribute:
+the explanation follows its row across a redraw, and closes by itself when the
+row it belongs to is gone.
+
 ## Silence
 
 The state is written at transitions and nowhere else, so a прогон is quiet for
