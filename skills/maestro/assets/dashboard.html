@@ -123,6 +123,10 @@
     cursor: pointer; vertical-align: middle;
   }
   .info:hover, .info:focus-visible { color: var(--ink); border-color: var(--muted); }
+  /* A row's i is quieter than a heading's: eight of them in a column would
+     otherwise read as eight warnings. */
+  .row .info { margin-left: .4rem; font-size: .62rem; border-color: transparent; }
+  .row:hover .info, .row .info:focus-visible { border-color: var(--line); }
   #explain {
     position: absolute; z-index: 10; max-width: 24rem;
     padding: .7rem .85rem;
@@ -554,6 +558,26 @@ globalThis.MAESTRO_LOGIC = (function () {
             : count + ' ' + plural(count, 'находка', 'находки', 'находок')
               + ' — ' + plural(count, 'отработана', 'отработаны', 'отработаны');
         },
+        // Where a стадия stands, in one line, for the popover on its row.
+        //
+        // One wording for both registers, like every other branch of this map:
+        // a status, a clock and a note are facts, and a fact does not get
+        // simpler when the reader does. Every word here is already safe for the
+        // plain reader, which is why the стадия explanations may share it
+        // instead of keeping two copies equal by hand.
+        stageStanding: function (name, status, clock, finished) {
+          var head = 'Этап «' + name + '» — ' + status;
+          if (clock === null) return head + '; часы по нему не шли.';
+          return head + ', ' + (finished ? 'заняло ' : 'на часах ') + clock + '.';
+        },
+        stageAria: function (name) { return 'Что делает этап: ' + name; },
+        stageNote: function (note) { return 'Заметка этапа: ' + note; },
+        stageGateFailed: function (count) {
+          return count === 0
+            ? 'Проверка после этого этапа не прошла, но замечаний в состоянии прогона нет.'
+            : 'Проверка после этого этапа не прошла — ' + count + ' '
+              + plural(count, 'замечание', 'замечания', 'замечаний') + ':';
+        },
         noFindings: 'Проверка не оставила замечаний.',
         noTasks: 'Таски ещё не нарезаны.',
         noRequirements: 'Требования ещё не записаны.',
@@ -751,6 +775,22 @@ globalThis.MAESTRO_LOGIC = (function () {
           return plain
             ? count + (one ? ' note — already dealt with' : ' notes — every one already dealt with')
             : count + (one ? ' finding — acted on' : ' findings — all acted on');
+        },
+        // The English twin of the same three lines. See the Russian ones for
+        // why one wording serves both registers.
+        stageStanding: function (name, status, clock, finished) {
+          var head = '«' + name + '» — ' + status;
+          if (clock === null) return head + '; no clock has run on it.';
+          return head + ', ' + (finished ? 'it took ' : '') + clock
+            + (finished ? '.' : ' on the clock.');
+        },
+        stageAria: function (name) { return 'What this step does: ' + name; },
+        stageNote: function (note) { return 'The step left a note: ' + note; },
+        stageGateFailed: function (count) {
+          return count === 0
+            ? 'The check after this step did not pass, and left no notes behind.'
+            : 'The check after this step did not pass — '
+              + count + (count === 1 ? ' note:' : ' notes:');
         },
         noFindings: 'The check left no findings.',
         noTasks: 'No tasks cut yet.',
@@ -1483,7 +1523,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         changes > 0
           ? 'По ходу прогона тумблеры меняли: записано изменений ' + changes + '. Смена записывается вместе с фазой, на которой произошла.'
           : 'Тумблеры не меняли с начала прогона.',
-        'Режим решает, сколько спрашивают у пользователя; глубина — насколько глубоко под бриф копать; доводка — идёт ли круг полировки после приёмки. Ни один тумблер не убирает гейт.'
+        'Режим решает, сколько спрашивают у пользователя; глубина — насколько глубоко под бриф копать; доводка — идёт ли круг доводки после приёмки. Ни один тумблер не убирает гейт.'
       ];
     },
 
@@ -1668,7 +1708,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Находок ' + found + ': под пройденными ' + settled + ', под проваленными ' + standing
             + '. Находка под пройденным гейтом — запись об уже отработанном, а не открытая проблема:'
             + ' гейт не проходят, пока замечание не закрыто. Поэтому такой список свёрнут и не окрашен в цвет провала.',
-        'Гейт — это сравнение двух документов прогона, а не мнение о нём. G4 читает сборку против манифеста, и спека при этом от читателя скрыта.'
+        'Гейт — это сравнение двух документов прогона, а не мнение о нём. G4 читает готовую работу против манифеста, и спека при этом от субагента скрыта.'
       ];
     }
   };
@@ -1718,7 +1758,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Этапов пройдено ' + p.stagesDone + ' из ' + p.stagesTotal + ', таски прошли '
             + Math.round(p.tasksShare * 100) + '% пути (полностью принято ' + p.tasksDone
             + ' из ' + p.tasksTotal + ') — вместе ' + p.percent + '%.',
-        'Таск — это один кусок работы, который делает один исполнитель. Полоска считает не только доделанные таски, а весь пройденный путь: начатый таск — это уже половина, проверяемый — почти весь. Поэтому она движется, пока идёт работа, а не стоит и потом прыгает. Этапы весят по-разному: разработка длинная, подготовка короткая.'
+        'Таск — это один кусок работы, который целиком делает один субагент — отдельный помощник, которому прогон отдаёт этот кусок и ждёт ответа. Полоска считает не только доделанные таски, а весь пройденный путь: начатый таск — это уже половина, проверяемый — почти весь. Поэтому она движется, пока идёт работа, а не стоит и потом прыгает. Этапы весят по-разному: разработка длинная, подготовка короткая.'
           + (p.tasksOffContract > 0
             ? ' ' + p.tasksOffContract + ' ' + plural(p.tasksOffContract, 'таск', 'таска', 'тасков')
               + ' ' + plural(p.tasksOffContract, 'записан', 'записаны', 'записаны')
@@ -1799,7 +1839,7 @@ globalThis.MAESTRO_LOGIC = (function () {
               ? ', и ещё ' + counts.offContract + ' ' + plural(counts.offContract, 'таск', 'таска', 'тасков')
                 + ' — со словом, которого страница не знает'
               : '') + '.',
-        'Ревью — это когда написанное читает и проверяет другой исполнитель. Большая цифра считает только полностью принятые таски, а полоска — весь путь: начатый таск это половина, проверяемый — почти весь. Пройдено ' + Math.round(travelled.share * 100) + '% пути. Полоска умеет и отступать: если проверка вернула таск в исправление, часть пути пропала вместе с работой.'
+        'Ревью — это когда написанное перечитывает и проверяет другой субагент — отдельный помощник, который этот код не писал. Большая цифра считает только полностью принятые таски, а полоска — весь путь: начатый таск это половина, проверяемый — почти весь. Пройдено ' + Math.round(travelled.share * 100) + '% пути. Полоска умеет и отступать: если проверка вернула таск в исправление, часть пути пропала вместе с работой.'
           + (counts.retries > 0
             ? ' Переделок ' + counts.retries + '. Таск, вернувшийся не готовым, идёт в ремонт, а не переписывается на месте.'
             : '')
@@ -1899,7 +1939,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Замечаний ' + found + ': под пройденными ' + settled + ', под непройденными ' + standing
             + '. Замечание под пройденной проверкой говорит о том, что уже исправлено: проверку не проходят,'
             + ' пока замечание открыто. Поэтому такой список свёрнут и не покрашен в цвет ошибки.',
-        'Проверка сравнивает два документа работы, а не высказывает о ней мнение. На последней, G4, готовую работу читают против вашего списка — а спецификацию от читателя прячут, чтобы он не подтвердил её сам себе.'
+        'Проверка сравнивает два документа работы, а не высказывает о ней мнение. На последней, G4, готовую работу сверяет с вашим списком отдельный субагент — помощник, которому прогон отдаёт одну проверку и который эту работу не делал; спецификацию от него прячут, чтобы он не подтвердил её сам себе.'
       ];
     }
   };
@@ -2353,6 +2393,103 @@ globalThis.MAESTRO_LOGIC = (function () {
     }
   };
 
+  /**
+   * What each стадия is responsible for, one sentence, per language and per
+   * register.
+   *
+   * A стадия is not a region and must never be added to `EXPLAIN_ORDER`: a
+   * region is a block of the screen, declared in the *What It Renders* table of
+   * docs/spec/dashboard.md, marked once with `data-region`, and held to both by
+   * the checker. A стадия is a row inside the `stages` region, rebuilt from
+   * state on every poll. So the стадии get their own pair of maps per language,
+   * keyed by the ids of STAGE_ORDER, and their own check.
+   *
+   * The job sentences come from the *Phases* table of docs/spec/phases.md, said
+   * in the словарь's own words. Everything after them is read from the прогон
+   * by `stageStanding`, through the same functions the row itself renders with.
+   */
+  function stageExplainer(language, what) {
+    return function (stage, state, now, marks) {
+      return [what].concat(stageStanding(stage, state, now, marks, language));
+    };
+  }
+
+  L10N.ru.STAGE_EXPLAIN = {
+    preflight: stageExplainer('ru',
+      'Подготовка заводит прогон: разбирает переданные аргументы и состояние репозитория, решает тумблеры, создаёт состояние прогона и поднимает этот дашборд.'),
+    manifest: stageExplainer('ru',
+      'Требования превращают бриф в манифест — нумерованный список требований R##, и рядом кладут сам бриф вашими словами.'),
+    briefing: stageExplainer('ru',
+      'Брифинг задаёт по манифесту вопросы, на которые прогон не может ответить сам, и складывает ответы и найденные образцы рядом с ним.'),
+    spec: stageExplainer('ru',
+      'Спецификация собирает из манифеста и ответов один документ, по которому дальше режут работу.'),
+    plan: stageExplainer('ru',
+      'План режет спецификацию на таски и записывает интерфейсы между ними — что каждый таск обещает соседним.'),
+    build: stageExplainer('ru',
+      'Разработка пишет код проекта по таскам и интерфейсам, а интерфейсы, найденные по дороге, записывает обратно.'),
+    review: stageExplainer('ru',
+      'Ревью читает написанное против тасков и интерфейсов — вторым субагентом, который этот код не писал.'),
+    acceptance: stageExplainer('ru',
+      'Приёмка сверяет готовую работу с манифестом и брифом и пишет итоговый отчёт.')
+  };
+
+  L10N.ru.STAGE_EXPLAIN_PLAIN = {
+    preflight: stageExplainer('ru',
+      'Подготовка — это самое начало: прогон разбирает, что ему передали, выбирает настройки, заводит состояние прогона и открывает вам эту страницу.'),
+    manifest: stageExplainer('ru',
+      'Здесь то, что вы попросили, превращается в нумерованный список требований — манифест. Требование — это одна строка этого списка с номером вида R01.'),
+    briefing: stageExplainer('ru',
+      'Брифинг — это вопросы: чего прогон не может решить за вас, он спрашивает, а ваши ответы и найденные примеры кладёт рядом со списком.'),
+    spec: stageExplainer('ru',
+      'Спецификация — это подробное описание того, что именно будет сделано. Её пишут из списка требований и ваших ответов, и дальше работу режут уже по ней.'),
+    plan: stageExplainer('ru',
+      'План режет спецификацию на таски. Таск — это кусок работы, который целиком делает один субагент — отдельный помощник, которому прогон отдаёт этот кусок и ждёт ответа. Заодно записывают, что каждый кусок обещает соседним.'),
+    build: stageExplainer('ru',
+      'Разработка — это когда пишется код самого проекта, таск за таском.'),
+    review: stageExplainer('ru',
+      'Ревью — это когда написанное перечитывает и проверяет другой субагент — отдельный помощник, который этот код не писал. Свежий взгляд замечает то, чего не заметил первый.'),
+    acceptance: stageExplainer('ru',
+      'Приёмка — это последняя сверка: готовую работу сравнивают с вашим списком требований и пишут итоговый отчёт.')
+  };
+
+  L10N.en.STAGE_EXPLAIN = {
+    preflight: stageExplainer('en',
+      'Setup opens the run: it reads the arguments it was given and the state of the repository, settles the dials, creates the run state, and raises this dashboard.'),
+    manifest: stageExplainer('en',
+      'Requirements turns the brief into the manifest — a numbered list of requirements, R##, with the brief itself kept beside it in your own words.'),
+    briefing: stageExplainer('en',
+      'Briefing asks the questions the manifest raises and the run cannot answer for itself, and files the answers and any references beside it.'),
+    spec: stageExplainer('en',
+      'Specification builds one document out of the manifest and the answers, and from here on the work is cut from it.'),
+    plan: stageExplainer('en',
+      'Plan cuts the specification into tasks and records the interfaces between them — what each task promises its neighbours.'),
+    build: stageExplainer('en',
+      'Development writes the project code against the tasks and the interfaces, and records the interfaces it discovers along the way.'),
+    review: stageExplainer('en',
+      'Review reads what was written against the tasks and the interfaces — by a second subagent, one that did not write this code.'),
+    acceptance: stageExplainer('en',
+      'Acceptance checks the finished work against the manifest and the brief, and writes the final report.')
+  };
+
+  L10N.en.STAGE_EXPLAIN_PLAIN = {
+    preflight: stageExplainer('en',
+      'Setup is the very beginning: the run reads what it was handed, chooses its settings, writes down how far it has got, and opens this page for you.'),
+    manifest: stageExplainer('en',
+      'This is where what you asked for becomes a numbered list of requirements. A requirement is one numbered line of that list, like R01.'),
+    briefing: stageExplainer('en',
+      'Briefing is the questions: whatever the run cannot decide for you it asks, and it keeps your answers and any examples it found beside the list.'),
+    spec: stageExplainer('en',
+      'The specification is the detailed description of what exactly will be made. It is written from the list of requirements and your answers, and from here on the work is cut from it.'),
+    plan: stageExplainer('en',
+      'Plan cuts the specification into tasks. A task is a piece of work done whole by one subagent — a separate helper the run hands that piece to and waits to hear back from. It also writes down what each piece promises the pieces beside it.'),
+    build: stageExplainer('en',
+      'Development is where the project code itself gets written, one task at a time.'),
+    review: stageExplainer('en',
+      'Review is where a second subagent — a separate helper that did not write this code — reads it back and checks it. A fresh pair of eyes catches what the first one missed.'),
+    acceptance: stageExplainer('en',
+      'Acceptance is the last check: the finished work is compared with your own list of requirements, and the final report is written.')
+  };
+
   /** The regions the page must be able to explain, in the order they appear. */
   var EXPLAIN_ORDER = [
     'dials', 'progress', 'coverage', 'stage', 'elapsed', 'estimate', 'tasks', 'debt',
@@ -2366,6 +2503,59 @@ globalThis.MAESTRO_LOGIC = (function () {
     var make = from[key];
     if (!make) return [];
     return make(state || {}, now, marks || []);
+  }
+
+  /**
+   * Where a стадия stands in this прогон: its status, its clock, its note, and
+   * the findings of the check that failed after it.
+   *
+   * Every figure is read through the function the row itself renders with —
+   * `worked` for the clock, `label` for the status, `gateFor` for the check —
+   * so the popover cannot disagree with the line it opened from. Nothing here
+   * is worded twice by register: a status and a clock are facts.
+   */
+  function stageStanding(stage, state, now, marks, language) {
+    var said = words(language);
+    var lines = [];
+    var span = stage.startedAt
+      ? worked(stage.startedAt, state, now, stage.finishedAt || undefined, marks || [])
+      : null;
+    lines.push(said.UI.stageStanding(
+      label(said.STAGE_LABEL, stage.id),
+      label(said.STAGE_STATUS, stage.status).toLowerCase(),
+      span === null ? null : formatDuration(span),
+      !!stage.finishedAt
+    ));
+    if (stage.note) lines.push(said.UI.stageNote(lineOf(stage.note)));
+
+    var gate = gateFor(state, stage.id);
+    if (gate && gate.status === 'failed') {
+      var findings = (gate.findings || []);
+      lines.push(said.UI.stageGateFailed(findings.length));
+      findings.forEach(function (finding) { lines.push(lineOf(finding)); });
+    }
+    return lines;
+  }
+
+  /**
+   * `explain`, for a row of the timeline rather than for a block of the screen.
+   *
+   * An id the registries do not hold returns `[]` rather than throwing: the
+   * caller is a click on a button the page drew, and a page that throws on one
+   * unknown стадия stops rendering every known one.
+   */
+  function explainStage(id, state, now, marks, register, language) {
+    var said = words(language);
+    var from = ((register || registerOf(state)) === 'plain')
+      ? said.STAGE_EXPLAIN_PLAIN : said.STAGE_EXPLAIN;
+    var make = from[id];
+    if (!make) return [];
+    var found = null;
+    orderedStages(state || {}).forEach(function (stage) {
+      if (stage.id === id) found = stage;
+    });
+    if (!found) return [];
+    return make(found, state || {}, now, marks || []);
   }
 
   /** A frozen clock with no explanation is the failure mode this guards. */
@@ -2452,6 +2642,8 @@ globalThis.MAESTRO_LOGIC = (function () {
     silenceNotice: silenceNotice,
     EXPLAIN_ORDER: EXPLAIN_ORDER,
     explain: explain,
+    stageStanding: stageStanding,
+    explainStage: explainStage,
     isStopped: isStopped,
     isStateShape: isStateShape,
     readOutcome: readOutcome
@@ -2641,6 +2833,10 @@ globalThis.MAESTRO_SNAPSHOT = null;
   var lastGood = null;
   var pollTimer = null;
   var refillOpenExplainer = function () {};
+  // renderStages draws its rows long after mountExplainers has run, and it
+  // draws them again on every poll, so the row's button cannot hold a closure
+  // over the controller — it asks for it by name at click time instead.
+  var toggleExplainer = function () {};
   var marks = [];
 
   function el(id) { return document.getElementById(id); }
@@ -2872,7 +3068,18 @@ globalThis.MAESTRO_SNAPSHOT = null;
 
     L.orderedStages(state).forEach(function (stage) {
       var row = put(host, 'div', null, 'row stage stage-' + stage.status);
-      put(row, 'span', L.label(T.STAGE_LABEL, stage.id), 'name');
+      var name = put(row, 'span', L.label(T.STAGE_LABEL, stage.id), 'name');
+      // Inside `.name`, so the row's four columns are untouched by it.
+      (function (key) {
+        var info = put(name, 'button', 'i', 'info');
+        info.type = 'button';
+        info.setAttribute('data-explains', key);
+        info.setAttribute('aria-label', T.UI.stageAria(L.label(T.STAGE_LABEL, stage.id)));
+        info.addEventListener('click', function (event) {
+          event.stopPropagation();
+          toggleExplainer(key, info);
+        });
+      }('stage:' + stage.id));
       put(row, 'span', L.label(T.STAGE_STATUS, stage.status), 'status');
       var clock = put(row, 'span', '', 'clock');
       if (stage.startedAt) {
@@ -3082,12 +3289,29 @@ globalThis.MAESTRO_SNAPSHOT = null;
       box.hidden = true;
     }
 
+    // One key space for two kinds of thing: a region is named by its own key,
+    // a стадия by `stage:<id>`. That is what lets close, refill and reopen stay
+    // one code path rather than three that have to agree.
+    function linesFor(key) {
+      var now = Date.now();
+      var register = L.registerOf(lastGood);
+      return key.indexOf('stage:') === 0
+        ? L.explainStage(key.slice(6), lastGood, now, marks, register, lang)
+        : L.explain(key, lastGood, now, marks, register, lang);
+    }
+
     function fill(key) {
       clear(box);
-      L.explain(key, lastGood, Date.now(), marks, L.registerOf(lastGood), lang)
-        .forEach(function (line, index) {
-          put(box, 'p', line, index === 0 ? 'what' : null);
-        });
+      linesFor(key).forEach(function (line, index) {
+        put(box, 'p', line, index === 0 ? 'what' : null);
+      });
+    }
+
+    function toggle(key, button) {
+      if (open === key) return close();
+      open = key;
+      fill(key);
+      place(button);
     }
 
     function place(button) {
@@ -3119,12 +3343,10 @@ globalThis.MAESTRO_SNAPSHOT = null;
         // language is in force, and the name has to follow a reader who
         // switches languages with the popover already mounted.
         button.setAttribute('data-aria-region', key);
+        button.setAttribute('data-explains', key);
         button.addEventListener('click', function (event) {
           event.stopPropagation();
-          if (open === key) return close();
-          open = key;
-          fill(key);
-          place(button);
+          toggle(key, button);
         });
       }(regions[i]));
     }
@@ -3139,7 +3361,22 @@ globalThis.MAESTRO_SNAPSHOT = null;
     // An explanation is about the прогон, so it follows it: a popover left open
     // while the state moves is refilled rather than left describing a moment
     // that has passed.
-    refillOpenExplainer = function () { if (open) fill(open); };
+    //
+    // A стадия's button is a different node after every poll, so the popover
+    // cannot hold on to the one it was opened from. It re-finds the button by
+    // key and re-places itself over it — and closes when the row is gone, which
+    // is the honest thing to do with an explanation of something no longer on
+    // the screen. A region's heading is drawn once and needs neither.
+    refillOpenExplainer = function () {
+      if (!open) return;
+      fill(open);
+      if (open.indexOf('stage:') !== 0) return;
+      var button = document.querySelector('[data-explains="' + open + '"]');
+      if (!button) return close();
+      place(button);
+    };
+
+    toggleExplainer = toggle;
   }
 
   mountExplainers();
