@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { checkSpec, parseTables, type Violation } from './spec-integrity.ts';
+import { carries, checkSpec, parseTables, type Violation } from './spec-integrity.ts';
 
 // Fixtures are generated per test rather than committed: each one differs from
 // the passing baseline by exactly the defect under test, which is easier to
@@ -12,14 +12,18 @@ import { checkSpec, parseTables, type Violation } from './spec-integrity.ts';
 const BASELINE: Record<string, string> = {
   'vocabulary.md': `# Vocabulary
 
-| Stage id | Label |
-|---|---|
-| preflight | Подготовка |
-| build | Разработка |
+| Stage id | Label | Label (en) |
+|---|---|---|
+| preflight | Подготовка | Setup |
+| build | Разработка | Development |
 
 | Banned | Use instead |
 |---|---|
 | сборка | прогон |
+
+| Banned (en) | Use instead (en) |
+|---|---|
+| build | run |
 `,
   'phases.md': `# Phases
 
@@ -164,7 +168,7 @@ test('a state field written in an unknown phase is reported', async () => {
 
 test('a stage without a label is reported', async () => {
   const violations = await violationsFor({
-    'vocabulary.md': `| Stage id | Label |\n|---|---|\n| preflight | Подготовка |\n\n| Banned | Use instead |\n|---|---|\n| сборка | прогон |\n`,
+    'vocabulary.md': `| Stage id | Label | Label (en) |\n|---|---|---|\n| preflight | Подготовка | Setup |\n\n| Banned | Use instead |\n|---|---|\n| сборка | прогон |\n\n| Banned (en) | Use instead (en) |\n|---|---|\n| build | run |\n`,
   });
   assert.equal(violations.length, 1);
   assert.equal(violations[0]?.check, 'labels');
@@ -173,7 +177,7 @@ test('a stage without a label is reported', async () => {
 
 test('a label for a phase that is not a stage is reported', async () => {
   const violations = await violationsFor({
-    'vocabulary.md': `| Stage id | Label |\n|---|---|\n| preflight | Подготовка |\n| build | Разработка |\n| memory | Память |\n\n| Banned | Use instead |\n|---|---|\n| сборка | прогон |\n`,
+    'vocabulary.md': `| Stage id | Label | Label (en) |\n|---|---|---|\n| preflight | Подготовка | Setup |\n| build | Разработка | Development |\n| memory | Память | Memory |\n\n| Banned | Use instead |\n|---|---|\n| сборка | прогон |\n\n| Banned (en) | Use instead (en) |\n|---|---|\n| build | run |\n`,
   });
   assert.equal(violations.length, 1);
   assert.match(violations[0]?.message ?? '', /not a stage in phases\.md/);
@@ -181,7 +185,7 @@ test('a label for a phase that is not a stage is reported', async () => {
 
 test('a banned term inside a label is reported', async () => {
   const violations = await violationsFor({
-    'vocabulary.md': `| Stage id | Label |\n|---|---|\n| preflight | Подготовка |\n| build | Сборка |\n\n| Banned | Use instead |\n|---|---|\n| сборка | прогон |\n`,
+    'vocabulary.md': `| Stage id | Label | Label (en) |\n|---|---|---|\n| preflight | Подготовка | Setup |\n| build | Сборка | Development |\n\n| Banned | Use instead |\n|---|---|\n| сборка | прогон |\n\n| Banned (en) | Use instead (en) |\n|---|---|\n| build | run |\n`,
   });
   assert.equal(violations.length, 1);
   assert.equal(violations[0]?.check, 'banned');
@@ -197,7 +201,7 @@ test('a specification missing safety.md is rejected', async () => {
 
 test('a banned term is caught in a label defined outside the core documents', async () => {
   const violations = await violationsFor({
-    'dashboard.md': `# Dashboard\n\n| Region | Label |\n|---|---|\n| header | Сборка |\n`,
+    'dashboard.md': `# Dashboard\n\n| Region | Label | Label (en) |\n|---|---|---|\n| header | Сборка | Run |\n`,
   });
   assert.equal(violations.length, 1);
   assert.equal(violations[0]?.check, 'banned');
@@ -206,7 +210,7 @@ test('a banned term is caught in a label defined outside the core documents', as
 
 test('a document beyond the required set is still parsed', async () => {
   const violations = await violationsFor({
-    'appendix.md': `# Appendix\n\n| Region | Label |\n|---|---|\n| footer | Сборка |\n`,
+    'appendix.md': `# Appendix\n\n| Region | Label | Label (en) |\n|---|---|---|\n| footer | Сборка | Run |\n`,
   });
   assert.equal(violations.length, 1);
   assert.equal(violations[0]?.check, 'banned');
@@ -305,4 +309,93 @@ test('dials with no mode table is reported', async () => {
   assert.equal(violations.length, 1);
   assert.equal(violations[0]?.file, 'dials.md');
   assert.match(violations[0]?.message ?? '', /no table with columns Mode and Human gates/);
+});
+
+
+// --- the second label column ------------------------------------------------
+//
+// A column the scan does not know about is worse than a missing check: the
+// English labels would ship unchecked while `spec-integrity: OK` was printed.
+
+test('a banned English term inside an English label is reported', async () => {
+  const violations = await violationsFor({
+    'vocabulary.md': `| Stage id | Label | Label (en) |\n|---|---|---|\n`
+      + `| preflight | Подготовка | Setup |\n| build | Разработка | Build |\n\n`
+      + `| Banned | Use instead |\n|---|---|\n| сборка | прогон |\n\n`
+      + `| Banned (en) | Use instead (en) |\n|---|---|\n| build | run |\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'banned');
+  assert.match(violations[0]?.message ?? '', /label "Build" uses banned term "build"/);
+});
+
+// The reason the English list is matched on word boundaries: `Rebuilt` carries
+// the letters of `build` and none of its meaning, and a substring match would
+// report it while the Russian list needs a substring match to catch «сборки».
+test('an English label that merely contains a banned term is left alone', async () => {
+  const violations = await violationsFor({
+    'vocabulary.md': `| Stage id | Label | Label (en) |\n|---|---|---|\n`
+      + `| preflight | Подготовка | Setup |\n| build | Разработка | Rebuilt work |\n\n`
+      + `| Banned | Use instead |\n|---|---|\n| сборка | прогон |\n\n`
+      + `| Banned (en) | Use instead (en) |\n|---|---|\n| build | run |\n`,
+  });
+  assert.deepEqual(violations, []);
+});
+
+// The mirror of the test above, and the reason the two columns are matched
+// differently: «Пересборка» carries «сборка» inside it and is caught, while
+// `Rebuilt` carries `build` inside it and is not. Russian inflects and compounds
+// onto the stem; English puts a different word around it.
+test('a Russian label containing a banned stem is reported', async () => {
+  const violations = await violationsFor({
+    'vocabulary.md': `| Stage id | Label | Label (en) |\n|---|---|---|\n`
+      + `| preflight | Подготовка | Setup |\n| build | Пересборка | Development |\n\n`
+      + `| Banned | Use instead |\n|---|---|\n| сборка | прогон |\n\n`
+      + `| Banned (en) | Use instead (en) |\n|---|---|\n| build | run |\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.match(violations[0]?.message ?? '', /banned term "сборка"/);
+});
+
+test('a row with one label and not the other is reported', async () => {
+  const violations = await violationsFor({
+    'vocabulary.md': `| Stage id | Label | Label (en) |\n|---|---|---|\n`
+      + `| preflight | Подготовка | Setup |\n| build | Разработка | |\n\n`
+      + `| Banned | Use instead |\n|---|---|\n| сборка | прогон |\n\n`
+      + `| Banned (en) | Use instead (en) |\n|---|---|\n| build | run |\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'labels');
+  assert.match(violations[0]?.message ?? '', /"Разработка" has no Label \(en\) beside it/);
+});
+
+test('a table of labels that carries only one language is reported once', async () => {
+  // Once, not once per row: the column is what is missing, and every row would
+  // otherwise report the same repair.
+  const violations = await violationsFor({
+    'appendix.md': `# Appendix\n\n| Region | Label |\n|---|---|\n`
+      + `| footer | Долг |\n| header | Этапы |\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'labels');
+  assert.match(violations[0]?.message ?? '', /carries no Label \(en\) column/);
+});
+
+test('a specification with no English banned list is reported', async () => {
+  const violations = await violationsFor({
+    'vocabulary.md': `| Stage id | Label | Label (en) |\n|---|---|---|\n`
+      + `| preflight | Подготовка | Setup |\n| build | Разработка | Development |\n\n`
+      + `| Banned | Use instead |\n|---|---|\n| сборка | прогон |\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'banned');
+  assert.match(violations[0]?.message ?? '', /Banned \(en\) and Use instead \(en\)/);
+});
+
+test('carries matches a stem one way and a whole word the other', () => {
+  assert.equal(carries('пересборка', 'сборка', false), true);
+  assert.equal(carries('сборка кода', 'сборка', false), true);
+  assert.equal(carries('rebuilt work', 'build', true), false);
+  assert.equal(carries('the build', 'build', true), true);
+  assert.equal(carries('build-time', 'build', true), true);
 });

@@ -86,11 +86,32 @@ export function parseTables(markdown: string): Table[] {
   return tables;
 }
 
-const findTable = (tables: Table[], required: string[]): Table | undefined =>
+const findTable = (tables: Table[], required: readonly string[]): Table | undefined =>
   tables.find(table => required.every(column => table.columns.includes(column)));
 
 export const cleanCell = (value: string | number | undefined): string =>
   String(value ?? '').replace(/`/g, '').trim();
+
+/**
+ * One label column and the banned list it is held to.
+ *
+ * The lists are two lists, not one list translated — `vocabulary.md` says why
+ * under *Plain Words*. The matching differs with them: Russian is inflected and
+ * a stem has to catch every case of it, while English is not and a substring
+ * match would ban `rebuilt` for containing `build`.
+ */
+const LABEL_SURFACES = [
+  { column: 'Label', bannedColumns: ['Banned', 'Use instead'], wordwise: false },
+  { column: 'Label (en)', bannedColumns: ['Banned (en)', 'Use instead (en)'], wordwise: true },
+] as const;
+
+const escapeForRegExp = (term: string): string => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Does this label carry that term — as a stem, or as a whole word? */
+export function carries(label: string, term: string, wordwise: boolean): boolean {
+  if (!wordwise) return label.includes(term);
+  return new RegExp(`\\b${escapeForRegExp(term)}\\b`).test(label);
+}
 
 export async function checkSpec(specDir: string): Promise<Violation[]> {
   const violations: Violation[] = [];
@@ -261,27 +282,64 @@ export async function checkSpec(specDir: string): Promise<Violation[]> {
   }
 
   // --- no banned synonym survives inside a defined label -------------------
-  const bannedTable = findTable(tablesOf('vocabulary.md'), ['Banned', 'Use instead']);
-  if (!bannedTable) {
-    add('banned', 'vocabulary.md', 0, 'no table with columns Banned and Use instead');
-  } else {
+  //
+  // Two label columns and two banned lists, walked by a loop rather than by two
+  // copies of the same block: a language forgotten here would ship its labels
+  // unchecked while the check reported success, and the loop is what makes that
+  // impossible to do by omission.
+  for (const surface of LABEL_SURFACES) {
+    const bannedTable = findTable(tablesOf('vocabulary.md'), surface.bannedColumns);
+    if (!bannedTable) {
+      add('banned', 'vocabulary.md', 0,
+        `no table with columns ${surface.bannedColumns.join(' and ')}`);
+      continue;
+    }
     const banned = bannedTable.rows
-      .map(row => cleanCell(row['Banned']).toLowerCase())
+      .map(row => cleanCell(row[surface.bannedColumns[0] ?? '']).toLowerCase())
       .filter(Boolean);
+
     for (const [name, tables] of docs) {
       for (const table of tables) {
-        if (!table.columns.includes('Label')) continue;
+        if (!table.columns.includes(surface.column)) continue;
         for (const row of table.rows) {
-          const label = cleanCell(row['Label']).toLowerCase();
-          const hit = banned.find(term => label.includes(term));
+          const raw = cleanCell(row[surface.column]);
+          const label = raw.toLowerCase();
+          const hit = banned.find(term => carries(label, term, surface.wordwise));
           if (hit) {
             add('banned', name, row.__line,
-              `label "${cleanCell(row['Label'])}" uses banned term "${hit}"`);
+              `label "${raw}" uses banned term "${hit}"`);
           }
         }
       }
     }
-    log.info('banned', 'labels scanned for banned terms', { terms: banned.length });
+    log.info('banned', 'labels scanned for banned terms',
+      { column: surface.column, terms: banned.length });
+  }
+
+  // --- a language is never half-supported ----------------------------------
+  //
+  // A row with one label and not the other is a hole in a screen rather than a
+  // wording question: whoever meets it reads a word in a language they did not
+  // choose, or reads nothing at all, and neither one can be guessed past.
+  for (const [name, tables] of docs) {
+    for (const table of tables) {
+      const has = LABEL_SURFACES.map(surface => table.columns.includes(surface.column));
+      if (!has.some(Boolean)) continue;
+      if (!has.every(Boolean)) {
+        const missing = LABEL_SURFACES.filter((_, at) => !has[at]).map(s => s.column);
+        add('labels', name, table.line,
+          `this table defines labels and carries no ${missing.join(' or ')} column — `
+          + 'every label the user reads exists in both languages');
+        continue;
+      }
+      for (const row of table.rows) {
+        const filled = LABEL_SURFACES.map(surface => cleanCell(row[surface.column]));
+        if (filled.every(cell => cell === '') || filled.every(cell => cell !== '')) continue;
+        const empty = LABEL_SURFACES.filter((_, at) => filled[at] === '').map(s => s.column);
+        add('labels', name, row.__line,
+          `"${filled.find(cell => cell !== '')}" has no ${empty.join(' or ')} beside it`);
+      }
+    }
   }
 
   return violations;

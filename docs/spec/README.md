@@ -51,17 +51,24 @@ manifest whose numbering shifts cannot be checked against anything.
    parses them. Renaming a column is a breaking change to that script.
 4. **Russian appears only as data.** These documents are English. A Russian
    string inside them is always a user-facing label being defined, never prose.
+   Since the language dial, every such label has an English twin in a `(en)`
+   column beside it, and that twin is data in exactly the same way — English
+   prose and an English label are told apart by which column they sit in.
 
 ## Machine-Readable Tables
 
 | Document | Table | Required columns |
 |---|---|---|
-| `vocabulary.md` | Stage labels | `Stage id`, `Label` |
+| `vocabulary.md` | Stage labels | `Stage id`, `Label`, `Label (en)` |
 | `vocabulary.md` | Banned synonyms | `Banned`, `Use instead` |
+| `vocabulary.md` | Banned synonyms (en) | `Banned (en)`, `Use instead (en)` |
+| `vocabulary.md` | Plain words | `Shorthand`, `Say instead` |
+| `vocabulary.md` | Plain words (en) | `Shorthand (en)`, `Say instead (en)` |
 | `phases.md` | Phases | `Id`, `Name`, `Stage`, `Reads`, `Produces` |
 | `phases.md` | Mode Matrix | `Phase`, then one column per mode defined in `dials.md` |
 | `dials.md` | Modes | `Mode`, `Default`, `Human gates` |
 | `dials.md` | Register | `Register`, `Default`, `What changes` |
+| `dials.md` | Language | `Language`, `What changes` — and no `Default`, because it is derived |
 | `gates.md` | Gates | `Gate`, `After phase`, `Pass condition` |
 | `artifacts.md` | Run artifacts | `Artifact`, `Writer`, `Readers`, `Mutable` |
 | `state-contract.md` | State fields | `Field`, `Type`, `Written in`, `Read by` |
