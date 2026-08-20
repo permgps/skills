@@ -151,6 +151,11 @@ check is for.
 
 ### 5. Raise the dashboard
 
+<!-- maestro:view:opens-panel -->
+This is the one step in the bundle that opens a page in front of the user. The
+rule that makes it the only one is in `SKILL.md`, under *The Dashboard*, and it
+holds for every phase after this; what follows is the pane's share of it.
+
 Copy two files into `.maestro/`, beside the state you just wrote —
 [`../assets/dashboard.html`](../assets/dashboard.html) and
 [`../tools/sync.py`](../tools/sync.py) — then run the tool once:
@@ -193,6 +198,12 @@ each of them fails quietly:
   navigate to a local port that no preview call preceded is refused. Use
   `localhost` in that address — `127.0.0.1` is refused where `localhost` is
   accepted, even though the server binds to `127.0.0.1` either way.
+- **The pane is the panel's, for the rest of the прогон.** Nothing else goes in
+  it. Two прогоны have now put a second page there — a субагент's own checks
+  page, on a port it raised for itself — and afterwards the panel was gone from
+  the tab strip while the run went on writing state nobody could see. Whether a
+  pane keeps only one preview at a time is the pane's business and not something
+  you can settle from here; not creating the situation is entirely yours.
 - **A pane silences navigation, not sub-resource loading.** `location.reload()`
   and `<meta http-equiv="refresh">` do nothing there. The page knows this and
   re-loads the state with a fresh script tag instead, so it keeps ticking and
@@ -231,6 +242,21 @@ row, who found the dashboard minutes later by pressing it themselves — and the
 rule was written in this file both times. A phase file is read once, several
 steps before the sentence is needed; the tool's output is read at the moment of
 saying it.
+
+**If the panel is gone, bring it back.** Two things say so: the user, and a
+`sync.py` call that reports the address moved. Either way — run the tool again,
+open the address it prints once, look that a clock moves, and say the address in
+the chat. It is the same two-part navigation as the first time, and it is not an
+occasion for a second announcement block: one line with the address, then back to
+the стадия you were in. `MAESTRO_SYNC_DEBUG=1` on that call is how a прогон that
+suspects the panel's own server explains itself; that output is on `stderr`, for
+you and not for the chat.
+
+**The one exception, and it is narrow.** If something other than the panel truly
+has to be seen, you are the one who shows it — never a субагент — it goes to the
+system browser and never into the pane holding the panel, and the user is told in
+one line what they are about to see and why. The exception is here so the rule is
+not quietly broken, not so it is used.
 
 **Do not open anything in a remote session.** If `SSH_CONNECTION` or `CI` is
 set, print the path and move on: a window on someone else's machine helps nobody.

@@ -105,6 +105,13 @@ For each таск that returns done, in this order:
    writing it here would mean the same word described a checked таск in one
    place and an unchecked one in another.
 
+**Before launching the next wave, check the panel is still there.** If anything
+in the wave's output mentions a page opened or a server raised, or the `sync.py`
+call after the state write reported that the address moved, bring the panel back
+the way step 5 of preflight says. This phase is the only one that runs субагенты,
+so it is the only one where the panel is at risk from the прогон's own work; the
+rest inherit the rule from `SKILL.md` and need nothing here.
+
 Then take whatever became launchable and go back to step 3.
 
 **Write each transition into `tasks[]` as it happens**, not in a batch at the

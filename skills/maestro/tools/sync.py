@@ -20,7 +20,10 @@ It does five things, in this order, and reports what it did:
 3.  **Puts `index.html` beside the page**, because a viewer can be handed an
     origin with no path, and a directory listing is what it shows otherwise.
 4.  **Raises a static server** over this directory, bound to the loopback
-    interface, if one is not already answering for it — and prints the address.
+    interface, if one is not already answering for it — and prints the address,
+    with a line above it when that address has moved since the last call. A
+    moved address is the one thing here a user cannot recover from on their own:
+    the link they were handed is dead, and nothing else in the прогон says so.
 5.  **Checks every status against the contract.** This runs last, after the
     address, and on purpose: a прогон whose таск carries a word the contract
     does not define is still worth showing, and a stopped дашборд helps nobody.
@@ -93,6 +96,29 @@ FOLDED = {
 }
 
 
+# What the прогон says when the address is not the one it handed out last time.
+# Above the address rather than below it: a user who reads the new link first has
+# no reason to look further, and the dead tab stays open beside it.
+MOVED = {
+    'ru': {
+        'taken': 'sync: адрес панели сменился. Прежний '
+                 '(http://localhost:%d/dashboard.html) больше не отвечает — его '
+                 'занял кто-то другой. Откройте новый и скажите его пользователю.',
+        'gone': 'sync: адрес панели сменился. Прежний '
+                '(http://localhost:%d/dashboard.html) больше не отвечает. '
+                'Откройте новый и скажите его пользователю.',
+    },
+    'en': {
+        'taken': 'sync: the panel has a new address. The old one '
+                 '(http://localhost:%d/dashboard.html) is dead — something else '
+                 'took it. Open the new one and say it to the user.',
+        'gone': 'sync: the panel has a new address. The old one '
+                '(http://localhost:%d/dashboard.html) is dead. Open the new one '
+                'and say it to the user.',
+    },
+}
+
+
 def spoken(text):
     """The run's language, or Russian — the same fallback the page makes."""
     try:
@@ -142,25 +168,33 @@ def place_index():
         return False
 
 
-def running_for_this_directory():
-    """The recorded port, if the process behind it is still serving *this* run."""
+def recorded():
+    """The pid and port the last call wrote down, or (None, None)."""
     try:
         record = json.load(open(SERVE, encoding='utf-8'))
-        pid, port = int(record['pid']), int(record['port'])
+        return int(record['pid']), int(record['port'])
     except Exception:
-        return None
+        return None, None
 
+
+def command_of(pid):
+    """What `ps` says that process is running, or '' when it is gone."""
+    if pid is None:
+        return ''
     try:
-        command = subprocess.run(['ps', '-p', str(pid), '-o', 'command='],
-                                 capture_output=True, text=True, timeout=5).stdout
+        return subprocess.run(['ps', '-p', str(pid), '-o', 'command='],
+                              capture_output=True, text=True, timeout=5).stdout.strip()
     except Exception:
-        return None
+        return ''
 
-    # The directory has to match. A pid file that only says "a server is up"
-    # is how one project ends up pointed at another project's dashboard.
-    if DIR in command and 'http.server' in command:
-        return port
-    return None
+
+def ours(command):
+    """Whether that command line is a server for *this* directory.
+
+    The directory has to match. A pid file that only says "a server is up" is
+    how one project ends up pointed at another project's dashboard.
+    """
+    return bool(command) and DIR in command and 'http.server' in command
 
 
 def free(port):
@@ -172,22 +206,22 @@ def free(port):
             return False
 
 
-def pick_port():
-    """Prefer the port already handed to the user, so a copied link keeps working."""
-    try:
-        remembered = int(json.load(open(SERVE, encoding='utf-8'))['port'])
-        if free(remembered):
-            return remembered
-    except Exception:
-        pass
+def pick_port(keep):
+    """`keep`, when the port already handed to the user is still free to take.
+
+    Preferring it is what makes a copied link survive a server that died: the
+    caller establishes whether it is free, because whether it was is also the
+    reason the address moved, and that reason has to be said out loud.
+    """
+    if keep is not None:
+        return keep
     with socket.socket() as probe:
         probe.bind(('127.0.0.1', 0))
         return probe.getsockname()[1]
 
 
-def serve():
+def serve(port, moved_from):
     """Raise a server for this directory, detached, on the loopback only."""
-    port = pick_port()
     try:
         process = subprocess.Popen(
             [sys.executable, '-m', 'http.server', str(port),
@@ -198,7 +232,12 @@ def serve():
         debug('server refused to start: %s' % error)
         return None
 
-    json.dump({'pid': process.pid, 'port': port}, open(SERVE, 'w', encoding='utf-8'))
+    # The port this address replaced, written down rather than only printed: the
+    # call that moves the address is not always the call whose output is read.
+    record = {'pid': process.pid, 'port': port}
+    if moved_from is not None:
+        record['previousPort'] = moved_from
+    json.dump(record, open(SERVE, 'w', encoding='utf-8'))
     return port
 
 
@@ -239,17 +278,34 @@ def main():
     mirrored = mirror(text)
     linked = place_index()
 
-    port = running_for_this_directory()
-    reused = port is not None
-    if port is None:
-        port = serve()
+    pid, remembered = recorded()
+    command = command_of(pid)
+    reused = ours(command)
+    held = None
+    moved_from = None
 
+    if reused:
+        port, why = remembered, 'the recorded server is still this directory\'s'
+    else:
+        held = (not free(remembered)) if remembered is not None else None
+        chosen = pick_port(remembered if held is False else None)
+        why = ('the remembered port was free' if held is False
+               else 'the remembered port is held by something else' if held
+               else 'nothing was remembered')
+        if remembered is not None and chosen != remembered:
+            moved_from = remembered
+        port = serve(chosen, moved_from)
+
+    language = spoken(text)
     if port is None:
         print('sync: no server — open %s directly; it shows the snapshot and will not tick' % PAGE)
     else:
+        if moved_from is not None:
+            print(MOVED[language]['taken' if held else 'gone'] % moved_from)
         print('http://localhost:%d/dashboard.html' % port)
-    print(FOLDED[spoken(text)])
-    debug('mirrored=%s linked=%s port=%s reused=%s' % (mirrored, linked, port, reused))
+    print(FOLDED[language])
+    debug('mirrored=%s linked=%s remembered=%s held=%s holder=%r chosen=%s why=%s moved_from=%s reused=%s'
+          % (mirrored, linked, remembered, held, command[:120], port, why, moved_from, reused))
 
     # Last, and deliberately after the address: the page works either way, and
     # this is about the tool that reads the run when it is over.
