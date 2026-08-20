@@ -83,6 +83,37 @@ The clocks in a capture of the in-flight state are measured against the moment
 of the capture, so re-running the command produces a different image. That is
 the page working, not the fixture drifting.
 
+## Asking what a number means
+
+Every region carries a small `i` — the cards, the bars, the blocks, and the row
+of dials in the header. Pressing it opens one popover, and there is exactly one
+popover on the page: moving it is what closes the previous explanation, so
+nothing shifts under you while you read about the number you are looking at.
+Escape closes it, so does a click anywhere else.
+
+What it says is about **your прогон**, not about dashboards. «Осталось» does not
+explain that it holds an estimate; it says the estimate is 18…31 минуты, that
+the median behind it came from two finished таски, and that the chain it was
+measured along is three таски long. Before there is anything to say, it explains
+the empty state instead — which is when you are least able to guess. Each
+explanation is built by calling the same functions the region draws itself with,
+so it cannot tell you a story the number above it disagrees with.
+
+## When the page has nothing new to say
+
+A прогон writes its state at transitions and at no other time, so quiet
+stretches are normal — the манифест can think for ten minutes and say nothing.
+A прогон that has *stopped* is quiet in exactly the same way, and that is the
+harder case: a stage that never closed leaves its clock running, and a session
+that died sets no interruption to stop it.
+
+So the page says how long ago the state was last written, and raises the line
+once that is longer than the longest quiet stretch this run has already come
+through. The threshold is the run's own — ten minutes of silence is unremarkable
+in a прогон that has already been quiet for eleven, and alarming in one that
+writes at every таск. A finished or interrupted прогон is not nagged about it:
+that silence is accounted for, and the page already says so.
+
 ## What is checked
 
 `npm run dashboard` proves the page is self-contained — no CDN, no external
@@ -92,6 +123,12 @@ also checks the words that belong to no field at all: every card and block name
 the vocabulary owns has to appear on the page, because a card renamed on the
 page and nowhere else is drift no value map can see. The
 page holds those copies because the state stores ids; an unchecked copy drifts.
+
+It holds the regions to `spec/dashboard.md` as well. Every region named there
+must be marked once in the markup, must have somewhere to hang its `i`, and must
+have an explanation that answers when called — in both directions, so a region
+added to the page and forgotten in the table fails too. A region cannot ship
+mute.
 
 Its DOM-free logic is exercised separately by `scripts/validate/dashboard-logic.test.ts`,
 which evaluates the page's own `<script id="logic">` block in a VM rather than

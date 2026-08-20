@@ -84,6 +84,14 @@ Every number there is computed from the run state when the page draws itself.
 Nothing is stored as a duration, and «осталось» is a range that refuses to be
 sharper than the таски it was measured from.
 
+Every region carries a small `i`, and what it opens is about your прогон rather
+than about dashboards: which median the estimate used, how long the chain is,
+how many требования are in the denominator and why. And because a прогон writes
+its state only at transitions, the page also says how long it has been since the
+last write — raising the line once the silence is longer than any this run has
+already come through, so a session that died is no longer indistinguishable from
+one that is thinking.
+
 More about it in [`docs/dashboard.md`](docs/dashboard.md).
 
 ## Six rules nothing turns off
