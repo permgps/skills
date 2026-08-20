@@ -4,9 +4,22 @@ The human view of a прогон. It is opened for the user, not described to th
 
 ## Input
 
-`state.js` and nothing else. The dashboard never reads `manifest.md`, `spec.md`,
-a task file, or any path in the repository. A view that reaches into artifacts
-becomes a second source of truth, and the second one is silently wrong.
+**The data it renders comes from `state.js` and nothing else.** The dashboard
+never reads `manifest.md`, `spec.md`, a task file, or any path in the
+repository. A view that reaches into artifacts becomes a second source of truth,
+and the second one is silently wrong.
+
+A **view preference** is not data about the прогон, and the rule above does not
+reach it. Which theme the page is painted in, and which of its two languages a
+particular reader is reading, are properties of that reader's eyes and their
+browser. They are kept in that browser, they are no path in the repository, and
+nothing about the прогон changes when one of them moves. *The Reader's Own Two
+Controls* below is the whole of what they are allowed to be.
+
+The rule is stated this way round because the words are absolute and the next
+reader would otherwise call a remembered theme a violation of it. What is
+forbidden is a second source for the прогон, not a reader remembering how they
+like to look at it.
 
 ## What It Renders
 
@@ -31,6 +44,35 @@ The `Key` column is the region's name in the page: it is the `data-region`
 attribute in the markup and the entry in `EXPLAIN_ORDER` in the logic block.
 `scripts/validate/dashboard-integrity.ts` checks all three against each other,
 so a region cannot be added to one and forgotten in the others.
+
+## The Reader's Own Two Controls
+
+Two switches in the header, and everything true of one is true of the other:
+
+| Control | Values | Kept in | Reaches the прогон |
+|---|---|---|---|
+| Theme | light, dark, and *neither chosen* | the browser | never |
+| Language | `ru`, `en`, and *neither chosen* | the browser | never |
+
+**Three states apiece, and the third one is the one that matters.** Before a
+reader presses anything there is no choice at all: the theme follows the screen
+the page was opened on, and the language follows what the прогон decided. A
+press writes a choice, and from then on the choice wins. The stylesheet owns all
+three theme states — no `data-theme` attribute means the media query governs —
+so no colour is ever decided in script.
+
+**The theme is in no state field, no config key and no dial.** Two people
+watching one прогон may legitimately want different ones, so a single stored
+answer would be wrong for one of them. `contractVersion` does not move for it,
+`state-contract.md` does not mention it, and neither does `config.json`.
+
+**The language control changes the view and nothing else, and it says so.** It
+cannot change the language the прогон speaks in: the page reads `state.js` and
+has no channel back — that is the *Input* rule above, working as intended. So a
+sentence beside the control says what it does not do, in the language being
+shown. Without it the button quietly promises the one thing this page cannot
+deliver, and `scripts/validate/dashboard-integrity.ts` fails the build when a
+language branch stops carrying that sentence.
 
 ## The Language It Paints In
 

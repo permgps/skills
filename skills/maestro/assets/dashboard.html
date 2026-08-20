@@ -16,8 +16,19 @@
   goes stale silently; one computed at render time cannot.
 -->
 <style>
-  :root {
-    color-scheme: light dark;
+  /*
+    Three states, and CSS is the source of truth for all three.
+
+    Before anyone has pressed anything there is no `data-theme` attribute at
+    all, and the media query governs — that is what makes the page follow the
+    screen it was opened on. A press writes the attribute, and from then on the
+    attribute wins in both directions. JavaScript sets the attribute and reads
+    nothing back: a theme decided in script would be a second place to look the
+    day these colours are changed.
+  */
+  :root,
+  :root[data-theme="light"] {
+    color-scheme: light;
     --bg: #fbfbfa;
     --panel: #ffffff;
     --line: #e3e2df;
@@ -31,7 +42,8 @@
     --fail: #9b2c2c;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme]) {
+      color-scheme: dark;
       --bg: #17181a;
       --panel: #1f2124;
       --line: #33363b;
@@ -44,6 +56,20 @@
       --warn: #d8a657;
       --fail: #e07a72;
     }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #17181a;
+    --panel: #1f2124;
+    --line: #33363b;
+    --ghost: #2a2d31;
+    --ink: #e8e6e1;
+    --muted: #9a978f;
+    --accent: #6cc38f;
+    --info: #7aa9d8;
+    --fix: #b28ad0;
+    --warn: #d8a657;
+    --fail: #e07a72;
   }
   * { box-sizing: border-box; }
   body {
@@ -184,6 +210,22 @@
   .track > .fill .phase { opacity: .85; font-size: .8rem; }
   #now { color: var(--muted); font-size: .9rem; margin: .6rem 0 0; }
   #build-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
+  /* The two view controls: the reader's own, and nothing to do with the прогон. */
+  #controls {
+    display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+    margin: .6rem 0 0;
+  }
+  .switch {
+    display: inline-flex; border: 1px solid var(--line); border-radius: 6px;
+    overflow: hidden; background: var(--panel);
+  }
+  .switch button {
+    font: inherit; font-size: .78rem; line-height: 1;
+    padding: .3rem .55rem; border: 0; background: none; color: var(--muted);
+    cursor: pointer;
+  }
+  .switch button[aria-pressed="true"] { background: var(--ghost); color: var(--ink); }
+  #view-note { margin: 0; color: var(--muted); font-size: .78rem; flex: 1 1 14rem; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -192,6 +234,17 @@
 <header>
   <h1 id="run-title">Maestro</h1>
   <div id="dials" data-region="dials" data-region-label="dials"></div>
+  <div id="controls">
+    <div class="switch" id="theme-switch">
+      <button type="button" data-theme-choice="light"></button>
+      <button type="button" data-theme-choice="dark"></button>
+    </div>
+    <div class="switch" id="language-switch">
+      <button type="button" data-language-choice="ru">RU</button>
+      <button type="button" data-language-choice="en">EN</button>
+    </div>
+    <p id="view-note"></p>
+  </div>
   <p id="notice" hidden></p>
 </header>
 
@@ -487,7 +540,14 @@ globalThis.MAESTRO_LOGIC = (function () {
           return plain
             ? 'В последний раз что-то менялось ' + quiet + ' назад.'
             : 'Последняя запись — ' + quiet + ' назад.';
-        }
+        },
+        themeLight: 'Светлая',
+        themeDark: 'Тёмная',
+        themeAria: 'Тема страницы',
+        languageAria: 'Язык страницы',
+        viewNote: 'Эти две кнопки меняют только эту страницу. На каком языке с вами '
+          + 'говорит сам прогон, решено в прогоне: страница читает то, что он пишет, '
+          + 'и ответить ему не может.'
       }
     },
 
@@ -656,7 +716,14 @@ globalThis.MAESTRO_LOGIC = (function () {
           return plain
             ? 'Something last changed ' + quiet + ' ago.'
             : 'Last write — ' + quiet + ' ago.';
-        }
+        },
+        themeLight: 'Light',
+        themeDark: 'Dark',
+        themeAria: 'Page theme',
+        languageAria: 'Page language',
+        viewNote: 'These two buttons change this page and nothing else. Which language '
+          + 'the run itself speaks in was decided by the run; this page reads what the '
+          + 'run writes and has no way to answer back.'
       }
     }
   };
@@ -2203,14 +2270,7 @@ globalThis.MAESTRO_SNAPSHOT = null;
   var T = L.words(lang);
 
   function storedLanguage() {
-    try {
-      var kept = globalThis.localStorage && localStorage.getItem(LANGUAGE_KEY);
-      return L.LANGUAGE_ORDER.indexOf(kept) === -1 ? null : kept;
-    } catch (ignored) {
-      // Private browsing and file:// in some clients throw on the very first
-      // read. A page that cannot remember a preference still has to render.
-      return null;
-    }
+    return kept(LANGUAGE_KEY, L.LANGUAGE_ORDER);
   }
 
   function useLanguage(next) {
@@ -2218,6 +2278,107 @@ globalThis.MAESTRO_SNAPSHOT = null;
     T = L.words(next);
     document.documentElement.lang = next;
     paintLabels();
+  }
+
+  /**
+   * The theme, in three states, and CSS is the source of truth for all three.
+   *
+   * An explicit choice is an attribute on the root and a line in this browser's
+   * own storage. No choice is no attribute at all, and then the media query in
+   * the stylesheet governs — which is why nothing here reads a colour or
+   * decides one. This function sets an attribute and reflects a button; the
+   * page decides how that looks.
+   *
+   * It is in the browser and nowhere else on purpose. A theme is a property of
+   * the reader's eyes and their screen, and two people watching one прогон may
+   * legitimately want different ones — so it reaches `state.js`, the run state
+   * and the state contract never.
+   */
+  var THEME_KEY = 'maestro.theme';
+  var THEMES = ['light', 'dark'];
+
+  function kept(key, allowed) {
+    try {
+      var value = globalThis.localStorage && localStorage.getItem(key);
+      return allowed.indexOf(value) === -1 ? null : value;
+    } catch (ignored) {
+      // Private browsing, and file:// in some clients, throw on the first read.
+      // A page that cannot remember a preference still has to render.
+      return null;
+    }
+  }
+
+  function keep(key, value) {
+    try {
+      if (globalThis.localStorage) localStorage.setItem(key, value);
+    } catch (ignored) {
+      // Nothing to do and nothing worth saying: the choice holds for this view.
+    }
+  }
+
+  function systemTheme() {
+    return (globalThis.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)
+      ? 'dark' : 'light';
+  }
+
+  /** What the reader is actually looking at, chosen or inherited. */
+  function shownTheme() {
+    return document.documentElement.getAttribute('data-theme') || systemTheme();
+  }
+
+  function useTheme(next) {
+    if (next === null) document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', next);
+    paintSwitches();
+  }
+
+  /** Both switches, showing what is in force rather than what was pressed. */
+  function paintSwitches() {
+    var theme = shownTheme();
+    var buttons = document.querySelectorAll('[data-theme-choice]');
+    for (var i = 0; i < buttons.length; i += 1) {
+      var choice = buttons[i].getAttribute('data-theme-choice');
+      buttons[i].setAttribute('aria-pressed', choice === theme ? 'true' : 'false');
+      buttons[i].textContent = choice === 'dark' ? T.UI.themeDark : T.UI.themeLight;
+    }
+    var languages = document.querySelectorAll('[data-language-choice]');
+    for (var j = 0; j < languages.length; j += 1) {
+      var picked = languages[j].getAttribute('data-language-choice');
+      languages[j].setAttribute('aria-pressed', picked === lang ? 'true' : 'false');
+    }
+    el('theme-switch').setAttribute('aria-label', T.UI.themeAria);
+    el('language-switch').setAttribute('aria-label', T.UI.languageAria);
+    el('view-note').textContent = T.UI.viewNote;
+  }
+
+  function mountSwitches() {
+    document.addEventListener('click', function (event) {
+      var target = event.target;
+      if (!target || !target.getAttribute) return;
+
+      var theme = target.getAttribute('data-theme-choice');
+      if (theme) {
+        keep(THEME_KEY, theme);
+        useTheme(theme);
+        return;
+      }
+
+      var picked = target.getAttribute('data-language-choice');
+      if (picked) {
+        keep(LANGUAGE_KEY, picked);
+        useLanguage(picked);
+        // The whole page, not the headings alone: every sentence on it was
+        // composed in the language that has just changed.
+        if (lastGood) render(lastGood);
+      }
+    });
+
+    // The buttons stay honest when the system flips and nothing was chosen.
+    // Without this the page would repaint itself and go on claiming the old one.
+    if (globalThis.matchMedia && matchMedia('(prefers-color-scheme: dark)').addEventListener) {
+      matchMedia('(prefers-color-scheme: dark)')
+        .addEventListener('change', function () { paintSwitches(); });
+    }
   }
 
   /** Every heading and every i on the page, in the language now in force. */
@@ -2232,6 +2393,7 @@ globalThis.MAESTRO_SNAPSHOT = null;
       var region = buttons[j].getAttribute('data-aria-region');
       buttons[j].setAttribute('aria-label', T.UI.explainAria(T.SCREEN[region] || region));
     }
+    paintSwitches();
   }
 
   var generation = 0;
@@ -2706,6 +2868,12 @@ globalThis.MAESTRO_SNAPSHOT = null;
   }
 
   mountExplainers();
+  mountSwitches();
+
+  // The theme before anything else, so a reader who chose one never sees the
+  // other flash past. Absent a choice, no attribute is set and the stylesheet's
+  // media query decides — which is the state the page ships in.
+  useTheme(kept(THEME_KEY, THEMES));
 
   // A language before the first state: the headings are empty in the markup, so
   // a page whose state never loads would otherwise show a column of blank

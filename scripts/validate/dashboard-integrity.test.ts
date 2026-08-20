@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   checkDashboard,
+  customProperties,
   scriptBlock,
   stripComments,
   type SpecSources,
@@ -101,6 +102,7 @@ const RU = {
   DEPTH: "{ normal: 'Обычная' }",
   POLISH: "{ 'false': 'Выключена' }",
   REGISTER: "{ plain: 'Простые' }",
+  UI: "{ viewNote: 'Кнопки меняют только эту страницу.' }",
 };
 
 const EN = {
@@ -113,6 +115,7 @@ const EN = {
   DEPTH: "{ normal: 'Normal' }",
   POLISH: "{ 'false': 'Off' }",
   REGISTER: "{ plain: 'Plain' }",
+  UI: "{ viewNote: 'These buttons change this page and nothing else.' }",
 };
 
 /** The regions of the What It Renders table, as the markup marks them. */
@@ -122,6 +125,24 @@ const REGIONS = [
   'run-clock', 'stage-clock', 'dials', 'progress', 'cards',
   'stages', 'tasks', 'now', 'requirements', 'gates',
 ];
+
+/** The reader's own controls: one button per theme, one per language. */
+const SWITCHES = [
+  '<button data-theme-choice="light"></button>',
+  '<button data-theme-choice="dark"></button>',
+  '<button data-language-choice="ru">RU</button>',
+  '<button data-language-choice="en">EN</button>',
+].join('\n');
+
+/** The three theme states, with one token apiece so the sets can be compared. */
+const STYLE = `<style>
+  :root,
+  :root[data-theme="light"] { --bg: #fff; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) { --bg: #000; }
+  }
+  :root[data-theme="dark"] { --bg: #000; }
+</style>`;
 
 /** A page shaped like the real one, small enough that a test can bend one part of it. */
 function page(overrides: {
@@ -140,6 +161,9 @@ function page(overrides: {
   plainEn?: string | null;
   /** The body of the snapshot block. `null` leaves the block out entirely. */
   snapshot?: string | null;
+  /** The reader's two switches, and the stylesheet that gives the theme three states. */
+  switches?: string;
+  style?: string;
 } = {}): string {
   const root = { ...LOGIC, ...(overrides.logic ?? {}) };
   const entries = Object.entries(root).map(([name, value]) => `${name}: ${value}`).join(',\n    ');
@@ -170,8 +194,10 @@ function page(overrides: {
     ? '' : `<script id="snapshot">\n${snapshotBody}\n</script>`;
 
   return [
-    '<!doctype html>', '<html lang="ru">', '<head><title>Maestro</title></head>', '<body>',
+    '<!doctype html>', '<html lang="ru">', '<head><title>Maestro</title>',
+    overrides.style ?? STYLE, '</head>', '<body>',
     '<h2>Ход разработки</h2>', '<h2>Development progress</h2>',
+    overrides.switches ?? SWITCHES,
     regions, explained, overrides.body ?? '', snapshotBlock, logicBlock, '</body>', '</html>',
   ].join('\n');
 }
@@ -520,4 +546,55 @@ test('a specification with no Plain Words table is reported', () => {
   };
   assert.match(messages(page(), stripped),
     /vocabulary\.md has no table with columns Shorthand and Say instead/);
+});
+
+
+// --- the reader's own two controls ------------------------------------------
+//
+// Neither can be pressed from here. What is held instead is that each choice is
+// offered once, that the theme has all three of its states in the stylesheet,
+// and that the language control still carries the sentence saying what it does
+// not do.
+
+test('a theme with no button is reported', () => {
+  const found = messages(page({
+    switches: SWITCHES.replace('<button data-theme-choice="dark"></button>', ''),
+  }));
+  assert.match(found, /the theme "dark" is offered 0 time\(s\)/);
+});
+
+test('a language the page carries and cannot be switched to is reported', () => {
+  const found = messages(page({
+    switches: SWITCHES.replace('<button data-language-choice="en">EN</button>', ''),
+  }));
+  assert.match(found, /the language "en" is offered 0 time\(s\)/);
+});
+
+// The state nobody clicks to reach, and therefore the one a change loses: no
+// attribute at all, with the media query deciding.
+test('a stylesheet with no follow-the-system dark block is reported', () => {
+  const found = messages(page({
+    style: STYLE.replace(':root:not([data-theme]) { --bg: #000; }', ''),
+  }));
+  assert.match(found, /no "system dark" theme block/);
+});
+
+test('a colour defined in one theme and not the other is reported', () => {
+  const found = messages(page({
+    style: STYLE.replace(':root[data-theme="dark"] { --bg: #000; }',
+      ':root[data-theme="dark"] { --bg: #000; --ink: #fff; }'),
+  }));
+  assert.match(found, /"--ink" is declared in the "chosen dark" theme block and not in the light one/);
+});
+
+test('a language control with nothing said beside it is reported', () => {
+  const found = messages(page({ en: { UI: "{ }" } }));
+  assert.match(found, /the en branch carries no viewNote/);
+});
+
+test('customProperties reads a block and nothing past its brace', () => {
+  const css = ':root { --a: 1; --b: 2; }\n:root[data-theme="dark"] { --c: 3; }';
+  assert.deepEqual(customProperties(css, ':root {'), ['--a', '--b']);
+  assert.deepEqual(customProperties(css, ':root[data-theme="dark"] {'), ['--c']);
+  assert.equal(customProperties(css, ':root[data-theme="sepia"] {'), null);
 });

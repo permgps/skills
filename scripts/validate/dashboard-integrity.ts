@@ -97,6 +97,23 @@ const LANGUAGES: Array<{
   },
 ];
 
+/**
+ * The three theme blocks, and the selector each one is reached by.
+ *
+ * `none` is the state the page ships in: no `data-theme` attribute at all, so
+ * the media query governs and the page follows the screen it was opened on. It
+ * is the state a checker is most likely to lose, because it is the one nobody
+ * clicks to reach.
+ */
+const THEME_BLOCKS: Array<{ state: string; selector: string }> = [
+  { state: 'light', selector: ':root,\n  :root[data-theme="light"] {' },
+  { state: 'system dark', selector: ':root:not([data-theme]) {' },
+  { state: 'chosen dark', selector: ':root[data-theme="dark"] {' },
+];
+
+/** The two values the theme control writes, and nothing else. */
+const THEMES = ['light', 'dark'];
+
 export class UnreadableAssetError extends Error {
   constructor(file: string, reason: string) {
     super(`${file}: ${reason}`);
@@ -165,6 +182,15 @@ export function stringLiterals(source: string): string {
   const found: string[] = [];
   for (const hit of source.matchAll(/'((?:[^'\\]|\\.)*)'/g)) found.push(hit[1] ?? '');
   return found.join(' \n ');
+}
+
+/** The `--custom-property` names declared between a selector and its `}`. */
+export function customProperties(css: string, selector: string): string[] | null {
+  const start = css.indexOf(selector);
+  if (start === -1) return null;
+  const end = css.indexOf('}', start);
+  const body = css.slice(start + selector.length, end === -1 ? undefined : end);
+  return [...body.matchAll(/(--[a-z0-9-]+)\s*:/g)].map(hit => hit[1] ?? '').sort();
 }
 
 /** Evaluate the DOM-free block and hand back what it exports. */
@@ -249,6 +275,58 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
   }
   log.info('snapshot', 'snapshot block checked', { present: snapshot !== null });
 
+  // --- the reader's own two controls ---------------------------------------
+  //
+  // Neither one is about the прогон, and neither can be pressed by a checker.
+  // What can be held is that each choice is offered exactly once and that the
+  // page still carries the sentence saying what the language control does not
+  // do — a control that quietly promised to change the language of the chat
+  // would be promising the one thing the page has no channel for.
+  for (const theme of THEMES) {
+    const offered = [...html.matchAll(new RegExp(`data-theme-choice="${theme}"`, 'g'))].length;
+    if (offered !== 1) {
+      add('view', 0,
+        `the theme "${theme}" is offered ${offered} time(s) — each of the two is a `
+        + 'button, and a theme with no button is a theme no reader can reach');
+    }
+  }
+  for (const { language } of LANGUAGES) {
+    const offered = [...html.matchAll(new RegExp(`data-language-choice="${language}"`, 'g'))].length;
+    if (offered !== 1) {
+      add('view', 0,
+        `the language "${language}" is offered ${offered} time(s) — the page carries both `
+        + 'and a language it cannot be switched to is a branch nobody sees');
+    }
+  }
+
+  // --- the theme has three states and the stylesheet owns all three ---------
+  const declared = new Map<string, string[] | null>();
+  for (const { state, selector } of THEME_BLOCKS) {
+    const properties = customProperties(html, selector);
+    declared.set(state, properties);
+    if (properties === null) {
+      add('view', 0,
+        `no "${state}" theme block — the page needs the light one, the dark one behind `
+        + '@media for a reader who chose nothing, and the dark one behind the attribute');
+    }
+  }
+  const light = declared.get('light');
+  if (light && light.length > 0) {
+    for (const [state, properties] of declared) {
+      if (state === 'light' || properties === null) continue;
+      const why = ' — a colour defined in one theme and not the other is a page that '
+        + 'reads as broken in exactly one of them';
+      for (const name of light.filter(each => !properties.includes(each))) {
+        add('view', 0,
+          `"${name}" is declared in the light theme block and not in the "${state}" one${why}`);
+      }
+      for (const name of properties.filter(each => !light.includes(each))) {
+        add('view', 0,
+          `"${name}" is declared in the "${state}" theme block and not in the light one${why}`);
+      }
+    }
+  }
+
   // --- the copied vocabulary still matches the vocabulary -------------------
   const block = scriptBlock(html, 'logic');
   if (block === null) {
@@ -286,6 +364,19 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
       add('labels', 0,
         `the page carries a "${language}" branch in L10N that this checker holds to no `
         + 'column of vocabulary.md — an unchecked language ships its labels unread');
+    }
+  }
+
+  for (const { language } of LANGUAGES) {
+    const branch = branches[language];
+    const ui = (branch && typeof branch === 'object')
+      ? (branch as Record<string, unknown>)['UI'] : undefined;
+    const note = (ui && typeof ui === 'object')
+      ? (ui as Record<string, unknown>)['viewNote'] : undefined;
+    if (typeof note !== 'string' || note.trim() === '') {
+      add('view', 0,
+        `the ${language} branch carries no viewNote — the language control has to say, `
+        + 'beside itself, that it changes the page and not what the прогон speaks in');
     }
   }
 
