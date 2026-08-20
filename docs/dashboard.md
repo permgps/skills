@@ -189,6 +189,16 @@ because Russian takes three plural forms and any one number exercises only one
 of them. A function the page stops exporting is reported rather than skipped: a
 check silently not running is indistinguishable from a check that passes.
 
+**The sentences the view composes are read too**, and this is where the rule
+bites hardest. Every label, chip and one-line summary the page assembles lives
+in one map per language, shared by both registers, and that map is read as
+source — so *every branch of it* has to survive the plain list, including the
+one the plain reader never reaches. That is why the median line says «серединное
+время» rather than «медиана» in both registers, and why the folded findings line
+names neither the check nor its status: `normal` is *allowed* the trade's words,
+never owed them, and a sentence that has to differ by register belongs in a
+called function instead.
+
 Its DOM-free logic is exercised separately by `scripts/validate/dashboard-logic.test.ts`,
 which evaluates the page's own `<script id="logic">` block in a VM rather than
 reimplementing it.

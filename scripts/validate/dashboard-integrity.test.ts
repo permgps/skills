@@ -5,6 +5,7 @@ import {
   checkDashboard,
   customProperties,
   scriptBlock,
+  sliceObjectLiteral,
   stripComments,
   type SpecSources,
 } from './dashboard-integrity.ts';
@@ -617,4 +618,34 @@ test('a page with no folded findings line at all is reported', () => {
   // rather than enforced — which is the defect this whole block answers.
   const found = messages(page().replace('findingsLine:', 'unusedLine:'));
   assert.match(found, /exports no findingsLine/);
+});
+
+test('a map nested inside another literal is still found', () => {
+  // `L10N.ru.UI` is written `UI: {` inside `ru: {` inside `var L10N = {`, and
+  // is never assigned by its full name. Looking only for `L10N.ru.UI = {`
+  // returned null, the caller skipped, and every sentence the view composes
+  // shipped unscanned while the check stayed green.
+  const source = "var L10N = {\n  ru: { UI: { a: 'один' } },\n  en: { UI: { a: 'one' } }\n};\n"
+    + "L10N.ru.EXPLAIN_PLAIN = { p: 'потом' };";
+  assert.match(sliceObjectLiteral(source, 'L10N.ru.UI')!, /один/);
+  assert.doesNotMatch(sliceObjectLiteral(source, 'L10N.ru.UI')!, /one'/);
+  assert.match(sliceObjectLiteral(source, 'L10N.en.UI')!, /one/);
+  // The direct form still wins, and it is the one the real page uses here.
+  assert.match(sliceObjectLiteral(source, 'L10N.ru.EXPLAIN_PLAIN')!, /потом/);
+  assert.equal(sliceObjectLiteral(source, 'L10N.de.UI'), null);
+});
+
+test('a banned word in the composed sentences is reported', () => {
+  // Every branch of a UI function has to be safe for the plain reader: the map
+  // is shared by both registers and read as source, so a branch never taken
+  // still ships. This is the check that was silently doing nothing.
+  const found = messages(page({
+    ru: { UI: "{ viewNote: 'Кнопки меняют страницу.', gap: 'после гейта' }" },
+  }));
+  assert.match(found, /the composed sentences \(ru\) says "гейт"/);
+});
+
+test('a page with no composed sentences at all is reported', () => {
+  const found = messages(page().replace('UI: {', 'UNUSED: {'));
+  assert.match(found, /carries no L10N\.ru\.UI block to check/);
 });

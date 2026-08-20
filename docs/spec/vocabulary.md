@@ -292,7 +292,19 @@ removes them.
 
 `scripts/validate/dashboard-integrity.ts` reads the `Shorthand` column and holds
 every plain string the dashboard ships against it. That is every plain sentence
-this repository can see. The chat is composed at run time by the прогон itself;
+this repository can see.
+
+**Where a string lives decides which rule it lives under.** The normal-register
+explanations are not scanned and may use the trade's words freely. The plain
+explanations are read as source, because a branch never taken still ships. The
+map of sentences the view composes is read as source too — and it is shared by
+both registers, so **every branch of it must be safe for the plain reader**,
+including the branch only `normal` reaches. Wording that genuinely has to differ
+between the registers lives in a function the checker **calls** with each
+register instead, which is how the silence notice and the folded findings line
+are reached. A page that stops exporting one of those is reported rather than
+skipped: a check silently not running and a check that passes look the same from
+outside. The chat is composed at run time by the прогон itself;
 no checker reads a word of it, and it is governed by the rule in the bundle's
 `SKILL.md` instead.
 

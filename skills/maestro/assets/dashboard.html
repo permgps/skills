@@ -483,10 +483,16 @@ globalThis.MAESTRO_LOGIC = (function () {
         stagePosition: function (place) {
           return place.position + ' из ' + place.total + ' этапов';
         },
+        // One wording, not two. `UI` is read as source by the checker, so a
+        // `plain ? … : …` here would ship «Медиана» to the scan whichever
+        // branch ran — and rightly: a branch never taken still ships. Wording
+        // that genuinely has to differ by register lives in a function the
+        // checker calls instead, the way silenceNotice and findingsLine do.
+        // Nothing is lost: `normal` is allowed «Медиана», never owed it.
         medianSub: function (ms) {
           return ms === null
-            ? 'Медиана появится после двух готовых тасков'
-            : 'Медиана на таск — ' + L10N.ru.UI.minutes(ms);
+            ? 'Серединное время появится после двух готовых тасков'
+            : 'Серединное время на таск — ' + L10N.ru.UI.minutes(ms);
         },
         estimateFinished: 'Прогон завершён',
         estimateEarly: 'Рано считать',
@@ -513,14 +519,19 @@ globalThis.MAESTRO_LOGIC = (function () {
           if (!tests) return 'Прогон ещё не запускал тесты';
           return tests.failed > 0 ? 'Упало ' + tests.failed : 'После последнего таска';
         },
+        // The row above already names the check and its status, so this line
+        // names neither. That is also what keeps it out of trouble: `UI` is
+        // read as source, so «Гейт» in the normal branch would be scanned
+        // whichever branch ran — and rightly, because a branch never taken
+        // still ships. Every branch here is safe for the plain reader.
         findingsFolded: function (count, plain) {
           return plain
-            ? 'Проверка оставила ' + count + ' '
-              + plural(count, 'замечание', 'замечания', 'замечаний') + ' — все уже исправлены'
-            : 'Гейт оставил ' + count + ' '
-              + plural(count, 'находку', 'находки', 'находок') + ' — все отработаны';
+            ? count + ' ' + plural(count, 'замечание', 'замечания', 'замечаний')
+              + ' — ' + plural(count, 'уже исправлено', 'уже исправлены', 'уже исправлены')
+            : count + ' ' + plural(count, 'находка', 'находки', 'находок')
+              + ' — ' + plural(count, 'отработана', 'отработаны', 'отработаны');
         },
-        noFindings: 'Гейт не оставил замечаний.',
+        noFindings: 'Проверка не оставила замечаний.',
         noTasks: 'Таски ещё не нарезаны.',
         noRequirements: 'Требования ещё не записаны.',
         noGates: 'Гейты ещё не заведены.',
@@ -666,6 +677,9 @@ globalThis.MAESTRO_LOGIC = (function () {
           return place.position + ' of ' + place.total + ' stages';
         },
         medianSub: function (ms) {
+          // No register split here: English already owns the plain words for
+          // this, and `median` is on the English shorthand list with nothing
+          // that needs it. One wording is the honest answer, not a shortcut.
           return ms === null
             ? 'The middle time appears once two tasks have finished'
             : 'Middle time per task — ' + L10N.en.UI.minutes(ms);
@@ -698,8 +712,8 @@ globalThis.MAESTRO_LOGIC = (function () {
         findingsFolded: function (count, plain) {
           var one = count === 1;
           return plain
-            ? 'The check left ' + count + (one ? ' note' : ' notes') + ' — every one already dealt with'
-            : 'The check left ' + count + (one ? ' finding' : ' findings') + ' — all acted on';
+            ? count + (one ? ' note — already dealt with' : ' notes — every one already dealt with')
+            : count + (one ? ' finding — acted on' : ' findings — all acted on');
         },
         noFindings: 'The check left no findings.',
         noTasks: 'No tasks cut yet.',

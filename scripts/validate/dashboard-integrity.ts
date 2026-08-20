@@ -153,7 +153,27 @@ const findTable = (tables: Table[], required: string[]): Table | undefined =>
  * the branch a fixture forgets to reach.
  */
 export function sliceObjectLiteral(source: string, name: string): string | null {
-  const start = source.indexOf(`${name} = {`);
+  const direct = braced(source, source.indexOf(`${name} = {`));
+  if (direct !== null) return direct;
+
+  // A map nested inside another literal is never assigned by its full name:
+  // `L10N.ru.UI` is written `UI: {` inside `ru: {` inside `var L10N = {`, and
+  // looking for `L10N.ru.UI = {` finds nothing. Returning null there was a
+  // scan that believed it had run — the caller skipped, the check stayed
+  // green, and every word the view composes shipped unread. So the dotted
+  // path is walked instead, one literal narrowing the next.
+  const path = name.split('.');
+  let slice: string | null = source;
+  for (let at = 0; at < path.length; at += 1) {
+    const key = path[at]!;
+    slice = braced(slice, slice.indexOf(at === 0 ? `${key} = {` : `${key}: {`));
+    if (slice === null) return null;
+  }
+  return slice;
+}
+
+/** The object literal opening at or after `start`, brace-balanced. */
+function braced(source: string, start: number): string | null {
   if (start === -1) return null;
 
   let depth = 0;
@@ -641,7 +661,11 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     // The sentences the view composes are words too, and they are the half a
     // scan of the explanations alone would miss.
     const ui = sliceObjectLiteral(stripComments(block), `L10N.${language}.UI`);
-    if (ui !== null) scan('the composed sentences', stringLiterals(ui));
+    if (ui === null) {
+      add('plain', 0, `the page carries no L10N.${language}.UI block to check`);
+    } else {
+      scan('the composed sentences', stringLiterals(ui));
+    }
 
     log.info('plain', 'plain strings scanned',
       { language, banned: banned.length, exempt: labels.length, sources: scanned });

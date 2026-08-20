@@ -926,29 +926,32 @@ test('the findings view survives a state that wrote nonsense', () => {
 });
 
 test('the folded line counts in the language and the register it is given', () => {
-  assert.equal(L.findingsLine(1, 'normal', 'ru'), 'Гейт оставил 1 находку — все отработаны');
-  assert.equal(L.findingsLine(1, 'plain', 'ru'), 'Проверка оставила 1 замечание — все уже исправлены');
-  assert.equal(L.findingsLine(1, 'normal', 'en'), 'The check left 1 finding — all acted on');
-  assert.equal(L.findingsLine(2, 'normal', 'en'), 'The check left 2 findings — all acted on');
-  assert.equal(L.findingsLine(1, 'plain', 'en'), 'The check left 1 note — every one already dealt with');
-  // The plain register may not say «гейт», and this is the line that would.
+  assert.equal(L.findingsLine(1, 'normal', 'ru'), '1 находка — отработана');
+  assert.equal(L.findingsLine(1, 'plain', 'ru'), '1 замечание — уже исправлено');
+  assert.equal(L.findingsLine(1, 'normal', 'en'), '1 finding — acted on');
+  assert.equal(L.findingsLine(2, 'normal', 'en'), '2 findings — all acted on');
+  assert.equal(L.findingsLine(1, 'plain', 'en'), '1 note — already dealt with');
+  // The line names neither the check nor its status: the row above says both.
+  // It is also what keeps every branch safe for the plain reader, which the
+  // source scan of the UI map requires — «гейт» in either branch would fail.
   assert.doesNotMatch(L.findingsLine(21, 'plain', 'ru'), /[Гг]ейт/);
+  assert.doesNotMatch(L.findingsLine(21, 'normal', 'ru'), /[Гг]ейт/);
 });
 
 test('the Russian count reads correctly at 1, 2, 5, 11 and 21', () => {
   // 21 is the number the real прогон produced, and it is the one a naive
   // plural gets wrong: it takes the singular, not the many.
   const line = (n: number): string => L.findingsLine(n, 'normal', 'ru');
-  assert.match(line(1), /1 находку/);
-  assert.match(line(2), /2 находки/);
-  assert.match(line(5), /5 находок/);
-  assert.match(line(11), /11 находок/);
-  assert.match(line(21), /21 находку/);
+  assert.match(line(1), /^1 находка — отработана$/);
+  assert.match(line(2), /^2 находки — отработаны$/);
+  assert.match(line(5), /^5 находок — отработаны$/);
+  assert.match(line(11), /^11 находок — отработаны$/);
+  assert.match(line(21), /^21 находка — отработана$/);
   const plain = (n: number): string => L.findingsLine(n, 'plain', 'ru');
-  assert.match(plain(1), /1 замечание/);
-  assert.match(plain(2), /2 замечания/);
-  assert.match(plain(5), /5 замечаний/);
-  assert.match(plain(21), /21 замечание/);
+  assert.match(plain(1), /^1 замечание — уже исправлено$/);
+  assert.match(plain(2), /^2 замечания — уже исправлены$/);
+  assert.match(plain(5), /^5 замечаний — уже исправлены$/);
+  assert.match(plain(21), /^21 замечание — уже исправлено$/);
 });
 
 test('the checks explain their findings in every language and register', () => {
