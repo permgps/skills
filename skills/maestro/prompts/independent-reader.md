@@ -20,6 +20,13 @@ That is the only question. Read the бриф line by line and, for each thing th
 user asked for, find where the specification handles it. Something you cannot
 find is a finding.
 
+<!-- maestro:view:no-viewer -->
+**Both of your files are text, and so is your answer.** There is nothing to run
+and nothing to open: a line of the бриф is either accounted for in `spec.md` or
+it is not, and that is settled by reading. If you find yourself wanting to see
+the built thing to decide, the specification is silent where the бриф was not,
+and that silence is the finding.
+
 ## What Is A Finding
 
 A finding is a piece of the бриф you could not locate in the specification. Each

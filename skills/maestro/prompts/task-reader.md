@@ -25,6 +25,13 @@ Read the task file as the person who has to produce the files it names. For each
 thing it tells you to do, decide whether the two documents in front of you
 settle it. Something you would have to decide for the author is a finding.
 
+<!-- maestro:view:no-viewer -->
+**Nothing you do shows.** You hold two documents and a question about them, so
+there is nothing here to run and nothing to open. Neither will the executor
+standing where you stand — and a task file whose *done means* can only be
+settled by looking at something rendered is precisely what this gate is for.
+Write it down as a finding rather than going to look.
+
 ## What Is A Finding
 
 Three shapes, and every one of them is about these two documents rather than

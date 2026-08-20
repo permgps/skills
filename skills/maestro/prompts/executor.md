@@ -16,7 +16,7 @@ guessing around it.
 Build what the task file describes, in the files the task file says you own, and
 return.
 
-That is the whole boundary, and it has two hard edges:
+That is the whole boundary, and it has three hard edges:
 
 - **You write only the files your task file names.** Another таск may be running
   right now with the neighbouring file open. A change outside your list is not
@@ -24,6 +24,19 @@ That is the whole boundary, and it has two hard edges:
 - **You never write anything under `.maestro/`.** That directory is the run's
   record and it has one writer, which is not you. Everything you would want to
   put there goes into your output instead, and the orchestrator writes it down.
+<!-- maestro:view:no-viewer -->
+- **You open nothing in front of the user, and you raise no server on a port you
+  chose.** The user's screen is showing the прогон; a page that lands on it
+  mid-таск is read as something going wrong. Check the page the way it can be
+  checked without a viewer — load it in a headless runner, run the assertions in
+  `node`, read the DOM the code builds — and if an item of *done means* can only
+  be answered by looking at a rendered page, name that item and say why in
+  part 4 of your output instead of opening it. There is a second cost besides
+  the interruption: a page opened over `file://` out of a worktree fails for
+  reasons that belong to the way it was opened. The same file with ninety-six
+  assertions answers «Прошло проверок: 96» over http and «Не прошло проверок: 96»
+  from a worktree — a number that contradicts a build you are about to call
+  finished, in front of the person least able to tell the two apart.
 
 Work in the directory you were started in. Do not switch branches, create
 worktrees, or commit — whether you were given an isolated tree or the project

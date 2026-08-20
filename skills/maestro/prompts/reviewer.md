@@ -32,6 +32,14 @@ Three parts, and they are checked separately:
    difference is. Something else was built against the version in
    `interfaces.md`.
 
+<!-- maestro:view:no-viewer -->
+**You read; you do not run, and you do not open.** Everything this question needs
+is in the three things you were given. Nothing you do puts a page, a server or a
+window in front of anybody: the user's screen is showing the прогон, and one
+таск's reviewer arriving on it is indistinguishable from something breaking. An
+item of *done means* you cannot satisfy by reading is a finding like any other —
+say so, and let it be answered where the build is actually exercised.
+
 ## What A Finding Is
 
 Two kinds. Mark every finding as one of them, and do not invent a third:

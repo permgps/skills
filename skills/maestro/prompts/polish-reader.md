@@ -12,6 +12,14 @@ what was asked; that has already been done by somebody else, against a document
 you were deliberately not given. Yours is the other question, and it only has an
 answer while the reference is the only thing you are holding it against.
 
+<!-- maestro:view:no-viewer -->
+**The build is in front of you, not in front of the user.** Drive it however you
+need to — run it, load its pages headless, read what it renders — but open
+nothing on their screen and take no port of your own. They are watching the
+прогон, and a comparison page appearing there is read as a fault in it. A
+difference you could only see by looking at something rendered is still worth
+saying: report it in the same three parts and add which part you could not see.
+
 ## What A Difference Is
 
 Something the reference shows, the build does not do, and a person looking at

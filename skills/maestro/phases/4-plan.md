@@ -78,6 +78,16 @@ Each file carries:
 A task file that assumes context the executor does not have is the defect this
 phase produces most often. Read each one back as if you had never seen the spec.
 
+**An item of *done means* is phrased so it can be answered without putting
+anything in front of the user.** «The checks page shows all green» is not such an
+item: the only way to satisfy it is to open the page, and an executor that opens
+a page takes over the screen the прогон is being watched on. Write what can be
+run and read instead — the command, its exit code, the assertions, what the code
+produces. An item that genuinely needs a rendered page is one this таск cannot
+close: leave it out of *done means* and carry it, named, to the отчёт's
+assumptions or to приёмка, where the build is exercised by somebody whose whole
+job is exercising it.
+
 ### 5. Have each task file read by somebody standing where the executor will
 
 Hand every task file to its own subagent, briefed by
@@ -88,6 +98,11 @@ one question: could you build this without asking a question?
 
 They are independent of each other, so they go out at once and the wave is as
 wide as the host allows.
+
+The same test belongs to that reading: **a task file whose *done means* can only
+be satisfied by opening something is a finding.** The reader is standing exactly
+where the executor will stand, so it is the one place the question can be asked
+before the answer costs the user their screen.
 
 Act on every finding by editing the task file, here, before any executor sees
 it. Then record them in the G3 entry of the run state — an empty list is a real

@@ -112,6 +112,22 @@ performed dozens of times in a run. Skipping it degrades rather than breaks: a
 page served over http still updates from `state.js`; what goes stale is what
 someone sees when they open the page with no server behind it.
 
+<!-- maestro:view:owner -->
+**The прогон puts exactly one page in front of the user, and it is this one.** No
+other — a checks page, a built page, a coverage report, a log — is opened in
+their viewer by you or by anything you launch. A question that can only be
+answered by *looking* at a rendered page is either answered without a viewer or
+written down unanswered and carried forward; the single route for something that
+truly has to be seen is in [`phases/0-preflight.md`](phases/0-preflight.md),
+beside the rest of what is known about panes. And when `sync.py` reports that
+the panel's address moved, say the new address in the chat once — the link the
+user is holding is dead, and that tool is the only thing that knows it.
+
+**This is here rather than in the phase files because every phase can open
+something.** The user's screen is showing the прогон, and a page that lands on it
+mid-таск is read as something going wrong, by the one person with no way to
+check.
+
 ## What The State's Lists Hold
 
 **`gates[].findings`, the three lists inside `debt`, and `additions` hold plain
