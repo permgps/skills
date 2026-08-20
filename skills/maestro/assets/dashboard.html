@@ -1534,16 +1534,24 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     gates: function (state) {
       var gates = (state.gates || []).filter(Boolean);
-      var passed = 0, failed = 0;
+      var passed = 0, failed = 0, settled = 0, standing = 0;
       gates.forEach(function (gate) {
         if (gate.status === 'passed') passed += 1;
         if (gate.status === 'failed') failed += 1;
+        var left = ((gate.findings || []).length);
+        if (gate.status === 'failed') standing += left; else settled += left;
       });
+      var found = settled + standing;
       return [
         'Четыре гейта прогона: G1 после брифинга, G2 после спеки, G3 после плана, G4 на приёмке.',
         gates.length === 0
           ? 'Гейты ещё не проходили.'
           : 'Пройдено ' + passed + ', провалено ' + failed + ' из ' + gates.length + '.',
+        found === 0
+          ? 'Находок гейты пока не оставили.'
+          : 'Находок ' + found + ': под пройденными ' + settled + ', под проваленными ' + standing
+            + '. Находка под пройденным гейтом — запись об уже отработанном, а не открытая проблема:'
+            + ' гейт не проходят, пока замечание не закрыто. Поэтому такой список свёрнут и не окрашен в цвет провала.',
         'Гейт — это сравнение двух документов прогона, а не мнение о нём. G4 читает сборку против манифеста, и спека при этом от читателя скрыта.'
       ];
     }
@@ -1744,16 +1752,24 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     gates: function (state) {
       var gates = (state.gates || []).filter(Boolean);
-      var passed = 0, failed = 0;
+      var passed = 0, failed = 0, settled = 0, standing = 0;
       gates.forEach(function (gate) {
         if (gate.status === 'passed') passed += 1;
         if (gate.status === 'failed') failed += 1;
+        var left = ((gate.findings || []).length);
+        if (gate.status === 'failed') standing += left; else settled += left;
       });
+      var found = settled + standing;
       return [
         'Блок «Гейты» — это четыре проверки, каждая после своего шага: G1 после брифинга, G2 после спецификации, G3 после плана, G4 на приёмке.',
         gates.length === 0
           ? 'Проверки ещё не проходили.'
           : 'Пройдено ' + passed + ', провалено ' + failed + ' из ' + gates.length + '.',
+        found === 0
+          ? 'Замечаний проверки пока не оставили.'
+          : 'Замечаний ' + found + ': под пройденными ' + settled + ', под непройденными ' + standing
+            + '. Замечание под пройденной проверкой говорит о том, что уже исправлено: проверку не проходят,'
+            + ' пока замечание открыто. Поэтому такой список свёрнут и не покрашен в цвет ошибки.',
         'Проверка сравнивает два документа работы, а не высказывает о ней мнение. На последней, G4, готовую работу читают против вашего списка — а спецификацию от читателя прячут, чтобы он не подтвердил её сам себе.'
       ];
     }
@@ -1945,16 +1961,25 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     gates: function (state) {
       var gates = (state.gates || []).filter(Boolean);
-      var passed = 0, failed = 0;
+      var passed = 0, failed = 0, settled = 0, standing = 0;
       gates.forEach(function (gate) {
         if (gate.status === 'passed') passed += 1;
         if (gate.status === 'failed') failed += 1;
+        var left = ((gate.findings || []).length);
+        if (gate.status === 'failed') standing += left; else settled += left;
       });
+      var found = settled + standing;
       return [
         'The four checks of the run: G1 after briefing, G2 after the specification, G3 after the plan, G4 at acceptance.',
         gates.length === 0
           ? 'No check has run yet.'
           : 'Passed ' + passed + ', not passed ' + failed + ' of ' + gates.length + '.',
+        found === 0
+          ? 'The checks have left no findings yet.'
+          : 'Findings in all: ' + found + ' — ' + settled + ' under checks that passed, '
+            + standing + ' under checks that did not. A finding under a passed check is a record of'
+            + ' something already acted on rather than an open problem: a check is not passed while a'
+            + ' finding is still standing. That is why such a list is folded and not painted as a failure.',
         'A check compares two documents of the run rather than holding an opinion about it. At the last one, the finished work is read against the manifest, and the specification is hidden from the reader so that it cannot confirm itself.'
       ];
     }
@@ -2155,16 +2180,25 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     gates: function (state) {
       var gates = (state.gates || []).filter(Boolean);
-      var passed = 0, failed = 0;
+      var passed = 0, failed = 0, settled = 0, standing = 0;
       gates.forEach(function (gate) {
         if (gate.status === 'passed') passed += 1;
         if (gate.status === 'failed') failed += 1;
+        var left = ((gate.findings || []).length);
+        if (gate.status === 'failed') standing += left; else settled += left;
       });
+      var found = settled + standing;
       return [
         'The «Checks» block is four checks, each after its own step: G1 after the briefing, G2 after the specification, G3 after the plan, G4 at acceptance.',
         gates.length === 0
           ? 'No check has run yet.'
           : 'Passed ' + passed + ', not passed ' + failed + ' of ' + gates.length + '.',
+        found === 0
+          ? 'The checks have left no notes yet.'
+          : 'Notes in all: ' + found + ' — ' + settled + ' under checks that passed, '
+            + standing + ' under checks that did not. A note under a passed check says what was already'
+            + ' put right rather than what is still wrong: a check does not pass while a note is open.'
+            + ' That is why such a list is folded and not painted in the colour of a mistake.',
         'A check compares two documents of the work rather than giving an opinion about it. At the last one, the finished work is read against your own list — and the specification is hidden from the reader, so that it cannot confirm itself.'
       ];
     }
