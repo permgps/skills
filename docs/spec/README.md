@@ -126,6 +126,7 @@ node scripts/validate/repair-doors.ts \
   docs/spec skills/maestro                               # the repair phase's doors
 node scripts/validate/dials-defaults.ts \
   docs/spec skills/maestro                               # the mode set and its default
+node scripts/validate/viewer-ownership.ts skills/maestro    # the view boundary
 node --test 'scripts/**/*.test.ts'                     # the checkers themselves
 
 LOG_LEVEL=DEBUG node scripts/validate/spec-integrity.ts docs/spec
