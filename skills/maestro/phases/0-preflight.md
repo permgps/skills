@@ -216,6 +216,15 @@ pane varies — sometimes beside the chat, sometimes as a card the user still ha
 to press — and one printed line covers every case and leaves them independent of
 a button.
 
+**And say that a folded one opens with a press.** What you checked is that the
+page works; whether anyone is looking at it is a second claim and not one you
+can see. A pane may land as a row in the chat rather than as an open panel, and
+from where you sit the two are indistinguishable — your tool reported success
+either way. So name the address, and add in the same breath that the row opens
+when pressed. The прогон that produced this rule announced «панель живая, часы
+идут» to a user who was looking at a closed card and found the panel by
+pressing it themselves, some minutes later.
+
 **Do not open anything in a remote session.** If `SSH_CONNECTION` or `CI` is
 set, print the path and move on: a window on someone else's machine helps nobody.
 

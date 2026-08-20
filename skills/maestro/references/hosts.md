@@ -18,7 +18,7 @@ Answer these six, by observation rather than by belief about the product:
 | Can you create a git worktree? | shell access plus a git repository |
 | Can you commit? | the same |
 | Can you write outside `.maestro/`? | the project code has to reach disk somehow |
-| Can the user watch the прогон change? | the page is on screen **and** a stage clock moved after a state write |
+| Can the user watch the прогон change? | the page renders **and** a stage clock moved after a state write — the two halves you can check yourself |
 
 If you cannot answer one of them, it is a **no** for this прогон. A capability
 assumed and then missing halfway through a wave is worse than one that was never
@@ -61,6 +61,12 @@ is that nobody later mistakes a host limitation for a decision the прогон 
   page renders it perfectly and leaves it unable to load the state beside it, so
   the failure looks like a working dashboard describing an empty прогон. The
   check is that a clock moved, not that a window opened.
+- **Do not read "the dashboard works" as "the user can see it".** The same
+  mistake with the two claims swapped. There, a window that opened proved
+  nothing about the state; here, a state that ticks proves nothing about the
+  window. A client may present the pane as a folded row in the chat, and your
+  tool reports the same success it reports for a panel filling half the screen.
+  Name the address, and say the row opens with a press.
 - **Do not skip a reader because fan-out is missing.** Sequential is slower, not
   weaker; the withholding is what makes the reading worth anything, and that
   survives.
