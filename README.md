@@ -6,19 +6,31 @@ about the genuine forks, writes a specification, cuts it into tasks, builds them
 with parallel executors, reviews the result — and then checks the build against
 your original words with the specification withheld.
 
-It is one Agent Skill. Installing it copies a directory of Markdown; nothing is
+It is an Agent Skill. Installing it copies a directory of Markdown; nothing is
 compiled, and nothing runs at install time.
+
+**The package holds a second skill: `scout`.** It is reconnaissance for the case
+Maestro deliberately does not handle — a ТЗ that is thin, or a domain the user
+does not yet have the words for. Scout reads the domain across many sources,
+finds how existing products already solve it, asks only the forks that reading
+exposes, proposes edits to the ТЗ one at a time in the user's own words, and
+prints a бриф to paste after `/maestro`. It writes nothing a прогон reads and
+starts no run of its own.
+
+**Neither skill needs the other.** Maestro runs exactly as it did before Scout
+existed. Scout ends at a block of text.
 
 ## Install
 
 ```bash
-npx skills add permgps/skills
+npx skills add permgps/skills -y
 ```
 
-Verified on 2026-08-19: the bundle installs from GitHub and arrives byte-identical
-to this repository. No selector is needed — the published tree holds exactly one
-skill. [`docs/install.md`](docs/install.md) shows that run and the
-local-checkout form with their real output.
+The `-y` matters now that the package holds two skills: without it the CLI stops
+on a picker with **nothing pre-selected**, so pressing enter installs nothing.
+Add `-s maestro` or `-s scout` to install one. Measured 2026-08-21 against a
+publish-shaped export of this repository — [`docs/install.md`](docs/install.md)
+has that run, the picker, the local-checkout form and their real output.
 
 The first run in a project asks two things, and never asks them again. Both
 answers go to that project's `.maestro/config.json`, outside the bundle, where
@@ -126,7 +138,9 @@ No mode, depth or finish removes any of them.
 | Path | What it is |
 |---|---|
 | `skills/maestro/` | the skill itself: the orchestrator, one file per phase, the subagent briefs, the dashboard |
-| `docs/spec/` | the behavior specification — what the phases must do, and the authority when a phase file disagrees |
+| `skills/scout/` | the second skill: the reconnaissance order, the boundary, one file per step |
+| `docs/spec/` | Maestro's behavior specification — what the phases must do, and the authority when a phase file disagrees |
+| `docs/spec/scout/` | Scout's, kept separate because they are separate skills and no sentence may have two homes |
 | `docs/` | the documentation pages, starting with [installing](docs/install.md) and [the dashboard](docs/dashboard.md) |
 | `scripts/` | this repository's own tooling: validators, the state contract, the gate checks, the metrics tool |
 | `CHANGELOG.md` | every tagged release and what it shipped, newest first |
@@ -135,7 +149,7 @@ The skill carries no runtime dependencies. The tooling needs Node.js 22.18 or
 newer, because it is TypeScript executed by Node's native type stripping.
 
 ```bash
-npm run check     # typecheck, eight validators, and their tests
+npm run check     # typecheck, ten validator runs across two skills, and their tests
 npm run metrics   # measure a finished run
 ```
 
@@ -146,6 +160,12 @@ deliberate split rather than an oversight: the conversation happens where you
 are, and the artifacts live where the code does. Your brief is translated exactly
 once, and the numbered manifest is shown to you before any other work begins — so
 the translated contract is agreed rather than substituted.
+
+**Scout is the one exception, and it exists to protect that check.** The ТЗ it
+composes is written in your language, because handing Maestro an English бриф
+means Maestro translates it zero times and shows the manifest with no original
+line beneath each requirement — switching off the round-trip check exactly where
+the contract was not written in your own words.
 
 The skill therefore uses Russian names for the things you see on screen. The
 stages in the dashboard read *Подготовка, Требования, Брифинг, Спецификация,

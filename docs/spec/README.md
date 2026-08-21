@@ -133,8 +133,10 @@ meets both with no way to know they are one thing.
 ```bash
 npm run check                                          # everything below, in order
 
-node scripts/validate/spec-integrity.ts docs/spec      # the specification vs itself
+node scripts/validate/spec-integrity.ts docs/spec      # this specification vs itself
+node scripts/validate/spec-integrity.ts docs/spec/scout    # and Scout's, under its own profile
 node scripts/validate/bundle-integrity.ts skills/maestro   # the skill bundle's structure
+node scripts/validate/bundle-integrity.ts skills/scout     # and Scout's, whose steps live in steps/
 node scripts/validate/dashboard-integrity.ts \
   skills/maestro/assets/dashboard.html docs/spec           # the dashboard asset
 node scripts/validate/state-matches-spec.ts docs/spec  # the contract vs its code
@@ -189,7 +191,13 @@ existed. A door nobody opens is a promise, and this is the check that reads it
 as a defect.
 
 Pass a directory to the validator to check a different tree; it defaults to
-`docs/spec`. `LOG_LEVEL` accepts `DEBUG`, `INFO`, `WARN`, `ERROR` and defaults to
+`docs/spec`. **Which profile it applies is resolved from the directory's own
+name**, not from its path: a directory called `scout` is checked against Scout's
+required documents and declared tables, anything else against these. That is why
+this run does not reach `scout/` on its own — it reads its directory
+non-recursively and filters for names ending in `.md`, so the subdirectory is not
+among them, and widening it to walk would make every rule here apply to a tree
+that does not have the same documents. `LOG_LEVEL` accepts `DEBUG`, `INFO`, `WARN`, `ERROR` and defaults to
 `INFO`, so a CI run can be quietened without editing the script. Use the glob
 form for the tests — a bare directory argument is not resolved as a test target.
 

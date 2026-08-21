@@ -1,8 +1,17 @@
-# Installing Maestro
+# Installing
 
-Maestro is one Agent Skill. Installing it copies a directory of Markdown into
-the place your agent looks for skills; nothing is compiled, and nothing runs at
-install time.
+This package holds **two** Agent Skills, and installing copies directories of
+Markdown into the place your agent looks for skills; nothing is compiled, and
+nothing runs at install time.
+
+| Skill | What it does | Needs the other |
+|---|---|---|
+| `maestro` | Turns a бриф into a finished, verified project in one dialogue | no |
+| `scout` | Reconnaissance before that: reads the domain, asks the forks it exposes, and hands back a бриф to paste after `/maestro` | no |
+
+**Neither one requires the other.** Maestro runs exactly as it always has with
+Scout absent, and Scout ends by printing text — it never starts a прогон itself.
+Install both, or install one; the section below is about how to say which.
 
 ## Requirements
 
@@ -27,19 +36,57 @@ pane. Without it the dashboard still opens in a browser.
 ## From the published repository
 
 ```bash
-npx skills add permgps/skills
+npx skills add permgps/skills -y
 ```
 
-The selector is not needed here and the reason is worth one sentence: the CLI
-walks the tree for `SKILL.md` files and installs what it finds, and the
-published tree holds exactly one. A development checkout does not — see below.
-
-Verified output:
+**The `-y` is not decoration, and this is the one thing on this page that
+changed when the package gained a second skill.** The CLI walks the tree for
+`SKILL.md` files and installs what it finds. With one skill it printed the
+description and went on. With two it stops on a picker instead:
 
 ```text
-◇  Installation complete
-│  ✓ maestro (copied)
-│    → ./.claude/skills/maestro
+◇  Found 2 skills
+◆  Select skills to install
+│  Search:
+│  ↑↓ move, space select, enter confirm
+│
+│ ❯ ○ Select All (0/2)
+│   ────────────────────────────────────
+│   ○ maestro
+│   ○ scout
+```
+
+Read the `(0/2)`. **Nothing is pre-selected**, so pressing enter installs
+nothing — a command that used to finish on its own now needs either a keystroke
+or the flag. The picker is worth knowing about rather than avoiding: it is how
+you install one skill and not the other without knowing the selector syntax.
+
+With `-y`, both are installed and nothing is asked. Measured 2026-08-21 against a
+publish-shaped export of this repository — `git archive HEAD`, which is the same
+tree GitHub serves — exit code `0`:
+
+```text
+◇  Found 2 skills
+●  Installing all 2 skills
+◇  Installed 2 skills ───────────╮
+│  ✓ maestro (copied)            │
+│    → ./.claude/skills/maestro  │
+│  ✓ scout (copied)              │
+│    → ./.claude/skills/scout    │
+```
+
+**Against the export, not against `permgps/skills`.** No push has yet carried two
+bundles to the default branch, so the run above proves what the CLI does with two
+`SKILL.md` files and not what GitHub is currently serving. It is recorded as
+**F14** in `.ai-factory/dogfood-findings.md` with all four runs it took to
+establish, including the difference between an agent session — which installs
+non-interactively and never sees the picker — and a person at a terminal, who
+does.
+
+To install only one of them, name it:
+
+```bash
+npx skills add permgps/skills -s maestro -y
 ```
 
 One line of that run is worth reading twice. The summary printed *before* the
@@ -63,12 +110,25 @@ thing on that channel.
 
 The `skills-lock.json` written beside it records `"source": "permgps/skills"`
 with `"sourceType": "github"`; the local form below records a relative path and
-`"sourceType": "local"`. The `computedHash` is the same in both, which is the
-short proof that what GitHub serves and what this checkout holds are one bundle.
+`"sourceType": "local"`. **Each skill gets its own entry with its own
+`computedHash`**, so `npx skills update` can move one without the other:
 
-Last verified on 2026-08-19: `diff -r` against `skills/maestro` reports no
-difference across `SKILL.md`, `phases/`, `prompts/`, `references/` and
-`assets/`.
+```json
+{
+  "version": 1,
+  "skills": {
+    "maestro": { "source": "…", "sourceType": "local", "computedHash": "2b71e812…" },
+    "scout":   { "source": "…", "sourceType": "local", "computedHash": "0a8ff7e6…" }
+  }
+}
+```
+
+The hash is what proves that what GitHub serves and what this checkout holds are
+one bundle.
+
+Last verified on 2026-08-21: `diff -r` against the exported tree reports no
+difference for either skill — `SKILL.md`, `phases/`, `prompts/`, `references/`
+and `assets/` for Maestro, `SKILL.md` and `steps/` for Scout.
 
 ## From a local checkout
 
@@ -79,22 +139,24 @@ use if you cloned the repository yourself.
 # List what the repository offers, without installing anything
 npx skills add /path/to/maestro -l
 
-# Install just this skill, for Claude Code, copying rather than symlinking
+# Install one skill, for Claude Code, copying rather than symlinking
 npx skills add /path/to/maestro -s maestro -a claude-code -y --copy
+npx skills add /path/to/maestro -s scout   -a claude-code -y --copy
 ```
 
-The `-s maestro` selector is not optional in a development checkout, and the
-reason is easy to trip over: the CLI walks the whole tree for `SKILL.md` files,
-and a checkout that also has agent tooling under `.claude/skills/` presents every
-one of those as an installable skill. In this repository the listing reports 30
-skills, of which exactly one is Maestro's. Selecting by name is what keeps an
-install from picking up somebody else's tooling.
+**A selector is not optional in a development checkout**, and here the reason is
+different from the picker above: the CLI walks the whole tree for `SKILL.md`
+files, and a checkout that also has agent tooling under `.claude/skills/`
+presents every one of those as an installable skill. In this repository the
+listing reports **31** skills — it was 30 before Scout — of which exactly two are
+this package's. Selecting by name is what keeps an install from picking up
+somebody else's tooling, and `-y` alone would install all thirty-one.
 
-Verified output:
+Verified output on 2026-08-21:
 
 ```text
 ◇  Local path validated
-◇  Found 30 skills
+◇  Found 31 skills
 ●  Selected 1 skill: maestro
 ◇  Installation complete
 ✓ maestro (copied)
@@ -107,15 +169,18 @@ anything changed.
 
 ### Verifying the copy
 
-The installed bundle must be byte-identical to the source:
+Each installed bundle must be byte-identical to its source:
 
 ```bash
 diff -r skills/maestro <target>/.claude/skills/maestro
+diff -r skills/scout   <target>/.claude/skills/scout
 ```
 
-Last verified on 2026-08-19, with the bundle complete: the listing still reports
-30 skills, of which one is Maestro's, and `diff -r` reports no difference across
-`SKILL.md`, `phases/`, `prompts/`, `references/` and `assets/`.
+Last verified on 2026-08-21: the listing reports 31 skills, two of which are this
+package's, and `diff -r` reports no difference for either. Compare against a
+`git archive HEAD` export rather than the working tree if the checkout has
+uncommitted work — otherwise the diff reports your own edits and looks like a
+broken install.
 
 ## The First Run Asks One Thing
 
@@ -153,6 +218,8 @@ The same bundle, a different target convention. The agent is selected by name:
 npx skills add /path/to/maestro -s maestro -a codex -y --copy
 npx skills add /path/to/maestro -s maestro -a gemini-cli -y --copy
 ```
+
+Scout installs the same way under `-s scout`; neither host has run it.
 
 Two things are worth knowing before either command is run. The Gemini agent is
 called **`gemini-cli`**, not `gemini`; the shorter name is rejected with a list
@@ -195,6 +262,10 @@ npm run link      # symlink skills/maestro into .claude, .codex and .gemini
 npm run unlink    # remove those symlinks
 ```
 
+`link-local.ts` links Maestro only. Scout has no run behind it yet, and giving it
+a symlink into three agent directories before one exists would put it in front of
+a session that did not ask for it.
+
 Verified on 2026-08-19: all three symlinks are created and removed, and the
 script refuses any path that is not already a symlink.
 
@@ -212,8 +283,10 @@ npm run check     # everything below, in this order
 | Command | Checks |
 |---|---|
 | `npm run typecheck` | `tsc --noEmit` over every script |
-| `npm run spec` | the behavior specification does not contradict itself |
+| `npm run spec` | Maestro's behavior specification does not contradict itself |
+| `npm run spec:scout` | Scout's does not either, and its declared tables exist |
 | `npm run bundle` | frontmatter, link targets, no cross-phase links, no orphaned phase |
+| `npm run bundle:scout` | the same over Scout, whose steps live in `steps/` |
 | `npm run dashboard` | the dashboard asset's regions, labels and pure logic |
 | `npm run state` | `docs/spec/state-contract.md` and `scripts/state/contract.ts` still agree |
 | `npm run hosts` | every host capability that degrades is probed in preflight and spent in a phase |
