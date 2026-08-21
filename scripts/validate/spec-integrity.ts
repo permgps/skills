@@ -2,6 +2,7 @@
 // Checks the behavior specification in docs/spec for internal contradictions.
 // Runs directly under Node's type stripping — no build step, no runtime deps.
 
+import { existsSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -13,21 +14,87 @@ export type { Violation };
 
 const log = createLogger('spec-integrity');
 
-// Two different lists, deliberately: REQUIRED_DOCS is what must exist, and the
+/**
+ * One specification directory's required set and the checks that apply to it.
+ *
+ * There are two specifications in this tree and they do not have the same
+ * documents. Rather than loosening one list until it fits both — which is how a
+ * document silently stops being checked — each directory declares its own, and
+ * the cross-document checks below run only where the documents they read exist.
+ */
+export interface SpecProfile {
+  /** For logs and messages. */
+  name: string;
+  /** Documents that must exist. */
+  required: string[];
+  /** Tables that must exist, by the columns that identify them. */
+  tables: Array<{ doc: string; columns: string[] }>;
+  /**
+   * The document whose "Machine-Readable Tables" listing is held to `tables`,
+   * so the checker and the document cannot drift apart. Empty to skip.
+   */
+  declares: string;
+  /** Whether the Maestro-specific cross-document checks apply. */
+  crossChecks: boolean;
+}
+
+// Two different lists, deliberately: `required` is what must exist, and the
 // parse set is every markdown file actually present. Collapsing them into one
 // list is how a document silently stops being checked.
-const REQUIRED_DOCS = [
-  'README.md',
-  'vocabulary.md',
-  'safety.md',
-  'dials.md',
-  'phases.md',
-  'gates.md',
-  'artifacts.md',
-  'state-contract.md',
-  'dashboard.md',
-  'hosts.md',
-];
+export const MAESTRO_PROFILE: SpecProfile = {
+  name: 'maestro',
+  required: [
+    'README.md',
+    'vocabulary.md',
+    'safety.md',
+    'dials.md',
+    'phases.md',
+    'gates.md',
+    'artifacts.md',
+    'state-contract.md',
+    'dashboard.md',
+    'hosts.md',
+  ],
+  // The Maestro tables are identified by the cross-document checks themselves,
+  // each of which fails with its own message when its table is absent. Listing
+  // them here as well would give two checks one job and two error messages.
+  tables: [],
+  declares: '',
+  crossChecks: true,
+};
+
+export const SCOUT_PROFILE: SpecProfile = {
+  name: 'scout',
+  required: [
+    'README.md',
+    'boundary.md',
+    'steps.md',
+    'search.md',
+    'reconcile.md',
+    'output.md',
+    'vocabulary.md',
+  ],
+  tables: [
+    { doc: 'steps.md', columns: ['Id', 'Name', 'Reads', 'Produces'] },
+    { doc: 'steps.md', columns: ['Capability', 'Absent', 'Cost'] },
+    { doc: 'boundary.md', columns: ['Rule', 'What it forbids'] },
+    { doc: 'reconcile.md', columns: ['Kind', 'Shows', 'May be forced by'] },
+    { doc: 'search.md', columns: ['Sweep', 'Budget', 'Stops when', 'Produces'] },
+    { doc: 'vocabulary.md', columns: ['Term', 'Means'] },
+    { doc: 'vocabulary.md', columns: ['Term', 'Owned by'] },
+  ],
+  declares: 'README.md',
+  crossChecks: false,
+};
+
+/**
+ * Which profile a directory is checked under. Resolved by the directory's own
+ * name rather than its path, so a fixture directory in a test is checked as
+ * Maestro without the test having to know where it sits.
+ */
+export function profileFor(specDir: string): SpecProfile {
+  return path.basename(path.resolve(specDir)) === 'scout' ? SCOUT_PROFILE : MAESTRO_PROFILE;
+}
 
 /**
  * One parsed table row. `__line` is the 1-based source line, so a violation can
@@ -113,7 +180,10 @@ export function carries(label: string, term: string, wordwise: boolean): boolean
   return new RegExp(`\\b${escapeForRegExp(term)}\\b`).test(label);
 }
 
-export async function checkSpec(specDir: string): Promise<Violation[]> {
+export async function checkSpec(
+  specDir: string,
+  profile: SpecProfile = MAESTRO_PROFILE,
+): Promise<Violation[]> {
   const violations: Violation[] = [];
   const add = (check: string, file: string, line: number, message: string): void => {
     violations.push({ check, file, line, message });
@@ -124,10 +194,15 @@ export async function checkSpec(specDir: string): Promise<Violation[]> {
     (await readdir(specDir)).filter(name => name.endsWith('.md')),
   );
 
-  for (const doc of REQUIRED_DOCS) {
-    if (!present.has(doc)) add('documents', doc, 0, `required document is missing: ${doc}`);
+  for (const doc of profile.required) {
+    if (present.has(doc)) continue;
+    // Two specification directories means the likeliest cause of an absent
+    // document is a document written into the other one. Name the profile in a
+    // line of its own so the fix is «move it», not «write it again».
+    log.warn('documents', 'required document is missing', { profile: profile.name, doc });
+    add('documents', doc, 0, `required document is missing: ${doc}`);
   }
-  log.debug('documents', 'documents scanned', { found: present.size });
+  log.debug('documents', 'documents scanned', { profile: profile.name, found: present.size });
   if (violations.length > 0) return violations;
 
   // Parse everything present, not only the required set: a table defined in any
@@ -141,6 +216,77 @@ export async function checkSpec(specDir: string): Promise<Violation[]> {
   // Every required document is present by the time we get here; the fallback
   // keeps the types honest without inventing a second failure path.
   const tablesOf = (name: string): Table[] => docs.get(name) ?? [];
+
+  // --- every relative link resolves ----------------------------------------
+  //
+  // Two specification directories link to each other under the one-owner rule:
+  // the second document is required to link to the first rather than restate it,
+  // so a link that resolves to nothing turns a rule with one owner into a rule
+  // with none.
+  const INLINE_LINK = /\[[^\]]*\]\(([^)\s]+)[^)]*\)/g;
+  let linkCount = 0;
+  for (const name of [...present].sort()) {
+    const body = await readFile(path.join(specDir, name), 'utf8');
+    body.split('\n').forEach((line, index) => {
+      for (const match of line.matchAll(INLINE_LINK)) {
+        const raw = (match[1] ?? '').split('#')[0] ?? '';
+        if (raw === '' || /^[a-z][a-z0-9+.-]*:/i.test(raw)) continue;
+        linkCount += 1;
+        if (!existsSync(path.join(specDir, raw))) {
+          add('links', name, index + 1, `link "${raw}" resolves to nothing`);
+        }
+      }
+    });
+  }
+  log.info('links', 'links checked', { count: linkCount });
+
+  // --- every declared table exists, with the columns that identify it -------
+  for (const wanted of profile.tables) {
+    if (findTable(tablesOf(wanted.doc), wanted.columns)) continue;
+    add('tables', wanted.doc, 0,
+      `no table with columns ${wanted.columns.join(', ')}`);
+  }
+  if (profile.tables.length > 0) {
+    log.info('tables', 'declared tables checked', { count: profile.tables.length });
+  }
+
+  // --- the document that lists the tables agrees with this checker ----------
+  //
+  // A "Machine-Readable Tables" section is a promise about what a program reads.
+  // Held only by prose it drifts in both directions at once: a table the checker
+  // requires and the document never mentions, and a row the document advertises
+  // that nothing reads.
+  if (profile.declares !== '') {
+    const declared = findTable(tablesOf(profile.declares), ['Document', 'Table', 'Required columns']);
+    if (!declared) {
+      add('tables', profile.declares, 0,
+        'no table with columns Document, Table, Required columns');
+    } else {
+      const key = (doc: string, columns: string[]): string =>
+        `${doc}::${columns.map(column => column.replace(/`/g, '').trim()).sort().join(',')}`;
+      const inChecker = new Set(profile.tables.map(table => key(table.doc, table.columns)));
+      const inDocument = new Map<string, number>();
+      for (const row of declared.rows) {
+        const doc = String(row['Document'] ?? '').replace(/`/g, '').trim();
+        const columns = String(row['Required columns'] ?? '').split(',');
+        inDocument.set(key(doc, columns), row.__line);
+      }
+      for (const [entry, line] of inDocument) {
+        if (!inChecker.has(entry)) {
+          add('tables', profile.declares, line,
+            `this row promises a table no checker reads: ${entry.replace('::', ' — ')}`);
+        }
+      }
+      for (const entry of inChecker) {
+        if (!inDocument.has(entry)) {
+          add('tables', profile.declares, declared.line,
+            `the checker requires a table this section does not list: ${entry.replace('::', ' — ')}`);
+        }
+      }
+    }
+  }
+
+  if (!profile.crossChecks) return violations;
 
   // --- phases: the id set every other check resolves against ---------------
   const phaseTable = findTable(tablesOf('phases.md'), ['Id', 'Stage']);
@@ -347,11 +493,12 @@ export async function checkSpec(specDir: string): Promise<Violation[]> {
 
 async function main(): Promise<number> {
   const specDir = process.argv[2] ?? 'docs/spec';
-  log.info('run', 'checking specification', { specDir });
+  const profile = profileFor(specDir);
+  log.info('run', 'checking specification', { specDir, profile: profile.name });
 
   let violations: Violation[];
   try {
-    violations = await checkSpec(specDir);
+    violations = await checkSpec(specDir, profile);
   } catch (error) {
     // A missing or unreadable directory is an operator mistake, not a defect in
     // the specification. Report it as one line instead of a stack trace.

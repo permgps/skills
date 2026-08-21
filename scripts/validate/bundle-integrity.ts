@@ -15,8 +15,55 @@ export type { Violation };
 const log = createLogger('bundle-integrity');
 
 const REQUIRED_KEYS = ['name', 'description', 'argument-hint'];
-const PHASES_DIR = 'phases';
-const PROMPTS_DIR = 'prompts';
+
+/**
+ * One bundle's directory names.
+ *
+ * The package holds two skills and they do not use the same word for the thing
+ * read one file at a time: Maestro has `phases/`, Scout has `steps/`. Both mean
+ * the same rule — linked only from `SKILL.md`, never from each other — so the
+ * checker learns the name rather than the rule learning a second name.
+ *
+ * **What the widening costs.** Before it, a bundle either had `phases/` or was
+ * silently unchecked: `listMarkdown` returns nothing for a directory that is not
+ * there, the reachability pass reports zero files, and the run says OK. That is
+ * how Scout's five step files passed this checker while nothing had read them.
+ * A profile table does not remove that failure mode, it only moves it — a third
+ * bundle whose directory is named something else fails open in exactly the same
+ * way. So the profile carries `other`, the markdown directories a bundle
+ * deliberately does not read one at a time, and any directory of markdown that
+ * no profile accounts for is a violation. Fail-open became fail-loud; the price
+ * is that adding a bundle means adding a row here, and forgetting to is now an
+ * error rather than a silence.
+ */
+export interface BundleProfile {
+  name: string;
+  /** Read one file at a time, linked only from `SKILL.md`. */
+  steps: string;
+  /** Handed to a субагент; linked from anywhere in the bundle. */
+  prompts: string;
+  /** Markdown that is neither, and is opened deliberately by something else. */
+  other: string[];
+}
+
+export const MAESTRO_BUNDLE: BundleProfile = {
+  name: 'maestro',
+  steps: 'phases',
+  prompts: 'prompts',
+  other: ['references'],
+};
+
+export const SCOUT_BUNDLE: BundleProfile = {
+  name: 'scout',
+  steps: 'steps',
+  prompts: 'prompts',
+  other: [],
+};
+
+/** Resolved by the bundle's own directory name, which is also its skill name. */
+export function bundleProfileFor(bundleDir: string): BundleProfile {
+  return path.basename(path.resolve(bundleDir)) === 'scout' ? SCOUT_BUNDLE : MAESTRO_BUNDLE;
+}
 
 export interface Frontmatter {
   keys: Map<string, string>;
@@ -103,7 +150,12 @@ async function listMarkdown(bundleDir: string, directory: string): Promise<strin
   return found;
 }
 
-export async function checkBundle(bundleDir: string): Promise<Violation[]> {
+export async function checkBundle(
+  bundleDir: string,
+  profile: BundleProfile = MAESTRO_BUNDLE,
+): Promise<Violation[]> {
+  const PHASES_DIR = profile.steps;
+  const PROMPTS_DIR = profile.prompts;
   const violations: Violation[] = [];
   const add = (check: string, file: string, line: number, message: string): void => {
     violations.push({ check, file, line, message });
@@ -139,6 +191,17 @@ export async function checkBundle(bundleDir: string): Promise<Violation[]> {
         `frontmatter name "${declared}" does not match directory "${directory}"`);
     }
     log.info('frontmatter', 'frontmatter checked', { keys: frontmatter.keys.size });
+  }
+
+  // --- no markdown directory is outside every profile ----------------------
+  for (const entry of await readdir(bundleDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name === PHASES_DIR || entry.name === PROMPTS_DIR) continue;
+    if (profile.other.includes(entry.name)) continue;
+    if ((await listMarkdown(bundleDir, entry.name)).length === 0) continue;
+    add('directories', entry.name, 0,
+      `"${entry.name}" holds markdown and profile "${profile.name}" does not account for it — `
+      + 'a directory no profile names is a directory nothing reads');
   }
 
   // --- links resolve, everywhere in the bundle ------------------------------
@@ -183,7 +246,7 @@ export async function checkBundle(bundleDir: string): Promise<Violation[]> {
         add('cross-phase', file, link.line, fromPrompt
           ? `prompt links to "${link.target}" — a subagent brief that reaches a phase's `
             + 'rules stops being an independent brief'
-          : `phase file links to "${link.target}" — hoist the shared rule into SKILL.md `
+          : `${PHASES_DIR} file links to "${link.target}" — hoist the shared rule into SKILL.md `
             + 'or give it its own file each phase opens deliberately');
       }
     }
@@ -193,7 +256,7 @@ export async function checkBundle(bundleDir: string): Promise<Violation[]> {
   // --- nothing under phases/ or prompts/ is orphaned ------------------------
   for (const file of phaseFiles) {
     if (!linkedFromSkill.has(file)) {
-      add('reachability', file, 0, `phase file is not linked from SKILL.md`);
+      add('reachability', file, 0, `${PHASES_DIR} file is not linked from SKILL.md`);
     }
   }
   // A prompt is opened by whichever phase hands it over, so any document in the
@@ -215,11 +278,12 @@ export async function checkBundle(bundleDir: string): Promise<Violation[]> {
 
 async function main(): Promise<number> {
   const bundleDir = process.argv[2] ?? 'skills/maestro';
-  log.info('run', 'checking bundle', { bundleDir });
+  const profile = bundleProfileFor(bundleDir);
+  log.info('run', 'checking bundle', { bundleDir, profile: profile.name });
 
   let violations: Violation[];
   try {
-    violations = await checkBundle(bundleDir);
+    violations = await checkBundle(bundleDir, profile);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     log.error('run', 'bundle could not be read', { bundleDir, reason });

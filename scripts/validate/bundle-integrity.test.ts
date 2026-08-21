@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
+  bundleProfileFor,
   checkBundle,
   findRelativeLinks,
   parseFrontmatter,
@@ -279,4 +280,93 @@ test('a prompt escaping the bundle is reported', async () => {
 
 test('a bundle with no prompts directory is valid', async () => {
   assert.deepEqual(await violationsFor({}), []);
+});
+
+// --- the second bundle, and what the widening costs -------------------------
+
+const SCOUT_FRONTMATTER = `---
+name: scout
+description: Reconnaissance before a brief becomes a project.
+argument-hint: "<what you want built, however incomplete>"
+---
+`;
+
+const SCOUT_BASELINE: Record<string, string> = {
+  'SKILL.md': `${SCOUT_FRONTMATTER}
+# Scout
+
+| # | Step | Rules |
+|---|---|---|
+| 1 | Ground | [steps/1-ground.md](steps/1-ground.md) |
+| 2 | Search | [steps/2-search.md](steps/2-search.md) |
+`,
+  'steps/1-ground.md': `# Ground
+
+Read what the user gave you. Then read the search step file.
+`,
+  'steps/2-search.md': `# Search
+
+Two sweeps.
+`,
+};
+
+async function scoutViolationsFor(overrides: Overrides = {}): Promise<Violation[]> {
+  const dir = await mkdtemp(path.join(tmpdir(), 'bundle-integrity-scout-'));
+  const bundle = path.join(dir, 'scout');
+  const files: Overrides = { ...SCOUT_BASELINE, ...overrides };
+  for (const [name, body] of Object.entries(files)) {
+    if (body === null) continue;
+    const target = path.join(bundle, name);
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, body, 'utf8');
+  }
+  await mkdir(bundle, { recursive: true });
+  try {
+    return await checkBundle(bundle, bundleProfileFor(bundle));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+test('a bundle whose steps live in steps/ passes under its own profile', async () => {
+  assert.deepEqual(await scoutViolationsFor(), []);
+});
+
+test('a step file not linked from SKILL.md is reported, and named as a step', async () => {
+  const violations = await scoutViolationsFor({ 'steps/3-grill.md': '# Grill\n\nAsk.\n' });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'reachability');
+  assert.match(violations[0]?.message ?? '', /^steps file is not linked/);
+});
+
+test('a step file linking to another step file is reported', async () => {
+  const violations = await scoutViolationsFor({
+    'steps/1-ground.md': '# Ground\n\nThen [search](2-search.md).\n',
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'cross-phase');
+  assert.match(violations[0]?.message ?? '', /^steps file links to/);
+});
+
+test('markdown in a directory no profile accounts for is reported, not ignored', async () => {
+  // This is the failure mode the widening exists to convert from silence into an
+  // error: before profiles, a bundle whose step directory had another name was
+  // checked as though it had no steps at all, and the run said OK.
+  const violations = await scoutViolationsFor({ 'notes/anything.md': '# Notes\n' });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'directories');
+  assert.match(violations[0]?.message ?? '', /does not account for it/);
+});
+
+test('the maestro profile still accepts references/, which scout does not have', async () => {
+  assert.deepEqual(await violationsFor({}), []);
+  const violations = await scoutViolationsFor({ 'references/anything.md': '# Ref\n' });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'directories');
+});
+
+test('bundleProfileFor picks the profile from the bundle directory name', () => {
+  assert.equal(bundleProfileFor('skills/scout').steps, 'steps');
+  assert.equal(bundleProfileFor('skills/maestro').steps, 'phases');
+  assert.equal(bundleProfileFor('/tmp/whatever').steps, 'phases');
 });

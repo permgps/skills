@@ -4,7 +4,15 @@ import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { carries, checkSpec, parseTables, type Violation } from './spec-integrity.ts';
+import {
+  carries,
+  checkSpec,
+  MAESTRO_PROFILE,
+  parseTables,
+  profileFor,
+  SCOUT_PROFILE,
+  type Violation,
+} from './spec-integrity.ts';
 
 // Fixtures are generated per test rather than committed: each one differs from
 // the passing baseline by exactly the defect under test, which is easier to
@@ -398,4 +406,152 @@ test('carries matches a stem one way and a whole word the other', () => {
   assert.equal(carries('rebuilt work', 'build', true), false);
   assert.equal(carries('the build', 'build', true), true);
   assert.equal(carries('build-time', 'build', true), true);
+});
+
+// --- the second specification directory ------------------------------------
+
+const SCOUT_BASELINE: Record<string, string> = {
+  'README.md': `# Scout
+
+## Machine-Readable Tables
+
+| Document | Table | Required columns |
+|---|---|---|
+| \`steps.md\` | Steps | \`Id\`, \`Name\`, \`Reads\`, \`Produces\` |
+| \`steps.md\` | Degradation | \`Capability\`, \`Absent\`, \`Cost\` |
+| \`boundary.md\` | Boundary rules | \`Rule\`, \`What it forbids\` |
+| \`reconcile.md\` | Proposal kinds | \`Kind\`, \`Shows\`, \`May be forced by\` |
+| \`search.md\` | Sweeps | \`Sweep\`, \`Budget\`, \`Stops when\`, \`Produces\` |
+| \`vocabulary.md\` | Scout terms | \`Term\`, \`Means\` |
+| \`vocabulary.md\` | Borrowed terms | \`Term\`, \`Owned by\` |
+`,
+  'boundary.md': `# Boundary
+
+| Rule | What it forbids |
+|---|---|
+| B1 | Treating a finding as a fact about the user |
+`,
+  'steps.md': `# Steps
+
+| Id | Name | Reads | Produces |
+|---|---|---|---|
+| \`ground\` | Ground | the ТЗ | the working ТЗ |
+
+| Capability | Absent | Cost |
+|---|---|---|
+| \`web\` | cannot fetch | the search step does not run |
+`,
+  'search.md': `# Search
+
+| Sweep | Budget | Stops when | Produces |
+|---|---|---|---|
+| terminology | ~50 | three dry sources | a term list |
+`,
+  'reconcile.md': `# Reconcile
+
+| Kind | Shows | May be forced by |
+|---|---|---|
+| \`add\` | the new line | an answer |
+`,
+  'output.md': `# Output
+
+One asked-for thing per line.
+`,
+  'vocabulary.md': `# Vocabulary
+
+| Term | Means |
+|---|---|
+| находка | something a sweep learned |
+
+| Term | Owned by |
+|---|---|
+| бриф | the Maestro specification |
+`,
+};
+
+async function scoutViolationsFor(overrides: Overrides = {}): Promise<Violation[]> {
+  const parent = await mkdtemp(path.join(tmpdir(), 'spec-integrity-'));
+  // Named `scout`, because the profile is resolved from the directory's own name.
+  const dir = path.join(parent, 'scout');
+  await mkdir(dir, { recursive: true });
+  const files: Overrides = { ...SCOUT_BASELINE, ...overrides };
+  for (const [name, body] of Object.entries(files)) {
+    if (body === null) continue;
+    await writeFile(path.join(dir, name), body, 'utf8');
+  }
+  try {
+    return await checkSpec(dir, profileFor(dir));
+  } finally {
+    await rm(parent, { recursive: true, force: true });
+  }
+}
+
+test('profileFor picks the profile from the directory name', () => {
+  assert.equal(profileFor('docs/spec/scout').name, 'scout');
+  assert.equal(profileFor('docs/spec').name, 'maestro');
+  assert.equal(profileFor('/tmp/spec-integrity-abc').name, 'maestro');
+});
+
+test('a consistent scout specification produces no violations', async () => {
+  assert.deepEqual(await scoutViolationsFor(), []);
+});
+
+test('the two profiles have different required documents', async () => {
+  // The whole reason for a per-directory required set: `phases.md` is required
+  // in one directory and meaningless in the other, and one merged list would
+  // have to drop it to fit both.
+  assert.ok(MAESTRO_PROFILE.required.includes('phases.md'));
+  assert.ok(!SCOUT_PROFILE.required.includes('phases.md'));
+  assert.ok(SCOUT_PROFILE.required.includes('boundary.md'));
+  assert.ok(!MAESTRO_PROFILE.required.includes('boundary.md'));
+});
+
+test('a missing scout document is reported under the scout required set', async () => {
+  const violations = await scoutViolationsFor({ 'reconcile.md': null });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'documents');
+  assert.match(violations[0]?.message ?? '', /reconcile\.md/);
+});
+
+test('a declared table that is not there is reported', async () => {
+  const violations = await scoutViolationsFor({ 'search.md': '# Search\n\nNo table.\n' });
+  assert.ok(violations.some(v => v.check === 'tables' && v.file === 'search.md'));
+});
+
+test('a table the section promises and no checker reads is reported', async () => {
+  const violations = await scoutViolationsFor({
+    'README.md': `${SCOUT_BASELINE['README.md']}| \`output.md\` | Shapes | \`Shape\`, \`Why\` |\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'tables');
+  assert.match(violations[0]?.message ?? '', /promises a table no checker reads/);
+});
+
+test('a table the checker requires and the section does not list is reported', async () => {
+  const trimmed = (SCOUT_BASELINE['README.md'] ?? '')
+    .split('\n')
+    .filter(line => !line.includes('Borrowed terms'))
+    .join('\n');
+  const violations = await scoutViolationsFor({ 'README.md': trimmed });
+  assert.equal(violations.length, 1);
+  assert.match(violations[0]?.message ?? '', /does not list/);
+});
+
+test('a link that resolves to nothing is reported', async () => {
+  const violations = await scoutViolationsFor({
+    'output.md': '# Output\n\nSee [the boundary](boundry.md).\n',
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'links');
+  assert.match(violations[0]?.message ?? '', /boundry\.md/);
+});
+
+test('a link into the sibling specification is followed, not assumed', async () => {
+  // The one-owner rule makes Scout link to `../safety.md` rather than restate S6.
+  // A link that resolves to nothing turns a rule with one owner into none.
+  const violations = await scoutViolationsFor({
+    'boundary.md': `${SCOUT_BASELINE['boundary.md']}\nSee [safety](../safety.md).\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'links');
 });

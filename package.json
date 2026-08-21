@@ -11,10 +11,12 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "spec": "node scripts/validate/spec-integrity.ts docs/spec",
+    "spec:scout": "node scripts/validate/spec-integrity.ts docs/spec/scout",
     "bundle": "node scripts/validate/bundle-integrity.ts skills/maestro",
+    "bundle:scout": "node scripts/validate/bundle-integrity.ts skills/scout",
     "dashboard": "node scripts/validate/dashboard-integrity.ts skills/maestro/assets/dashboard.html docs/spec",
     "test": "node --test 'scripts/**/*.test.ts'",
-    "check": "npm run typecheck && npm run spec && npm run bundle && npm run dashboard && npm run state && npm run hosts && npm run doors && npm run dials && npm run view && npm run test",
+    "check": "npm run typecheck && npm run spec && npm run spec:scout && npm run bundle && npm run bundle:scout && npm run dashboard && npm run state && npm run hosts && npm run doors && npm run dials && npm run view && npm run test",
     "link": "node scripts/package/link-local.ts link",
     "unlink": "node scripts/package/link-local.ts unlink",
     "state": "node scripts/validate/state-matches-spec.ts docs/spec",
