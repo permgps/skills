@@ -19,7 +19,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import net from 'node:net';
-import { mkdtemp, writeFile, copyFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, copyFile, readFile, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -55,6 +55,69 @@ const STATE = {
 interface Outcome { status: number; out: string }
 
 /**
+ * The environment every test runs the script in unless it says otherwise.
+ *
+ * `MAESTRO_SYNC_NO_OPEN` is not a nicety: without it the script opens a browser
+ * window, and `npm run test` would open one per test on the machine running it.
+ * A test that wants to watch the opening injects a fake one instead of removing
+ * this — see `opener()`.
+ */
+const SEALED = { MAESTRO_SYNC_NO_OPEN: '1' };
+
+/** Run the script with the sealed environment, plus whatever a test adds. */
+function run(script: string, extra: Record<string, string>, args: string[] = []): Outcome {
+  const done = spawnSync(python as string, [script, ...args], {
+    encoding: 'utf8',
+    env: { ...process.env, ...SEALED, ...extra },
+  });
+  return { status: done.status ?? -1, out: (done.stdout ?? '') + (done.stderr ?? '') };
+}
+
+/**
+ * An opener that records instead of opening.
+ *
+ * Written into the directory under test and handed to the script through
+ * `MAESTRO_SYNC_OPENER`, so what a test asserts is the url the script decided
+ * to open — the decision — and never a window that actually appeared.
+ */
+async function opener(root: string): Promise<Record<string, string>> {
+  const script = path.join(root, 'opener.sh');
+  await writeFile(script, `#!/bin/sh\nprintf '%s\\n' "$1" >> "${path.join(root, 'opened.log')}"\n`,
+    'utf8');
+  // Through `sh` rather than the bare path: the file needs no execute bit, and
+  // the script splits this value the way a shell would.
+  return { MAESTRO_SYNC_OPENER: `/bin/sh ${script}`, MAESTRO_SYNC_NO_OPEN: '' };
+}
+
+/** Every url the fake opener was handed, in order. */
+async function opened(root: string): Promise<string[]> {
+  try {
+    return (await readFile(path.join(root, 'opened.log'), 'utf8')).split('\n').filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The urls, once there are at least `expected` of them.
+ *
+ * The script detaches the opener and does not wait for it — it must not, since
+ * `open` can outlive the call — so the log lands a moment after the process
+ * exits. This waits for that moment instead of asserting into a race.
+ */
+async function openedAfter(root: string, expected: number): Promise<string[]> {
+  for (let attempt = 0; attempt < 250; attempt += 1) {
+    const seen = await opened(root);
+    if (seen.length >= expected) return seen;
+    await new Promise((wait) => setTimeout(wait, 20));
+  }
+  return opened(root);
+}
+
+/** Long enough that an opener which was going to run would have run. */
+const settle = (): Promise<void> => new Promise((done) => setTimeout(done, 400));
+
+/**
  * Run sync.py over a state, in a directory of its own, and stop the server it
  * raises. Leaving that server running would leak a detached process per test.
  */
@@ -69,8 +132,7 @@ async function sync(state: unknown): Promise<Outcome> {
       'utf8',
     );
 
-    const done = spawnSync(python as string, [path.join(root, 'sync.py')], { encoding: 'utf8' });
-    return { status: done.status ?? -1, out: (done.stdout ?? '') + (done.stderr ?? '') };
+    return run(path.join(root, 'sync.py'), {});
   } finally {
     try {
       const record = JSON.parse(await readFile(path.join(root, 'serve.json'), 'utf8')) as
@@ -91,7 +153,8 @@ async function sync(state: unknown): Promise<Outcome> {
  * cannot use `sync()`, which throws its directory away after one run.
  */
 interface Session {
-  run(): Promise<Outcome>;
+  root: string;
+  run(extra?: Record<string, string>, args?: string[]): Promise<Outcome>;
   record(): Promise<{ pid: number; port: number; previousPort?: number }>;
   page(): Promise<string>;
   dispose(): Promise<void>;
@@ -120,14 +183,15 @@ async function session(state: unknown, raw?: string): Promise<Session> {
       { pid: number; port: number; previousPort?: number };
 
   return {
-    async run() {
-      const done = spawnSync(python as string, [path.join(root, 'sync.py')], { encoding: 'utf8' });
+    root,
+    async run(extra: Record<string, string> = {}, args: string[] = []) {
+      const done = run(path.join(root, 'sync.py'), extra, args);
       try {
         raised.add((await record()).pid);
       } catch {
         // No server was raised. The exit-code tests below expect exactly that.
       }
-      return { status: done.status ?? -1, out: (done.stdout ?? '') + (done.stderr ?? '') };
+      return done;
     },
     record,
     page: () => readFile(path.join(root, 'dashboard.html'), 'utf8'),
@@ -382,3 +446,144 @@ test('every offender is named, not just the first', { skip: python === null }, a
   assert.match(done.out, /tasks\[0\]\.status is "pending"/);
   assert.match(done.out, /tasks\[1\]\.status is "blocked"/);
 });
+
+// What it *opens*. Until these existed, the tool printed an address and left the
+// act of putting it in front of somebody to prose in `phases/0-preflight.md`,
+// addressed to the orchestrator. A прогон on Claude Code Desktop printed the
+// address, opened nothing, and the user found the дашборд minutes later by
+// pressing the browser icon themselves.
+
+test('the page is opened, not only printed', { skip: python === null }, async () => {
+  const held = await session(STATE);
+  try {
+    const first = await held.run(await opener(held.root));
+    assert.equal(first.status, 0, first.out);
+    const port = (await held.record()).port;
+    assert.deepEqual(await openedAfter(held.root, 1), [`http://localhost:${port}/dashboard.html`],
+      `the address was printed and not opened: ${first.out}`);
+    assert.match(first.out, /панель открыта/,
+      `nothing in the output says the page was opened: ${first.out}`);
+  } finally {
+    await held.dispose();
+  }
+});
+
+test('a second call opens nothing — the page is raised once and only once',
+  { skip: python === null }, async () => {
+    // `SKILL.md` says "raised in preflight and never opened a second time", and a
+    // run calls this tool dozens of times. Remembering that is not the
+    // orchestrator's job when the tool can hold it.
+    const held = await session(STATE);
+    try {
+      const env = await opener(held.root);
+      await held.run(env);
+      await openedAfter(held.root, 1);
+      const again = await held.run(env);
+      assert.equal(again.status, 0, again.out);
+      await settle();
+      assert.equal((await opened(held.root)).length, 1,
+        'the page was opened twice for one address');
+    } finally {
+      await held.dispose();
+    }
+  });
+
+test('an address that moved is opened again, because the tab the user has is dead',
+  { skip: python === null }, async () => {
+    const held = await session(STATE);
+    let stranger: net.Server | null = null;
+    try {
+      const env = await opener(held.root);
+      await held.run(env);
+      const before = await held.record();
+      await stop(before.pid, before.port);
+      stranger = await occupy(before.port);
+
+      const moved = await held.run(env);
+      assert.equal(moved.status, 0, moved.out);
+      const after = await held.record();
+      assert.notEqual(after.port, before.port);
+      assert.deepEqual(await openedAfter(held.root, 2), [
+        `http://localhost:${before.port}/dashboard.html`,
+        `http://localhost:${after.port}/dashboard.html`,
+      ], `a moved address left the user holding a dead tab: ${moved.out}`);
+    } finally {
+      if (stranger !== null) await new Promise<void>((done) => stranger!.close(() => done()));
+      await held.dispose();
+    }
+  });
+
+test('--reopen brings it back when the panel is gone', { skip: python === null }, async () => {
+  const held = await session(STATE);
+  try {
+    const env = await opener(held.root);
+    await held.run(env);
+    const port = (await held.record()).port;
+    const back = await held.run(env, ['--reopen']);
+    assert.equal(back.status, 0, back.out);
+    assert.deepEqual(await openedAfter(held.root, 2), [
+      `http://localhost:${port}/dashboard.html`,
+      `http://localhost:${port}/dashboard.html`,
+    ], `--reopen did not open the page again: ${back.out}`);
+  } finally {
+    await held.dispose();
+  }
+});
+
+test('a remote session opens nothing and says where the page is',
+  { skip: python === null }, async () => {
+    // A window on someone else's machine helps nobody. This was a sentence in
+    // `phases/0-preflight.md`; it belongs in the code that does the opening.
+    for (const away of ['CI', 'SSH_CONNECTION']) {
+      const held = await session(STATE);
+      try {
+        const env = { ...await opener(held.root), [away]: '1' };
+        const done = await held.run(env, ['--reopen']);
+        assert.equal(done.status, 0, done.out);
+        await settle();
+        assert.deepEqual(await opened(held.root), [],
+          `${away} was set and the script still opened a window`);
+      } finally {
+        await held.dispose();
+      }
+    }
+  });
+
+test('MAESTRO_SYNC_NO_OPEN is honoured, so a host driving its own pane can say so',
+  { skip: python === null }, async () => {
+    const held = await session(STATE);
+    try {
+      const env = { ...await opener(held.root), MAESTRO_SYNC_NO_OPEN: '1' };
+      const done = await held.run(env, ['--reopen']);
+      assert.equal(done.status, 0, done.out);
+      await settle();
+      assert.deepEqual(await opened(held.root), []);
+    } finally {
+      await held.dispose();
+    }
+  });
+
+test('a live server for this directory is adopted, not duplicated',
+  { skip: python === null }, async () => {
+    // The failure this encodes: `serve.json` lives inside `.maestro/`, which
+    // preflight re-populates every run. A second run found no record, raised a
+    // second server for the same directory, and handed out a new address in
+    // silence — `moved_from` is None when nothing was remembered, so not even
+    // the moved-address line fired. Two servers were left listening.
+    const held = await session(STATE);
+    try {
+      await held.run();
+      const before = await held.record();
+      await unlink(path.join(held.root, 'serve.json'));
+
+      const again = await held.run();
+      assert.equal(again.status, 0, again.out);
+      const after = await held.record();
+      assert.equal(after.port, before.port,
+        `a live server for this directory was duplicated instead of adopted: ${again.out}`);
+      assert.equal(after.pid, before.pid, 'the adopted record must name the live server');
+      assert.ok(again.out.includes(`http://localhost:${before.port}/dashboard.html`), again.out);
+    } finally {
+      await held.dispose();
+    }
+  });

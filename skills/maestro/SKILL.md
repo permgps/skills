@@ -145,6 +145,14 @@ cannot load a file beside it, checks that `state.js` is readable by the tool
 that measures a finished run, and brings back a server that died since the last
 update. The screen follows on its own within seconds, wherever it is open.
 
+**The tool is what opens the page, and what remembers that it did** — the first
+call in a directory puts it in front of the user, later calls open nothing, and
+an address that moved is opened again because the tab the user holds is dead.
+None of that is yours to track. What is yours is to relay what it printed. If
+the user says the panel is gone, `python3 .maestro/sync.py --reopen` is the
+whole of the answer; if your harness shows the page in a pane of its own, pass
+`--no-open` in preflight so the user does not get two.
+
 **This is here rather than in the phase files because every phase writes state.**
 A rule copied into nine files is nine rules that drift apart, and this one is
 performed dozens of times in a run. Skipping it degrades rather than breaks: a

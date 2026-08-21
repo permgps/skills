@@ -45,6 +45,7 @@ Everything else here still breaks quietly, so change it with that in mind.
 import json
 import os
 import re
+import shlex
 import socket
 import subprocess
 import sys
@@ -54,6 +55,12 @@ STATE = os.path.join(DIR, 'state.js')
 PAGE = os.path.join(DIR, 'dashboard.html')
 INDEX = os.path.join(DIR, 'index.html')
 SERVE = os.path.join(DIR, 'serve.json')
+OPENED = os.path.join(DIR, 'opened.json')
+
+# A session where a window helps nobody, because the window would appear on a
+# machine the user is not sitting at. This was prose in `phases/0-preflight.md`;
+# it belongs beside the code that opens things.
+REMOTE = ('SSH_CONNECTION', 'SSH_TTY', 'CI')
 
 # The contract's own value sets, copied here because nothing else present in a
 # real прогон holds them. `scripts/validate/state-matches-spec.ts` compares these
@@ -96,6 +103,22 @@ FOLDED = {
 }
 
 
+# What the прогон says once the page is in front of the user. Said because the
+# opening is silent from where the orchestrator sits: a detached process that
+# returns nothing looks identical whether a window appeared or not, and the user
+# is the only one who can tell the тool it did not.
+SHOWN = {
+    'ru': 'sync: панель открыта в браузере. Если окно не появилось — откройте адрес выше.',
+    'en': 'sync: the panel is open in a browser. If no window appeared, open the address above.',
+}
+
+# And what it says instead when it deliberately opened nothing.
+AWAY = {
+    'ru': 'sync: удалённая сессия — ничего не открываю. Страница здесь: %s',
+    'en': 'sync: remote session — opening nothing. The page is at %s',
+}
+
+
 # What the прогон says when the address is not the one it handed out last time.
 # Above the address rather than below it: a user who reads the new link first has
 # no reason to look further, and the dead tab stays open beside it.
@@ -117,6 +140,76 @@ MOVED = {
                 'and say it to the user.',
     },
 }
+
+
+def opener():
+    """The command this machine hands a url to.
+
+    `MAESTRO_SYNC_OPENER` overrides it, split the way a shell would: the tests
+    point it at a script that records the url instead of showing it, so what is
+    under test is the decision to open and never a window that really appeared.
+    """
+    override = os.environ.get('MAESTRO_SYNC_OPENER')
+    if override:
+        return shlex.split(override)
+    if sys.platform == 'darwin':
+        return ['open']
+    if sys.platform.startswith('win'):
+        # `start` is a shell builtin, and its first argument is a window title.
+        # The empty string is not decoration: without it the url becomes the
+        # title and nothing opens.
+        return ['cmd', '/c', 'start', '']
+    return ['xdg-open']
+
+
+def shown():
+    """The address this directory's page was already opened on, or None."""
+    try:
+        with open(OPENED, encoding='utf-8') as handle:
+            return json.load(handle).get('url')
+    except Exception:
+        return None
+
+
+def open_page(url, force):
+    """Put the page in front of the user, once per address.
+
+    Returns what happened, because the caller prints it: 'shown' when a window
+    was asked for, 'remote' when this is somebody else's machine, and None when
+    there was nothing to do — the same address is already open, or the host
+    said it drives its own pane.
+
+    Once per *address* rather than once per directory: a run calls this tool
+    dozens of times and must not open dozens of tabs, but an address that moved
+    left the user holding a dead one, and that is worth a new window.
+    """
+    if os.environ.get('MAESTRO_SYNC_NO_OPEN'):
+        debug('not opening: MAESTRO_SYNC_NO_OPEN is set')
+        return None
+    if any(os.environ.get(name) for name in REMOTE):
+        debug('not opening: remote session')
+        return 'remote'
+    if not force and shown() == url:
+        debug('not opening: %s is already open' % url)
+        return None
+
+    command = opener() + [url]
+    try:
+        subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
+    except Exception as error:
+        # The same principle the server has: a page that could not be opened is
+        # one line of output, not a stopped прогон. The address is already
+        # printed above, and it is still true.
+        debug('opener refused (%r): %s' % (command, error))
+        return None
+
+    try:
+        with open(OPENED, 'w', encoding='utf-8') as handle:
+            json.dump({'url': url}, handle)
+    except OSError as error:
+        debug('could not record the opened address: %s' % error)
+    return 'shown'
 
 
 def spoken(text):
@@ -197,6 +290,53 @@ def ours(command):
     return bool(command) and DIR in command and 'http.server' in command
 
 
+def port_of(command):
+    """The port out of a `python -m http.server <port> …` command line."""
+    parts = command.split()
+    try:
+        after = parts.index('http.server') + 1
+    except ValueError:
+        return None
+    try:
+        return int(parts[after])
+    except (IndexError, ValueError):
+        return None
+
+
+def adopt():
+    """A live server for this directory that no file remembers, or None.
+
+    `serve.json` lives inside `.maestro/`, which preflight re-populates at the
+    start of every run — so the second run through a directory finds no record,
+    raises a second server for it, and hands out a new address in silence:
+    `moved_from` is None when nothing was remembered, so not even the
+    moved-address line fires. One project ended with two servers listening and
+    a user holding the older link.
+
+    This is `ours()` asked of the process table instead of one remembered pid,
+    and it runs only when the cheap path found nothing.
+    """
+    try:
+        listing = subprocess.run(['ps', '-A', '-o', 'pid=,command='],
+                                 capture_output=True, text=True, timeout=5).stdout
+    except Exception as error:
+        debug('ps refused: %s' % error)
+        return None
+
+    for line in listing.splitlines():
+        head, _, command = line.strip().partition(' ')
+        if not ours(command):
+            continue
+        port = port_of(command)
+        if port is None:
+            continue
+        try:
+            return int(head), port
+        except ValueError:
+            continue
+    return None
+
+
 def free(port):
     with socket.socket() as probe:
         try:
@@ -263,7 +403,16 @@ def status_violations(state):
     return found
 
 
-def main():
+def main(argv):
+    # Two flags, and both exist because the run needs a way back. `--reopen`
+    # is what a user saying "the panel is gone" turns into; `--no-open` is for
+    # the host that has a preview pane of its own and drives it itself, which
+    # must not also get a browser window — two pages is the one thing
+    # `references/hosts.md` forbids outright.
+    reopen = '--reopen' in argv
+    if '--no-open' in argv:
+        os.environ['MAESTRO_SYNC_NO_OPEN'] = '1'
+
     if not os.path.exists(STATE):
         print('sync: no state.js beside this script — nothing to mirror yet')
         return 2
@@ -284,8 +433,22 @@ def main():
     held = None
     moved_from = None
 
+    taken = None if reused else adopt()
+
     if reused:
         port, why = remembered, 'the recorded server is still this directory\'s'
+    elif taken is not None:
+        # A live server for this directory that serve.json had forgotten. Taking
+        # it keeps the address the user already has and leaves one server
+        # listening instead of two.
+        pid, port = taken
+        why = 'adopted a live server this directory had forgotten'
+        try:
+            with open(SERVE, 'w', encoding='utf-8') as handle:
+                json.dump({'pid': pid, 'port': port}, handle)
+        except OSError as error:
+            debug('could not record the adopted server: %s' % error)
+        reused = True
     else:
         held = (not free(remembered)) if remembered is not None else None
         chosen = pick_port(remembered if held is False else None)
@@ -299,13 +462,28 @@ def main():
     language = spoken(text)
     if port is None:
         print('sync: no server — open %s directly; it shows the snapshot and will not tick' % PAGE)
+        url = 'file://' + PAGE
     else:
         if moved_from is not None:
             print(MOVED[language]['taken' if held else 'gone'] % moved_from)
-        print('http://localhost:%d/dashboard.html' % port)
+        url = 'http://localhost:%d/dashboard.html' % port
+        print(url)
     print(FOLDED[language])
-    debug('mirrored=%s linked=%s remembered=%s held=%s holder=%r chosen=%s why=%s moved_from=%s reused=%s'
-          % (mirrored, linked, remembered, held, command[:120], port, why, moved_from, reused))
+
+    # And then open it, rather than describing how somebody else should. This
+    # step used to live in `phases/0-preflight.md` as prose addressed to the
+    # orchestrator, which made the most visible part of a прогон depend on
+    # whether a model went looking for a preview tool. It is a step now.
+    opening = open_page(url, reopen)
+    if opening == 'shown':
+        print(SHOWN[language])
+    elif opening == 'remote':
+        print(AWAY[language] % url)
+
+    debug('mirrored=%s linked=%s remembered=%s held=%s holder=%r chosen=%s why=%s moved_from=%s '
+          'reused=%s adopted=%s opening=%s reopen=%s'
+          % (mirrored, linked, remembered, held, command[:120], port, why, moved_from,
+             reused, taken, opening, reopen))
 
     # Last, and deliberately after the address: the page works either way, and
     # this is about the tool that reads the run when it is over.
@@ -330,4 +508,4 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

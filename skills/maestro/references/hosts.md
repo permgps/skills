@@ -18,7 +18,7 @@ Answer these six, by observation rather than by belief about the product:
 | Can you create a git worktree? | shell access plus a git repository |
 | Can you commit? | the same |
 | Can you write outside `.maestro/`? | the project code has to reach disk somehow |
-| Can the user watch the прогон change? | the page renders **and** a stage clock moved after a state write — the two halves you can check yourself |
+| Can the user watch the прогон change? | the page renders **and** a stage clock moved after a state write — the two halves you can check yourself. `sync.py` opens it and reports what it did; a host where the opener refuses is a host where the answer is no |
 
 If you cannot answer one of them, it is a **no** for this прогон. A capability
 assumed and then missing halfway through a wave is worse than one that was never
@@ -64,9 +64,10 @@ is that nobody later mistakes a host limitation for a decision the прогон 
 - **Do not read "the dashboard works" as "the user can see it".** The same
   mistake with the two claims swapped. There, a window that opened proved
   nothing about the state; here, a state that ticks proves nothing about the
-  window. A client may present the pane as a folded row in the chat, and your
-  tool reports the same success it reports for a panel filling half the screen.
-  Name the address, and say the row opens with a press.
+  window. A client may present a panel as a folded row in the chat, and a
+  detached opener reports nothing at all about what appeared. Name the address,
+  and say the row opens with a press — `sync.py` prints both lines for you, and
+  relaying them is the whole of what you can do about this from here.
 - **Do not open a second page where the panel is.** The pane is the panel's for
   the rest of the прогон. Twice now a page opened beside it — a subagent's own
   checks, served on a port it chose — and afterwards the panel was gone from the

@@ -154,7 +154,7 @@ check is for.
 <!-- maestro:view:opens-panel -->
 This is the one step in the bundle that opens a page in front of the user. The
 rule that makes it the only one is in `SKILL.md`, under *The Dashboard*, and it
-holds for every phase after this; what follows is the pane's share of it.
+holds for every phase after this; what follows is this step's share of it.
 
 Copy two files into `.maestro/`, beside the state you just wrote —
 [`../assets/dashboard.html`](../assets/dashboard.html) and
@@ -166,27 +166,72 @@ python3 .maestro/sync.py
 
 It mirrors the state into the page, puts `index.html` beside it, raises a static
 server for this directory on the loopback interface if one is not already
-answering, and prints the address. **What it prints is what you open.**
+answering, prints the address — **and opens it**. The opening is the tool's, not
+yours. It was yours until a прогон on a desktop client printed the address,
+opened nothing, and the user found the дашборд minutes later by pressing the
+browser icon themselves; a step that depends on the orchestrator noticing it is
+a step that is sometimes skipped.
+
+What the tool leaves you is one job: **relay what it printed**. The address, and
+the line under it.
 
 - **The state is written first.** The mirror copies `state.js`; run before step
   4 there is nothing to copy.
 - **Copy the page, never edit it.** Everything the user sees comes from the
   state. The one part of the page that changes is the snapshot block, and the
   tool is what changes it.
-- **Open it once.** The page keeps itself current — it re-reads the state on its
-  own interval, because you are often busy for minutes at a time and it must not
-  wait for you. Do not reopen it at every stage, and do not announce each
-  refresh.
+- **It opens once, and the tool is what remembers.** The page keeps itself
+  current — it re-reads the state on its own interval, because you are often
+  busy for minutes at a time and it must not wait for you. Later calls open
+  nothing, and you do not have to hold that: `opened.json` beside the state is
+  where it is held. The exception is an address that *moved*, which is opened
+  again, because the tab the user is holding is dead.
 - **It outlives the прогон.** After приёмка it stays as the record of what
   happened, with every clock stopped. Nothing deletes it at the end.
+- **It opens nothing in a remote session.** `SSH_CONNECTION`, `SSH_TTY` or `CI`
+  set means the path is printed and no window is asked for. You do not have to
+  check this either.
 
-**Path A — inside the window the user is already looking at, and it goes over
-http.** If your harness can show a local page in that window — a preview pane, an
-in-app browser, a webview — use it. A dashboard exists to be glanceable, and a
-separate browser window gives away half of that.
+**Then look at what it opened, once.** A stage list and a running clock is a
+dashboard; a title above an error is a page that rendered and could not reach
+the state. Those look alike from the outside and only one of them is worth
+announcing — the прогон that produced this rule reported an open dashboard for a
+whole phase while the state file sat unread beside it.
 
-Three things about such a pane are worth knowing before you open one, because
-each of them fails quietly:
+**Say the address out loud in the chat.** How a client presents a window varies,
+and one printed line covers every case and leaves the user independent of a
+button. **And say that a folded panel opens with a press — the tool prints that
+sentence for you, in the прогон's language.** It prints it rather than leaving it
+here because leaving it here did not work: two прогоны announced a live panel to
+a user looking at a collapsed row, and the rule was written in this file both
+times. A phase file is read once, several steps before the sentence is needed;
+the tool's output is read at the moment of saying it.
+
+**If the panel is gone, bring it back with one line.** Two things say so: the
+user, and a `sync.py` call reporting that the address moved.
+
+```bash
+python3 .maestro/sync.py --reopen
+```
+
+It is not an occasion for a second announcement block: one line with the
+address, then back to the стадия you were in. `MAESTRO_SYNC_DEBUG=1` on that
+call is how a прогон that suspects the panel's own server explains itself; that
+output is on `stderr`, for you and not for the chat.
+
+**If your harness has a pane of its own — a preview panel, an in-app browser, a
+webview — you may use it instead, and then you own the opening.** A dashboard is
+glanceable, and a pane beside the chat keeps that better than a separate window.
+The cost is that the tool must be told to stand down, or the user gets two
+pages, which is the one thing [`../references/hosts.md`](../references/hosts.md)
+forbids outright:
+
+```bash
+python3 .maestro/sync.py --no-open
+```
+
+Four things about such a pane are worth knowing before you take that trade,
+because each of them fails quietly:
 
 - **Do not hand it a `file://` path.** A pane typically inlines the page rather
   than navigating to it, which leaves the document with a `null` origin — and
@@ -209,57 +254,13 @@ each of them fails quietly:
   re-loads the state with a fresh script tag instead, so it keeps ticking and
   keeps its scroll position. Do not add a refresh of your own.
 
-If the preview tool is not in your tool list, look for it before concluding
-there is no pane — in some sessions it loads on demand, and "no viewer here"
-sends a run to Path B on a machine that had one.
-
-**Path B — the system browser.** No pane, or no `python3`. Hand the file to the
-operating system; a real browser opens `file://` as a page and loads `state.js`
-from the same directory, so the poll works with no server at all.
-
-**Then look at what you opened, once.** A stage list and a running clock is a
-dashboard; a title above an error is a page that rendered and could not reach
-the state. Those look alike from the outside and only one of them is worth
-announcing — the прогон that produced this rule reported an open dashboard for a
-whole phase while the state file sat unread beside it.
-
-**Say the address out loud in the chat on both paths.** How a client presents a
-pane varies — sometimes beside the chat, sometimes as a card the user still has
-to press — and one printed line covers every case and leaves them independent of
-a button.
-
-**And say that a folded one opens with a press — the tool prints that sentence
-for you.** What you checked is that the page works; whether anyone is looking at
-it is a second claim and not one you can see. A pane may land as a row in the
-chat rather than as an open panel, and from where you sit the two are
-indistinguishable: your tool reported success either way. `sync.py` prints the
-line under the address, in the прогон's language, and relaying both is the whole
-of the requirement.
-
-It prints it rather than leaving it here because leaving it here did not work.
-Two прогоны have now announced a live panel to a user looking at a collapsed
-row, who found the dashboard minutes later by pressing it themselves — and the
-rule was written in this file both times. A phase file is read once, several
-steps before the sentence is needed; the tool's output is read at the moment of
-saying it.
-
-**If the panel is gone, bring it back.** Two things say so: the user, and a
-`sync.py` call that reports the address moved. Either way — run the tool again,
-open the address it prints once, look that a clock moves, and say the address in
-the chat. It is the same two-part navigation as the first time, and it is not an
-occasion for a second announcement block: one line with the address, then back to
-the стадия you were in. `MAESTRO_SYNC_DEBUG=1` on that call is how a прогон that
-suspects the panel's own server explains itself; that output is on `stderr`, for
-you and not for the chat.
-
 **The one exception, and it is narrow.** If something other than the panel truly
-has to be seen, you are the one who shows it — never a субагент — it goes to the
-system browser and never into the pane holding the panel, and the user is told in
-one line what they are about to see and why. The exception is here so the rule is
-not quietly broken, not so it is used.
-
-**Do not open anything in a remote session.** If `SSH_CONNECTION` or `CI` is
-set, print the path and move on: a window on someone else's machine helps nobody.
+has to be seen, you are the one who shows it — never a субагент — it goes to a
+window of its own and never into the pane holding the panel, and never over
+`file://`: the identical page that answers «96 прошло» over http answers «96 не
+прошло» from a worktree. The user is told in one line what they are about to see
+and why. The exception is here so the rule is not quietly broken, not so it is
+used.
 
 If the copy fails — no `assets/` in the installed bundle, an unwritable
 `.maestro/` — say so plainly and continue. A прогон without a live view is a
@@ -267,10 +268,10 @@ If the copy fails — no `assets/` in the installed bundle, an unwritable
 textual progress display**: a stand-in that looks like the dashboard is harder to
 remove later than a missing feature is to notice.
 
-A server that will not start is not a failure either. The page carries its
-snapshot, so the user sees where the прогон is and the clocks stand still. Say
-it in one line, name the file, and carry on. Do not retry and do not install
-anything.
+A server that will not start is not a failure either, and neither is an opener
+that refuses. The page carries its snapshot, so the user sees where the прогон is
+and the clocks stand still. Say it in one line, name the file, and carry on. Do
+not retry and do not install anything.
 
 ### 6. Announce the dials
 

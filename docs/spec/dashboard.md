@@ -348,6 +348,34 @@ tool that raised it says so above the new address, naming the dead one, and the
 прогон repeats the new address in the chat once. The alternative is a user
 holding a link that will never tick again, with nothing anywhere explaining it.
 
+**Opening is the tool's, not the orchestrator's.** It was the orchestrator's
+until a прогон on a desktop client printed the address, opened nothing, and the
+user found the дашборд minutes later by pressing the browser icon; a step carried
+only in prose is a step that is sometimes skipped, and this is the most visible
+step there is. So `sync.py` hands the address to the platform opener itself.
+
+Four properties come with that, and each of them exists because the alternative
+was observed:
+
+- **Once per address, not once per call.** A run calls the tool dozens of times
+  and must not open dozens of tabs, so the address it opened is recorded beside
+  the state. An address that *moved* is opened again, because by then the tab
+  the user holds is dead.
+- **Nothing opens in a remote session.** `SSH_CONNECTION`, `SSH_TTY` or `CI`
+  set means the path is printed instead. A window on someone else's machine
+  helps nobody.
+- **A host with a pane of its own says so.** `--no-open` stands the opener down
+  for a прогон that will show the page in a preview panel itself. Without it that
+  host gets two pages, which is the one thing this section forbids outright.
+- **A refusal is one line, not a stop.** An opener that is missing or fails
+  leaves the address printed and true, exactly as a server that will not start
+  leaves the snapshot readable.
+
+**And a panel that vanished comes back with one line.** `--reopen` opens the
+current address again. It exists because the recovery used to be a paragraph of
+prose about running the tool and opening what it prints, performed by someone
+who has just been told the thing they were watching is gone.
+
 ## Constraints
 
 - One self-contained HTML file. No CDN, no external stylesheet, no font fetch,

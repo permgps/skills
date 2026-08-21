@@ -115,11 +115,24 @@ writing state nobody could see. The page it opened was misleading as well as
 uninvited: loaded from a worktree over `file://`, it reported ninety-six failed
 checks that were failures of the way it had been opened, not of the build.
 
+You do not have to go looking for it either. The tool that keeps the page
+current is what opens it, at the start of the run and by itself — the прогон used
+to be asked to do that in prose, and a run on a desktop client printed the
+address, opened nothing, and left its user to find the дашборд by pressing the
+browser icon some minutes later. It opens once and then stops: a run writes
+state dozens of times and none of those calls brings up another tab.
+
 If the panel does disappear, the прогон brings it back rather than describing it
 to you: it raises the page again and says the address in the chat. And if the
 address has changed — another program can take the port between one write and
-the next — the line above it says the old one is dead, because otherwise you are
-left pressing a link that will never tick again.
+the next — the line above it says the old one is dead, and the new page is
+opened for you, because otherwise you are left pressing a link that will never
+tick again.
+
+Two places where nothing opens, both on purpose. Over SSH or in CI the path is
+printed instead: a window on a machine you are not sitting at helps nobody. And
+a host that shows the page in a panel of its own tells the tool to stand down,
+so you get one page rather than two.
 
 ## The fixtures behind these images
 
