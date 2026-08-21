@@ -36,7 +36,7 @@ like to look at it.
 | `tests` | Тесты | The last full suite | `tests`, or the last таск's own |
 | `requirements` | Требования (счёт) | The манифест counted by status | `requirements[]` |
 | `stages` | Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
-| `build` | Ход разработки | The таски grouped by волна, each with its status, phase and clock, and a line naming what is running now | `tasks[]` |
+| `build` | Ход разработки | The таски grouped by волна, each with its status, phase and clock | `tasks[]` |
 | `requirement-list` | Требования (список) | The манифест one требование at a time | `requirements[]` |
 | `gates` | Gates | G1–G4 with status, findings when failed, and a folded count of them when passed | `gates[]` |
 

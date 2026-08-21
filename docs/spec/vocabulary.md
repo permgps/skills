@@ -152,7 +152,6 @@ term, and a term with two homes drifts.
 | Ход разработки | Development progress | The таски as they are being built, grouped by волна |
 | Волна | Wave | One layer of the plan — the таски that may run at the same time |
 | Критический путь | Critical path | The longest remaining chain of blocked таски, which is what the estimate is measured along |
-| Сейчас | Now | The таски being worked on at this moment, named in one line |
 | Календарных | Calendar | Wall-clock time from the start, pauses included — shown beside Прошло времени, never instead of it |
 | Объяснения | Wording | Which register the прогон is speaking in — the label that keeps `Обычные` from being read as the depth's `Обычная` |
 | Вне контракта | Off-contract | Таски whose status is not one the contract defines — counted, shown as written, and worth nothing on the bar |

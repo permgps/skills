@@ -14,6 +14,8 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**The «Сейчас» line is gone from the дашборд.** It named the таски in flight and their statuses on one row under the build block — every word of which the таск rows above it were already showing, in colour, with a clock apiece and a counting chip at the top. A second copy of a live number is worse than none: the two are written by different code and a reader who notices them disagree has no way to tell which one lied. `docs/spec/vocabulary.md` lost the label with it, which is what keeps the page and the specification from drifting — the screen-labels check fails on a word the spec promises and the page no longer carries.
+
 **A прогон says who is holding it, and a writer that lost a race says so instead
 of overwriting.** `state.js` carries an optional `heldBy` — a token the session
 mints when it opens a прогон that has none, and the moment it minted it — and

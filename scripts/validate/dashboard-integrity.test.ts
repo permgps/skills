@@ -160,7 +160,7 @@ const EXPLAINED = ['progress', 'gates'];
 
 const REGIONS = [
   'run-clock', 'stage-clock', 'dials', 'progress', 'cards',
-  'stages', 'tasks', 'now', 'requirements', 'gates',
+  'stages', 'tasks', 'requirements', 'gates',
 ];
 
 /** The reader's own controls: one button per theme, one per language. */

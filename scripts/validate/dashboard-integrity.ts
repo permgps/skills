@@ -31,7 +31,7 @@ const log = createLogger('dashboard-integrity');
 const REQUIRED_REGIONS = [
   'run-clock', 'stage-clock', 'dials',
   'progress', 'cards',
-  'stages', 'tasks', 'now', 'requirements', 'gates',
+  'stages', 'tasks', 'requirements', 'gates',
 ];
 
 /** Anything that would make the page depend on a network it may not have. */

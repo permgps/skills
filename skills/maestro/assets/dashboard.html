@@ -228,7 +228,6 @@
   }
   .track > .fill.queued { background: none; color: var(--muted); border: 1px dashed var(--line); }
   .track > .fill .phase { opacity: .85; font-size: .8rem; }
-  #now { color: var(--muted); font-size: .9rem; margin: .6rem 0 0; }
   #build-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
   /* The two view controls: the reader's own, and nothing to do with the прогон. */
   #controls {
@@ -343,7 +342,6 @@
     <h2 data-label="build"></h2>
     <div id="build-chips"></div>
     <div id="tasks"></div>
-    <p id="now" hidden></p>
   </section>
 
   <section data-region="requirement-list"><h2 data-label="requirement-list"></h2><div id="requirements"></div></section>
@@ -444,7 +442,6 @@ globalThis.MAESTRO_LOGIC = (function () {
         'requirement-list': 'Требования',
         wave: 'Волна',
         criticalPath: 'Критический путь',
-        now: 'Сейчас',
         calendar: 'Календарных',
         register: 'Объяснения',
         offContract: 'Вне контракта',
@@ -588,7 +585,6 @@ globalThis.MAESTRO_LOGIC = (function () {
           }
           return name;
         },
-        nowPrefix: 'Сейчас: ',
         requirementsTotal: function (n) { return 'Всего требований: ' + n; },
         calendar: function (span) { return 'Календарных ' + span; },
         explainAria: function (name) { return 'Что показывает: ' + name; },
@@ -673,7 +669,6 @@ globalThis.MAESTRO_LOGIC = (function () {
         'requirement-list': 'Requirements',
         wave: 'Wave',
         criticalPath: 'Critical path',
-        now: 'Now',
         calendar: 'Calendar',
         register: 'Wording',
         offContract: 'Off-contract',
@@ -800,7 +795,6 @@ globalThis.MAESTRO_LOGIC = (function () {
           }
           return name;
         },
-        nowPrefix: 'Now: ',
         requirementsTotal: function (n) { return 'Requirements in all: ' + n; },
         calendar: function (span) { return 'Calendar ' + span; },
         explainAria: function (name) { return 'What this shows: ' + name; },
@@ -3101,12 +3095,10 @@ globalThis.MAESTRO_SNAPSHOT = null;
   function renderBuild(state) {
     var host = clear(el('tasks'));
     var chips = clear(el('build-chips'));
-    var now = el('now');
     var tasks = state.tasks || [];
 
     if (tasks.length === 0) {
       empty(host, T.UI.noTasks);
-      now.hidden = true;
       return;
     }
 
@@ -3154,20 +3146,6 @@ globalThis.MAESTRO_SNAPSHOT = null;
         }
       });
     });
-
-    var live = tasks.filter(function (task) {
-      return task.status === 'running' || task.status === 'review' || task.status === 'repair';
-    });
-    clear(now);
-    now.hidden = live.length === 0;
-    if (live.length > 0) {
-      put(now, 'span', T.UI.nowPrefix);
-      live.forEach(function (task, index) {
-        if (index > 0) put(now, 'span', ' · ');
-        put(now, 'b', task.id);
-        put(now, 'span', ' ' + task.title + ' — ' + L.label(T.TASK_STATUS, task.status));
-      });
-    }
   }
 
   function renderRequirements(state) {
