@@ -1,11 +1,23 @@
 # Behavior Specification
 
-This directory defines **what Maestro does**. It is the source every future
-`skills/maestro/SKILL.md` and `phases/*.md` file is written from.
+This directory defines **what Maestro does**, and only Maestro. It is the source
+every future `skills/maestro/SKILL.md` and `phases/*.md` file is written from.
 
 It is not a set of agent instructions. A phase file tells an agent how to act;
 these documents state the behavior that agent must produce. When the two
 disagree, this specification is right and the phase file is a bug.
+
+The package holds a second skill, and it has a second specification.
+[`scout/`](scout/README.md) defines **what Scout does** and is the source
+`skills/scout/SKILL.md` is written from. The two are separate directories
+because they are separate skills: Scout runs before a прогон starts and produces
+no run artifact, so nothing in this directory describes it and nothing in
+`scout/` may restate a rule that lives here. Where Scout needs one of these rules
+it links to it, under the one-owner rule below, which spans both directories
+rather than each of them separately.
+
+A прогон runs the same with Scout absent. Nothing in this directory is
+conditional on the other skill existing.
 
 ## Reading Order
 
@@ -43,7 +55,13 @@ manifest whose numbering shifts cannot be checked against anything.
 
 1. **One owner per statement.** A rule lives in exactly one document. If two
    documents need it, the second links to the first. Two copies drift, and the
-   drift stays invisible until a gate disagrees with itself.
+   drift stays invisible until a gate disagrees with itself. **The rule spans
+   `scout/` too.** Two specifications in one tree is exactly the arrangement in
+   which the same sentence acquires two homes, so the boundary is stated as a
+   test rather than a preference: a statement belongs here when it is about what
+   a прогон does, and there when it is about what Scout does before one starts.
+   A statement that seems to be about both is about neither — it is two
+   statements, and they are written separately.
 2. **Behavior, not phrasing.** No document here contains text meant to be pasted
    into a prompt.
 3. **Machine-checkable where it matters.** The tables named in the next section
