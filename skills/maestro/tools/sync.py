@@ -24,12 +24,13 @@ It does five things, in this order, and reports what it did:
     with a line above it when that address has moved since the last call. A
     moved address is the one thing here a user cannot recover from on their own:
     the link they were handed is dead, and nothing else in the прогон says so.
-5.  **Checks every status against the contract.** This runs last, after the
-    address, and on purpose: a прогон whose таск carries a word the contract
-    does not define is still worth showing, and a stopped дашборд helps nobody.
-    It is the only place a real прогон can catch the violation at all —
-    `scripts/state/validate.ts` lives in the development repository and is not
-    part of what is copied into `.maestro/`.
+5.  **Checks the state against the contract** — every status, and the language
+    of the three fields the panel prints word for word. This runs last, after
+    the address, and on purpose: a прогон whose таск carries a word the
+    contract does not define is still worth showing, and a stopped дашборд
+    helps nobody. It is the only place a real прогон can catch either violation
+    at all — `scripts/state/validate.ts` lives in the development repository
+    and is not part of what is copied into `.maestro/`.
 
 Failing to raise a server is not an error. The page carries its snapshot, so a
 run without a server shows the truth and stops ticking; that is worth one line
@@ -77,6 +78,25 @@ CHECKED = [
     ('requirements', REQUIREMENT_STATUSES),
     ('gates', GATE_STATUSES),
 ]
+
+# The three fields of the state that reach the panel as text. `dashboard.html`
+# puts each of them through `textContent` unchanged — there is no vocabulary to
+# translate a free line against — so these carry the dial's language while every
+# other file a прогон writes stays English. `SKILL.md`, under *Language*, is the
+# rule; this is the part of it a program can hold.
+#
+# The list is short because the boundary is visibility, not shape. `debt` reaches
+# the page as three counts, `additions` is not rendered there at all, and a
+# требование's `reason` is read out of `report.md` rather than off the screen —
+# so English in any of them is the rule rather than a breach of it.
+SPOKEN = [
+    ('gates', 'findings', True),
+    ('tasks', 'title', False),
+    ('stages', 'note', False),
+]
+
+CYRILLIC = re.compile(u'[\u0400-\u04FF]')
+LATIN = re.compile(u'[A-Za-z]')
 
 ASSIGNMENT = 'globalThis.MAESTRO_STATE ='
 SNAPSHOT_RE = re.compile(
@@ -403,6 +423,51 @@ def status_violations(state):
     return found
 
 
+def language_violations(state):
+    """Every line the panel prints word for word that is not in the прогон's language.
+
+    Three fields reach the page as text, and a прогон speaking `ru` that writes
+    them in English puts two languages on one screen. That is not a theory: a
+    прогон on 2026-08-22 carried `"language": "ru"`, Russian таск titles, and
+    seventeen English gate findings above them — one orchestrator, one rule,
+    and the rule did not decide the case.
+
+    **Only `ru` is checked, and the asymmetry is deliberate.** A Russian line
+    contains Cyrillic and an English one does not, so for `ru` the alphabet
+    decides it and no heuristic is involved. The mirror is not decidable: an
+    English finding quoting the user's own sentence — «Расписание» inside an
+    otherwise English line — is correct, and nothing here can tell it from a
+    breach. A check that failed the honest case would be worse than none, so
+    the `en` half is left to the rule in `SKILL.md`.
+
+    A line with no Latin letter is skipped too. An id, a path or a count has no
+    language to be wrong about, and naming one would spend the прогон's
+    attention on nothing.
+    """
+    found = []
+    if not isinstance(state, dict) or state.get('language') != 'ru':
+        return found
+    for field, key, many in SPOKEN:
+        entries = state.get(field)
+        if not isinstance(entries, list):
+            continue
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, dict):
+                continue
+            value = entry.get(key)
+            lines = value if many and isinstance(value, list) else [value]
+            for at, line in enumerate(lines):
+                if not isinstance(line, str) or not LATIN.search(line):
+                    continue
+                if CYRILLIC.search(line):
+                    continue
+                where = '%s[%d].%s' % (field, index, key)
+                if many:
+                    where += '[%d]' % at
+                found.append((where, line))
+    return found
+
+
 def main(argv):
     # Two flags, and both exist because the run needs a way back. `--reopen`
     # is what a user saying "the panel is gone" turns into; `--no-open` is for
@@ -495,16 +560,31 @@ def main(argv):
         print('      Quote every key and use JSON values — the writer emits JSON.stringify output.')
         return 1
 
+    # Both reports are printed before either exit: a прогон that called this
+    # once should not have to call it again to learn the second thing wrong.
+    failed = False
+
     offenders = status_violations(state)
     if offenders:
+        failed = True
         for path, found, allowed in offenders:
             print('sync: %s is %s — the contract allows %s'
                   % (path, json.dumps(found, ensure_ascii=False), ', '.join(allowed)))
         print('      The page cannot count a status it cannot name: it shows such an')
         print('      entry as written, and the entry counts towards no progress at all.')
-        return 1
 
-    return 0
+    unspoken = language_violations(state)
+    if unspoken:
+        failed = True
+        for path, line in unspoken:
+            print('sync: %s has no Russian in it — this прогон speaks ru'
+                  % path)
+            print('      %s' % json.dumps(line[:100], ensure_ascii=False))
+        print('      The panel prints these three fields word for word, so they carry the')
+        print('      dial\'s language: gates[].findings, tasks[].title, stages[].note.')
+        print('      Every other file the прогон writes stays English.')
+
+    return 1 if failed else 0
 
 
 if __name__ == '__main__':

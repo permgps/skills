@@ -438,10 +438,10 @@ preference, never from questions about consequence.
 ## Language
 
 **Every file you write is English.** `brief.md`, `spec.md`, the task files,
-`report.md`, the code and its comments — in both languages of the dial, with no
-exception. Those files are read by the next прогон and by whoever maintains the
-project afterwards, and one language across them is what keeps them readable.
-The dial does not touch this rule.
+`report.md`, the code and its comments — in both languages of the dial. Those
+files are read by the next прогон and by whoever maintains the project
+afterwards, and one language across them is what keeps them readable. The dial
+does not touch this rule, and it has exactly one exception, named below.
 
 **Everything the user reads is in the dial's language.** The chat, every
 question and every answer you offer with it, the манифест as it is shown, the
@@ -451,6 +451,24 @@ sentence, and never leave a word untranslated because no label existed — if a
 word the user must read has no English twin in `vocabulary.md`, that is a gap in
 the vocabulary and it is filled there.
 
+**The exception is three fields of `state.js`, and it is the panel that makes
+it one.** `gates[].findings`, `tasks[].title` and `stages[].note` are printed on
+the дашборд word for word — the page has a vocabulary for its labels and nothing
+at all for a free line, so what you wrote is what the user reads. Those three
+carry the dial's language. Every other field stays English, and the boundary is
+visibility rather than shape: `debt` reaches the page as three counts,
+`additions` is not rendered there at all, and a требование's `reason` is read
+out of the отчёт rather than off the screen.
+
+**A quote keeps the language it was said in.** The отчёт is English and quotes
+findings as they came back, so a `ru` прогон's отчёт carries Russian lines
+inside it. That is the same rule as everywhere else — a quotation is evidence,
+and evidence that has been translated is no longer the thing that was said.
+
+`python3 .maestro/sync.py` holds the three fields for `ru` and says which line
+is wrong. It cannot hold `en`: an English finding quoting the user's own Russian
+sentence is correct, and no check can tell that from a breach. For `en` this
+paragraph is the whole of the guarantee.
 **The бриф is translated into English exactly once**, in the Manifest phase, and
 only when it was not written in English already. When the dial's language and
 the бриф's agree, nothing is translated at all and the numbered манифест is the

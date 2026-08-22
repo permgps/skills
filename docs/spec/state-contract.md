@@ -223,9 +223,11 @@ from one that was met.
   **The enforcement reaches the state where this repository's own tooling reads
   and writes it** — `scripts/state/read.ts`, and `scripts/state/write.ts`, which
   refuses to write a state that fails. A прогон writes `state.js` itself and
-  runs `.maestro/sync.py` after every write, and that tool checks that the file
-  parses as JSON and nothing beyond it. So a broken chain is caught when the
-  прогон is measured, not at the moment it is written. A specification that
+  runs `.maestro/sync.py` after every write; that tool checks that the file
+  parses as JSON, that every status is one the contract defines, and that the
+  three spoken fields below are in the прогон's language — and the chain is not
+  among them. So a broken chain is caught when the прогон is measured, not at
+  the moment it is written. A specification that
   names an enforcer is read as a claim about coverage, which is why the edge of
   the coverage is written beside it.
 - **`currentStage` may not name a стадия that has not begun.** The dashboard
@@ -261,6 +263,24 @@ from one that was met.
 - `interruptedAt` is set when a phase fails or the run stops, and cleared when a
   resumed run passes its next phase boundary. It is what lets the dashboard show
   an interrupted прогон as interrupted rather than as frozen.
+- **Three fields are written in the прогон's language; every other one is
+  English.** `gates[].findings`, `tasks[].title` and `stages[].note` are the
+  only free text the page prints word for word — it has labels for everything
+  else and no vocabulary at all for a line somebody composed — so these are read
+  by the user and carry `language`. The boundary is what the page renders, not
+  what the field holds: `debt` reaches it as three counts, `additions` is not
+  rendered there, and `requirements[].reason` is read out of the отчёт instead.
+  The rule and its reasoning live in
+  [`../../skills/maestro/SKILL.md`](../../skills/maestro/SKILL.md) under
+  *Language*, because it is the orchestrator that has to obey it.
+
+  **`.maestro/sync.py` holds it for `ru` only, and that edge is written here
+  beside the enforcer.** A Russian line contains Cyrillic and an English one
+  does not, so `ru` is decided by the alphabet. The mirror is not decidable — an
+  English finding quoting the user's own Russian sentence is correct — and a
+  check that failed the honest case would be worse than none. For `en` the rule
+  in `SKILL.md` is the whole of the guarantee. Two languages reached one screen
+  this way on 2026-08-22, and nothing anywhere noticed.
 - The orchestrator never reads the dashboard's rendering of the state back. The
   state file is the only direction of travel.
 

@@ -447,6 +447,111 @@ test('every offender is named, not just the first', { skip: python === null }, a
   assert.match(done.out, /tasks\[1\]\.status is "blocked"/);
 });
 
+// What it *reads out loud*. Three fields of the state reach the panel word for
+// word, so they are the three the прогон writes in the dial's language while
+// every other file it writes stays English. The rule is in `SKILL.md` under
+// *Language*; these are what hold it. A прогон on 2026-08-22 spoke `ru`, wrote
+// its таск titles in Russian and all seventeen of its gate findings in English,
+// and nothing anywhere noticed.
+
+test('a finding written in English while the прогон speaks Russian is named',
+  { skip: python === null }, async () => {
+    const done = await sync({
+      ...STATE,
+      language: 'ru',
+      gates: [{ id: 'G1', status: 'passed', findings: ['Every one of the 392 requirements carries a status'] }],
+    });
+    assert.equal(done.status, 1, done.out);
+    assert.match(done.out, /gates\[0\]\.findings\[0\] has no Russian in it/);
+    assert.match(done.out, /this прогон speaks ru/);
+  });
+
+test('the finding itself is quoted, because the line is what has to be rewritten',
+  { skip: python === null }, async () => {
+    const done = await sync({
+      ...STATE,
+      language: 'ru',
+      gates: [{ id: 'G1', status: 'passed', findings: ['The room half recorded as a partial debt row'] }],
+    });
+    assert.equal(done.status, 1, done.out);
+    assert.match(done.out, /The room half recorded as a partial debt row/);
+  });
+
+test('a finding in the прогон\'s own language raises nothing',
+  { skip: python === null }, async () => {
+    const done = await sync({
+      ...STATE,
+      language: 'ru',
+      gates: [{ id: 'G1', status: 'passed', findings: ['R009 — комната записана отдельной строкой долга'] }],
+    });
+    assert.equal(done.status, 0, done.out);
+  });
+
+test('a таск title and a стадия note are held to the same rule as a finding',
+  { skip: python === null }, async () => {
+    const done = await sync({
+      ...STATE,
+      language: 'ru',
+      stages: [{ id: 'build', status: 'active', note: 'waiting on the solver seam' }],
+      tasks: [{ id: '01', status: 'review', title: 'Data model: types, schemas and rules' }],
+    });
+    assert.equal(done.status, 1, done.out);
+    assert.match(done.out, /tasks\[0\]\.title has no Russian in it/);
+    assert.match(done.out, /stages\[0\]\.note has no Russian in it/);
+  });
+
+test('the fields the panel never prints as text are left alone',
+  { skip: python === null }, async () => {
+    // `debt` reaches the page as three counts and `additions` is not rendered
+    // there at all, so English in them is the rule rather than a breach of it.
+    const done = await sync({
+      ...STATE,
+      language: 'ru',
+      debt: { placeholders: ['R009 — the room half only'], assumptions: ['R390 — four open questions'], emptyEnv: [] },
+      additions: ['R003 — a restart action on the timetable screen'],
+      requirements: [{ id: 'R01', status: 'dropped', reason: 'out of scope for M0' }],
+    });
+    assert.equal(done.status, 0, done.out);
+  });
+
+test('an English прогон is not held to the mirror of the rule',
+  { skip: python === null }, async () => {
+    // Deliberate: an English finding quoting the user's Russian sentence is
+    // correct, and a script-based check cannot tell it from a breach. The `ru`
+    // half is decidable and is checked; the `en` half is not and is not.
+    const done = await sync({
+      ...STATE,
+      language: 'en',
+      gates: [{ id: 'G1', status: 'passed', findings: ['R002 — «Расписание» was the user\'s own word'] }],
+    });
+    assert.equal(done.status, 0, done.out);
+  });
+
+test('a state written before the language dial existed is not held to the rule',
+  { skip: python === null }, async () => {
+    // The contract makes `language` optional, and a reader supplying `ru` on the
+    // writer's behalf would be reporting a choice nobody made.
+    const done = await sync({
+      ...STATE,
+      gates: [{ id: 'G1', status: 'passed', findings: ['Every requirement carries a status'] }],
+    });
+    assert.equal(done.status, 0, done.out);
+  });
+
+test('the address still comes first when the only complaint is the language',
+  { skip: python === null }, async () => {
+    const done = await sync({
+      ...STATE,
+      language: 'ru',
+      gates: [{ id: 'G1', status: 'passed', findings: ['A finding nobody translated'] }],
+    });
+    assert.equal(done.status, 1, done.out);
+    const address = done.out.indexOf('http://localhost');
+    const finding = done.out.indexOf('gates[0].findings[0]');
+    assert.ok(address !== -1 && address < finding,
+      `the дашборд must be reachable before the complaint: ${done.out}`);
+  });
+
 // What it *opens*. Until these existed, the tool printed an address and left the
 // act of putting it in front of somebody to prose in `phases/0-preflight.md`,
 // addressed to the orchestrator. A прогон on Claude Code Desktop printed the
