@@ -90,6 +90,30 @@ what you actually said, with our paraphrase of it taken away. G2 asks while the
 answer is still a paragraph and cheap to change; G4 asks when it is the last
 chance to know.
 
+## One state file, and who is holding it
+
+A прогон is one JSON file — the стадии and their clocks, the таски and their
+statuses, the gates and their findings. The dashboard reads it; the metrics tool
+reads it when the run is over; nothing else is a source of truth about a run.
+
+**A прогон says who is driving it.** The session that opens one with no owner
+mints a token into `heldBy` and re-reads the state immediately before every
+write, comparing `updatedAt` with what it last read; a write that lost the race
+is refused rather than landing on top of somebody else's. It detects a second
+orchestrator instead of preventing one, and that limit is deliberate — nothing
+here can expire a lease, and a claim that refused would strand the next session
+in front of a прогон it cannot touch. Two sessions once drove one прогон and
+neither had a way to notice.
+
+**A таск's commits are a list**, because a repaired таск lands twice. A review
+reads the union of that таск's own commits — `git diff <first>^..<last>` — and
+explicitly not the tree, which by then carries every wave that followed. The
+repair phase appends rather than replaces, so the commit the first review was
+written against stays findable.
+
+The fields, and what may be left out of them, are in
+[`docs/spec/state-contract.md`](docs/spec/state-contract.md).
+
 ## A live dashboard
 
 One self-contained HTML file, opened for you when the run starts, reading the run
@@ -114,6 +138,22 @@ its state only at transitions, the page also says how long it has been since the
 last write — raising the line once the silence is longer than any this run has
 already come through, so a session that died is no longer indistinguishable from
 one that is thinking.
+
+**You do not have to go looking for it.** The tool that keeps the page current is
+what opens it, rather than a paragraph of prose asking the orchestrator to
+remember: `.maestro/sync.py` hands the address to the platform opener itself and
+records in `opened.json` that it did, so a run that writes state dozens of times
+raises exactly one tab. An address that *moved* is opened again, because by then
+the tab you are holding is dead. Nothing opens over SSH or in CI, where a window
+on a machine you are not sitting at helps nobody, and `--no-open` stands the
+opener down for a host that shows the page in a pane of its own — the one case
+that would otherwise produce two. If the panel disappears, `--reopen` is the
+whole of the recovery.
+
+**It is the only page the прогон opens.** No субагент raises a page or a server
+on a port of its own; a question that can only be answered by looking at a
+rendered page is either answered without a viewer or written down unanswered.
+`npm run view` holds that rule against the skill's own files.
 
 More about it in [`docs/dashboard.md`](docs/dashboard.md).
 
@@ -177,6 +217,20 @@ The full glossary, and the rule that each term has exactly one name, are in
 Changing the interface language means editing the skill's phase files; it is not
 a dial, and nothing in the specification hard-codes Russian except the vocabulary
 itself.
+
+**Three fields of the state carry the прогон's language, and the boundary is
+visibility.** `gates[].findings`, `tasks[].title` and `stages[].note` are printed
+on the dashboard word for word, and the page has no vocabulary to translate a
+composed line against — so those three follow the dial while every other field
+stays English. `debt` reaches the page as three counts, `additions` is not drawn
+there at all, and a требование's `reason` is read out of the отчёт, which is why
+none of them moves. A quotation keeps the language it was said in, so an English
+отчёт carries Russian findings inside it. `python3 .maestro/sync.py` holds the
+rule for `ru`, naming and quoting each offending line after it has printed the
+address — a дашборд nobody can reach helps nobody. It deliberately does not hold
+`en`: a Russian line carries Cyrillic and an English one does not, while an
+English finding quoting your own sentence is correct and no check can tell that
+from a breach.
 
 **How plainly it speaks is a dial**, and it does not change the words themselves.
 In *по-простому* a *таск* is still a *таск* — it simply arrives with one clause
