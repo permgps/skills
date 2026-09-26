@@ -292,6 +292,7 @@ npm run check     # everything below, in this order
 | `npm run hosts` | every host capability that degrades is probed in preflight and spent in a phase |
 | `npm run doors` | every door into the repair phase is listed there and opened by some phase |
 | `npm run dials` | the mode set and its built-in default agree across spec, phase and `SKILL.md` |
+| `npm run readers` | each blind check's reader declares the inputs `docs/spec/gates.md` says it is handed |
 | `npm run view` | `SKILL.md` states the view boundary, every prompt carries it, and only preflight opens a page |
 | `npm run test` | the checkers' own tests |
 

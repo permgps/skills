@@ -164,7 +164,11 @@ More about it in [`docs/dashboard.md`](docs/dashboard.md).
 
 No mode, depth or finish removes any of them.
 
-1. A requirement is removed only by you, in your own words.
+1. A requirement is removed only by you, in your own words. Change your mind
+   while a run is going and what you said is appended to the brief verbatim, in
+   the language you said it in, beside the requirement it amends — and the final
+   check reads it, so a requirement you withdrew never comes back to you reported
+   as missing.
 2. A credential is never requested, echoed, or written. This is the only stop
    condition among the six.
 3. A fact about you is never invented — prices, addresses, texts stay visible
@@ -192,7 +196,7 @@ The skill carries no runtime dependencies. The tooling needs Node.js 22.18 or
 newer, because it is TypeScript executed by Node's native type stripping.
 
 ```bash
-npm run check     # typecheck, ten validator runs across two skills, and their tests
+npm run check     # typecheck, eleven validator runs across two skills, and their tests
 npm run metrics   # measure a finished run
 ```
 
