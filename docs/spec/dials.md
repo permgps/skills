@@ -108,11 +108,26 @@ Pinning one is a thing the user does to the file by hand, for a project whose
 
 ### What The Language Does Not Change
 
-Every file the прогон writes stays English in both: `brief.md`, `spec.md`, the
-task files, `report.md`, the code and its comments. That rule is older than this
-dial and this dial does not touch it. The one Russian thing inside an artifact —
-the `Требование` column header of `manifest.md` — is the manifest's own shape and
-is covered where the manifest is specified, not here.
+Every file the прогон writes stays English in both: the original text of
+`brief.md`, `spec.md`, the task files, `report.md`, the code and its comments.
+That rule is older than this dial and this dial does not touch it. Two non-English
+things live inside artifacts, and neither one is the прогон writing in another
+language.
+
+The first is the `Требование` column header of `manifest.md` — the manifest's own
+shape, covered where the manifest is specified, not here.
+
+The second is the **additions block of `brief.md`**, and its reason is its own.
+The block is a quotation: the user's words, taken down as they were said. This
+dial decides which language the прогон *speaks* in, and the additions are not the
+прогон speaking — they are the user being quoted for a reader that is measuring
+the build against the user's words and is forbidden to read the прогон's
+paraphrase of them. Translating the quotation would put a translation of the ruler
+into the hands of the one reader whose whole job is to not be measuring against
+something the прогон wrote. The additions keep their language for the same shape
+of reason Scout's ТЗ draft keeps its own: writing it in English performs a
+translation nothing checks, and it does it exactly where the contract stopped
+being the прогон's own words.
 
 The slug stays Latin in both, for the same reason it was Latin before: it is a
 directory name.

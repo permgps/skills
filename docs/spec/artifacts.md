@@ -42,7 +42,7 @@ actually built.
 
 | Artifact | Writer | Readers | Mutable |
 |---|---|---|---|
-| `brief.md` | manifest | manifest, acceptance | no |
+| `brief.md` | manifest | manifest, G2, acceptance (the manifest plus the additions) | append-only |
 | `manifest.md` | manifest | briefing, spec, plan, acceptance, G1, G2, G3, G4 | append-only |
 | `answers.md` | briefing | spec | append-only |
 | `reference.md` | briefing | polish | append-only |
@@ -99,6 +99,41 @@ phase that established it, and read by everyone downstream. Two phases editing
 one file would leave the first disagreement between them with no owner, which is
 the single thing this table exists to prevent.
 
+### What The `Mutable` Column Means
+
+`Mutable` is a column of values rather than a sentence. Three values, and no
+fourth: `no` — the file is written once and never changes; `yes` — the file is
+rewritten by its own writer; `append-only` — it grows, and nothing already in it
+is touched. A row may qualify its value after a comma, as `spec.md` does with
+"by amendment only"; the qualifier is prose and this section is where it is read.
+
+`append-only` means three things at once:
+
+- the text already in the file is **never edited** — not corrected, not
+  reordered, not summarised;
+- an append is **additive**: a reader who knew the earlier version of the file
+  can still find all of it;
+- **the shape of what is appended is owned by the one phase in the `Writer`
+  cell**, while the appending itself happens in whichever phase the words
+  arrive. Those are two different things and only the first one is the single
+  writer's.
+
+The last clause is what makes this value usable for `brief.md`, whose appends
+happen in whichever phase the user speaks in and whose shape is still the
+manifest phase's to define. A row carrying `append-only` states its own appender
+rule in the prose of this section — what a well-formed entry is, and in what
+order the entries go down. **Nothing checks that sentence**, because the check
+that reads this table can read a value and cannot read prose; the rule is
+text-held and is written down here rather than left to be discovered.
+
+Two rows carry a rule that is more than "append at the end", and each is written
+where its artifact is:
+
+- **`brief.md`** — the additions block, specified under *Translate Once* below.
+  It is the one row whose appender is not its writer.
+- **`report.md`** — a round of приёмка appended under its own date, which is the
+  paragraph just above.
+
 The project memory file is **not in that table**, and its absence is deliberate.
 It is `AGENTS.md` in the target project's root — not a run artifact, not under
 `.maestro/`, and not written once per прогон but added to across many. Its
@@ -108,13 +143,22 @@ file, and version control, and [`phases.md`](phases.md) says what goes in it and
 which region of it the прогон owns.
 
 Requirement **statuses are not in `manifest.md`.** The manifest holds requirement
-text, written once; the statuses live in the run state, whose writer is the
-preflight-created state file. That keeps the manifest immutable and gives the
-gates a single place to read from.
+text and nothing else, growing by rows; the statuses live in the run state, whose
+writer is the preflight-created state file. That keeps the manifest free of the
+one column two readers could disagree about, and gives the gates a single place
+to read a status from. A requirement the user adds later becomes another row; a
+withdrawn one keeps its row unchanged, because the withdrawal is a status and
+belongs in the state. The two documents stay comparable only while they are both
+lists of requirement text — the moment one of them carries a status, S1's
+comparison of them has two answers to choose from.
 
 ## Lifecycle
 
-- `brief.md` is dated in its filename because a feature slug outlives one sitting.
+- `brief.md` is dated in its filename because a feature slug outlives one
+  sitting. The date marks the sitting, and one sitting is one бриф: a бриф
+  dictated on a later day is a new file under that day's date, not an append to
+  this one. What grows inside one file is the additions block, which holds the
+  changes the user made while this прогон was running.
 - `.maestro/` is committed, not ignored. It is the user's record of what was
   promised and what was delivered; a прогон that leaves nothing behind did not
   happen.
@@ -136,7 +180,9 @@ passes redaction **before it reaches a file**, never after.
 ## Translate Once
 
 Every file is English; the user speaks Russian. The conversion happens exactly
-once, in the manifest phase, and never again:
+once, in the manifest phase, and never again — with one exception, under *The
+Additions Block* below, which is the user's own words quoted and not a text this
+прогон composed:
 
 1. The user's бриф is redacted, then rendered into English as `brief.md`.
 2. The requirements are numbered from that English text into `manifest.md`.
@@ -149,3 +195,30 @@ once, in the manifest phase, and never again:
 No later phase re-translates anything. A phase that finds an English requirement
 unclear asks about the requirement, not about the translation — asking about the
 translation would reopen the contract after it was agreed.
+
+### The Additions Block
+
+`brief.md` is written once, in the manifest phase, and appended to afterwards.
+The text written in phase 1 is frozen — it is the version G1 was agreed against,
+and the frozen part is what makes an append recognisable as one. The file holds
+two things, in this order:
+
+1. the frozen text from the manifest phase;
+2. one dated entry per change the user made after that, oldest first — the
+   additions block.
+
+An entry is two parts, and the order is the rule:
+
+- **The user's words, verbatim after redaction, in the language they were said
+  in.** This is the second place inside an artifact where a language other than
+  English is allowed, and [`dials.md`](dials.md) carries the reasoning with the
+  first. In short: the entry is a quotation, and a quotation keeps the language
+  it was said in.
+- **One line, visibly ours**, naming the `R##` the quotation touches and what was
+  done about it — the requirement was dropped, a new `Rnn` was added, or it was
+  deferred. The line is English, like the rest of the file. **Where the line and
+  the quotation disagree, the quotation wins**, because the quotation is the
+  ruler and the line is our reading of it.
+
+The appends happen in whichever phase the user speaks in; the shape above is the
+manifest phase's, which is the phase this table names as the writer.

@@ -25,6 +25,7 @@ hits the gap cannot even guess what was meant.
 | таск | task | One unit of work, cut in the plan phase, handed whole to one субагент | задача, тикет, issue, стори |
 | субагент | subagent | An agent the прогон hands one таск or one check to, which works in its own context and reports back | исполнитель, читатель, воркер, агент |
 | бриф | brief | What the user originally asked for, in their own words | задача, ТЗ |
+| Дополнения | Additions | What the user said about the бриф after it was frozen — the dated block at the end of `brief.md` | правки, уточнения |
 | требование | requirement | One numbered line of the manifest, `R##` | пункт, пожелание |
 | манифест | manifest | The numbered list of requirements | список требований, чеклист |
 | приёмка | acceptance | The final check of the build against the manifest | тестирование, проверка |

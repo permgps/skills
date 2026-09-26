@@ -9,13 +9,13 @@ right thing was built.
 | Id | Name | Stage | Reads | Produces |
 |---|---|---|---|---|
 | preflight | Preflight | yes | user arguments, repository state | resolved dials, run state created, dashboard raised |
-| manifest | Manifest | yes | бриф from the user | `brief.md`, `manifest.md` |
+| manifest | Manifest | yes | бриф from the user | `brief.md` — written once, then grown by its additions block — and `manifest.md` |
 | briefing | Briefing | yes | `manifest.md` | `answers.md`, `reference.md` |
 | spec | Specification | yes | `manifest.md`, `answers.md` | `spec.md` |
 | plan | Plan | yes | `spec.md` | `tasks/`, `interfaces.md` |
 | build | Build | yes | `tasks/`, `interfaces.md` | project code, `discovered-interfaces.md`, a handoff where one was needed |
 | review | Review | yes | `tasks/`, `interfaces.md`, project code | `reviews/` |
-| acceptance | Acceptance | yes | `manifest.md`, `brief.md`, `reviews/`, project code | `report.md` |
+| acceptance | Acceptance | yes | the phase: `manifest.md`, `brief.md`, `reviews/`, project code — the reader it consults: `manifest.md` plus the бриф's dated additions | `report.md` |
 | polish | Доводка | no | `reference.md`, project code | polished build, `tasks/` of its own |
 | memory | Memory | no | `discovered-interfaces.md`, `spec.md`, project code, run state | the memory block in `AGENTS.md`, `decisions.md` |
 | repair | Repair | no | whatever one of its four doors provides | retried таск, `amendments.md` |
@@ -24,6 +24,39 @@ right thing was built.
 stage and after приёмка. `memory` runs twice — once during `build`, when the
 build discovers something worth outliving the run, and once after `acceptance`,
 when the finished code can be described. `repair` runs on demand, through the four doors its own section lists.
+
+## A Change That Arrives Mid-Прогон
+
+The user may withdraw or add a требование at any point after the манифест was
+agreed — during брифинг, during the plan, during the build, while a таск is
+being reviewed. There is one procedure for it, **owned by the briefing phase**
+and cited by every phase after that one, because a procedure copied into five
+phases is five procedures and the first drift between them is unattributable.
+
+**The order is the procedure, and the first step is the one that gets skipped:**
+
+1. **The additions block of `brief.md` first** — the user's words verbatim,
+   after redaction, in the language they were said in, under that day's entry.
+2. **Then the run state** — `dropped`, with the requirement's reason quoting the
+   user, or a new `Rnn` with its own status and reason.
+3. **Then the plan** — a таск cut for an added требование, a `deferred` row for
+   one that will not be built, or a line in the отчёт.
+4. **Then one sentence to the user**, saying what the change costs the schedule.
+   A требование accepted silently is a schedule the user never agreed to.
+
+The state is second, and never first, for a reason that is not about tidiness.
+Writing the status feels like having recorded the change — it is the write that
+makes the требование look settled — and the two gates capable of catching a lost
+требование, `G2` and `G4`, are **forbidden to read the state**
+([`gates.md`](gates.md)). A change that reaches the state and not the бриф is
+invisible to both of them: G4 reads the манифест and the additions, so a
+withdrawn требование stays in front of it as a live one, and an added one is in
+no document it was handed at all. Recorded, and checked by nobody.
+
+The manifest grows by rows and by nothing else. An added требование becomes an
+`Rnn` row; a withdrawn one keeps its row and is not edited — the withdrawal lives
+in the state and in the additions, which is what keeps the manifest's two
+readings comparable.
 
 ## Loading Rule
 

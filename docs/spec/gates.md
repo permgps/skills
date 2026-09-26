@@ -8,7 +8,7 @@ that fails is not a warning: the phase is redone.
 | G1 | briefing | Every требование has a status, and none is left open without a recorded reason |
 | G2 | spec | Every live требование is in-spec, deferred, or dropped with zero left open, **and** an independent reader given only `brief.md` and `spec.md` finds nothing missing |
 | G3 | plan | Every in-spec требование maps to at least one таск, **and** every таск traces back to at least one требование, **and** a reader given exactly what an executor will be given finds every task file buildable without asking a question |
-| G4 | acceptance | The build is checked against `manifest.md` with `spec.md` withheld, and every disagreement is reported |
+| G4 | acceptance | The build is checked against `manifest.md` and the dated additions in `brief.md`, with `spec.md` and the бриф's original text withheld, and every disagreement is reported |
 
 ## Evidence
 
@@ -40,16 +40,22 @@ act on.
 
 ## What "Blind" Means
 
-At G4 the acceptance check is performed by a reader that has `manifest.md` and
-the running build, and does **not** have `spec.md`, the plan, the task files, or
-the review notes. The withholding is the mechanism: a reader who has seen the
-specification will confirm the specification, not the бриф.
+At G4 the acceptance check is performed by a reader that has `manifest.md`, the
+dated additions in `brief.md`, and the running build, and does **not** have
+`spec.md`, the plan, the task files, the review notes, or the бриф's original
+text. The withholding is the mechanism: a reader who has seen the specification
+will confirm the specification, not the бриф.
 
-**`brief.md` is withheld as well.** The манифест is the numbered form of the
-бриф and was agreed with the user before any other work began, so the two say
-the same thing everywhere except where they disagree — and there a reader
-holding both would answer from the looser one. That disagreement is precisely
-what the gate exists to surface.
+**The бриф's original text is withheld, and its additions are not.** That reads
+like an inconsistency and it is not one. The original text is what the манифест
+was numbered from, and it was shown back to the user at G1 as the agreed
+contract — so a reader holding both would be holding two copies of one thing and
+would answer from the looser one exactly where they disagree, which is the
+disagreement this gate exists to surface. An addition never passed G1. It is
+what the user said *after* the contract was agreed, and no reading of it has
+been agreed by anybody, which is precisely why it has to travel as the user's
+words alone rather than as a paraphrase — and why the reader is told, in its own
+brief, that the quotation wins over any line the прогон wrote beside it.
 
 ## Failure Behavior
 

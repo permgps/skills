@@ -107,7 +107,7 @@ one, the user's reason.
 |---|---|---|
 | `in-spec` | live, and goes to the specification | no |
 | `deferred` | out of this прогон, by the user's decision | yes |
-| `dropped` | withdrawn by the user, in their own words quoted into the манифест | yes |
+| `dropped` | withdrawn by the user, in their own words quoted into the additions block of `brief.md` | yes |
 | `open` | still unanswered | yes — and G1 is about to ask why |
 
 - A status change the user did not make is not a status change. S1: a требование
