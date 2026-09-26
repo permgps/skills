@@ -146,6 +146,8 @@ node scripts/validate/repair-doors.ts \
   docs/spec skills/maestro                               # the repair phase's doors
 node scripts/validate/dials-defaults.ts \
   docs/spec skills/maestro                               # the mode set and its default
+node scripts/validate/gate-readers.ts \
+  docs/spec skills/maestro                               # what each blind reader is handed
 node scripts/validate/viewer-ownership.ts skills/maestro    # the view boundary
 node --test 'scripts/**/*.test.ts'                     # the checkers themselves
 
@@ -180,6 +182,21 @@ document: every degrading capability owes a cost row there, each row names the
 capability it is the runtime half of, and a row that stops the прогон where the
 specification says it narrows — or the reverse — is the same defect seen from
 the reference side.
+
+`gate-readers` proves that the two gates decided in part by a subagent — G2 and
+G4 — hand their reader exactly what [`gates.md`](gates.md) says they do. That
+list lives in five places: the gate table, the phase table, the phase file, the
+reader's own brief in `prompts/`, and `SKILL.md`. Four of them are prose a model
+reads at run time; the brief is the fifth, and it was the one nothing compared —
+a reader whose inputs drifted was still a reader, and the gate would report
+against a list nobody had agreed. `gates.md` therefore carries the list a second
+time as a table, and this check holds each brief's own declaration to it name
+for name, naming both places when they disagree.
+
+It reads the `Given` column and not the `Withheld` one, and that boundary is
+deliberate: what a reader must refuse is a list of things that are not there,
+and it stays prose. Stated here because a check believed to cover a column it
+does not read fails differently from one that is known not to.
 
 `repair-doors` proves that every door into the repair phase declared in
 [`phases.md`](phases.md) is listed by the bundle's own repair phase and marked

@@ -174,6 +174,16 @@ const LABEL_SURFACES = [
 
 const escapeForRegExp = (term: string): string => term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/**
+ * The three values the artifact table's `Mutable` cell may carry.
+ *
+ * A value set rather than a sentence because the cell decides what a lifetime
+ * rule means, and it acquired its third value in the change that made `brief.md`
+ * grow. `artifacts.md` says what each one obliges; this is the enforcement half,
+ * and it reads the value only — a qualifier after a comma is prose.
+ */
+const MUTABLE_VALUES = ['no', 'yes', 'append-only'] as const;
+
 /** Does this label carry that term — as a stem, or as a whole word? */
 export function carries(label: string, term: string, wordwise: boolean): boolean {
   if (!wordwise) return label.includes(term);
@@ -336,6 +346,45 @@ export async function checkSpec(
       }
     }
     log.info('artifacts', 'artifacts checked', { count: artifactTable.rows.length });
+  }
+
+  // --- the Mutable column holds one of three values -------------------------
+  // The column was prose nothing read until it acquired a fourth possible
+  // meaning — a brief that grows rather than a brief written once — so a value
+  // set is what stops the next meaning arriving without anybody deciding it.
+  // Only the value is read: a row may qualify it after a comma (`yes, by
+  // amendment only`), and a qualifier is a sentence this checker cannot read.
+  // What `append-only` obliges a row to state in prose is stated in
+  // artifacts.md, and nothing here pretends to verify it.
+  if (artifactTable) {
+    if (!artifactTable.columns.includes('Mutable')) {
+      add('mutability', 'artifacts.md', artifactTable.line,
+        'the artifact table has no Mutable column — every row must declare whether its file can change');
+    } else {
+      let declared = 0;
+      for (const row of artifactTable.rows) {
+        const artifact = cleanCell(row['Artifact']);
+        const cell = cleanCell(row['Mutable']);
+        const value = cell.split(',')[0]?.trim().toLowerCase() ?? '';
+        if (value === '') {
+          add('mutability', 'artifacts.md', row.__line,
+            `artifact ${artifact} declares no Mutable value — say ${MUTABLE_VALUES.join(', ')}`);
+          continue;
+        }
+        if (!(MUTABLE_VALUES as readonly string[]).includes(value)) {
+          add('mutability', 'artifacts.md', row.__line,
+            `artifact ${artifact} declares Mutable "${cell}" — the values are ${MUTABLE_VALUES.join(', ')}; `
+            + 'a qualifier may follow the value after a comma, but the value itself is one of those three');
+          continue;
+        }
+        declared += 1;
+      }
+      log.info('mutability', 'mutable values checked', {
+        rows: artifactTable.rows.length,
+        declared,
+        values: [...MUTABLE_VALUES],
+      });
+    }
   }
 
   // --- every state field is produced and consumed --------------------------

@@ -157,6 +157,50 @@ test('an artifact with no writer is reported', async () => {
   assert.match(violations[0]?.message ?? '', /has no writer/);
 });
 
+test('an artifact whose Mutable cell carries a fourth value is reported', async () => {
+  const violations = await violationsFor({
+    'artifacts.md': `| Artifact | Writer | Readers | Mutable |\n|---|---|---|---|\n| \`state.js\` | preflight | dashboard | sometimes |\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'mutability');
+  assert.match(violations[0]?.message ?? '', /declares Mutable "sometimes"/);
+  assert.match(violations[0]?.message ?? '', /the values are no, yes, append-only/);
+});
+
+test('a qualifier after the value is prose, and the value itself is what is read', async () => {
+  const violations = await violationsFor({
+    'artifacts.md': `| Artifact | Writer | Readers | Mutable |\n|---|---|---|---|\n| \`spec.md\` | preflight | build | yes, by amendment only |\n`,
+  });
+  assert.deepEqual(violations, []);
+});
+
+test('an artifact with no Mutable value is reported', async () => {
+  const violations = await violationsFor({
+    'artifacts.md': `| Artifact | Writer | Readers | Mutable |\n|---|---|---|---|\n| \`state.js\` | preflight | dashboard |  |\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'mutability');
+  assert.match(violations[0]?.message ?? '', /declares no Mutable value/);
+});
+
+test('an artifact table without the Mutable column is reported rather than skipped', async () => {
+  const violations = await violationsFor({
+    'artifacts.md': `| Artifact | Writer | Readers |\n|---|---|---|\n| \`state.js\` | preflight | dashboard |\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'mutability');
+  assert.match(violations[0]?.message ?? '', /no Mutable column/);
+});
+
+test('the real artifact table declares a Mutable value for every row', async () => {
+  // The fixture above proves the rule fires; this proves the rule is satisfied
+  // by the specification this repository actually ships, which is the half a
+  // fixture can never check.
+  const specDir = path.resolve(import.meta.dirname, '..', '..', 'docs', 'spec');
+  const violations = await checkSpec(specDir);
+  assert.deepEqual(violations.filter(violation => violation.check === 'mutability'), []);
+});
+
 test('a state field with no reader is reported', async () => {
   const violations = await violationsFor({
     'state-contract.md': `| Field | Type | Written in | Read by |\n|---|---|---|---|\n| \`runId\` | string | preflight |  |\n`,

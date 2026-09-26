@@ -57,6 +57,28 @@ been agreed by anybody, which is precisely why it has to travel as the user's
 words alone rather than as a paraphrase — and why the reader is told, in its own
 brief, that the quotation wins over any line the прогон wrote beside it.
 
+### What Each Independent Reader Is Given
+
+Two gates are decided in part by a subagent — G2 and G4 — and each of those
+readers is handed a fixed list of things. The same list otherwise lives in five
+places: this table, the phase table, the phase file, the reader's own brief, and
+`SKILL.md`. The last of those is the one that drifts, because it is the one
+nothing compares.
+
+So the list gets a machine-readable form. `scripts/validate/gate-readers.ts`
+holds every reader's brief to the two columns below, name for name: a name
+present in one and not the other is a finding that names both places.
+
+| Gate | Reader's brief | Given | Withheld |
+|---|---|---|---|
+| G2 | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning |
+| G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, the running build | `spec.md`, the plan, the task files, `reviews/`, the бриф's original text |
+
+A name in `Given` is something the reader's brief must declare it has; a name in
+`Withheld` is one it must declare it does not have and will not ask for. The
+list is short on purpose — a reader handed more than this stops being a reader
+and becomes a second opinion on work it has already seen.
+
 ## Failure Behavior
 
 - A failed gate returns control to the phase it follows. That phase runs again
