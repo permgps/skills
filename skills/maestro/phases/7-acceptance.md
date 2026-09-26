@@ -25,8 +25,15 @@ a требование nobody looked at.
 
 One reader, briefed by
 [`../prompts/acceptance-reader.md`](../prompts/acceptance-reader.md), given
-`manifest.md` and the running build. **Nothing else travels with them** — not
-`spec.md`, not the plan, not the task files, not `reviews/`, and not `brief.md`.
+`manifest.md`, **the additions block of `brief.md`**, and the running build.
+
+**Nothing else travels with them** — not `spec.md`, not the plan, not the task
+files, not `reviews/`, and not the бриф's original text. The original text is
+withheld because it already became the манифест and was shown back to the user at
+G1 as the agreed contract; the additions are handed over because they never
+passed that gate and are the only record of what the user changed afterwards.
+Hand the additions as they stand — the dated entries, quotation first, your own
+line under each — and nothing else from that file.
 
 You are holding all of those. That is the difference between you and the reader,
 and it is the whole mechanism of this gate: what you know about how the
@@ -35,18 +42,28 @@ checking it.
 
 The reader gets the whole манифест, including требования you know were deferred
 or dropped. It is not told which; that is decided against its answer, in the next
-step, and telling it beforehand would hand it the conclusion.
+step, and telling it beforehand would hand it the conclusion. The additions are
+the exception, and only because they are the user's own record of that decision —
+a withdrawal the user announced is not a conclusion you are leaking, it is
+evidence they are owed.
 
 ### 3. Sort what came back
 
-Each thing the reader returned is one of three, and the run state's requirement
+Each thing the reader returned is one of four, and the run state's requirement
 statuses are what tell them apart:
 
 | What came back | Against a требование that is | It is |
 |---|---|---|
 | a finding | `in-spec` | a **disagreement** — a G4 finding, recorded against its `R##` |
 | a finding | `deferred` or `dropped` | confirmation that what was set aside really was not built — it belongs in *What is left*, not in G4 |
+| reported as withdrawn | `dropped` | the same confirmation, said the other way round: the user removed it and the reader read the addition saying so. It belongs in *What is left* with the withdrawal named |
 | unchecked | any | carried into the отчёт as unchecked — neither passed nor failed |
+
+The third row is the one this milestone added, and the second row is why it
+matters. A reader that is not handed the additions can only see a withdrawn
+требование as one the build never implemented, and reports it as a finding — the
+false «R03 не реализовано» this phase used to produce. A reader that *is* handed
+them can tell a removal from a gap, and the two rows stay apart.
 
 A finding naming an `R##` that is not in the манифест at all is about the прогон,
 not about a требование: record it as it came and say so, rather than dropping it

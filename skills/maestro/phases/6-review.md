@@ -9,6 +9,12 @@ held during it: a finding is not a defect you may put right between two
 paragraphs, and a таск whose review blocked goes to repair rather than to your
 keyboard.
 
+**A требование the user changes while a review is running is not a review
+finding, and it does not turn a таск red** — a reviewer judges one таск against
+the file its executor was given, and that file did not change. It goes through
+the briefing phase's procedure, in that phase's order: the additions block of
+`brief.md` first, then the run state, then the plan.
+
 ## Steps
 
 ### 1. Read the таски

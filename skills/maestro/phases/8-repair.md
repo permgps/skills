@@ -19,6 +19,11 @@ No mode and no depth changes anything here: a таск that failed failed under
 whatever dials the прогон is running, and the two answers this phase chooses
 between are the same two in every column.
 
+**A требование the user changes while a retry is running does not enter the
+retry** — a retry is given what its door carries and nothing else. It goes
+through the briefing phase's procedure, in that phase's order: the additions
+block of `brief.md` first, then the run state, then the plan.
+
 `S5` holds here with no softening. You decide what to try again and you write
 down what was learned; **an executor writes every line of the code**, including
 the one-line fix that looks too small to hand over. That fix is exactly where

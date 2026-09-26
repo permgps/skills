@@ -26,7 +26,7 @@ Run redaction over the бриф **first**, in memory. A detected credential beco
   advise rotating them. This is safety rule S2 — it is a stop condition, so
   report before continuing, in every mode.
 
-### 3. Write `brief.md`, in English, once
+### 3. Write `brief.md`, in English, once — then grow it, and never edit it
 
 Render the redacted бриф into English and write it to
 `.maestro/<slug>/<YYYY-MM-DD>-brief.md`.
@@ -42,8 +42,52 @@ Render the redacted бриф into English and write it to
   carried into English as an ambiguity, and belongs to the брифинг phase.
 - Where a translation was genuinely uncertain, note it — it goes under
   Assumptions in `report.md` at the end.
-- The file is dated because a feature slug outlives one sitting, and it is
-  written once.
+- The file is dated because a feature slug outlives one sitting. The date marks
+  the sitting: a бриф dictated on a later day is a new file under that day's
+  date, not an append to this one.
+
+**What you write here is frozen.** Nothing after this phase edits it — not a
+correction, not a tidy-up, not a re-reading against the code. It is the version
+the user agreed to at G1, and the frozen part is what makes everything appended
+under it readable as an addition rather than as the бриф itself.
+
+#### The additions block
+
+After this phase the file grows. Everything the user says about the бриф while
+the прогон is running is appended below the frozen text, oldest first, one dated
+entry each. **You own the shape**, and only the shape: the appending happens in
+whichever phase the words arrive, which is why the shape is written down here
+rather than there.
+
+An entry is two parts, and the order is the rule:
+
+1. **The user's words, verbatim after redaction, in the language they were said
+   in.** Do not translate them. `brief.md` is English and this is its one
+   exception: the entry is a quotation, and a quotation keeps the language it was
+   said in. Translating it would hand the acceptance reader a translation of the
+   very ruler it measures against — and that reader is forbidden to read your
+   paraphrase of the user's words, which is the whole reason it exists.
+2. **One line of your own, visibly yours**, naming the `R##` the quotation
+   touches and what was done about it — `dropped`, a new `Rnn`, or `deferred`.
+   That line is English, like the rest of the file.
+
+Two rules keep the block usable, and both are about who wins:
+
+- **The quotation goes down first, always.** The order is what lets a reader
+  tell the user's words from ours without reading for tone.
+- **Where your line and the quotation disagree, the quotation wins.** Your line
+  is a reading of the quotation, not a summary of it, and a reading is the part
+  that can be wrong. The acceptance reader is told the same thing, so the two of
+  you resolve a disagreement the same way.
+
+```markdown
+## 2026-09-27
+
+> Слушай, убери требование про экспорт в CSV — передумал.
+
+`R07` dropped at the user's request. No таск carries it and the schedule is one
+таск shorter.
+```
 
 ### 4. Number the требования into `manifest.md`
 
@@ -61,8 +105,12 @@ it:
 - One asked-for thing per row. Two things joined by "and" are two rows.
 - Include what the user said, not what it implies. An implication is depth, and
   depth is applied in the specification phase.
-- **`manifest.md` holds text and nothing else.** No status column, no notes. It
-  is written once and never edited: that is what makes S1 checkable.
+- **`manifest.md` holds text and nothing else.** No status column, no notes. An
+  added требование becomes another row; a withdrawn one keeps its row unchanged.
+  The manifest is the one document a gate can compare against `brief.md`, and two
+  documents compared is one comparison — a status column here would give S1 two
+  answers to choose from, which is why the statuses live in the run state and the
+  reason for a removal lives in the additions block.
 
 ### 5. Write the statuses into the run state
 
@@ -116,7 +164,9 @@ R02 — …
 - If the user corrects a требование, correct `manifest.md` before it is
   considered written — this is the one moment it is still open. After this
   phase, a требование is removed only by the user, in their own words, quoted
-  into the манифест.
+  into the additions block of `brief.md`, with the decision recorded against it
+  in the run state. The briefing phase owns that procedure; this phase only
+  hands it over.
 
 ## Gates
 
@@ -127,8 +177,8 @@ phase created.
 
 | Artifact | State |
 |---|---|
-| `.maestro/<slug>/<YYYY-MM-DD>-brief.md` | written once, English, redacted |
-| `.maestro/<slug>/manifest.md` | written once, numbered требования, no statuses |
+| `.maestro/<slug>/<YYYY-MM-DD>-brief.md` | the frozen English text, redacted; it grows afterwards by the additions block — the user's words quoted in their own language, each with one line of ours |
+| `.maestro/<slug>/manifest.md` | numbered требования, no statuses and no notes; new rows appended when the user adds one |
 | `.maestro/state.js` | `requirements[]` filled, every entry `open` with a reason |
 | the манифест | shown to the user in the прогон's language, with the original beside it when the two differ |
 

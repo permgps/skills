@@ -105,6 +105,15 @@ reasoning, the манифест, or the answers will confirm the specification r
 than check it. Give it the two files named above and refuse every request for
 more.
 
+**This reader sees the additions, and it sees them the moment the file grows.**
+`brief.md` is not frozen at the end of phase 1: everything the user says about
+the бриф afterwards is appended below the original text as dated entries, in the
+user's own language, and this gate is handed the whole file. So a требование the
+user withdrew or added while this phase was running arrives in front of the one
+reader whose question is whether anything in the бриф is unaccounted for by the
+specification — which is the second of the two checks that can catch a change
+that reached the run state and not the бриф.
+
 - The reader's findings are either acted on or recorded as an explicit deferral
   against a requirement id — which is itself a status change. **G2 is never
   passed with notes.**

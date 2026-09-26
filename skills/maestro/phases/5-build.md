@@ -8,6 +8,12 @@ hold `spec.md`, the манифест and the plan; an executor holds one тас�
 boundaries. Handing over is what keeps those two facts apart, and a two-line fix
 you make yourself collapses them for the rest of the прогон.
 
+**A требование the user withdraws or adds mid-build does not go through your own
+judgement about which таски it touched.** It goes through the briefing phase's
+procedure, in that phase's order — the additions block of `brief.md` first, then
+the run state, then the plan — and you stop handing out work in the files it
+changes until that has happened.
+
 ## Steps
 
 ### 1. Read `tasks/` and `interfaces.md`

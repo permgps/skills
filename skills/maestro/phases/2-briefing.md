@@ -114,6 +114,57 @@ one, the user's reason.
   is removed only by the user, and their words are what records it.
 - The reason is the user's answer, not your paraphrase of your own question.
 
+## A Change That Arrives Later
+
+This phase owns one procedure for the rest of the прогон, and **every phase after
+this one cites it instead of restating it.** A procedure copied into five phases
+is five procedures, and the first drift between them is a change recorded one way
+in a file and another way in the state.
+
+The user may withdraw a требование, add one, or reword one at any point. When
+that happens *in this phase* it is an ordinary answer, and step 6 already covers
+it. When it happens later — during the plan, mid-build, while a таск is under
+review — this is what to do, in this order.
+
+### The order is the procedure
+
+1. **Append to the additions block of `brief.md` first.** The user's words
+   verbatim, after redaction, in the language they were said in, under that day's
+   date — and one line of your own beneath them naming the `R##` it touches and
+   what was done about it. That line is English; the quotation is not. The
+   quotation goes down first and wins any disagreement with your line.
+2. **Then the run state.** A withdrawal is `dropped`, with the user's answer
+   recorded as its reason; an addition is a new `Rnn` in `requirements[]` with its
+   own status and reason. Written with the ordinary ritual, stamp check included.
+3. **Then the plan.** An added требование gets a таск cut for it, or a `deferred`
+   row if it will not be built in this прогон. A withdrawn one stops the таски
+   that carried it, and each of those is said out loud rather than performed
+   quietly.
+4. **Then one sentence to the user**, saying what the change costs the schedule.
+   A требование accepted silently is a schedule the user never agreed to.
+
+### Why the additions come first
+
+Because writing the status *feels* like having recorded the change. The state is
+where a требование looks settled, so it is the write an orchestrator reaches for
+first — and it is the wrong first. The two readers capable of catching a lost
+требование, the one after the specification and the one at приёмка, are
+**forbidden to read the run state**. They read `brief.md` and `manifest.md`. A
+change that reached the state and not the бриф is invisible to both: a withdrawn
+требование stays in front of the приёмка reader as a live one and comes back as a
+false finding, and an added one is in no document that reader was handed at all.
+
+Recorded, and checked by nobody — which is exactly the failure this order exists
+to prevent, and why the step that feels like a formality is the one that goes
+first.
+
+### A new sitting is a new бриф
+
+The additions block collects the changes **one прогон** takes in while it runs. It
+is not the place for a бриф the user dictates on a later day about other work:
+that is a new file under that day's date and a new прогон. The date in the
+filename marks the sitting, and one sitting is one бриф.
+
 ## Gates
 
 **G1 runs after this phase.** It passes when every требование has a status and

@@ -48,6 +48,44 @@ it or from a row of the table above: what is written down anywhere here is what 
 phase produces, never how, and a phase run from its output description is a phase
 run without its rules.
 
+## The Бриф And The Манифест
+
+Two documents, and the rules that keep them comparable.
+
+**`brief.md` is written once, then grown.** The manifest phase writes it in
+English and freezes it; everything the user says afterwards is appended below the
+frozen text as a dated entry, oldest first. Appending is the only write that file
+ever takes — the original is never edited, corrected or tidied, because it is the
+version the user agreed to at G1 and the frozen part is what makes an addition
+readable as one.
+
+**An addition is a quotation, and quotations are not translated.** The user's
+words go down verbatim, after redaction, **in the language they were said in**,
+and one line of your own follows them, naming the `R##` it touches and what was
+done about it. That line is English. The quotation goes first, and **where the
+two disagree the quotation wins** — your line is a reading of the quotation, and
+a reading is the part that can be wrong. Translating the quotation would hand the
+приёмка reader a translation of the very ruler it measures against, which is the
+one thing that reader exists to avoid.
+
+**The procedure for a change that arrives mid-прогон belongs to the briefing
+phase** ([`phases/2-briefing.md`](phases/2-briefing.md)), and every phase after
+it cites that procedure rather than restating it. The order is the rule: the
+additions block first, then the run state, then the plan, then one sentence to
+the user saying what the change costs the schedule. The state is second and never
+first, because the two readers that could catch a lost требование are forbidden
+to read it — a change written only into the state is recorded, and checked by
+nobody.
+
+**`manifest.md` holds requirement text and nothing else.** No status column, no
+notes, ever. It grows by rows — an added требование is another row — and a
+withdrawn one keeps its row unchanged, because a withdrawal is a status and
+statuses live in the run state. It has to stay this way for S1's sake: the
+manifest is the one document a gate compares against `brief.md`, and two
+documents compared is one comparison. A status column here would give that
+comparison two answers to choose from, and nothing in the прогон could tell
+which one the user meant.
+
 ## Recovery
 
 After a compaction, re-read **the state, not the rules**: the run state,
@@ -378,13 +416,20 @@ fails is not a warning: the phase is redone.**
 | G1 | briefing | Every требование has a status, and none is left open without a recorded reason |
 | G2 | spec | Every live требование is in-spec, deferred, or dropped with zero left open, **and** an independent reader given only `brief.md` and `spec.md` finds nothing missing |
 | G3 | plan | Every in-spec требование maps to at least one таск, **and** every таск traces back to at least one требование |
-| G4 | acceptance | The build is checked against `manifest.md` with `spec.md` withheld, and every disagreement is reported |
+| G4 | acceptance | The build is checked against `manifest.md` and the dated additions in `brief.md`, with `spec.md` and the бриф's original text withheld, and every disagreement is reported |
 
-At G4 the reader has `manifest.md` and the running build, and does **not** have
-`spec.md`, the plan, the task files, the review notes, or `brief.md`. The
-withholding is the mechanism: a reader who has seen the specification confirms
-the specification, and a reader holding the бриф beside the манифест answers
-from the looser of the two exactly where they disagree.
+At G4 the reader has `manifest.md`, the dated additions in `brief.md`, and the
+running build, and does **not** have `spec.md`, the plan, the task files, the
+review notes, or the бриф's original text. The withholding is the mechanism: a
+reader who has seen the specification confirms the specification, and a reader
+holding the бриф's original text beside the манифест answers from the looser of
+the two exactly where they disagree.
+
+**The original text is withheld and the additions are not**, which reads like an
+inconsistency and is the point. The original text is what the манифест was
+numbered from, and it was shown back to the user at G1 as the agreed contract;
+an addition never passed that gate, so it travels as the user's words alone and
+never as a reading of them that anybody agreed to.
 
 When a gate fails, open
 [`references/failure-modes.md`](references/failure-modes.md) — the catalogue of
@@ -413,7 +458,7 @@ calibration; these are not.
 
 | Id | Rule | On violation |
 |---|---|---|
-| S1 | A требование is removed only by the user, in their own words, quoted into the манифест | Restore the requirement, record who removed it and when it reappeared, report it in the final отчёт. A run that silently lost a requirement is a failed run, not a partial one |
+| S1 | A требование is removed only by the user, in their own words, quoted into the additions block of `brief.md`, with the decision recorded against that requirement in the run state | Restore the requirement, record who removed it and when it reappeared, report it in the final отчёт. A run that silently lost a requirement is a failed run, not a partial one |
 | S2 | A credential is never requested, echoed, or written — not to a file, a prompt, a commit, or the отчёт | Stop condition. Report immediately in plain language, name the variable, advise rotation, and re-run the redaction gate over every artifact written so far |
 | S3 | A fact about the user is never invented — prices, addresses, texts, account names | Replace with a visible placeholder, list it in the отчёт under Assumptions. A plausible guess that reached the build is treated as a defect, not a detail |
 | S4 | An irreversible or outward-facing action is a question — deploy, publish, pay, message a third party, delete data, rewrite history | Ask, in every mode including the no-questions one. If the action already happened, stop and report it before doing anything else |
@@ -441,7 +486,10 @@ preference, never from questions about consequence.
 `report.md`, the code and its comments — in both languages of the dial. Those
 files are read by the next прогон and by whoever maintains the project
 afterwards, and one language across them is what keeps them readable. The dial
-does not touch this rule, and it has exactly one exception, named below.
+does not touch this rule. It has exactly one exception, named below, and one
+thing that looks like a second and is not: a quotation is the user's text, not
+yours, and it keeps the language it was said in — see *A quote keeps the language
+it was said in* below.
 
 **Everything the user reads is in the dial's language.** The chat, every
 question and every answer you offer with it, the манифест as it is shown, the
@@ -462,8 +510,12 @@ out of the отчёт rather than off the screen.
 
 **A quote keeps the language it was said in.** The отчёт is English and quotes
 findings as they came back, so a `ru` прогон's отчёт carries Russian lines
-inside it. That is the same rule as everywhere else — a quotation is evidence,
-and evidence that has been translated is no longer the thing that was said.
+inside it. The additions block of `brief.md` is the same rule one step further
+out: it is a quotation of the user, so it stays in the user's language inside a
+file that is otherwise English, and translating it would be translating the ruler
+the приёмка reader measures against. That is the same rule as everywhere else — a
+quotation is evidence, and evidence that has been translated is no longer the
+thing that was said.
 
 `python3 .maestro/sync.py` holds the three fields for `ru` and says which line
 is wrong. It cannot hold `en`: an English finding quoting the user's own Russian
