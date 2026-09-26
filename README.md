@@ -79,7 +79,7 @@ a warning: the phase is redone.
 | G1 | briefing | every requirement has a status, and none is open without a recorded reason |
 | G2 | specification | nothing is left open, **and** an independent reader given only the brief and the spec finds nothing missing |
 | G3 | plan | every in-spec requirement reaches a task, every task traces back to a requirement, **and** a reader given exactly what an executor will be given finds every task file buildable without asking a question |
-| G4 | acceptance | the build is checked against the manifest with the specification withheld, and every disagreement is reported |
+| G4 | acceptance | the build is checked against the manifest and against anything you said about the brief after it was frozen, with the specification withheld, and every disagreement is reported |
 
 All three withheld readings are the same idea: hand somebody exactly what the
 next person downstream will have, and ask whether it is enough. G3 asks it of a
@@ -88,7 +88,10 @@ task file, before an executor is stuck with the answer.
 G2 and G4 are the same question asked at the two ends of the run: does this match
 what you actually said, with our paraphrase of it taken away. G2 asks while the
 answer is still a paragraph and cheap to change; G4 asks when it is the last
-chance to know.
+chance to know — and it is handed the manifest plus whatever you said about the
+brief after it was frozen, in your own words and your own language, so a
+requirement you withdrew or added mid-run is weighed by the reader instead of
+falling between two documents.
 
 ## One state file, and who is holding it
 
