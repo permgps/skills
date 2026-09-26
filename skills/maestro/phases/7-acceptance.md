@@ -9,6 +9,13 @@ at the start: a disagreement found now is not a defect you may put right before
 writing it down. What you produce is the отчёт and a run state that says how it
 ended.
 
+**A требование the user withdraws or adds while приёмка is running is not a
+finding for you to weigh.** It goes through the briefing phase's procedure, in
+that phase's order — the additions block of `brief.md` first, then the run state,
+then the plan — and that happens before the reader is handed anything, because
+the additions are one of its inputs and a change that reached the state and not
+the бриф is invisible to it.
+
 ## Steps
 
 ### 1. Bring the build up

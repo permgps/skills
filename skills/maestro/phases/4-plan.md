@@ -8,6 +8,13 @@ You do not build anything here, and you will not build anything after it either
 — `S5` holds for the whole прогон. What this phase decides is who gets handed
 what, and what they may assume about each other.
 
+**A требование the user withdraws or adds while the таски are being cut is not
+a таск you quietly re-scope.** It goes through the briefing phase's procedure, in
+that phase's order — the additions block of `brief.md` first, then the run state,
+then the plan — and the plan is that third step, so an added требование becomes a
+таск here, a `deferred` row if it will not be built, and a withdrawn one stops
+the таски that carried it.
+
 ## Steps
 
 ### 1. Read `spec.md`

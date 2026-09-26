@@ -7,6 +7,13 @@ judges against. It ends at G2.
 This is the first phase that designs anything. Everything before it recorded
 what the user said; from here on, what gets built is being decided.
 
+**A требование the user withdraws or adds while the specification is being
+written is not a design decision for you to absorb here.** It goes through the
+briefing phase's procedure, in that phase's order — the additions block of
+`brief.md` first, then the run state, then the plan — so that the reader at G2,
+which is handed the whole бриф, meets the change itself rather than a design that
+quietly answered it.
+
 ## Steps
 
 ### 1. Read the манифест and the answers
