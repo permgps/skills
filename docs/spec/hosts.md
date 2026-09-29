@@ -19,6 +19,7 @@ parallelism, isolation and convenience — not correctness, and never silently.
 | a skills directory | installing the bundle at all | no | the host is not supported |
 | file writes | `.maestro/`, the project code, the memory file | no | the host is not supported |
 | version control | one commit per finished таск, and the history the review phase reads | yes | the прогон runs and says in the announcement that it cannot commit; the review phase reads the working tree instead of a diff, and says that it did |
+| browser verification | real pointer/keyboard and rendered-state checks on the integrated local app | yes | affected required UI checks are unavailable and their requirements incomplete; unrelated checks continue, but completion cannot be claimed |
 
 Two of those rows are absolute and the rest are adjustments. A host that cannot
 withhold a document from a reader is a host that cannot run the two gates the
@@ -37,6 +38,16 @@ preflight establishes the capability, and the phase that spends it says what
 its absence costs. `npm run hosts` fails when a row here degrades and no phase
 file carries the matching rule, which is how the rule stopped living only in a
 reference the прогон does not open.
+
+For reference-preserving work, preflight probes the actual browser automation
+available in this run. Headless execution and user-visible viewing are separate
+capabilities. An authorized headless browser may exercise pointer, focus, and
+layout without taking over the user's screen; it does not authorize taking over
+an unrelated server or running destructive reference flows. A host name,
+localhost address, or successful static fetch does not establish interaction
+capability. Record the tool and browser identity used, or the concrete missing
+capability. A missing mandatory browser leaves affected checks unavailable and
+their requirements incomplete; it cannot satisfy G4 or a completion claim.
 
 ## Degradation Is Announced
 

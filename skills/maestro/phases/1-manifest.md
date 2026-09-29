@@ -122,6 +122,17 @@ A status of `open`, `deferred` or `dropped` requires a recorded reason. At this
 point every требование is `open` with the reason "not yet briefed"; G1 is what
 later insists that none of them stayed that way without an answer.
 
+At the same write, detect preservation intent in the original request. “Clone
+`legacy/`,” “port the current application,” and “make this behave like the old
+site” declare authority without using the word “reference.” Give every named
+repository tree, deployment, URL, screenshot, archive, or document a stable
+`REF-*` record in `verification.references`, preserving the user statement,
+role, location, access method, availability and limitation, revision identity,
+conditions, and stated deviations. Do not create an unnamed reference for a
+backend-only request with no declared authority. Open
+[`../references/parity-migrations.md`](../references/parity-migrations.md) for
+the bounded procedure when preservation intent is present.
+
 ### 6. Show the манифест to the user, in the прогон's language
 
 Before any other work begins, show the numbered list back:
@@ -180,6 +191,7 @@ phase created.
 | `.maestro/<slug>/<YYYY-MM-DD>-brief.md` | the frozen English text, redacted; it grows afterwards by the additions block — the user's words quoted in their own language, each with one line of ours |
 | `.maestro/<slug>/manifest.md` | numbered требования, no statuses and no notes; new rows appended when the user adds one |
 | `.maestro/state.js` | `requirements[]` filled, every entry `open` with a reason |
+| verification register | declared references recorded, including unavailable ones |
 | the манифест | shown to the user in the прогон's language, with the original beside it when the two differ |
 
 Then read the briefing phase file.

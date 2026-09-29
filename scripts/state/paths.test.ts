@@ -14,7 +14,7 @@ import {
   PathEscapeError,
   ROOT,
 } from './paths.ts';
-import { CONTRACT_VERSION, type RunState } from './contract.ts';
+import type { RunState } from './contract.ts';
 
 const p = forRun('landing-page');
 
@@ -35,6 +35,14 @@ test('every feature artifact lands in the slug directory', () => {
     path.join(ROOT, 'landing-page', 'discovered-interfaces.md'),
   );
   assert.equal(p.report(), path.join(ROOT, 'landing-page', 'report.md'));
+});
+
+test('evidence paths stay inside their named execution directory', () => {
+  assert.equal(p.evidenceDir('X-1'), path.join(ROOT, 'landing-page', 'evidence', 'X-1'));
+  assert.equal(p.evidence('X-1', 'pointer.png'),
+    path.join(ROOT, 'landing-page', 'evidence', 'X-1', 'pointer.png'));
+  assert.throws(() => p.evidence('../X-1', 'pointer.png'), PathEscapeError);
+  assert.throws(() => p.evidence('X-1', '../pointer.png'), PathEscapeError);
 });
 
 test('the brief carries the date it was taken', () => {
@@ -137,7 +145,7 @@ test('a task name full of separators cannot climb out either', () => {
 
 test('forState uses the slug the state carries', () => {
   const state: RunState = {
-    contractVersion: CONTRACT_VERSION,
+    contractVersion: 3,
     runId: 'r1',
     slug: 'Checkout Flow',
     startedAt: '2026-08-19T09:00:00Z',

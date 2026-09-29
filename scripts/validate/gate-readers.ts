@@ -29,10 +29,11 @@ const PROMPTS_DIR = 'prompts';
 
 /** The heading a reader's brief declares its inputs under, and nothing else. */
 const INPUT_HEADING = 'What You Are Given';
+const WITHHELD_HEADING = 'What You Are Not Given';
 
 /** The specification's own list: gate, the brief that carries its reader, what
  * that reader is handed. */
-const GATES_TABLE_COLUMNS = ['Gate', "Reader's brief", 'Given'];
+const GATES_TABLE_COLUMNS = ['Gate', "Reader's brief", 'Given', 'Withheld'];
 
 /** The reader's brief declares its inputs in a table with these two columns. */
 const INPUT_TABLE_COLUMNS = ['Input', 'What it is'];
@@ -82,8 +83,8 @@ export function sectionBody(markdown: string, heading: string): string | undefin
 }
 
 /** Every input name a reader's brief declares, or `undefined` if it declares none. */
-export function declaredInputs(markdown: string): string[] | undefined {
-  const body = sectionBody(markdown, INPUT_HEADING);
+export function declaredInputs(markdown: string, heading = INPUT_HEADING): string[] | undefined {
+  const body = sectionBody(markdown, heading);
   if (body === undefined) return undefined;
 
   const table = findTable(parseTables(body), INPUT_TABLE_COLUMNS);
@@ -114,7 +115,7 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
   const declared = findTable(parseTables(await readFile(specFile, 'utf8')), GATES_TABLE_COLUMNS);
   if (!declared) {
     add('declared', specFile, 0,
-      'no table with columns Gate, Reader\'s brief and Given — the list each gate '
+      'no table with columns Gate, Reader\'s brief, Given and Withheld — the list each gate '
       + 'reader is handed needs one home a machine can read');
     return violations;
   }
@@ -124,6 +125,7 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
       gate: String(row['Gate'] ?? '').replace(/`/g, '').trim(),
       brief: String(row["Reader's brief"] ?? '').replace(/`/g, '').trim(),
       given: splitNames(row['Given']),
+      withheld: splitNames(row['Withheld']),
       line: row.__line,
     }))
     .filter(row => row.gate !== '');
@@ -150,11 +152,19 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
       continue;
     }
 
-    const inputs = declaredInputs(await readFile(briefPath, 'utf8'));
+    const brief = await readFile(briefPath, 'utf8');
+    const inputs = declaredInputs(brief);
     if (inputs === undefined) {
       add('briefs', briefPath, 0,
         `no "## ${INPUT_HEADING}" table with columns ${INPUT_TABLE_COLUMNS.join(' and ')} — `
         + `gate ${row.gate}'s reader must declare what it is handed, where a check can read it`);
+      continue;
+    }
+    const withheld = declaredInputs(brief, WITHHELD_HEADING);
+    if (withheld === undefined) {
+      add('briefs', briefPath, 0,
+        `no "## ${WITHHELD_HEADING}" table with columns ${INPUT_TABLE_COLUMNS.join(' and ')} — `
+        + `gate ${row.gate}'s reader must declare what is withheld`);
       continue;
     }
 
@@ -171,6 +181,20 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
       if (!declaredSet.has(name)) {
         add('inputs', briefPath, 0,
           `gate ${row.gate}'s brief declares "${name}", which ${specFile} does not list among what this reader is given`);
+      }
+    }
+    const declaredWithheld = new Set(row.withheld);
+    const briefWithheld = new Set(withheld);
+    for (const name of declaredWithheld) {
+      if (!briefWithheld.has(name)) {
+        add('withheld', briefPath, 0,
+          `gate ${row.gate}'s brief does not withhold "${name}", which ${specFile} requires`);
+      }
+    }
+    for (const name of briefWithheld) {
+      if (!declaredWithheld.has(name)) {
+        add('withheld', briefPath, 0,
+          `gate ${row.gate}'s brief withholds "${name}", which ${specFile} does not list`);
       }
     }
 
@@ -223,12 +247,9 @@ async function main(): Promise<number> {
   return 1;
 }
 
-// What this does not check: the `Withheld` column of the same table. What a
-// reader must refuse is prose in the brief for the same reason it is prose in
-// the specification — it is a list of things that are not there, and writing it
-// as a table would make the brief read like an inventory of what the reader has.
-// Nothing compares it, and that cost is stated here rather than left to be
-// discovered by someone who assumed the column was enforced.
+// This comparison checks the reader declarations. It cannot prove that the
+// orchestrator's actual dispatch envelope obeyed them; workflow evaluation owns
+// that boundary.
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   process.exit(await main());

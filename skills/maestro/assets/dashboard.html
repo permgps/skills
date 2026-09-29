@@ -357,7 +357,7 @@
 globalThis.MAESTRO_LOGIC = (function () {
   'use strict';
 
-  var KNOWN_CONTRACT_VERSION = 3;
+  var KNOWN_CONTRACT_VERSION = 4;
 
   // Mirrors docs/spec/phases.md. scripts/validate/dashboard-integrity.ts fails
   // the build when this set or any label below drifts from vocabulary.md.
@@ -596,6 +596,18 @@ globalThis.MAESTRO_LOGIC = (function () {
         finishedNotice: function (moment) {
           return 'Прогон завершён ' + moment + '. Часы остановлены.';
         },
+        verificationNotice: function (value) {
+          if (value.legacy) return 'Исторический прогон завершён; проверка результата не установлена. G4: ' + value.g4 + '.';
+          var counts = 'Ошибок: ' + value.failedIds.length + ', непроверено: ' + value.incompleteIds.length + '.';
+          if (value.outcome === 'completed' && value.g4 === 'passed') return 'Подтверждено выполнено. ' + counts;
+          if (value.outcome === 'closed_with_exceptions') return 'Закрыто с принятыми исключениями. G4: ' + value.g4 + '. ' + counts;
+          if (value.outcome === 'stopped_incomplete') return 'Остановлено без полного подтверждения. G4: ' + value.g4 + '. ' + counts;
+          return 'Проверка: G4 ' + value.g4 + '. ' + counts;
+        },
+        verificationRows: function (value) {
+          return 'Результат требований — ошибки: ' + (value.failedIds.join(', ') || 'нет')
+            + '; непроверено: ' + (value.incompleteIds.join(', ') || 'нет') + '.';
+        },
         interruptedNotice: function (moment) {
           return 'Прогон прерван ' + moment + '. Часы остановлены на этом моменте.';
         },
@@ -805,6 +817,18 @@ globalThis.MAESTRO_LOGIC = (function () {
         },
         finishedNotice: function (moment) {
           return 'The run finished ' + moment + '. The clocks have stopped.';
+        },
+        verificationNotice: function (value) {
+          if (value.legacy) return 'Historical run finished; verification not established. G4: ' + value.g4 + '.';
+          var counts = 'Failed: ' + value.failedIds.length + ', incomplete: ' + value.incompleteIds.length + '.';
+          if (value.outcome === 'completed' && value.g4 === 'passed') return 'Verified completed. ' + counts;
+          if (value.outcome === 'closed_with_exceptions') return 'Closed with accepted exceptions. G4: ' + value.g4 + '. ' + counts;
+          if (value.outcome === 'stopped_incomplete') return 'Stopped without full verification. G4: ' + value.g4 + '. ' + counts;
+          return 'Verification: G4 ' + value.g4 + '. ' + counts;
+        },
+        verificationRows: function (value) {
+          return 'Requirement results — failed: ' + (value.failedIds.join(', ') || 'none')
+            + '; incomplete: ' + (value.incompleteIds.join(', ') || 'none') + '.';
         },
         interruptedNotice: function (moment) {
           return 'The run was interrupted ' + moment
@@ -1416,10 +1440,109 @@ globalThis.MAESTRO_LOGIC = (function () {
     return words(language).UI.contractNotice(version, KNOWN_CONTRACT_VERSION);
   }
 
+  function sameFingerprint(a, b) {
+    if (!a || !b) return false;
+    var fields = ['reference', 'build', 'data', 'runtime', 'acceptanceInput'];
+    if (!fields.every(function (key) { return a[key] === b[key]; })) return false;
+    if (!Array.isArray(a.relevantPaths) || !Array.isArray(b.relevantPaths)
+      || !a.inputHashes || !b.inputHashes) return false;
+    if (a.relevantPaths.length !== b.relevantPaths.length) return false;
+    return a.relevantPaths.every(function (key) {
+      return b.relevantPaths.indexOf(key) !== -1 && a.inputHashes[key] === b.inputHashes[key];
+    });
+  }
+
+  function effectiveExecution(check, record) {
+    var matches = record.executions.filter(function (item) { return item.checkId === check.id; });
+    var superseded = matches.map(function (item) { return item.supersedes; });
+    return matches.filter(function (item) { return superseded.indexOf(item.id) === -1; })
+      .sort(function (a, b) { return b.executedAt.localeCompare(a.executedAt) || b.id.localeCompare(a.id); })[0];
+  }
+
+  function verificationOf(state) {
+    if (!state || state.contractVersion < 4 || !state.verification) {
+      var old = ((state && state.gates) || []).filter(function (item) { return item.id === 'G4'; })[0];
+      return { legacy: true, lifecycle: 'historical', g4: old ? old.status : 'historical',
+        failedIds: [], incompleteIds: [], requirementResults: {}, verificationEstablished: false };
+    }
+    var record = state.verification;
+    var obligations = record.obligations.filter(function (item) { return item.targetRevision === record.targetRevision; });
+    var checks = {};
+    record.checks.forEach(function (check) {
+      var execution = effectiveExecution(check, record);
+      checks[check.id] = !execution ? 'not_run'
+        : sameFingerprint(execution.fingerprint, check.currentFingerprint) ? execution.result : 'stale';
+    });
+    var obligationResults = {};
+    obligations.forEach(function (item) {
+      var required = record.checks.filter(function (check) {
+        return check.required && item.checkIds.indexOf(check.id) !== -1;
+      });
+      var contradicted = record.findings.some(function (finding) {
+        return finding.status === 'open' && finding.obligationIds.indexOf(item.id) !== -1;
+      });
+      obligationResults[item.id] = contradicted || required.some(function (check) { return checks[check.id] === 'failed'; })
+        ? 'failed' : item.discovery === 'unresolved' || required.length === 0
+          ? 'incomplete' : required.every(function (check) { return checks[check.id] === 'passed'; })
+            ? 'passed' : 'incomplete';
+    });
+    var requirementResults = {};
+    (state.requirements || []).forEach(function (requirement) {
+      if (requirement.status === 'dropped' || requirement.status === 'deferred') return;
+      var own = obligations.filter(function (item) { return item.requirementIds.indexOf(requirement.id) !== -1; });
+      var finding = record.findings.some(function (item) {
+        return item.status === 'open' && item.requirementIds.indexOf(requirement.id) !== -1;
+      });
+      var reviews = record.coverageReviews.filter(function (item) {
+        return item.requirementId === requirement.id && item.targetRevision === record.targetRevision
+          && item.inputDigest === record.acceptanceInputDigest;
+      }).sort(function (a, b) { return b.reviewedAt.localeCompare(a.reviewedAt); });
+      var ownResults = own.map(function (item) { return obligationResults[item.id]; });
+      requirementResults[requirement.id] = finding || ownResults.indexOf('failed') !== -1
+        ? 'failed' : own.length === 0 || !reviews[0] || reviews[0].status !== 'complete'
+          || ownResults.indexOf('incomplete') !== -1 ? 'incomplete' : 'passed';
+    });
+    var failedIds = Object.keys(requirementResults).filter(function (id) { return requirementResults[id] === 'failed'; });
+    var incompleteIds = Object.keys(requirementResults).filter(function (id) { return requirementResults[id] === 'incomplete'; });
+    var round = record.acceptanceRounds.filter(function (item) {
+      return item.targetRevision === record.targetRevision && item.inputDigest === record.acceptanceInputDigest;
+    }).sort(function (a, b) { return b.performedAt.localeCompare(a.performedAt); })[0];
+    var requiredChecks = record.checks.filter(function (check) {
+      return check.required && obligations.some(function (item) { return item.checkIds.indexOf(check.id) !== -1; });
+    });
+    var roundCurrent = !!round
+      && record.references.filter(function (item) { return item.role === 'authoritative_behavior'; })
+        .every(function (item) { return round.referenceIds.indexOf(item.id) !== -1; })
+      && requiredChecks.every(function (check) {
+        var execution = effectiveExecution(check, record);
+        return !!execution && round.executionIds.indexOf(execution.id) !== -1
+          && sameFingerprint(execution.fingerprint, check.currentFingerprint);
+      })
+      && record.coverageReviews.filter(function (item) {
+        return item.targetRevision === record.targetRevision && item.inputDigest === record.acceptanceInputDigest
+          && requirementResults[item.requirementId] !== undefined;
+      }).every(function (item) { return round.coverageReviewIds.indexOf(item.id) !== -1; })
+      && record.findings.filter(function (item) { return item.status === 'open'; })
+        .every(function (item) { return round.findingIds.indexOf(item.id) !== -1; });
+    var promised = record.promisedWork.some(function (item) { return item.status === 'open'; });
+    var g4 = failedIds.length ? 'failed'
+      : Object.keys(requirementResults).length === 0 || incompleteIds.length || !roundCurrent || promised
+        ? 'pending' : 'passed';
+    return { legacy: false, lifecycle: state.lifecycle || 'active', outcome: state.outcome,
+      g4: g4, failedIds: failedIds, incompleteIds: incompleteIds,
+      requirementResults: requirementResults, obligationResults: obligationResults,
+      currentRoundId: roundCurrent ? round.id : undefined,
+      verificationEstablished: state.lifecycle === 'closed' && state.outcome === 'completed' && g4 === 'passed' };
+  }
+
   function runNotice(state, language) {
     if (!state) return null;
     var say = words(language).UI;
-    if (state.finishedAt) return say.finishedNotice(formatMoment(state.finishedAt));
+    if (state.contractVersion >= 4) {
+      try { return say.verificationNotice(verificationOf(state)); }
+      catch (error) { return language === 'en' ? 'Verification record cannot be read.' : 'Запись проверки не читается.'; }
+    }
+    if (state.finishedAt) return say.verificationNotice(verificationOf(state));
     if (state.interruptedAt) return say.interruptedNotice(formatMoment(state.interruptedAt));
     return null;
   }
@@ -2623,6 +2746,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     debtCounts: debtCounts,
     testsOf: testsOf,
     contractNotice: contractNotice,
+    verificationOf: verificationOf,
     runNotice: runNotice,
     formatGap: formatGap,
     longestSilence: longestSilence,
@@ -2663,12 +2787,19 @@ globalThis.MAESTRO_SNAPSHOT = null;
 /* maestro:snapshot:end */
 </script>
 
+<script id="validation-snapshot">
+/* maestro:validation:start */
+globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
+/* maestro:validation:end */
+</script>
+
 <script id="view">
 (function () {
   'use strict';
 
   var L = globalThis.MAESTRO_LOGIC;
   var STATE_FILE = 'state.js';
+  var VALIDATION_FILE = 'validation.js';
   var POLL_MS = 2000;
 
   /** Which gates' findings the reader has opened, kept across the redraw. */
@@ -2840,17 +2971,42 @@ globalThis.MAESTRO_SNAPSHOT = null;
   function poll() {
     generation += 1;
     globalThis.MAESTRO_STATE = undefined;
+    globalThis.MAESTRO_VALIDATION = undefined;
 
-    var script = document.createElement('script');
-    script.src = STATE_FILE + '?v=' + generation;
-    script.addEventListener('load', settle);
-    script.addEventListener('error', settle);
-    document.head.appendChild(script);
+    var validation = document.createElement('script');
+    validation.src = VALIDATION_FILE + '?v=' + generation;
+    validation.addEventListener('load', loadState);
+    validation.addEventListener('error', loadState);
+    document.head.appendChild(validation);
 
-    function settle() {
-      if (script.parentNode) script.parentNode.removeChild(script);
-      apply(globalThis.MAESTRO_STATE);
+    function loadState() {
+      if (validation.parentNode) validation.parentNode.removeChild(validation);
+      var script = document.createElement('script');
+      script.src = STATE_FILE + '?v=' + generation;
+      script.addEventListener('load', settle);
+      script.addEventListener('error', settle);
+      document.head.appendChild(script);
+
+      function settle() {
+        if (script.parentNode) script.parentNode.removeChild(script);
+        apply(globalThis.MAESTRO_STATE);
+        applyValidation();
+      }
     }
+  }
+
+  function applyValidation() {
+    var envelope = globalThis.MAESTRO_VALIDATION || globalThis.MAESTRO_VALIDATION_SNAPSHOT;
+    if (!envelope || envelope.status !== 'invalid') return;
+    var details = (envelope.violations || []).slice(0, 3).map(function (item) {
+      return item.field + ': ' + item.message;
+    }).join('; ');
+    var revision = envelope.candidateRevision || '?';
+    var message = lang === 'en'
+      ? 'Candidate ' + revision + ' was rejected. ' + details
+      : 'Кандидат ' + revision + ' отклонён. ' + details;
+    problem(message);
+    el('regions').hidden = true;
   }
 
   function apply(state) {
@@ -2876,7 +3032,7 @@ globalThis.MAESTRO_SNAPSHOT = null;
     marks = L.collectMarks(state);
     clearProblem();
     render(state);
-    if (state.finishedAt && pollTimer !== null) {
+    if (state.contractVersion < 4 && state.finishedAt && pollTimer !== null) {
       clearInterval(pollTimer);
       pollTimer = null;
     }
@@ -3162,6 +3318,10 @@ globalThis.MAESTRO_SNAPSHOT = null;
       put(row, 'span', counts[status], 'count');
     });
     put(host, 'p', T.UI.requirementsTotal(counts.total), 'total');
+    if (state.contractVersion >= 4) {
+      try { put(host, 'p', T.UI.verificationRows(L.verificationOf(state)), 'total'); }
+      catch (error) { put(host, 'p', L.runNotice(state, lang), 'total'); }
+    }
   }
 
   function renderGates(state) {
@@ -3174,7 +3334,12 @@ globalThis.MAESTRO_SNAPSHOT = null;
 
     var register = L.registerOf(state);
 
-    gates.forEach(function (gate) {
+    gates.forEach(function (storedGate) {
+      var gate = storedGate;
+      if (state.contractVersion >= 4 && storedGate.id === 'G4') {
+        try { gate = Object.assign({}, storedGate, { status: L.verificationOf(state).g4 }); }
+        catch (error) { gate = Object.assign({}, storedGate, { status: 'pending' }); }
+      }
       var row = put(host, 'div', null, 'row gate gate-' + gate.status);
       put(row, 'span', gate.id, 'id');
       put(row, 'span', L.label(T.STAGE_LABEL, L.GATE_AFTER[gate.id]) || '', 'name');
@@ -3366,6 +3531,7 @@ globalThis.MAESTRO_SNAPSHOT = null;
   // The snapshot first, so a page opened without an address shows the прогон
   // instead of an error; then the file, which is what makes it move.
   if (L.isStateShape(globalThis.MAESTRO_SNAPSHOT)) apply(globalThis.MAESTRO_SNAPSHOT);
+  applyValidation();
 
   poll();
   pollTimer = setInterval(poll, POLL_MS);

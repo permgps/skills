@@ -7,7 +7,7 @@ import { CONTRACT_VERSION, type RunState } from './contract.ts';
 /** A state that passes every rule; each test bends exactly one thing. */
 function baseline(): RunState {
   return {
-    contractVersion: CONTRACT_VERSION,
+    contractVersion: 3,
     runId: 'run-2026-08-19-01',
     slug: 'landing-page',
     startedAt: '2026-08-19T09:00:00Z',

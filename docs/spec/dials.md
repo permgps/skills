@@ -191,6 +191,12 @@ beneath the бриф; it never buys a direction away from it.
 `polish` asks the user nothing and approves nothing with them. It changes no
 mode cell.
 
+Required appearance and interaction parity is part of acceptance whenever the
+user asked to preserve it. It runs in every mode and depth even when `polish`
+is off. The finish dial adds only discretionary refinement; it cannot waive a
+required fidelity check or turn missing evidence into a pass. See
+[`verification.md`](verification.md).
+
 ## Where An Unset Mode Or Register Comes From
 
 `semi` and `normal` are the built-in defaults, and a project may pin its own of

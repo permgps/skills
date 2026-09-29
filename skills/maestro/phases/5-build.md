@@ -89,6 +89,13 @@ write the state then: at the transition, never on a timer.
 The executor writes project code and returns text. It does not write into
 `.maestro/` — you do, from what it returned.
 
+The same handoff assigns each required check its execution owner and integrated
+prerequisites. A verification-only таск may own no implementation files. Give
+the executor the relevant request excerpt and neutral raw reference location
+inside its task file, never your prior verdict or the unrelated full spec. For
+browser checks, an owned headless local server may run the integrated app;
+record its address and cleanup, without opening a user-visible viewer.
+
 ### 5. Take the result back
 
 For each таск that returns done, in this order:
@@ -98,6 +105,15 @@ For each таск that returns done, in this order:
    back different from `interfaces.md` is such a fact, and the difference is
    recorded rather than reconciled: `interfaces.md` has one writer and it is not
    this phase.
+1a. **Import execution evidence.** Read each check-level result and its task-owned
+    captures. Verify the check/obligation IDs, invocation, assertions, reference
+    and integrated-build identity, fixture/runtime/variant, relevant input
+    hashes, capture paths and SHA-256. Copy captures into
+    `.maestro/<slug>/evidence/<execution-id>/` under orchestrator ownership,
+    seal them, and add the execution/evidence records to the same state
+    candidate. Publish through `sync.py --publish` only after validation.
+    Preserve an unavailable or failed result as such; missing capture or hash
+    rejects a passing claim. Keep earlier executions immutable after replay.
 2. **Merge its worktree back**, if it had one.
 3. **Commit**, one commit per finished таск. A прогон survives a compaction and
    a crash by what is committed, and the review phase judges each таск against
@@ -112,7 +128,7 @@ For each таск that returns done, in this order:
    place and an unchecked one in another.
 
 **Before launching the next wave, check the panel is still there.** If anything
-in the wave's output mentions a page opened or a server raised, or the `sync.py`
+in the wave's output mentions a user-visible page opened, or the `sync.py`
 call after the state write reported that the address moved, bring the panel back
 the way step 5 of preflight says. This phase is the only one that runs субагенты,
 so it is the only one where the panel is at risk from the прогон's own work; the
@@ -140,6 +156,13 @@ and this list is where that is broken by accident rather than on purpose;
 anything delivered beyond what was asked joins `additions` with the `R##` it
 served. A debt card that reads zero for the whole прогон and fills at приёмка is
 a claim nobody checked.
+
+A relevant shared CSS/JS, reference, fixture, generated asset, or runtime
+change invalidates only executions whose declared fingerprints depend on it.
+Keep those executions as history, mark the current check stale, and schedule
+fresh evidence. Record the exact oracle capture or authorized amendment behind
+every baseline, threshold, or ignore mask. A mask tuned to make the current
+output pass is a finding, not an oracle change.
 
 A таск that comes back wrong and cannot be rescued by its retries is `failed`.
 Leaving it `queued` or `running` reports work that is not happening; the one

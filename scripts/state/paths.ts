@@ -41,6 +41,12 @@ export function toIndex(value: number): string {
   return String(value).padStart(2, '0');
 }
 
+/** An evidence folder identity is stable and cannot contain path separators. */
+export function toEvidenceId(value: string): string {
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) throw new PathEscapeError(value);
+  return value;
+}
+
 /** `YYYY-MM-DD` from a Date the caller supplies. */
 export function toDate(when: Date): string {
   if (Number.isNaN(when.getTime())) throw new RangeError('date is invalid');
@@ -101,6 +107,14 @@ export function forRun(slug: string) {
     reviewsDir: (): string => inside('reviews'),
     review: (index: number, name: string): string =>
       inside('reviews', `${toIndex(index)}-${toSlug(name)}.md`),
+    evidenceDir: (executionId: string): string =>
+      inside('evidence', toEvidenceId(executionId)),
+    evidence: (executionId: string, filename: string): string => {
+      if (!/^[A-Za-z0-9._-]+$/.test(filename) || filename === '.' || filename === '..') {
+        throw new PathEscapeError(filename);
+      }
+      return inside('evidence', toEvidenceId(executionId), filename);
+    },
     report: (): string => inside('report.md'),
   };
 }

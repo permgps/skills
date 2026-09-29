@@ -86,12 +86,37 @@ documents compared is one comparison. A status column here would give that
 comparison two answers to choose from, and nothing in the прогон could tell
 which one the user meant.
 
+**Preservation work has an authority register.** A request to clone, port,
+replace, or preserve an existing artifact names a reference even without the
+word “reference.” Manifest and briefing record it in `verification.references`;
+the specification inventories observable obligations before G2. At phase entry,
+open [`references/parity-migrations.md`](references/parity-migrations.md) for
+discovery and [`references/verification-contract.md`](references/verification-contract.md)
+when writing verification records. Keep unresolved authority visible; it cannot
+become an implicit passing check. For non-UI work, use proportional non-UI
+obligations and checks.
+
 ## Recovery
 
 After a compaction, re-read **the state, not the rules**: the run state,
 `manifest.md`, `interfaces.md`, and the file of the phase you are actually in.
 Re-opening earlier phase files to recover the thread spends context on rules
 already executed, and the thread was never in them.
+
+For contract-4 recovery, reconstruct the current target revision, obligations,
+check fingerprints and effective executions, open findings, bounded decisions,
+coverage reviews, and promised work from `verification`. Keep superseded
+executions as history and replay stale checks before claiming conformance. The
+dashboard and report derive their verdicts from this same record.
+
+If `contractVersion` is below 4, inspect it with
+`python3 .maestro/sync.py --project .maestro/state.js`. Its historical G4 and
+finished timestamp remain readable, but verification is not established.
+Resuming is an explicit candidate transition: retain the old record, create
+contract-4 verification entries for the still-applicable requirements with
+incomplete results and open findings, and publish through `--publish` with
+`--expect`. Never infer passing checks from historical task or gate statuses;
+fresh executions and acceptance are required before `completed`.
 
 **A прогон that stopped without finishing is recovered the same way, and never
 restarted.** If the user says anything at all to a run that is not at one of its
@@ -133,9 +158,11 @@ Say it in the прогон's own language and ask:
 The sentence is the point. Both прогоны that hit this had nothing to say, so
 neither said anything, and the user found out from the file.
 
-`scripts/state/write.ts` refuses a write whose expected `updatedAt` has moved —
-but a прогон writes `state.js` itself and does not go through that module, so
-for you the re-read is a **step you perform**, not a property you may assume.
+`scripts/state/write.ts` guards repository writes. A real прогон uses the
+bundled `sync.py --publish` path below: supply the complete candidate and the
+last `updatedAt` plus your holder token. The helper rechecks them immediately
+before publication. This is an optimistic guard, not a lock; the re-read is
+still a step you perform.
 
 This is here rather than in each phase file for the reason the rule below is:
 every phase writes the state, and a rule copied into nine files is nine rules
@@ -170,41 +197,44 @@ that drift apart.
 
 ## The Dashboard
 
-Raised in preflight and never opened a second time. What it needs from you for
-the rest of the прогон is one line, run **after every write to `state.js`** —
-stage transitions, task transitions, gate results alike:
+Raised in preflight and never opened a second time. For every state transition,
+write the complete JSON candidate to a temporary file, then publish it through
+the bundled validator. On the first write omit `--expect`; afterwards pass the
+`updatedAt` you last read. Pass the current holder token when one is claimed:
 
 ```bash
-python3 .maestro/sync.py
+python3 .maestro/sync.py --publish .maestro/.candidate.json --expect '<last-updatedAt>' --holder '<token>'
 ```
 
-It mirrors the state into the page so the прогон is visible even where the page
-cannot load a file beside it, checks that `state.js` is readable by the tool
-that measures a finished run, and brings back a server that died since the last
-update. The screen follows on its own within seconds, wherever it is open.
+The helper validates the candidate and its evidence, then atomically replaces
+`state.js`; remove the temporary candidate after the call. A rejection publishes
+a validation diagnostic and leaves the last coherent state intact. Read the
+machine-readable JSON result: `published` has the dashboard `url`; `rejected`
+has concrete violations and a diagnostic `url`. Never announce success after a
+rejection. The helper mirrors a valid state into the page and recovers an owned
+server that died since the last update.
 
 **The tool is what opens the page, and what remembers that it did** — the first
 call in a directory puts it in front of the user, later calls open nothing, and
 an address that moved is opened again because the tab the user holds is dead.
-None of that is yours to track. What is yours is to relay what it printed. If
+None of that is yours to track. What is yours is to relay its `url`. If
 the user says the panel is gone, `python3 .maestro/sync.py --reopen` is the
 whole of the answer; if your harness shows the page in a pane of its own, pass
 `--no-open` in preflight so the user does not get two.
 
 **This is here rather than in the phase files because every phase writes state.**
 A rule copied into nine files is nine rules that drift apart, and this one is
-performed dozens of times in a run. Skipping it degrades rather than breaks: a
-page served over http still updates from `state.js`; what goes stale is what
-someone sees when they open the page with no server behind it.
+performed dozens of times in a run. Skipping publication leaves the old
+verified snapshot on screen and is not a completed transition.
 
 <!-- maestro:view:owner -->
 **The прогон puts exactly one page in front of the user, and it is this one.** No
 other — a checks page, a built page, a coverage report, a log — is opened in
 their viewer by you or by anything you launch. A question that can only be
-answered by *looking* at a rendered page is either answered without a viewer or
-written down unanswered and carried forward; the single route for something that
-truly has to be seen is in [`phases/0-preflight.md`](phases/0-preflight.md),
-beside the rest of what is known about panes. And when `sync.py` reports that
+answered by *looking* at a rendered page uses an available owned headless browser
+and a controlled local server, with actual input and recorded evidence. If that
+capability is absent, the affected check stays unavailable and the requirement
+incomplete. Never take over the dashboard pane or an unowned server. When `sync.py` reports that
 the panel's address moved, say the new address in the chat once — the link the
 user is holding is dead, and that tool is the only thing that knows it.
 
@@ -411,10 +441,20 @@ compose, so the discipline is the whole of the guarantee.
 Four gates. Each runs after a phase, in every mode, at every depth. **A gate that
 fails is not a warning: the phase is redone.**
 
+An independent reader, reviewer, or executor is a separate agent dispatch with
+its own bounded inputs and a returned result. A summary you write yourself is
+not that dispatch, even if it names the reader and its supposed findings. When
+the host cannot provide the required separate context, keep the affected gate
+pending and report the missing capability; do not record a pass.
+For blind readers, start a fresh context containing only the allowed handoff;
+do not fork the orchestrator's reasoning or earlier file reads into that
+reader. Confirm that the separate agent actually returned before recording its
+finding or pass.
+
 | Gate | After phase | Pass condition |
 |---|---|---|
 | G1 | briefing | Every требование has a status, and none is left open without a recorded reason |
-| G2 | spec | Every live требование is in-spec, deferred, or dropped with zero left open, **and** an independent reader given only `brief.md` and `spec.md` finds nothing missing |
+| G2 | spec | Every live требование is in-spec, deferred, or dropped with zero left open, **and** the independent intent reader and separate raw-reference reader return no unresolved mandatory gap |
 | G3 | plan | Every in-spec требование maps to at least one таск, **and** every таск traces back to at least one требование |
 | G4 | acceptance | The build is checked against `manifest.md` and the dated additions in `brief.md`, with `spec.md` and the бриф's original text withheld, and every disagreement is reported |
 

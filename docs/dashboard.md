@@ -5,10 +5,12 @@ opened for the user at that moment. It reads `state.js` on its own, on a short
 interval, because the orchestrator is often busy for minutes at a time and a
 view that waits to be told to refresh shows a run that looks frozen.
 
-Its only input is the run state — carried twice: as a snapshot written into the
-page, and as `state.js` beside it. The snapshot is what lets the page show a
+Its run-data input is the state — carried twice: as a snapshot written into the
+page, and as `state.js` beside it. The helper also publishes a validation
+diagnostic for a rejected candidate; this cannot turn a rejected state into a
+success. The snapshot is what lets the page show a
 прогон when it is opened with no address at all, which is what an in-app pane
-does to it; the file is what makes the clocks move. Whichever loaded last wins,
+does to it; the file is what makes the clocks move. Whichever valid snapshot loaded last wins,
 and a load that fails never replaces a state that worked. It never opens
 `manifest.md`, a task file, or any path in the repository — a view that reaches into artifacts becomes a second
 source of truth about a run, and the second one is silently wrong.
@@ -85,6 +87,15 @@ and each stage shows its own duration rather than the run's. A frozen clock with
 no explanation is the one failure mode the header notice exists to prevent: an
 interrupted run says it was interrupted and when.
 
+Version 4 separates task activity from verified conformance. Requirement rows
+show passed, failed, or incomplete results derived from current check executions,
+coverage reviews, and findings. G4 passes only with current applicable evidence.
+A closed run names its outcome as `completed`, `closed_with_exceptions`, or
+`stopped_incomplete`; an accepted exception keeps the failed check visible. A
+legacy snapshot remains readable with verification marked unestablished. An
+invalid candidate displays the helper's diagnostic and cannot replace the last
+coherent state.
+
 Under `G3` in the checks block is the line a passed check shows when it left
 findings behind: how many there were, and that they were acted on. It opens the
 list on a press and it is not painted in the colour of failure — a check is
@@ -108,7 +119,9 @@ than the misreading it prevented, and one press settles the question anyway.
 ## It is the only page the прогон opens
 
 Nothing else lands on your screen while a run is going: not a checks page, not a
-coverage report, not a log. That is deliberate, and it was learned the hard way —
+coverage report, not a log. Owned temporary servers and headless browsers may
+execute bounded checks without taking over the user-visible viewer. This
+viewer boundary was learned the hard way —
 twice a субагент opened its own page in the pane the dashboard was in, and the
 dashboard was gone from the tab strip afterwards while the run carried on
 writing state nobody could see. The page it opened was misleading as well as

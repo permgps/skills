@@ -44,6 +44,12 @@ noise:
 is not a failed run, and a memory file padded to look thorough is worse than an
 empty one: the next session reads it, finds nothing in it, and stops reading it.
 
+After acceptance, inspect the canonical verification projection before writing
+any delivery lesson. Record the actual lifecycle outcome and only lessons
+supported by current evidence; accepted exceptions remain known failures and
+stale/superseded executions remain historical. Do not turn a finished task or
+an old green G4 into a memory claim that the product was verified.
+
 ### 2. Write the block
 
 `AGENTS.md` in the project root, between `<!-- maestro:begin -->` and

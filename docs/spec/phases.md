@@ -10,15 +10,15 @@ right thing was built.
 |---|---|---|---|---|
 | preflight | Preflight | yes | user arguments, repository state | resolved dials, run state created, dashboard raised |
 | manifest | Manifest | yes | бриф from the user | `brief.md` — written once, then grown by its additions block — and `manifest.md` |
-| briefing | Briefing | yes | `manifest.md` | `answers.md`, `reference.md` |
-| spec | Specification | yes | `manifest.md`, `answers.md` | `spec.md` |
-| plan | Plan | yes | `spec.md` | `tasks/`, `interfaces.md` |
-| build | Build | yes | `tasks/`, `interfaces.md` | project code, `discovered-interfaces.md`, a handoff where one was needed |
-| review | Review | yes | `tasks/`, `interfaces.md`, project code | `reviews/` |
-| acceptance | Acceptance | yes | the phase: `manifest.md`, `brief.md`, `reviews/`, project code — the reader it consults: `manifest.md` plus the бриф's dated additions | `report.md` |
-| polish | Доводка | no | `reference.md`, project code | polished build, `tasks/` of its own |
+| briefing | Briefing | yes | `manifest.md`, declared references | `answers.md`, neutral `reference.md` |
+| spec | Specification | yes | `manifest.md`, `answers.md`, raw reference | `spec.md`, obligation and source coverage map |
+| plan | Plan | yes | `spec.md`, obligations and checks | `tasks/`, `interfaces.md`, ownership map |
+| build | Build | yes | task files, relevant raw reference, `interfaces.md` | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
+| review | Review | yes | task files, obligations, evidence, `interfaces.md`, project code | `reviews/`, findings and check limits |
+| acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md` |
+| polish | Доводка | no | `reference.md`, project code after required parity | optional polished build, `tasks/` of its own |
 | memory | Memory | no | `discovered-interfaces.md`, `spec.md`, project code, run state | the memory block in `AGENTS.md`, `decisions.md` |
-| repair | Repair | no | whatever one of its four doors provides | retried таск, `amendments.md` |
+| repair | Repair | no | whatever one of its five doors provides | retried таск, `amendments.md` |
 
 `polish` runs only when the finish dial asked for it, inside the acceptance
 stage and after приёмка. `memory` runs twice — once during `build`, when the
@@ -128,14 +128,14 @@ Three rules decide the cut, and they outrank the table:
    they are sequenced. That ownership is the таск's **zone**, and it is what
    splits a dependency layer into waves that can actually run together. Parallel
    width is bounded by file ownership, not by the number of executors available.
-3. **A таск traces to at least one требование**, and every in-spec требование
-   reaches at least one таск. That is half of G3, and it is what stops the cut
-   from drifting into work nobody asked for.
-4. **A task file is buildable by somebody who has only what its executor will
-   have** — the file itself and `interfaces.md`. That is the other half of G3,
-   read by a subagent given exactly that pair and nothing else, and it is what
-   stops a file that is perfectly traceable from contradicting itself. The
-   findings are acted on by editing the task file before any executor sees it.
+3. **A таск traces to at least one требование and its applicable obligations.**
+   Every active obligation has an implementation owner, and every required
+   check has an execution owner; these may be different tasks. This is G3's
+   two-directional map, including verification-only work.
+4. **A task file is buildable with the executor's actual inputs** — the task,
+   `interfaces.md`, relevant obligation and check excerpts, and needed raw
+   reference evidence. A separate reader receives the same bounded inputs and
+   reports missing execution dependencies before the task runs.
 
 A tiny project produces **one** таск carrying the whole spec, and that is a valid
 plan. Cutting one requirement into three таски to look thorough costs three
@@ -196,16 +196,16 @@ one thing the orchestrator does not do ([`safety.md`](safety.md), `S5`).
 
 ### The User's Viewer Is Not A Субагент's To Use
 
-**A субагент opens nothing in front of the user and raises no server on a port
-it chose.** Isolation above is about what a таск may write; this is about what it
+**A субагент opens nothing in front of the user. An owned temporary server for
+headless verification is allowed and must be cleaned up.** Isolation above is about what a таск may write; this is about what it
 may show. The user's screen is carrying the прогон, and the panel is the whole of
 what the run puts there ([`dashboard.md`](dashboard.md)) — a page arriving beside
 it mid-таск is read as a fault, and has twice cost the panel its place in the
 pane.
 
 A question that can only be answered by looking at a rendered page is answered
-without a viewer — headlessly, by running the assertions, by reading what the
-code produces — or it is written down unanswered and carried to whoever
+through real headless input and rendered-state assertions when the capability is
+available. Otherwise it is written down as unchecked and carried to whoever
 exercises the build next. An item of *done means* is phrased so that this is
 possible; one that cannot be is a finding against the task file, caught by the
 reader standing where the executor will stand, which is the last moment it is
@@ -341,23 +341,20 @@ The last phase asks the question the прогон was started for: does what was
 do what the user asked. It is the only phase that measures against the манифест
 instead of against something the прогон wrote about the манифест.
 
-**The reader is given `manifest.md` and the running build, and nothing else.**
-Not `spec.md`, not the plan, not the task files, not `reviews/` — and not
-`brief.md` either. The first four are withheld by [`gates.md`](gates.md), which
-owns G4 and says why: a reader who has seen the specification confirms the
-specification. `brief.md` is withheld on the same reasoning carried one step
-further. The манифест is the numbered form of the бриф, agreed with the user
-before any other work began; a reader holding both would answer from the looser
-of the two exactly where they disagree — and that disagreement is the thing
-worth knowing.
+**The independent reader is given `manifest.md`, current dated additions,
+neutral reference metadata, raw reference access, and the integrated build.**
+It is not given `spec.md`, plan, task files, reviews, prior dispositions, or
+the бриф's original text. [`gates.md`](gates.md) owns the exact input boundary.
+The initial pass can find behavior absent from the generated inventory. The
+orchestrator subsequently reconciles that discovery with scheduled checks and
+all other findings. See [`verification.md`](verification.md).
 
 ### The Phase And Its Reader Are Not One Actor
 
 The *phase* opens `brief.md`, `manifest.md`, `reviews/` and the run state,
-because the отчёт is composed from all of them. The *reader* it consults about
-the манифест gets the two inputs above and nothing more. The review section
-above drew this distinction already, for `reviews/`; this is the phase it was
-drawn for.
+because the отчёт is composed from all of them. The *reader* receives only
+the declared independent inputs above. The review section above drew this
+distinction already, for `reviews/`; this is the phase it was drawn for.
 
 Withholding binds the reader, not the orchestrator. A phase that could not read
 the run state could not record a finding against a требование, and one that
@@ -383,10 +380,10 @@ and passing it quietly are the same mistake made in opposite directions.
 | Section | Holds |
 |---|---|
 | What was asked | every `R##`, its status, and where it landed |
-| Disagreements | G4's findings, each against its требование |
+| Disagreements | G4's findings and failed/incomplete requirements, each against its требование and check evidence |
 | Assumptions | every placeholder standing in for a fact nobody supplied, and every wording whose translation was uncertain |
 | Observations | the non-blocking findings the reviews carried forward |
-| What is left | deferred and dropped требования, with the reason recorded against each |
+| What is left | deferred and dropped требования, unresolved work, closure outcome, and accepted exceptions without hiding technical failures |
 
 Fixed, because a отчёт whose shape is decided per прогон is a отчёт two прогона
 cannot be compared through. A section with nothing in it says so in one line
@@ -503,11 +500,12 @@ keeping rather than a failed one.
 Off unless the finish dial asked for it. When it is on, it runs inside the
 acceptance stage, after приёмка, for **up to three rounds**.
 
-The question it asks is not the one приёмка asks. Приёмка measures the build
-against the манифест — what the user said they wanted. Доводка measures it
-against `reference.md` — what the user pointed at and said *like this*. A
-reference shows things a бриф cannot say: spacing, tone, how dense a page feels,
-what a good error message sounds like.
+Доводка addresses optional refinement after required acceptance checks. When
+the user required visual or behavior parity with an authoritative reference,
+that fidelity is checked during приёмка for every dial setting. `reference.md`
+also carries contextual examples for optional polish. A reference can show
+spacing, tone, density, or error-message behavior; whether each is mandatory
+depends on the user's original request and recorded role, not on this phase.
 
 ### A Round
 
@@ -545,7 +543,7 @@ is being checked is the build the user will keep.
 
 ### The Doors
 
-Four things arrive here, and they are the only four. Each names the phase that
+Five things arrive here, and they are the only five. Each names the phase that
 opens it, because a door nobody opens is a promise the прогон cannot keep — the
 first end-to-end run wrote «carried to the repair phase» into a `D##` row that
 had no door, and the divergence it described shipped.
@@ -556,6 +554,7 @@ had no door, and the divergence it described shipped.
 | blocking-review | review | `repair` | committed, and the finding names what it contradicts |
 | g4-disagreement | acceptance | `done` | the disagreement and the `R##` it names |
 | recorded-divergence | build | `review` or `done` | the `D##`, and what the таск it depends on actually built |
+| coverage-omission | acceptance | any relevant task state | grounded missing behavior, source provenance, and a stable finding ID |
 
 The first has not been committed. The second has — the build committed it before
 the review looked — which is why the build stops short of calling it done.

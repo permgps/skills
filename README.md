@@ -1,6 +1,6 @@
 # Maestro
 
-Maestro turns a dictated idea into a finished, verified project in one dialogue.
+Maestro turns a dictated idea into a project and records what verification actually established in one dialogue.
 You say what you need; it records your words as numbered requirements, asks only
 about the genuine forks, writes a specification, cuts it into tasks, builds them
 with parallel executors, reviews the result — and then checks the build against
@@ -64,10 +64,10 @@ what to build; everything after it proves the right thing was built.
 | 7 | Acceptance | `report.md` |
 
 Three more phases run outside that sequence: **repair**, which a task reaches by
-coming back not done, by failing its review, or by carrying a requirement the
-final check disagreed about; **polish**, if you asked for it, comparing the build
-against your own reference; and **memory**, which writes down what should outlive
-the run.
+coming back not done, failing review, carrying a final disagreement, or exposing
+an omitted obligation; **polish**, if requested, for optional refinement; and
+**memory**, which writes down what should outlive the run. Required reference
+fidelity is checked in acceptance even when polish is off.
 
 ## Four gates
 
@@ -77,13 +77,14 @@ a warning: the phase is redone.
 | Gate | After | Passes when |
 |---|---|---|
 | G1 | briefing | every requirement has a status, and none is open without a recorded reason |
-| G2 | specification | nothing is left open, **and** an independent reader given only the brief and the spec finds nothing missing |
-| G3 | plan | every in-spec requirement reaches a task, every task traces back to a requirement, **and** a reader given exactly what an executor will be given finds every task file buildable without asking a question |
-| G4 | acceptance | the build is checked against the manifest and against anything you said about the brief after it was frozen, with the specification withheld, and every disagreement is reported |
+| G2 | specification | intent and independent raw-reference readers find no unresolved mandatory gap |
+| G3 | plan | each required obligation has an implementation owner, each check has an execution owner, and the task reader finds the handoff executable |
+| G4 | acceptance | current evidence covers the agreed requirements and reference behavior; findings and missing checks are reconciled |
 
-All three withheld readings are the same idea: hand somebody exactly what the
-next person downstream will have, and ask whether it is enough. G3 asks it of a
-task file, before an executor is stuck with the answer.
+Independent readings withhold earlier conclusions. G2 includes a separate reader
+of raw reference material; G4 can inspect that authority and exercise the
+integrated build with available headless tools. The precise input boundaries
+are in [the gates specification](docs/spec/gates.md).
 
 G2 and G4 are the same question asked at the two ends of the run: does this match
 what you actually said, with our paraphrase of it taken away. G2 asks while the
@@ -95,9 +96,12 @@ falling between two documents.
 
 ## One state file, and who is holding it
 
-A прогон is one JSON file — the стадии and their clocks, the таски and their
-statuses, the gates and their findings. The dashboard reads it; the metrics tool
-reads it when the run is over; nothing else is a source of truth about a run.
+A прогон is one atomic JSON snapshot with activity, verification records, and
+closure outcome. Immutable evidence captures live under the run's `evidence/`
+directory and are referenced by path and hash. The dashboard reads the snapshot
+and a validation diagnostic; reports and metrics derive from the same records.
+Activity reaching 100% does not establish conformance. A closed run can be
+`completed`, `closed_with_exceptions`, or `stopped_incomplete`.
 
 **A прогон says who is driving it.** The session that opens one with no owner
 mints a token into `heldBy` and re-reads the state immediately before every
@@ -153,10 +157,10 @@ opener down for a host that shows the page in a pane of its own — the one case
 that would otherwise produce two. If the panel disappears, `--reopen` is the
 whole of the recovery.
 
-**It is the only page the прогон opens.** No субагент raises a page or a server
-on a port of its own; a question that can only be answered by looking at a
-rendered page is either answered without a viewer or written down unanswered.
-`npm run view` holds that rule against the skill's own files.
+**It is the only user-visible page the прогон opens.** Owned temporary servers
+and headless browsers may run bounded checks without taking over that viewer.
+When the browser is unavailable, affected checks remain incomplete.
+`npm run view` holds the viewer boundary against the skill's own files.
 
 More about it in [`docs/dashboard.md`](docs/dashboard.md).
 
@@ -188,12 +192,13 @@ No mode, depth or finish removes any of them.
 | `skills/scout/` | the second skill: the reconnaissance order, the boundary, one file per step |
 | `docs/spec/` | Maestro's behavior specification — what the phases must do, and the authority when a phase file disagrees |
 | `docs/spec/scout/` | Scout's, kept separate because they are separate skills and no sentence may have two homes |
-| `docs/` | the documentation pages, starting with [installing](docs/install.md) and [the dashboard](docs/dashboard.md) |
+| `docs/` | the documentation pages: [installing](docs/install.md), [dashboard](docs/dashboard.md), and [parity verification](docs/parity-verification.md) |
 | `scripts/` | this repository's own tooling: validators, the state contract, the gate checks, the metrics tool |
 | `CHANGELOG.md` | every tagged release and what it shipped, newest first |
 
-The skill carries no runtime dependencies. The tooling needs Node.js 22.18 or
-newer, because it is TypeScript executed by Node's native type stripping.
+The bundle installs no application dependencies; its state helper needs Python
+3. Repository tooling needs Node.js 22.18 or newer, because it is TypeScript
+executed by Node's native type stripping.
 
 ```bash
 npm run check     # typecheck, eleven validator runs across two skills, and their tests

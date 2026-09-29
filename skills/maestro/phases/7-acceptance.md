@@ -32,10 +32,15 @@ a требование nobody looked at.
 
 One reader, briefed by
 [`../prompts/acceptance-reader.md`](../prompts/acceptance-reader.md), given
-`manifest.md`, **the additions block of `brief.md`**, and the running build.
+`manifest.md`, **the complete current additions block of `brief.md`**, neutral
+raw reference locations/capture identity, and the integrated running build.
+Compute and record a digest of this exact dispatched input set and target
+revision before handing it off. If additions or another relevant input change,
+invalidate the affected pass and dispatch fresh readers/checks.
 
-**Nothing else travels with them** — not `spec.md`, not the plan, not the task
-files, not `reviews/`, and not the бриф's original text. The original text is
+**Nothing else travels with them** — not `spec.md`, the plan, task rationale,
+task files, `reviews/`, previous verdicts/approvals, derived coverage, or the
+бриф's original text. The original text is
 withheld because it already became the манифест and was shown back to the user at
 G1 as the agreed contract; the additions are handed over because they never
 passed that gate and are the only record of what the user changed afterwards.
@@ -53,6 +58,26 @@ step, and telling it beforehand would hand it the conclusion. The additions are
 the exception, and only because they are the user's own record of that decision —
 a withdrawal the user announced is not a conclusion you are leaking, it is
 evidence they are owed.
+
+The reader's initial exploration is independent of the generated inventory.
+After it reports observations and limitations, reconcile against the current
+obligation/check graph. Add omitted behavior as a stable-ID finding and use the
+coverage-repair door; do not narrow the oracle to existing rows.
+<!-- maestro:opens:coverage-omission -->
+
+### 2b. Execute the scheduled verification contract
+
+Separately replay every required check whose current fingerprint lacks an
+applicable execution. Use the integrated build, applicable variants, real
+browser input for UI interactions, and explicit non-UI checks elsewhere.
+<!-- maestro:degrades:browser-verification -->
+Validate invocation, assertions, reference/build/data/runtime identity and
+hashed captures before importing results. A missing production value affects
+its own obligation; independent obligations may still pass. Shared CSS/JS or
+assets invalidate every check that declares them relevant. A digest or module
+signature cannot pass a hover, visibility, or resource obligation. Preserve
+customer review as a separate obligation when requested; automation cannot
+impersonate the customer.
 
 ### 3. Sort what came back
 
@@ -79,6 +104,14 @@ because it did not fit the table.
 **Do not reclassify a disagreement into an observation** because the build is
 otherwise finished. `in-spec` means the прогон undertook to build it.
 
+Union substantiated findings from coordinator, executor, reviewer, independent
+reader, user, and validator by stable failure ID. Origin records provenance,
+not priority. Derive each applicable requirement as `passed`, `failed`, or
+`incomplete` from current obligations, checks, coverage review, and open
+findings. Preserve both failed and incomplete rows. An independent reader that
+omits a requirement supplies no pass for it; a later coordinator finding can
+invalidate an earlier reader pass.
+
 ### 4. Write the отчёт
 
 `.maestro/<slug>/report.md`, written **by you**, in five sections and in that
@@ -92,6 +125,14 @@ sections under its own date rather than replacing what is there:
 | Assumptions | `debt` as the прогон recorded it — every placeholder standing in for a fact nobody supplied, every decision taken on the user's behalf, every unfilled variable by name — plus any wording whose translation was uncertain |
 | Observations | the non-blocking findings carried out of `reviews/` |
 | What is left | deferred and dropped требования, each with the reason recorded against it |
+
+Build the acceptance table and closure summary from the same derived
+verification projection used for G4: each applicable `R##` has a planning
+status, `passed`/`failed`/`incomplete` result, obligation IDs, and open finding
+IDs. Include current failures and incomplete checks together, accepted
+exception scope, stale evidence, and outstanding promised work. Analysis may
+explain a row but never replace its structured result or declare an unsupported
+`completed` outcome.
 
 A section with nothing in it says so in one line. An absent section reads as a
 section nobody wrote.
@@ -109,14 +150,20 @@ writes.
 
 ### 5. Close the round
 
-Write the state once, at this boundary: G4 `passed` with no findings, or `failed`
-with them.
+Publish an acceptance-round record with input digest, current reference IDs,
+execution IDs, coverage-review IDs, finding IDs, per-requirement results, and
+derived G4. G4 is `failed` when a current failure exists; otherwise `pending`
+for missing, unavailable, stale, or promised evidence; `passed` only with full
+current coverage. The phase's activity status does not decide this result.
 
-`finishedAt` and the acceptance stage's `done` are written **only when nothing
-else is due** — G4 passed, and either the finish dial is off or доводка has
-already run. A round that sends disagreements to repair leaves both unset: a
-прогон marked finished while work is still routed out of it is a dashboard
-telling the user something that is not true.
+Mark the acceptance stage `done` when its work for this round has run, even if
+G4 failed. Close the lifecycle only when no promised work remains. `completed`
+requires current passing G4. A user may authorize the exact presented residual
+finding/obligation set and choose `closed_with_exceptions`; keep failed checks
+and G4 visible. An explicit stop, unavailable prerequisite, or exhausted
+repair budget uses `stopped_incomplete` with a reason. Stamp `finishedAt` only
+at that closure transition. Record any promised further round before offering
+closure; a promise left open blocks every outcome.
 
 Then say, in the прогон's language, what the отчёт contains — what was asked
 and what was delivered, what disagreed, what was assumed. Labels are resolved
@@ -135,14 +182,21 @@ re-reviewed, this phase runs again and appends a second round to the отчёт.
 disagreement that survives two repairs stops the прогон and is reported as one
 nobody could close.
 
+If the user changes the target, append a `scope_amendment` decision with old
+and new target revisions and exact authorization, then verify the new target.
+If the user accepts residual nonconformance, append an `accepted_exception`
+decision with the exact displayed and selected finding/obligation IDs and
+authorization. “All” means all in that captured presentation only; later
+findings remain unaccepted. Neither decision rewrites a failed check as passed.
+
 **The reader asks for `spec.md` or the бриф.** Refuse, and record that it asked.
 Handing either over ends the gate — not the reading, the gate — because the
 answer that comes back afterwards is no longer blind and nothing in the прогон
 can tell that it was not.
 
 **Everything came back unchecked.** That is not a passed gate with an asterisk.
-The build was not exercised at all, and the отчёт says so plainly, in the
-Disagreements section rather than tucked into a list at the end.
+The affected results are incomplete and G4 remains pending unless another
+current failure exists. Name the limitations in the report.
 
 **A таск is not `done`.** Приёмка arrived early: the review phase either has not
 run or found something blocking, and the build in front of the reader is not the
@@ -163,7 +217,8 @@ asked.
 
 ## Gates
 
-**G4**, and it is the last one.
+**G4**, and it is the last one. Mandatory appearance and behavior fidelity
+remain in G4 for every mode, depth, and `polish` setting.
 
 It passes when the build has been checked against `manifest.md` with `spec.md`
 withheld, and every disagreement has been reported. It is the twin of G2 asked at

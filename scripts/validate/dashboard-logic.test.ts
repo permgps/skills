@@ -10,6 +10,8 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { evaluateLogic, scriptBlock } from './dashboard-integrity.ts';
+import { verifiedState } from '../state/fixtures/verification.ts';
+import { deriveVerification } from '../state/verification.ts';
 
 const ASSET = 'skills/maestro/assets/dashboard.html';
 
@@ -34,6 +36,10 @@ interface Logic {
   countRequirements: (list: unknown) => Record<string, number>;
   contractNotice: (version: unknown, language?: string) => string | null;
   runNotice: (state: unknown, language?: string) => string | null;
+  verificationOf: (state: unknown) => {
+    legacy: boolean; g4: string; outcome?: string; requirementResults: Record<string, string>;
+    failedIds: string[]; incompleteIds: string[]; verificationEstablished: boolean;
+  };
   formatGap: (ms: unknown, language?: string) => string;
   longestSilence: (marks: number[]) => number | null;
   lastWrite: (state: unknown, marks: number[]) => number | null;
@@ -112,6 +118,40 @@ const run = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
   requirements: [],
   gates: [],
   ...extra,
+});
+
+test('V14/V15/V23: dashboard projection matches the state contract across closure states', () => {
+  const passing = verifiedState();
+  const failed = structuredClone(passing);
+  failed.verification!.executions[0]!.result = 'failed';
+  failed.gates[3]!.status = 'failed';
+  failed.outcome = 'closed_with_exceptions';
+  const stale = structuredClone(passing);
+  stale.lifecycle = 'active';
+  delete stale.outcome;
+  delete stale.finishedAt;
+  stale.gates[3]!.status = 'pending';
+  stale.verification!.checks[0]!.currentFingerprint.build = 'changed-build';
+  const promised = structuredClone(passing);
+  promised.lifecycle = 'active';
+  delete promised.outcome;
+  delete promised.finishedAt;
+  promised.gates[3]!.status = 'pending';
+  promised.verification!.promisedWork.push({ id: 'P-1', description: 'Repeat acceptance', status: 'open' });
+  for (const state of [passing, failed, stale, promised]) {
+    const browser = L.verificationOf(state);
+    const contract = deriveVerification(state);
+    assert.equal(browser.g4, contract.g4);
+    assert.deepEqual(JSON.parse(JSON.stringify(browser.requirementResults)), contract.requirementResults);
+    assert.equal(browser.verificationEstablished,
+      state.lifecycle === 'closed' && state.outcome === 'completed' && contract.g4 === 'passed');
+  }
+  assert.match(String(L.runNotice(failed, 'en')), /Closed with accepted exceptions/);
+  assert.match(String(L.runNotice(promised, 'ru')), /G4 pending/);
+  const old = run({ contractVersion: 3, finishedAt: STARTED,
+    gates: [{ id: 'G4', status: 'failed', findings: ['R01 failed'] }] });
+  assert.equal(L.verificationOf(old).verificationEstablished, false);
+  assert.match(String(L.runNotice(old, 'en')), /verification not established.*G4: failed/);
 });
 
 test('a duration reads as a clock at zero, in minutes and across an hour', () => {

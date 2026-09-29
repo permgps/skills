@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Reference menu fixture</title>
+<style>
+  body { font: 16px sans-serif; margin: 0; }
+  nav { position: relative; width: 640px; height: 340px; padding: 20px; }
+  #trigger { width: 150px; height: 40px; }
+  #panel { display: none; position: absolute; top: 75px; left: 20px;
+    width: 590px; height: 220px; background: white; border: 1px solid #333; }
+  #panel.open { display: flex; }
+  #panel .column { width: 190px; padding: 12px; }
+  #panel img { width: 100px; height: 80px; }
+  body.changed-shared-asset #panel, body.hidden-panel #panel { display: none !important; }
+</style>
+<nav id="nav">
+  <button id="trigger">Products</button>
+  <section id="panel" aria-label="Products menu">
+    <div class="column" id="primary">Accounts</div>
+    <div class="column" id="secondary">Cards</div>
+    <div class="column" id="promotion">Featured offer</div>
+    <img id="hero" alt="Featured" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='80'%3E%3Crect width='100' height='80' fill='blue'/%3E%3C/svg%3E">
+  </section>
+</nav>
+<script>
+  const variant = new URL(location.href).searchParams.get('variant') || 'correct';
+  const nav = document.getElementById('nav');
+  const trigger = document.getElementById('trigger');
+  const panel = document.getElementById('panel');
+  const open = () => panel.classList.add('open');
+  const close = () => panel.classList.remove('open');
+  if (variant === 'missing-column') document.getElementById('secondary').remove();
+  if (variant === 'missing-promotion') document.getElementById('promotion').remove();
+  if (variant === 'missing-image') document.getElementById('hero').remove();
+  if (variant === 'resource-failure') document.getElementById('hero').src = '/missing-image.png';
+  if (variant === 'changed-shared-asset') document.body.classList.add('changed-shared-asset');
+  if (variant === 'hidden-panel') document.body.classList.add('hidden-panel');
+  if (variant === 'unmounted') {
+    const clone = trigger.cloneNode(true);
+    trigger.addEventListener('pointerenter', open);
+    trigger.replaceWith(clone);
+  } else if (variant === 'synthetic-only') {
+    trigger.addEventListener('synthetic-open', open);
+  } else if (variant !== 'missing-binding') {
+    trigger.addEventListener('pointerenter', open);
+  }
+  if (variant === 'premature-close') trigger.addEventListener('pointerleave', close);
+  else nav.addEventListener('pointerleave', close);
+  window.fixtureSignature = 'menu-handler-v1';
+</script>
+</html>

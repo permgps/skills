@@ -1,8 +1,10 @@
 # Run-State Contract
 
-One file, one writer, one reader. The orchestrator writes `state.js`; the
-dashboard reads it. Nothing else touches it, and nothing else is the dashboard's
-input.
+One authoritative state snapshot, owned by the orchestrator. The bundled
+helper validates and publishes `state.js` atomically; the dashboard reads the
+snapshot and its validation envelope. Verification records are embedded in the
+snapshot, while immutable captures live under the run's `evidence/` directory.
+See [`verification.md`](verification.md) for the entity graph and result rules.
 
 ## Fields
 
@@ -25,10 +27,14 @@ input.
 | `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason? }` | manifest | dashboard |
 | `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
+| `lifecycle` | `active` \| `closed` in contract 4 | preflight | dashboard |
+| `outcome` | `completed` \| `closed_with_exceptions` \| `stopped_incomplete`, only when closed | acceptance | dashboard |
+| `stopReason` | string, required for `stopped_incomplete` | acceptance | dashboard |
+| `verification` | versioned verification index, required in contract 4 | preflight | dashboard |
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
 | `tests` | `{ passed, failed }` | build | dashboard |
-| `finishedAt` | ISO 8601 string | acceptance | dashboard |
+| `finishedAt` | ISO 8601 closure timestamp, only when closed in contract 4 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
 
 **`language` is the second such dial, and it is here for the same reason.** The
@@ -165,6 +171,10 @@ cannot.
 | `tasks[].status` | `queued`, `running`, `review`, `repair`, `done`, `failed` |
 | `requirements[].status` | `open`, `in-spec`, `deferred`, `dropped`, `placeholder` |
 | `gates[].status` | `pending`, `passed`, `failed` |
+| `lifecycle` | `active`, `closed` |
+| `outcome` | `completed`, `closed_with_exceptions`, `stopped_incomplete` |
+| `verification.executions[].result` | `not_run`, `passed`, `failed`, `unavailable`, `stale` |
+| `verification.obligations[].result` | `passed`, `failed`, `incomplete` |
 
 **`pending` is a стадия's word and a гейт's, and never a таск's.** The three
 sets sit one under another above and the middle one is the odd column out, which
@@ -220,16 +230,12 @@ from one that was met.
   read is reported as its own finding rather than as a missing stamp, because
   the repair differs: one field has to be written, the other corrected.
 
-  **The enforcement reaches the state where this repository's own tooling reads
-  and writes it** — `scripts/state/read.ts`, and `scripts/state/write.ts`, which
-  refuses to write a state that fails. A прогон writes `state.js` itself and
-  runs `.maestro/sync.py` after every write; that tool checks that the file
-  parses as JSON, that every status is one the contract defines, and that the
-  three spoken fields below are in the прогон's language — and the chain is not
-  among them. So a broken chain is caught when the прогон is measured, not at
-  the moment it is written. A specification that
-  names an enforcer is read as a claim about coverage, which is why the edge of
-  the coverage is written beside it.
+  **The enforcement reaches each publication boundary.** Repository readers
+  and writers use `scripts/state/validate.ts`; a real run supplies the complete
+  candidate to the bundled `.maestro/sync.py`, which validates before atomic
+  publication. It checks the same version-4 graph, lifecycle, evidence
+  integrity, statuses, timestamps, and spoken-field constraints. A rejected
+  candidate is exposed as a diagnostic, never as an apparent successful run.
 - **`currentStage` may not name a стадия that has not begun.** The dashboard
   believes this field over the стадии themselves — `currentStage()` in
   `dashboard.html` takes the entry carrying this id and searches for the
@@ -252,11 +258,11 @@ from one that was met.
 
   `scripts/state/write.ts` enforces it — `writeState` accepts the `updatedAt`
   the caller last read and refuses when the file on disk carries a different one.
-  A прогон writes `state.js` itself and does not go through that module, so for
-  a real run the re-read is a step the orchestrator performs rather than a
-  property it can assume. That is why [`../../skills/maestro/SKILL.md`](../../skills/maestro/SKILL.md)
-  states it as a step, and why the edge of the enforcement is written here beside
-  the enforcer, as it is for the стадия chain above.
+  A real прогон asks `.maestro/sync.py` to publish the complete candidate with
+  the expected revision and holder. This optimistic check detects a stale
+  candidate; it is not a lock or a full compare-and-swap. That is why
+  [`../../skills/maestro/SKILL.md`](../../skills/maestro/SKILL.md) still states
+  the orchestrator's re-read step.
 - Every write is a whole-file write of a valid state. A partially written state
   is a broken dashboard, so the file is written to a temporary name and moved
   into place.
@@ -315,6 +321,15 @@ illustration of the state elsewhere shows the shape, not the whole field list.
 - The contract is changed in `scripts/state/` before it is changed on either
   side. That is what makes the single integration point real rather than
   aspirational.
+
+**Version 4** changes the meaning of completion, so it requires `lifecycle`,
+`verification`, and (for closed states) `outcome` and `finishedAt`. The
+verification index has its own `version: 1`. Active states have neither terminal
+outcome nor closure timestamp. `completed` is possible only with current passing
+coverage, G4 passed, and no outstanding promises. Earlier versions remain
+readable as historical, unverified records; their `finishedAt` does not assert
+verified completion. A resume creates a new candidate and requires fresh
+evidence. See [`verification.md`](verification.md) for all closure cases.
 
 **Version 2** raised the number because three value sets changed at once, not
 because of the fields that arrived with them:

@@ -30,18 +30,19 @@ conditional on the other skill existing.
 | 5 | `gates.md` | G1–G4: when each runs, what passes it, what a failure does |
 | 6 | `artifacts.md` | Every file a run writes, its single writer, its lifecycle |
 | 7 | `state-contract.md` | The run-state schema, who writes it, how it is versioned |
-| 8 | `dashboard.md` | What the dashboard renders, and what it may never read |
-| 9 | `hosts.md` | What a прогон needs from an agent host, and what a missing capability costs |
+| 8 | `verification.md` | Evidence, coverage, aggregation, decisions, and closure |
+| 9 | `dashboard.md` | What the dashboard renders, and what it may never read |
+| 10 | `hosts.md` | What a прогон needs from an agent host, and what a missing capability costs |
 
 Read them in that order once. After that each document stands alone, which is
-the point: a phase file being written needs one of them, not all nine.
+the point: a phase file being written needs one of them, not all ten.
 
 ## Identifier Schemes
 
 | Scheme | Shape | Assigned in | Example |
 |---|---|---|---|
 | Requirement | `R` + two digits | manifest phase | `R07` |
-| Task | `T` + two digits | plan phase | `T03` |
+| Task | two digits | plan phase | `03` |
 | Gate | `G` + one digit | fixed by this specification | `G2` |
 | Safety rule | `S` + one digit | fixed by this specification | `S4` |
 | Stage id | lowercase, single word | fixed by `phases.md` | `briefing` |
@@ -150,6 +151,8 @@ node scripts/validate/gate-readers.ts \
   docs/spec skills/maestro                               # what each blind reader is handed
 node scripts/validate/viewer-ownership.ts skills/maestro    # the view boundary
 node --test 'scripts/**/*.test.ts'                     # the checkers themselves
+npm run parity:browser                                 # real pointer regression; requires browser and loopback
+npm run parity:workflow                                # real independent discovery; requires Codex CLI
 
 LOG_LEVEL=DEBUG node scripts/validate/spec-integrity.ts docs/spec
 ```
@@ -193,10 +196,10 @@ against a list nobody had agreed. `gates.md` therefore carries the list a second
 time as a table, and this check holds each brief's own declaration to it name
 for name, naming both places when they disagree.
 
-It reads the `Given` column and not the `Withheld` one, and that boundary is
-deliberate: what a reader must refuse is a list of things that are not there,
-and it stays prose. Stated here because a check believed to cover a column it
-does not read fails differently from one that is known not to.
+It reads both the `Given` and `Withheld` columns against named tables in each
+reader brief. This checks declared input boundaries; an actual dispatch still
+needs workflow evaluation because a prompt file cannot prove what the agent
+received at run time.
 
 `repair-doors` proves that every door into the repair phase declared in
 [`phases.md`](phases.md) is listed by the bundle's own repair phase and marked

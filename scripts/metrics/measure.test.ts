@@ -5,13 +5,14 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { CONTRACT_VERSION, type RunState } from '../state/contract.ts';
+import { verifiedState } from '../state/fixtures/verification.ts';
 import { serializeState } from '../state/write.ts';
 import { STATE_FILE } from '../state/paths.ts';
 import { formatSpan, main, measure, render, span, targetFromArgv, wantsJson, widestWave } from './measure.ts';
 
 function baseline(): RunState {
   return {
-    contractVersion: CONTRACT_VERSION,
+    contractVersion: 3,
     runId: 'run-2026-08-19-01',
     slug: 'landing-page',
     startedAt: '2026-08-19T09:00:00Z',
@@ -74,6 +75,23 @@ test('span is null when either end is missing or unparseable', () => {
   assert.equal(span(undefined, '2026-08-19T09:00:00Z'), null);
   assert.equal(span('yesterday', '2026-08-19T09:00:00Z'), null);
   assert.equal(span('2026-08-19T09:00:00Z', '2026-08-19T09:01:30Z'), 90_000);
+});
+
+test('V14/V23: activity finish and verified conformance remain distinct', () => {
+  const historical = measure({ ...baseline(), contractVersion: 3 });
+  assert.equal(historical.finished, true);
+  assert.equal(historical.verificationEstablished, false);
+  assert.equal(historical.lifecycle, 'historical');
+  assert.equal(historical.conformance.g4, 'failed');
+  const current = measure(verifiedState());
+  assert.equal(current.verificationEstablished, true);
+  assert.equal(current.conformance.passed, 1);
+  const exception = verifiedState();
+  exception.outcome = 'closed_with_exceptions';
+  exception.verification!.executions[0]!.result = 'failed';
+  assert.equal(measure(exception).finished, true);
+  assert.equal(measure(exception).verificationEstablished, false);
+  assert.equal(measure(exception).conformance.g4, 'failed');
 });
 
 test('a duration the state does not carry renders as a dash, never as zero', () => {

@@ -38,6 +38,12 @@ const INDEPENDENT = `# Independent Reader
 | \`brief.md\` | what the user asked for |
 | \`spec.md\` | what is going to be built |
 
+## What You Are Not Given
+
+| Input | What it is |
+|---|---|
+| the манифест | the interpreted requirement list |
+
 ## Your Question
 
 Is there anything in the brief the specification does not account for?
@@ -52,6 +58,12 @@ const ACCEPTANCE = `# Acceptance Reader
 | \`manifest.md\` | the numbered требования |
 | the additions block of \`brief.md\` | the dated entries |
 | the running build | the project as it now is |
+
+## What You Are Not Given
+
+| Input | What it is |
+|---|---|
+| \`spec.md\` | the implementation specification |
 
 ## Your Question
 
@@ -109,6 +121,23 @@ test('a brief that declares an artifact the specification does not list is repor
   assert.deepEqual(checks(violations), ['inputs']);
   assert.match(violations[0]?.message ?? '', /declares "reviews\/"/);
   assert.match(violations[0]?.message ?? '', /does not list among what this reader is given/);
+});
+
+test('a missing withheld input is reported', async () => {
+  const violations = await violationsFor({
+    acceptance: ACCEPTANCE.replace('| `spec.md` | the implementation specification |\n', ''),
+  });
+  assert.deepEqual(checks(violations), ['withheld']);
+  assert.match(violations[0]?.message ?? '', /does not withhold "spec\.md"/);
+});
+
+test('an extra withheld input is reported', async () => {
+  const violations = await violationsFor({
+    independent: INDEPENDENT.replace('| the манифест | the interpreted requirement list |\n',
+      '| the манифест | the interpreted requirement list |\n| `reviews/` | prior verdicts |\n'),
+  });
+  assert.deepEqual(checks(violations), ['withheld']);
+  assert.match(violations[0]?.message ?? '', /withholds "reviews\/"/);
 });
 
 test('the additions reach the reader through the same name on both sides', async () => {

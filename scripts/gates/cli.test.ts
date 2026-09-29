@@ -6,11 +6,11 @@ import path from 'node:path';
 
 import { runGate, targetFromArgv, type GateFinding } from './cli.ts';
 import { writeState } from '../state/write.ts';
-import { CONTRACT_VERSION, type RunState } from '../state/contract.ts';
+import { type RunState } from '../state/contract.ts';
 
 function validState(): RunState {
   return {
-    contractVersion: CONTRACT_VERSION,
+    contractVersion: 3,
     runId: 'run-1',
     slug: 'landing-page',
     startedAt: '2026-08-19T09:00:00Z',

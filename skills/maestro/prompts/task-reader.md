@@ -27,10 +27,10 @@ settle it. Something you would have to decide for the author is a finding.
 
 <!-- maestro:view:no-viewer -->
 **Nothing you do shows.** You hold two documents and a question about them, so
-there is nothing here to run and nothing to open. Neither will the executor
-standing where you stand — and a task file whose *done means* can only be
-settled by looking at something rendered is precisely what this gate is for.
-Write it down as a finding rather than going to look.
+there is nothing here to run or open. The executor may later use an owned
+headless browser to test a rendered interaction. A task file that requires a
+visible viewer takeover, lacks a declared headless prerequisite, or substitutes
+source inspection for required interaction evidence has a finding.
 
 ## What Is A Finding
 
@@ -51,6 +51,10 @@ about the project:
   was before» — is one you cannot answer, because others are working beside you
   and their work lands in the same place. Quote the item and say what about it
   is not yours.
+- **A missing verification boundary.** The task names an obligation without
+  its expected behavior, raw oracle provenance, required check/variant, or
+  execution owner; or it asks for integrated evidence before its dependency
+  can mount the component. Name the missing ID or prerequisite.
 
 Each finding is:
 

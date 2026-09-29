@@ -19,12 +19,24 @@ quietly answered it.
 ### 1. Read the манифест and the answers
 
 Read `.maestro/<slug>/manifest.md` and `.maestro/<slug>/answers.md`.
+For preservation work, also read the neutral `reference.md` register and raw
+declared reference locations. Open
+[`../references/parity-migrations.md`](../references/parity-migrations.md) now.
 
 **Do not read the бриф here.** It was turned into numbered требования in phase 1
 and the манифест was agreed with the user; going back to the original wording
 invites re-deciding what is already settled, and produces a spec that answers to
 two documents. The бриф gets read again at G2, by someone who has not seen this
 one — that is what the gate is for.
+
+Before writing `spec.md`, inspect accessible authority within the bounded
+scope recorded in the reference procedure. Record `verification.surfaces` for
+shared components, distinct templates, and variants, including uninspected
+surfaces and limitations. Add a grounded obligation for each required
+observable state: observed with reference-origin evidence, source-derived with
+its source, or unresolved with the exact uncertainty. Include interaction
+entry, sustained state, content/resources, and exit where applicable. For
+non-UI work, use output obligations and proportionate checks.
 
 ### 2. Apply the depth, and apply it only here
 
@@ -69,6 +81,9 @@ act on without asking you, and a reviewer can check without guessing.
 - Written once. A later change is an **amendment**, and an amendment carries a
   `D##` row naming the demonstrated fact that forced it. A spec edited to match
   what was built is not a spec.
+- Connect each preservation criterion to its reference, surface/variant, and
+  obligation IDs. State the observable behavior and conditions. A source-only
+  clue remains source-derived and is never described as a live observation.
 
 ### 4. Close every требование
 
@@ -97,20 +112,27 @@ If they ever differ anywhere else, one of them is wrong.
 
 ## Gates
 
-**G2 runs after this phase**, and it has two halves that must both pass.
+**G2 runs after this phase**, and its intent and raw-reference checks must pass.
 
 1. **The statuses.** Every live требование is `in-spec`, `deferred` or `dropped`,
    with zero left `open` and a reason recorded for each of the last two.
-2. **The independent reader.** Hand `brief.md` and `spec.md` — and nothing else
-   — to a reader briefed by
+2. **The independent intent reader.** Hand `brief.md` and `spec.md` — and
+   nothing else — to a reader briefed by
    [`prompts/independent-reader.md`](../prompts/independent-reader.md). It
    answers one question: is there anything in the бриф the specification does
    not account for.
+3. **The independent raw-reference reader.** For preservation work, give a
+   separate fresh reader the user request/additions and neutral raw register
+   and locations. Brief it with
+   [`prompts/reference-reader.md`](../prompts/reference-reader.md). It inspects
+   authority independently and records observable states, provenance, and
+   uninspected areas. Only after that first pass, compare its results with the
+   generated inventory and spec. Any new required behavior becomes a grounded
+   obligation and criterion. Unresolved mandatory coverage blocks G2.
 
-**The withholding is the mechanism.** A reader who has seen this phase's
-reasoning, the манифест, or the answers will confirm the specification rather
-than check it. Give it the two files named above and refuse every request for
-more.
+**The withholding is the mechanism.** Neither reader receives this phase's
+reasoning, the манифест, answers, plan, old verdicts, or the generated inventory
+before independent discovery. Keep initial outputs separate, then reconcile.
 
 **This reader sees the additions, and it sees them the moment the file grows.**
 `brief.md` is not frozen at the end of phase 1: everything the user says about

@@ -314,6 +314,24 @@ The two guarantees are not equal. The difference is written down here rather
 than left to be discovered by a user who was promised plain words and was shown
 `G2`.
 
+## Verification and Closure Wording
+
+Use separate language for activity and verified conformance in every register.
+A stage or task may be done while G4 is failed or pending. For contract-4 runs,
+the dashboard says “Verified completed” / “Подтверждено выполнено” only for
+`lifecycle: closed`, `outcome: completed`, and current passing G4. It says
+“Closed with accepted exceptions” / “Закрыто с принятыми исключениями” for
+`closed_with_exceptions`, retaining failed and incomplete counts. It says
+“Stopped without full verification” / “Остановлено без полного подтверждения”
+for `stopped_incomplete`. Active runs name current G4 and failed/incomplete
+counts without a delivery claim. Historical runs say verification was not
+established and still show their original G4, including a failed gate.
+
+The requirements region continues to show planning statuses, then adds derived
+verification results by requirement ID. A 100% activity bar never changes the
+closure wording. A rejected candidate displays its revision and validation
+reason while the previous valid snapshot is hidden from success presentation.
+
 ## Banned Synonyms
 
 | Banned | Use instead |

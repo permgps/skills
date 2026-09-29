@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { checkG4, type GateFinding } from './check-g4.ts';
+import { verifiedState } from '../state/fixtures/verification.ts';
 import {
   CONTRACT_VERSION,
   type GateEntry,
@@ -37,6 +38,21 @@ function stateWith(
 }
 
 const messages = (findings: GateFinding[]): string => findings.map(f => f.message).join('\n');
+
+test('V14: a structured failed check remains failed after exception closure', () => {
+  const state = verifiedState();
+  state.outcome = 'closed_with_exceptions';
+  state.verification!.executions[0]!.result = 'failed';
+  state.gates[3]!.status = 'failed';
+  assert.match(messages(checkG4(state)), /R01 has a current failed verification result/);
+});
+
+test('V15: a promised acceptance round blocks completed closure', () => {
+  const state = verifiedState();
+  state.verification!.promisedWork.push({ id: 'P-1', description: 'Repeat acceptance', status: 'open' });
+  assert.match(messages(checkG4(state)), /completed closure requires current passing G4/);
+  assert.match(messages(checkG4(state)), /open promised work blocks closure/);
+});
 
 test('a прогон accepted with nothing disagreeing passes', () => {
   assert.deepEqual(checkG4(stateWith({ id: 'G4', status: 'passed', findings: [] })), []);

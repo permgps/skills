@@ -133,6 +133,11 @@ test('parseUnionCell reads a union of backticked literals', () => {
   assert.deepEqual(parseUnionCell('`full` | `semi` | `in-spec`'), ['full', 'semi', 'in-spec']);
 });
 
+test('parseUnionCell accepts closure outcomes with underscores', () => {
+  assert.deepEqual(parseUnionCell('`completed` | `closed_with_exceptions`'),
+    ['completed', 'closed_with_exceptions']);
+});
+
 test('parseUnionCell refuses prose and single values', () => {
   assert.equal(parseUnionCell('string'), null);
   assert.equal(parseUnionCell('`full`'), null);

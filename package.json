@@ -1,6 +1,6 @@
 {
   "name": "maestro-skills",
-  "version": "0.0.3-alpha",
+  "version": "0.0.4-alpha",
   "private": true,
   "type": "module",
   "description": "Maestro — an orchestrator skill that turns a dictated idea into a verified project",
@@ -25,7 +25,10 @@
     "readers": "node scripts/validate/gate-readers.ts docs/spec skills/maestro",
     "dials": "node scripts/validate/dials-defaults.ts docs/spec skills/maestro",
     "view": "node scripts/validate/viewer-ownership.ts skills/maestro",
-    "metrics": "node scripts/metrics/measure.ts"
+    "metrics": "node scripts/metrics/measure.ts",
+    "parity:browser": "node scripts/validate/parity-browser.ts",
+    "parity:workflow": "node scripts/validate/parity-workflow.ts --run",
+    "parity:workflow:prepare": "node scripts/validate/parity-workflow.ts --prepare"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

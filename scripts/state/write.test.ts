@@ -7,11 +7,11 @@ import path from 'node:path';
 import { writeState, serializeState, StaleStateError } from './write.ts';
 import { InvalidStateError } from './validate.ts';
 import { STATE_FILE } from './paths.ts';
-import { CONTRACT_VERSION, type RunState } from './contract.ts';
+import type { RunState } from './contract.ts';
 
 function baseline(): RunState {
   return {
-    contractVersion: CONTRACT_VERSION,
+    contractVersion: 3,
     runId: 'run-2026-08-19-01',
     slug: 'landing-page',
     startedAt: '2026-08-19T09:00:00Z',

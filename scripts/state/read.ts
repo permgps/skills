@@ -11,6 +11,7 @@ import path from 'node:path';
 
 import { createLogger } from '../shared/log.ts';
 import type { RunState } from './contract.ts';
+import { validateEvidence } from './evidence.ts';
 import { STATE_FILE } from './paths.ts';
 import { InvalidStateError, validateState } from './validate.ts';
 
@@ -54,6 +55,9 @@ export async function readState(target: string): Promise<RunState> {
   const parsed = parseStateSource(source);
 
   const violations = validateState(parsed);
+  if (violations.length === 0 && (parsed as RunState).contractVersion >= 4) {
+    violations.push(...await validateEvidence(parsed as RunState, path.dirname(path.dirname(file))));
+  }
   if (violations.length > 0) throw new InvalidStateError(violations);
 
   log.debug('read', 'state read', { file, runId: (parsed as RunState).runId });

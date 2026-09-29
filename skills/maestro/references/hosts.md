@@ -9,7 +9,7 @@ file adds for another host is the rest of the list and what each answer costs.
 
 ## What To Establish
 
-Answer these six, by observation rather than by belief about the product:
+Answer these capabilities by observation rather than by belief about the product:
 
 | Question | How you know |
 |---|---|
@@ -19,6 +19,7 @@ Answer these six, by observation rather than by belief about the product:
 | Can you commit? | the same |
 | Can you write outside `.maestro/`? | the project code has to reach disk somehow |
 | Can the user watch the прогон change? | the page renders **and** a stage clock moved after a state write — the two halves you can check yourself. `sync.py` opens it and reports what it did; a host where the opener refuses is a host where the answer is no |
+| Can a task execute browser checks? | an existing browser/tool loads the integrated local app, sends real pointer/keyboard input, inspects visible geometry, and captures evidence without taking over the user's dashboard pane |
 
 If you cannot answer one of them, it is a **no** for this прогон. A capability
 assumed and then missing halfway through a wave is worse than one that was never
@@ -39,6 +40,7 @@ says so in its first word.
 | commits | version control | the прогон runs. Say in the announcement that it cannot commit, and tell the review phase it will be reading the working tree rather than one таск's diff |
 | writing project files | file writes | **stop.** There is nowhere to build |
 | a page that follows the state | — | the прогон runs and the отчёт is unaffected. Say the view is a still picture, name the file, and stop promising a live one |
+| browser execution for a required UI check | browser verification | record the tool limitation; the affected check is unavailable and its obligation remains incomplete. Continue unrelated checks without installing a browser or manufacturing a pass |
 
 Two of those are stops and they are not negotiable. The rest narrow the wave,
 which a tiny project's plan does anyway.
@@ -83,3 +85,7 @@ is that nobody later mistakes a host limitation for a decision the прогон 
   `blockedBy` bound the wave; a missing capability only narrows it further.
 - **Do not mark a host supported here.** That is a claim about a прогон that has
   finished on it, and it belongs in the specification, not in a run.
+- **Do not conflate a headless test browser with a visible viewer.** An owned
+  local test server and headless browser may execute checks without displaying
+  another user-facing pane. Record server startup and cleanup; never take over
+  an unowned server or move the dashboard address to a test application.

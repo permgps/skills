@@ -26,6 +26,7 @@ import {
   type TaskStatus,
 } from '../state/contract.ts';
 import { readState } from '../state/read.ts';
+import { projectState } from '../state/projection.ts';
 
 const log = createLogger('metrics');
 
@@ -75,6 +76,10 @@ export interface Measurement {
   requirementsByStatus: Record<RequirementStatus, number>;
   gates: Array<{ id: GateId; status: string; findings: number }>;
   contractVersion: number;
+  lifecycle: 'active' | 'closed' | 'historical';
+  outcome: string | null;
+  verificationEstablished: boolean;
+  conformance: { g4: string; passed: number; failed: number; incomplete: number };
 }
 
 const countBy = <T extends string>(values: readonly T[], seen: readonly string[]): Record<T, number> => {
@@ -117,6 +122,8 @@ export function widestWave(state: RunState): number {
 }
 
 export function measure(state: RunState): Measurement {
+  const projection = projectState(state);
+  const results = Object.values(projection.summary?.requirementResults ?? {});
   const stages: StageMeasure[] = STAGE_IDS.map(id => {
     const entry = state.stages.find(stage => stage.id === id);
     return {
@@ -146,9 +153,19 @@ export function measure(state: RunState): Measurement {
     ),
     gates: GATE_IDS.map(id => {
       const entry = state.gates.find(gate => gate.id === id);
-      return { id, status: entry?.status ?? 'absent', findings: entry?.findings.length ?? 0 };
+      return { id, status: id === 'G4' ? projection.g4 : entry?.status ?? 'absent',
+        findings: entry?.findings.length ?? 0 };
     }),
     contractVersion: state.contractVersion,
+    lifecycle: projection.lifecycle,
+    outcome: projection.outcome ?? null,
+    verificationEstablished: projection.verificationEstablished,
+    conformance: {
+      g4: projection.g4,
+      passed: results.filter(result => result === 'passed').length,
+      failed: results.filter(result => result === 'failed').length,
+      incomplete: results.filter(result => result === 'incomplete').length,
+    },
   };
 }
 
@@ -187,6 +204,13 @@ export function render(m: Measurement): string {
     const findings = gate.findings === 0 ? '' : `  ${gate.findings} finding(s)`;
     row(`  ${gate.id}`, `${gate.status}${findings}`);
   }
+
+  lines.push('', '  conformance');
+  row('  lifecycle', m.lifecycle);
+  row('  outcome', m.outcome ?? '—');
+  row('  verification', m.verificationEstablished ? 'established' : 'not established');
+  row('  G4', m.conformance.g4);
+  row('  requirements', `${m.conformance.passed} passed, ${m.conformance.failed} failed, ${m.conformance.incomplete} incomplete`);
 
   return `${lines.join('\n')}\n`;
 }

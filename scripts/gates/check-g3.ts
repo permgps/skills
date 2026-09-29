@@ -84,6 +84,77 @@ export function checkG3(state: RunState): GateFinding[] {
     }
   }
 
+  if (state.contractVersion >= 4 && state.verification) {
+    const record = state.verification;
+    const tasks = new Map(state.tasks.map(task => [task.id, task]));
+    const checks = new Map(record.checks.map(check => [check.id, check]));
+    const obligations = record.obligations.filter(item => item.targetRevision === record.targetRevision);
+    const covered = new Set<string>();
+    for (const obligation of obligations) {
+      for (const requirementId of obligation.requirementIds) covered.add(requirementId);
+      const requiredChecks = obligation.checkIds.map(id => checks.get(id)).filter(check => check?.required);
+      if (requiredChecks.length === 0) findings.push({ requirementId: obligation.requirementIds[0] ?? '',
+        message: `obligation ${obligation.id} has no required executable check` });
+      for (const ownerId of obligation.implementationTaskIds) {
+        const owner = tasks.get(ownerId);
+        if (!owner || !obligation.requirementIds.some(id => owner.requirementIds.includes(id))) {
+          findings.push({ requirementId: obligation.requirementIds[0] ?? '',
+            message: `obligation ${obligation.id} has no matching implementation owner ${ownerId}` });
+        }
+      }
+      for (const check of requiredChecks) {
+        if (!check) continue;
+        const executionOwner = check.executionTaskId ? tasks.get(check.executionTaskId) : undefined;
+        if (!executionOwner || !obligation.requirementIds.some(id => executionOwner.requirementIds.includes(id))) {
+          findings.push({ requirementId: obligation.requirementIds[0] ?? '',
+            message: `check ${check.id} has no matching execution owner` });
+        }
+        for (const dependency of obligation.implementationTaskIds) {
+          if (!check.integrationDependencies.includes(dependency)) findings.push({
+            requirementId: obligation.requirementIds[0] ?? '',
+            message: `check ${check.id} omits implementation prerequisite ${dependency}` });
+        }
+        for (const dependency of check.integrationDependencies) {
+          if (!tasks.has(dependency)) findings.push({ requirementId: obligation.requirementIds[0] ?? '',
+            message: `check ${check.id} has missing integration prerequisite ${dependency}` });
+          else if (executionOwner && dependency !== executionOwner.id
+            && !executionOwner.blockedBy.includes(dependency)) findings.push({
+            requirementId: obligation.requirementIds[0] ?? '',
+            message: `execution owner ${executionOwner.id} must depend on prerequisite ${dependency}` });
+        }
+        if (check.method.includes('source') && /browser|pointer|keyboard|hover|visible/i.test(obligation.expectation)) {
+          findings.push({ requirementId: obligation.requirementIds[0] ?? '',
+            message: `source-only check ${check.id} cannot establish UI behavior ${obligation.id}` });
+        }
+      }
+    }
+    for (const [id, requirementStatus] of status) {
+      if (requirementStatus === 'in-spec' && !covered.has(id)) findings.push({ requirementId: id,
+        message: `requirement ${id} has no current observable obligation` });
+    }
+    const visiting = new Set<string>();
+    const visited = new Set<string>();
+    const visit = (id: string): void => {
+      if (visited.has(id)) return;
+      if (visiting.has(id)) {
+        findings.push({ requirementId: id, message: `task dependency cycle includes ${id}` });
+        return;
+      }
+      visiting.add(id);
+      for (const dependency of tasks.get(id)?.blockedBy ?? []) {
+        if (!tasks.has(dependency)) findings.push({ requirementId: id,
+          message: `task ${id} has missing prerequisite ${dependency}` });
+        else visit(dependency);
+      }
+      visiting.delete(id);
+      visited.add(id);
+    };
+    for (const id of tasks.keys()) visit(id);
+    log.info('verification', 'ownership graph checked', {
+      obligations: obligations.length, checks: record.checks.length, tasks: tasks.size,
+    });
+  }
+
   // --- the task-file reader's verdict was recorded, not filed ---------------
   const gate = state.gates.find(entry => entry.id === 'G3');
   if (gate === undefined) {

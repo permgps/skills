@@ -1,55 +1,36 @@
 #!/usr/bin/env python3
-"""Mirror the run state into the dashboard, and keep it reachable.
+"""Validate and atomically publish a coherent Maestro state candidate.
 
-Run it after every write to `state.js`:
+    python3 .maestro/sync.py --validate candidate.json
+    python3 .maestro/sync.py --project .maestro/state.js
+    python3 .maestro/sync.py --publish candidate.json [--expect timestamp]
+        [--holder token] [--no-open]
 
-    python3 .maestro/sync.py
+These modes write one JSON result on stdout. Exit 0 means valid/published, 1
+means a rejected candidate, and 2 means an unreadable input. `--validate` and
+`--project` are read-only. `--publish` checks graph semantics, capture hashes,
+relevant input hashes, holder and expected revision before replacing state.js.
+It cannot execute checks, invent records, or choose a closure outcome. A rejected
+candidate writes a diagnostic envelope, preserving the last valid state and
+keeping the dashboard reachable. The envelope is mirrored into the page so a
+file snapshot also exposes the failure.
 
-It does five things, in this order, and reports what it did:
-
-1.  **Checks that `state.js` parses as JSON.** The page is happy with any valid
-    JavaScript, so a hand-written object literal with bare keys renders exactly
-    as well as a strict one — and then `scripts/metrics/measure.ts`, which goes
-    through `JSON.parse`, cannot read the прогон at all. The dashboard is the
-    forgiving consumer and the metrics tool is the strict one; without this
-    check the difference surfaces after the run, when the file is finished and
-    nothing can be re-measured.
-2.  **Copies the state into the page's snapshot.** The copy is the same text
-    under a different name, so the snapshot cannot say something the file does
-    not — it is equal to the file or older than it, never in disagreement.
-3.  **Puts `index.html` beside the page**, because a viewer can be handed an
-    origin with no path, and a directory listing is what it shows otherwise.
-4.  **Raises a static server** over this directory, bound to the loopback
-    interface, if one is not already answering for it — and prints the address,
-    with a line above it when that address has moved since the last call. A
-    moved address is the one thing here a user cannot recover from on their own:
-    the link they were handed is dead, and nothing else in the прогон says so.
-5.  **Checks the state against the contract** — every status, and the language
-    of the three fields the panel prints word for word. This runs last, after
-    the address, and on purpose: a прогон whose таск carries a word the
-    contract does not define is still worth showing, and a stopped дашборд
-    helps nobody. It is the only place a real прогон can catch either violation
-    at all — `scripts/state/validate.ts` lives in the development repository
-    and is not part of what is copied into `.maestro/`.
-
-Failing to raise a server is not an error. The page carries its snapshot, so a
-run without a server shows the truth and stops ticking; that is worth one line
-of output, not a stopped прогон.
-
-Almost nothing in this file is checked by `npm run check`: `bundle-integrity.ts`
-walks `.md` and this is the only executable in the bundle. The four status sets
-below are the exception — `scripts/validate/state-matches-spec.ts` compares them
-with the specification, because a copy nothing reads goes stale in silence.
-Everything else here still breaks quietly, so change it with that in mind.
+With no mode argument, the historical mirror/server behavior remains available
+for old states and for reopening the dashboard. Contract-4 candidates are
+validated before this compatibility path mirrors them. Server failures do not
+invalidate an otherwise coherent snapshot. The helper uses only Python's
+standard library, and tests exercise this copied file without opening windows.
 """
 
 import json
+import hashlib
 import os
 import re
 import shlex
 import socket
 import subprocess
 import sys
+import tempfile
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(DIR, 'state.js')
@@ -57,6 +38,7 @@ PAGE = os.path.join(DIR, 'dashboard.html')
 INDEX = os.path.join(DIR, 'index.html')
 SERVE = os.path.join(DIR, 'serve.json')
 OPENED = os.path.join(DIR, 'opened.json')
+VALIDATION = os.path.join(DIR, 'validation.js')
 
 # A session where a window helps nobody, because the window would appear on a
 # machine the user is not sitting at. This was prose in `phases/0-preflight.md`;
@@ -71,6 +53,10 @@ STAGE_STATUSES = ['pending', 'active', 'done', 'failed', 'skipped']
 TASK_STATUSES = ['queued', 'running', 'review', 'repair', 'done', 'failed']
 REQUIREMENT_STATUSES = ['open', 'in-spec', 'deferred', 'dropped', 'placeholder']
 GATE_STATUSES = ['pending', 'passed', 'failed']
+LIFECYCLES = ['active', 'closed']
+CLOSURE_OUTCOMES = ['completed', 'closed_with_exceptions', 'stopped_incomplete']
+CHECK_RESULTS = ['not_run', 'passed', 'failed', 'unavailable', 'stale']
+VERIFICATION_RESULTS = ['passed', 'failed', 'incomplete']
 
 CHECKED = [
     ('stages', STAGE_STATUSES),
@@ -102,13 +88,29 @@ ASSIGNMENT = 'globalThis.MAESTRO_STATE ='
 SNAPSHOT_RE = re.compile(
     r'(/\*\s*maestro:snapshot:start\s*\*/)(.*?)(/\*\s*maestro:snapshot:end\s*\*/)',
     re.DOTALL)
+VALIDATION_SNAPSHOT_RE = re.compile(
+    r'(/\*\s*maestro:validation:start\s*\*/)(.*?)(/\*\s*maestro:validation:end\s*\*/)',
+    re.DOTALL)
 
 DEBUG = os.environ.get('MAESTRO_SYNC_DEBUG') == '1'
+LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO').upper()
+LEVELS = {'DEBUG': 10, 'INFO': 20, 'WARN': 30, 'ERROR': 40}
+
+
+def log(level, check, message, data=None):
+    """Structured diagnostics stay on stderr; JSON mode owns stdout."""
+    floor = LEVELS.get(LOG_LEVEL, 20)
+    if LEVELS[level] < floor:
+        return
+    suffix = '' if data is None else ' ' + json.dumps(data, sort_keys=True)
+    print('%s [sync.%s] %s%s' % (level, check, message, suffix), file=sys.stderr)
 
 
 def debug(message):
     if DEBUG:
         print('debug: ' + message, file=sys.stderr)
+    else:
+        log('DEBUG', 'legacy', message)
 
 
 # What the прогон relays to the user, beside the address. It lives here rather
@@ -265,8 +267,23 @@ def mirror(text):
     updated = SNAPSHOT_RE.sub(lambda m: m.group(1) + body + m.group(3), page, count=1)
     if updated == page:
         return False
-    open(PAGE, 'w', encoding='utf-8').write(updated)
+    atomic_text(PAGE, updated)
     return True
+
+
+def atomic_text(filename, body):
+    """Replace one same-directory file without exposing a partial write."""
+    descriptor, temporary = tempfile.mkstemp(prefix='.%s.' % os.path.basename(filename),
+                                            suffix='.tmp', dir=os.path.dirname(filename))
+    try:
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as handle:
+            handle.write(body)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, filename)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def place_index():
@@ -468,7 +485,822 @@ def language_violations(state):
     return found
 
 
+def fingerprint_equal(left, right):
+    """Compare declared current inputs without depending on JSON key order."""
+    if not isinstance(left, dict) or not isinstance(right, dict):
+        return False
+    names = ('reference', 'build', 'data', 'runtime', 'acceptanceInput')
+    return all(left.get(name) == right.get(name) for name in names) and (
+        sorted(left.get('relevantPaths', [])) == sorted(right.get('relevantPaths', []))
+        and left.get('inputHashes') == right.get('inputHashes'))
+
+
+def derive_verification(state):
+    """The deterministic v4 verdict; no file reads and no invented records."""
+    record = state['verification']
+    target = record['targetRevision']
+    obligations = [item for item in record['obligations'] if item['targetRevision'] == target]
+    check_results = {}
+    effective = {}
+    for check in record['checks']:
+        candidates = [item for item in record['executions'] if item['checkId'] == check['id']]
+        superseded = {item.get('supersedes') for item in candidates}
+        live = [item for item in candidates if item['id'] not in superseded]
+        live.sort(key=lambda item: (item['executedAt'], item['id']), reverse=True)
+        execution = live[0] if live else None
+        effective[check['id']] = execution
+        if execution is None:
+            result = 'not_run'
+        elif not fingerprint_equal(execution['fingerprint'], check['currentFingerprint']):
+            result = 'stale'
+        else:
+            result = execution['result']
+        check_results[check['id']] = result
+
+    obligation_results = {}
+    for obligation in obligations:
+        required = [check for check in record['checks'] if check['required']
+                    and check['id'] in obligation['checkIds']]
+        contradicted = any(item['status'] == 'open'
+                           and obligation['id'] in item['obligationIds']
+                           for item in record['findings'])
+        if contradicted or any(check_results[check['id']] == 'failed' for check in required):
+            result = 'failed'
+        elif obligation['discovery'] == 'unresolved' or not required:
+            result = 'incomplete'
+        elif all(check_results[check['id']] == 'passed' for check in required):
+            result = 'passed'
+        else:
+            result = 'incomplete'
+        obligation_results[obligation['id']] = result
+
+    requirement_results = {}
+    for requirement in state['requirements']:
+        if requirement['status'] in ('dropped', 'deferred'):
+            continue
+        own = [item for item in obligations if requirement['id'] in item['requirementIds']]
+        finding = any(item['status'] == 'open' and requirement['id'] in item['requirementIds']
+                      for item in record['findings'])
+        reviews = [item for item in record['coverageReviews']
+                   if item['requirementId'] == requirement['id']
+                   and item['inputDigest'] == record['acceptanceInputDigest']
+                   and item['targetRevision'] == target]
+        reviews.sort(key=lambda item: item['reviewedAt'], reverse=True)
+        review = reviews[0] if reviews else None
+        own_results = [obligation_results[item['id']] for item in own]
+        if finding or 'failed' in own_results:
+            result = 'failed'
+        elif not own or review is None or review['status'] != 'complete' or 'incomplete' in own_results:
+            result = 'incomplete'
+        else:
+            result = 'passed'
+        requirement_results[requirement['id']] = result
+
+    failed_ids = [key for key, value in requirement_results.items() if value == 'failed']
+    incomplete_ids = [key for key, value in requirement_results.items() if value == 'incomplete']
+    rounds = [item for item in record['acceptanceRounds']
+              if item['targetRevision'] == target
+              and item['inputDigest'] == record['acceptanceInputDigest']]
+    rounds.sort(key=lambda item: item['performedAt'], reverse=True)
+    current_round = rounds[0] if rounds else None
+    required_checks = [check for check in record['checks'] if check['required']
+                       and any(check['id'] in item['checkIds'] for item in obligations)]
+    round_current = current_round is not None
+    if round_current:
+        round_current = all(ref['id'] in current_round['referenceIds']
+                            for ref in record['references']
+                            if ref['role'] == 'authoritative_behavior')
+        round_current = round_current and all(
+            effective[check['id']] is not None
+            and effective[check['id']]['id'] in current_round['executionIds']
+            and fingerprint_equal(effective[check['id']]['fingerprint'], check['currentFingerprint'])
+            for check in required_checks)
+        round_current = round_current and all(
+            review['id'] in current_round['coverageReviewIds']
+            for review in record['coverageReviews']
+            if review['inputDigest'] == record['acceptanceInputDigest']
+            and review['targetRevision'] == target
+            and review['requirementId'] in requirement_results)
+        round_current = round_current and all(
+            item['id'] in current_round['findingIds']
+            for item in record['findings'] if item['status'] == 'open')
+    promises_open = any(item['status'] == 'open' for item in record['promisedWork'])
+    if failed_ids:
+        g4 = 'failed'
+    elif not requirement_results or incomplete_ids or not round_current or promises_open:
+        g4 = 'pending'
+    else:
+        g4 = 'passed'
+    result = {'checkResults': check_results, 'obligationResults': obligation_results,
+              'requirementResults': requirement_results, 'failedIds': failed_ids,
+              'incompleteIds': incomplete_ids, 'g4': g4}
+    if round_current:
+        result['currentRoundId'] = current_round['id']
+    log('DEBUG', 'derive', 'verification derived',
+        {'runId': state.get('runId'), 'g4': g4, 'failedIds': failed_ids,
+         'incompleteIds': incomplete_ids})
+    return result
+
+
+def validate_candidate(state):
+    """Pure graph and closure validation equivalent to scripts/state/validate.ts."""
+    errors = []
+
+    def add(field, message):
+        errors.append({'field': field, 'message': message})
+        log('ERROR', 'validate', message, {'field': field})
+
+    if not isinstance(state, dict):
+        add('', 'state must be an object')
+        return errors, None
+    if state.get('contractVersion') != 4:
+        add('contractVersion', 'publication requires contract version 4')
+    for field in ('runId', 'slug', 'startedAt', 'updatedAt'):
+        if not isinstance(state.get(field), str) or not state[field]:
+            add(field, '%s must be a non-empty string' % field)
+    if not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', state.get('slug', '')):
+        add('slug', 'contract-4 slug must be a canonical safe path segment')
+    if state.get('lifecycle') not in LIFECYCLES:
+        add('lifecycle', 'lifecycle must be active or closed')
+    if state.get('mode') not in ('full', 'semi', 'interview', 'manual'):
+        add('mode', 'unknown mode')
+    if state.get('depth') not in ('strict', 'normal', 'deep'):
+        add('depth', 'unknown depth')
+    if not isinstance(state.get('polish'), bool):
+        add('polish', 'polish must be boolean')
+    for field, allowed in CHECKED:
+        entries = state.get(field)
+        if not isinstance(entries, list):
+            add(field, '%s must be an array' % field)
+            continue
+        for index, item in enumerate(entries):
+            if not isinstance(item, dict):
+                add('%s[%d]' % (field, index), 'entry must be an object')
+            elif item.get('status') not in allowed:
+                add('%s[%d].status' % (field, index), 'unknown status')
+    stage_ids = ('preflight', 'manifest', 'briefing', 'spec', 'plan',
+                 'build', 'review', 'acceptance')
+    if state.get('currentStage') not in stage_ids:
+        add('currentStage', 'unknown current stage')
+    if not isinstance(state.get('dialChanges'), list):
+        add('dialChanges', 'dial changes must be an array')
+    if not isinstance(state.get('additions'), list):
+        add('additions', 'additions must be an array')
+    debt = state.get('debt')
+    if not isinstance(debt, dict) or any(not isinstance(debt.get(name), list)
+                                         for name in ('placeholders', 'assumptions', 'emptyEnv')):
+        add('debt', 'debt needs three arrays')
+    for index, item in enumerate(state.get('tasks', []) if isinstance(state.get('tasks'), list) else []):
+        if not isinstance(item, dict):
+            continue
+        at = 'tasks[%d]' % index
+        if not isinstance(item.get('id'), str) or not item['id']:
+            add(at + '.id', 'task ID is required')
+        if not isinstance(item.get('title'), str) or not item['title']:
+            add(at + '.title', 'task title is required')
+        for name in ('requirementIds', 'blockedBy', 'zone', 'files', 'commits'):
+            if not isinstance(item.get(name), list) or any(
+                    not isinstance(part, str) for part in item.get(name, [])):
+                add(at + '.' + name, 'field must contain strings')
+        if not isinstance(item.get('wave'), int) or item['wave'] < 1:
+            add(at + '.wave', 'wave must be positive')
+        for name in ('retries', 'repairs', 'handoffs'):
+            if not isinstance(item.get(name), int) or item[name] < 0:
+                add(at + '.' + name, 'counter must be non-negative')
+    for index, item in enumerate(state.get('requirements', [])
+                                 if isinstance(state.get('requirements'), list) else []):
+        if not isinstance(item, dict):
+            continue
+        at = 'requirements[%d]' % index
+        if not isinstance(item.get('id'), str) or not item['id']:
+            add(at + '.id', 'requirement ID is required')
+        if item.get('status') in ('open', 'deferred', 'dropped', 'placeholder') and not item.get('reason'):
+            add(at + '.reason', 'planning status needs a reason')
+    for index, item in enumerate(state.get('gates', []) if isinstance(state.get('gates'), list) else []):
+        if isinstance(item, dict) and (not isinstance(item.get('findings'), list)
+                                       or any(not isinstance(line, str)
+                                              for line in item.get('findings', []))):
+            add('gates[%d].findings' % index, 'presentation findings must be strings')
+    if errors:
+        return errors, None
+    record = state.get('verification')
+    if not isinstance(record, dict):
+        add('verification', 'contract 4 requires a verification object')
+        return errors, None
+    if record.get('version') != 1:
+        add('verification.version', 'verification version must be 1')
+    if not isinstance(record.get('targetRevision'), int) or record['targetRevision'] < 1:
+        add('verification.targetRevision', 'target revision must be positive')
+    if not isinstance(record.get('acceptanceInputDigest'), str) or not record['acceptanceInputDigest']:
+        add('verification.acceptanceInputDigest', 'current acceptance input digest is required')
+    shapes = {
+        'references': ('id', 'statement', 'role', 'location', 'accessMethod', 'available',
+                       'revision', 'conditions', 'approvedDeviationIds'),
+        'surfaces': ('id', 'referenceId', 'source', 'inspected', 'variantIds'),
+        'obligations': ('id', 'requirementIds', 'referenceIds', 'surfaceIds', 'expectation',
+                        'discovery', 'sourceEvidenceIds', 'variantIds', 'checkIds',
+                        'implementationTaskIds', 'targetRevision'),
+        'checks': ('id', 'obligationIds', 'method', 'target', 'procedure', 'oracle',
+                   'oracleEvidenceIds', 'variantIds', 'integrationDependencies',
+                   'required', 'currentFingerprint'),
+        'executions': ('id', 'checkId', 'result', 'fingerprint', 'invocation', 'tool',
+                       'host', 'executor', 'executedAt', 'assertions', 'evidenceIds'),
+        'evidence': ('id', 'path', 'sha256', 'mediaType', 'capturedAt', 'origin'),
+        'findings': ('id', 'requirementIds', 'obligationIds', 'checkIds', 'evidenceIds',
+                     'origin', 'description', 'status'),
+        'decisions': ('id', 'kind', 'authorizedBy', 'authorizedAt', 'authorization',
+                      'presentedFindingIds', 'presentedObligationIds',
+                      'selectedFindingIds', 'selectedObligationIds'),
+        'coverageReviews': ('id', 'requirementId', 'targetRevision', 'status',
+                            'inspectedSurfaceIds', 'uninspectedSurfaceIds',
+                            'reviewer', 'reviewedAt', 'inputDigest'),
+        'acceptanceRounds': ('id', 'targetRevision', 'inputDigest', 'referenceIds',
+                             'executionIds', 'findingIds', 'coverageReviewIds',
+                             'requirementResults', 'g4', 'performedAt'),
+        'promisedWork': ('id', 'description', 'status'),
+        'repairAttempts': ('id', 'findingId', 'taskId', 'at', 'outcome'),
+    }
+    string_fields = {
+        'references': ('id', 'statement', 'role', 'location', 'accessMethod', 'revision'),
+        'surfaces': ('id', 'referenceId', 'source'),
+        'obligations': ('id', 'expectation', 'discovery'),
+        'checks': ('id', 'method', 'target', 'oracle'),
+        'executions': ('id', 'checkId', 'result', 'invocation', 'tool', 'host', 'executor', 'executedAt'),
+        'evidence': ('id', 'path', 'sha256', 'mediaType', 'capturedAt', 'origin'),
+        'findings': ('id', 'origin', 'description', 'status'),
+        'decisions': ('id', 'kind', 'authorizedBy', 'authorizedAt', 'authorization'),
+        'coverageReviews': ('id', 'requirementId', 'status', 'reviewer', 'reviewedAt', 'inputDigest'),
+        'acceptanceRounds': ('id', 'inputDigest', 'g4', 'performedAt'),
+        'promisedWork': ('id', 'description', 'status'),
+        'repairAttempts': ('id', 'findingId', 'taskId', 'at', 'outcome'),
+    }
+    array_fields = {
+        'references': ('conditions', 'approvedDeviationIds'),
+        'surfaces': ('variantIds',),
+        'obligations': ('requirementIds', 'referenceIds', 'surfaceIds', 'sourceEvidenceIds',
+                        'variantIds', 'checkIds', 'implementationTaskIds'),
+        'checks': ('obligationIds', 'procedure', 'oracleEvidenceIds', 'variantIds',
+                   'integrationDependencies'),
+        'executions': ('assertions', 'evidenceIds'),
+        'findings': ('requirementIds', 'obligationIds', 'checkIds', 'evidenceIds'),
+        'decisions': ('presentedFindingIds', 'presentedObligationIds',
+                      'selectedFindingIds', 'selectedObligationIds'),
+        'coverageReviews': ('inspectedSurfaceIds', 'uninspectedSurfaceIds'),
+        'acceptanceRounds': ('referenceIds', 'executionIds', 'findingIds',
+                             'coverageReviewIds'),
+    }
+    for name, fields in shapes.items():
+        entries = record.get(name)
+        if not isinstance(entries, list):
+            add('verification.' + name, 'collection must be an array')
+            continue
+        seen = set()
+        for index, item in enumerate(entries):
+            at = 'verification.%s[%d]' % (name, index)
+            if not isinstance(item, dict):
+                add(at, 'entry must be an object')
+                continue
+            for field in fields:
+                if field not in item or item[field] is None:
+                    add(at + '.' + field, 'required field is missing')
+            for field in string_fields.get(name, ()):
+                if field in item and (not isinstance(item[field], str) or not item[field]):
+                    add(at + '.' + field, 'field must be a non-empty string')
+            for field in array_fields.get(name, ()):
+                if field in item and (not isinstance(item[field], list) or (
+                        field != 'assertions' and any(not isinstance(part, str)
+                                                      for part in item[field]))):
+                    add(at + '.' + field, 'field must be an array of strings')
+            if name == 'executions' and isinstance(item.get('assertions'), list):
+                for position, assertion in enumerate(item['assertions']):
+                    if (not isinstance(assertion, dict)
+                            or not isinstance(assertion.get('name'), str)
+                            or assertion.get('result') not in ('passed', 'failed')
+                            or not isinstance(assertion.get('evidenceIds'), list)):
+                        add(at + '.assertions[%d]' % position, 'assertion shape is invalid')
+            if name in ('checks', 'executions'):
+                fingerprint = item.get('currentFingerprint' if name == 'checks' else 'fingerprint')
+                if not isinstance(fingerprint, dict) or any(
+                        not isinstance(fingerprint.get(field), str) or not fingerprint[field]
+                        for field in ('reference', 'build', 'data', 'runtime', 'acceptanceInput')):
+                    add(at + '.fingerprint', 'fingerprint identity is required')
+                elif (not isinstance(fingerprint.get('relevantPaths'), list)
+                      or not isinstance(fingerprint.get('inputHashes'), dict)):
+                    add(at + '.fingerprint', 'fingerprint path hashes are required')
+            if name in ('obligations', 'coverageReviews', 'acceptanceRounds') and (
+                    not isinstance(item.get('targetRevision'), int)
+                    or item['targetRevision'] < 1):
+                add(at + '.targetRevision', 'positive target revision is required')
+            if name == 'checks' and not isinstance(item.get('required'), bool):
+                add(at + '.required', 'required flag must be boolean')
+            identity = item.get('id')
+            if not isinstance(identity, str) or not identity:
+                add(at + '.id', 'ID must be a non-empty string')
+            elif identity in seen:
+                add(at + '.id', 'duplicate ID %s' % identity)
+            seen.add(identity)
+    limits = record.get('repairLimits')
+    if not isinstance(limits, dict) or any(
+            not isinstance(limits.get(name), int) or limits[name] < 1
+            for name in ('perFinding', 'total')):
+        add('verification.repairLimits', 'finite positive repair limits are required')
+    if errors:
+        return errors, None
+
+    ids = {name: {item['id'] for item in record[name]} for name in shapes}
+    ids['tasks'] = {item.get('id') for item in state['tasks']}
+    ids['requirements'] = {item.get('id') for item in state['requirements']}
+
+    def refs(field, values, known):
+        if not isinstance(values, list):
+            values = [values]
+        for value in values:
+            if value not in ids[known]:
+                add(field, 'unknown ID %s' % value)
+
+    for index, item in enumerate(record['references']):
+        at = 'verification.references[%d]' % index
+        refs(at + '.approvedDeviationIds', item['approvedDeviationIds'], 'decisions')
+        if not item['available'] and not item.get('limitation'):
+            add(at + '.limitation', 'unavailable reference needs a limitation')
+        if item['role'] not in ('authoritative_behavior', 'visual_reference',
+                                'contextual_example', 'other'):
+            add(at + '.role', 'unknown reference role')
+        if item['role'] == 'other' and not item.get('roleDescription'):
+            add(at + '.roleDescription', 'other role needs a description')
+    for index, item in enumerate(record['surfaces']):
+        at = 'verification.surfaces[%d]' % index
+        refs(at + '.referenceId', item['referenceId'], 'references')
+        if not item['inspected'] and not item.get('limitation'):
+            add(at + '.limitation', 'uninspected surface needs a limitation')
+
+    phase_order = ('preflight', 'manifest', 'briefing', 'spec', 'plan',
+                   'build', 'review', 'acceptance')
+    current_stage = state.get('currentStage')
+    plan_finished = (current_stage in phase_order and phase_order.index(current_stage) > 4
+                     or any(item.get('id') == 'plan' and item.get('status') == 'done'
+                            for item in state['stages']))
+    evidence_by_id = {item['id']: item for item in record['evidence']}
+    for index, item in enumerate(record['obligations']):
+        at = 'verification.obligations[%d]' % index
+        for field, known in (('requirementIds', 'requirements'), ('referenceIds', 'references'),
+                             ('surfaceIds', 'surfaces'), ('sourceEvidenceIds', 'evidence'),
+                             ('checkIds', 'checks'), ('implementationTaskIds', 'tasks')):
+            refs(at + '.' + field, item[field], known)
+        if item['discovery'] not in ('observed', 'source_derived', 'unresolved'):
+            add(at + '.discovery', 'unknown discovery status')
+        if item['discovery'] == 'observed' and (not item['sourceEvidenceIds'] or any(
+                evidence_by_id.get(eid, {}).get('origin') != 'reference'
+                for eid in item['sourceEvidenceIds'])):
+            add(at + '.sourceEvidenceIds', 'observed behavior needs reference-origin evidence')
+        if item['targetRevision'] == record['targetRevision'] and plan_finished and not item['checkIds']:
+            add(at, 'current obligation needs required checks after planning')
+    for index, item in enumerate(record['checks']):
+        at = 'verification.checks[%d]' % index
+        for field, known in (('obligationIds', 'obligations'), ('oracleEvidenceIds', 'evidence'),
+                             ('integrationDependencies', 'tasks')):
+            refs(at + '.' + field, item[field], known)
+        if item.get('executionTaskId'):
+            refs(at + '.executionTaskId', item['executionTaskId'], 'tasks')
+        elif plan_finished and item['required']:
+            add(at + '.executionTaskId', 'required check needs an execution owner')
+        if item.get('supersedes'):
+            refs(at + '.supersedes', item['supersedes'], 'checks')
+            if not item.get('oracleChangeBasis') and not item.get('basisDecisionId'):
+                add(at, 'superseding check needs a recorded basis')
+        if item.get('basisDecisionId'):
+            refs(at + '.basisDecisionId', item['basisDecisionId'], 'decisions')
+        if item.get('ignoreMask') and not item.get('oracleChangeBasis') and not item.get('basisDecisionId'):
+            add(at + '.ignoreMask', 'ignore mask needs a recorded basis')
+    for index, item in enumerate(record['executions']):
+        at = 'verification.executions[%d]' % index
+        refs(at + '.checkId', item['checkId'], 'checks')
+        refs(at + '.evidenceIds', item['evidenceIds'], 'evidence')
+        if item.get('supersedes'):
+            refs(at + '.supersedes', item['supersedes'], 'executions')
+        if item['result'] not in CHECK_RESULTS:
+            add(at + '.result', 'unknown check result')
+        if item['result'] == 'passed' and (not item['assertions'] or not item['evidenceIds']
+                                           or any(assertion.get('result') == 'failed'
+                                                  for assertion in item['assertions'])):
+            add(at, 'passed execution needs passing assertions and evidence')
+        if item['result'] == 'unavailable' and not item.get('limitation'):
+            add(at + '.limitation', 'unavailable check needs a limitation')
+        for assertion in item['assertions']:
+            refs(at + '.assertions.evidenceIds', assertion.get('evidenceIds', []), 'evidence')
+            if any(eid not in item['evidenceIds'] for eid in assertion.get('evidenceIds', [])):
+                add(at + '.assertions', 'assertion evidence must belong to its execution')
+    for index, item in enumerate(record['evidence']):
+        at = 'verification.evidence[%d]' % index
+        if item['origin'] not in ('reference', 'execution'):
+            add(at + '.origin', 'unknown evidence origin')
+        if item['origin'] == 'execution' and any(
+                item['id'] in execution['evidenceIds']
+                and not item['path'].startswith('evidence/%s/' % execution['id'])
+                for execution in record['executions']):
+            add(at + '.path', 'execution capture must sit under its execution ID')
+    for index, item in enumerate(record['findings']):
+        at = 'verification.findings[%d]' % index
+        for field, known in (('requirementIds', 'requirements'), ('obligationIds', 'obligations'),
+                             ('checkIds', 'checks'), ('evidenceIds', 'evidence')):
+            refs(at + '.' + field, item[field], known)
+        if item.get('resolutionExecutionId'):
+            refs(at + '.resolutionExecutionId', item['resolutionExecutionId'], 'executions')
+        if item.get('supersedes'):
+            refs(at + '.supersedes', item['supersedes'], 'findings')
+        if item['status'] == 'resolved' and not item.get('resolutionExecutionId'):
+            add(at, 'resolved finding needs a resolving execution')
+    for index, item in enumerate(record['decisions']):
+        at = 'verification.decisions[%d]' % index
+        for field, known in (('presentedFindingIds', 'findings'),
+                             ('presentedObligationIds', 'obligations'),
+                             ('selectedFindingIds', 'findings'),
+                             ('selectedObligationIds', 'obligations')):
+            refs(at + '.' + field, item[field], known)
+        if (set(item['selectedFindingIds']) - set(item['presentedFindingIds'])
+                or set(item['selectedObligationIds']) - set(item['presentedObligationIds'])):
+            add(at, 'exception selection must be within displayed snapshot')
+        if item['kind'] == 'scope_amendment' and (
+                not item.get('previousTargetRevision') or not item.get('targetRevision')
+                or item['targetRevision'] <= item['previousTargetRevision']):
+            add(at, 'scope amendment must advance target revision')
+    for index, item in enumerate(record['coverageReviews']):
+        at = 'verification.coverageReviews[%d]' % index
+        refs(at + '.requirementId', item['requirementId'], 'requirements')
+        refs(at + '.inspectedSurfaceIds', item['inspectedSurfaceIds'], 'surfaces')
+        refs(at + '.uninspectedSurfaceIds', item['uninspectedSurfaceIds'], 'surfaces')
+        if item['status'] == 'complete' and item['uninspectedSurfaceIds']:
+            add(at, 'complete coverage cannot leave uninspected surfaces')
+    for index, item in enumerate(record['acceptanceRounds']):
+        at = 'verification.acceptanceRounds[%d]' % index
+        for field, known in (('referenceIds', 'references'), ('executionIds', 'executions'),
+                             ('findingIds', 'findings'), ('coverageReviewIds', 'coverageReviews')):
+            refs(at + '.' + field, item[field], known)
+        if item.get('supersedes'):
+            refs(at + '.supersedes', item['supersedes'], 'acceptanceRounds')
+    for index, item in enumerate(record['promisedWork']):
+        at = 'verification.promisedWork[%d]' % index
+        if item.get('acceptanceRoundId'):
+            refs(at + '.acceptanceRoundId', item['acceptanceRoundId'], 'acceptanceRounds')
+        if item.get('authorizationDecisionId'):
+            refs(at + '.authorizationDecisionId', item['authorizationDecisionId'], 'decisions')
+        if item['status'] == 'cancelled' and not item.get('authorizationDecisionId'):
+            add(at, 'cancelled promise needs user authorization')
+    repair_counts = {}
+    finding_by_id = {item['id']: item for item in record['findings']}
+    for index, item in enumerate(record['repairAttempts']):
+        at = 'verification.repairAttempts[%d]' % index
+        refs(at + '.findingId', item['findingId'], 'findings')
+        refs(at + '.taskId', item['taskId'], 'tasks')
+        root = item['findingId']
+        seen = set()
+        while root in finding_by_id and finding_by_id[root].get('supersedes') and root not in seen:
+            seen.add(root)
+            root = finding_by_id[root]['supersedes']
+        repair_counts[root] = repair_counts.get(root, 0) + 1
+    if len(record['repairAttempts']) > limits['total']:
+        add('verification.repairAttempts', 'overall repair budget was exceeded')
+    for root, count in repair_counts.items():
+        if count > limits['perFinding']:
+            add('verification.repairAttempts', 'repair budget exceeded for stable failure %s' % root)
+    if errors:
+        return errors, None
+
+    summary = derive_verification(state)
+    round_id = summary.get('currentRoundId')
+    current_round = next((item for item in record['acceptanceRounds'] if item['id'] == round_id), None)
+    if current_round:
+        if current_round['requirementResults'] != summary['requirementResults']:
+            add('verification.acceptanceRounds', 'stored requirement results disagree with derived results')
+        if current_round['g4'] != summary['g4']:
+            add('verification.acceptanceRounds', 'stored G4 disagrees with derived G4')
+    g4 = next((item for item in state['gates'] if item.get('id') == 'G4'), None)
+    if (record['acceptanceRounds'] or state['lifecycle'] == 'closed') and (
+            g4 is None or g4.get('status') != summary['g4']):
+        add('gates[G4].status', 'G4 must be %s from verification records' % summary['g4'])
+    if state['lifecycle'] == 'active':
+        if state.get('outcome') or state.get('finishedAt'):
+            add('lifecycle', 'active state cannot have outcome or finishedAt')
+    else:
+        if not state.get('finishedAt'):
+            add('finishedAt', 'closed state needs closure timestamp')
+        if state.get('outcome') not in CLOSURE_OUTCOMES:
+            add('outcome', 'closed state needs a known outcome')
+        if any(item['status'] == 'open' for item in record['promisedWork']):
+            add('verification.promisedWork', 'open promised work blocks closure')
+        if state.get('outcome') == 'completed' and summary['g4'] != 'passed':
+            add('outcome', 'completed requires verified passing G4')
+        if state.get('outcome') == 'stopped_incomplete' and not state.get('stopReason'):
+            add('stopReason', 'stopped incomplete run needs a reason')
+        if state.get('outcome') == 'closed_with_exceptions':
+            decisions = [item for item in record['decisions'] if item['kind'] == 'accepted_exception']
+            accepted_findings = set().union(*(set(item['selectedFindingIds']) for item in decisions))
+            accepted_obligations = set().union(*(set(item['selectedObligationIds']) for item in decisions))
+            open_findings = {item['id'] for item in record['findings'] if item['status'] == 'open'}
+            gaps = {key for key, result in summary['obligationResults'].items() if result != 'passed'}
+            if (not decisions or not (open_findings or gaps)
+                    or open_findings - accepted_findings or gaps - accepted_obligations):
+                add('outcome', 'exception closure needs bounded acceptance of every gap')
+    return errors, summary
+
+
+def sha256_file(filename):
+    digest = hashlib.sha256()
+    with open(filename, 'rb') as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def safe_file(root, relative, field, errors):
+    """Resolve after symlinks and insist on a regular file inside its root."""
+    if (not isinstance(relative, str) or not relative or os.path.isabs(relative)
+            or '..' in re.split(r'[/\\]', relative)):
+        errors.append({'field': field, 'message': 'path must be relative and confined'})
+        return None
+    root_real = os.path.realpath(root)
+    target = os.path.realpath(os.path.join(root, relative))
+    if not target.startswith(root_real + os.sep):
+        errors.append({'field': field, 'message': 'path escapes its declared root'})
+        return None
+    if not os.path.isfile(target):
+        errors.append({'field': field, 'message': 'declared file is missing or unreadable'})
+        return None
+    return target
+
+
+def validate_files(state):
+    """Validate immutable capture hashes and current relevant project files."""
+    record = state['verification']
+    errors = []
+    run_dir = os.path.join(DIR, state['slug'])
+    evidence_root = os.path.join(run_dir, 'evidence')
+    project_root = os.path.dirname(DIR)
+    if record['evidence']:
+        if (not os.path.realpath(run_dir).startswith(os.path.realpath(project_root) + os.sep)
+                or not os.path.realpath(evidence_root).startswith(
+                    os.path.realpath(run_dir) + os.sep)):
+            return [{'field': 'verification.evidence',
+                     'message': 'evidence root escapes the project run'}]
+    for index, item in enumerate(record['evidence']):
+        field = 'verification.evidence[%d].path' % index
+        relative = item['path']
+        if not isinstance(relative, str) or not re.fullmatch(r'evidence/[A-Za-z0-9_-]+/.+', relative):
+            errors.append({'field': field, 'message': 'capture path must use evidence/<execution-id>/...'})
+            continue
+        expected = item['sha256']
+        if not isinstance(expected, str) or not re.fullmatch(r'[a-f0-9]{64}', expected):
+            errors.append({'field': field, 'message': 'SHA-256 must be lowercase hex'})
+            continue
+        filename = safe_file(evidence_root, relative[len('evidence/'):], field, errors)
+        if filename:
+            try:
+                actual = sha256_file(filename)
+            except OSError:
+                actual = None
+            if actual != expected:
+                errors.append({'field': field, 'message': 'capture SHA-256 does not match artifact'})
+
+    def check_inputs(fingerprint, at):
+        if not isinstance(fingerprint, dict):
+            errors.append({'field': at, 'message': 'fingerprint must be an object'})
+            return
+        paths = fingerprint.get('relevantPaths')
+        hashes = fingerprint.get('inputHashes')
+        if not isinstance(paths, list) or not isinstance(hashes, dict):
+            errors.append({'field': at, 'message': 'relevant paths and input hashes are required'})
+            return
+        if len(paths) != len(set(paths)) or set(paths) != set(hashes):
+            errors.append({'field': at, 'message': 'input hashes must match unique relevant paths'})
+        for relative in paths:
+            field = '%s.inputHashes[%s]' % (at, json.dumps(relative))
+            expected = hashes.get(relative)
+            if not isinstance(expected, str) or not re.fullmatch(r'[a-f0-9]{64}', expected):
+                errors.append({'field': field, 'message': 'declared SHA-256 is missing or malformed'})
+                continue
+            filename = safe_file(project_root, relative, field, errors)
+            if filename:
+                try:
+                    actual = sha256_file(filename)
+                except OSError:
+                    actual = None
+                if actual != expected:
+                    errors.append({'field': field, 'message': 'relevant input changed; evidence is stale'})
+                    log('WARN', 'fingerprint', 'relevant input changed', {'field': field})
+
+    for index, check in enumerate(record['checks']):
+        check_inputs(check['currentFingerprint'],
+                     'verification.checks[%d].currentFingerprint' % index)
+    for index, execution in enumerate(record['executions']):
+        if any(check['id'] == execution['checkId']
+               and fingerprint_equal(check['currentFingerprint'], execution['fingerprint'])
+               for check in record['checks']):
+            check_inputs(execution['fingerprint'],
+                         'verification.executions[%d].fingerprint' % index)
+    if errors:
+        log('ERROR', 'evidence', 'candidate evidence failed integrity',
+            {'runId': state.get('runId'), 'violations': len(errors)})
+    return errors
+
+
+def validate_transition(previous, candidate):
+    """Published evidence and decisions are append-only, with explicit scope revisions."""
+    if not isinstance(previous, dict) or previous.get('contractVersion', 0) < 4:
+        return []
+    old = previous.get('verification')
+    new = candidate.get('verification')
+    if not isinstance(old, dict) or not isinstance(new, dict):
+        return []
+    errors = []
+    names = ('references', 'surfaces', 'obligations', 'checks', 'executions',
+             'evidence', 'decisions', 'acceptanceRounds', 'repairAttempts')
+    for name in names:
+        current = {item['id']: item for item in new[name]}
+        for item in old[name]:
+            successor = current.get(item['id'])
+            before = dict(item)
+            after = dict(successor) if successor else None
+            if name == 'checks':
+                before.pop('currentFingerprint', None)
+                if after:
+                    after.pop('currentFingerprint', None)
+            if after != before:
+                errors.append({'field': 'verification.%s[%s]' % (name, item['id']),
+                               'message': 'published record must remain immutable'})
+    if new['targetRevision'] < old['targetRevision']:
+        errors.append({'field': 'verification.targetRevision',
+                       'message': 'target revision cannot decrease'})
+    if new['targetRevision'] > old['targetRevision'] and not any(
+            item['kind'] == 'scope_amendment'
+            and item.get('previousTargetRevision') == old['targetRevision']
+            and item.get('targetRevision') == new['targetRevision']
+            for item in new['decisions']):
+        errors.append({'field': 'verification.targetRevision',
+                       'message': 'target revision change needs scope amendment'})
+    return errors
+
+
+def load_candidate(filename):
+    """Candidate JSON or the generated state assignment; never evaluate JavaScript."""
+    with open(filename, encoding='utf-8') as handle:
+        source = handle.read()
+    if ASSIGNMENT in source:
+        source = literal(source)
+    return json.loads(source)
+
+
+def validation_envelope(status, candidate, errors=None, previous=None):
+    """The page reads this alongside state.js and suppresses stale green success."""
+    envelope = {
+        'status': status,
+        'candidateRevision': candidate.get('updatedAt') if isinstance(candidate, dict) else None,
+        'candidateRunId': candidate.get('runId') if isinstance(candidate, dict) else None,
+        'lastValidRevision': previous.get('updatedAt') if isinstance(previous, dict) else None,
+        'violations': errors or [],
+    }
+    body = json.dumps(envelope, ensure_ascii=False, sort_keys=True)
+    atomic_text(VALIDATION, 'globalThis.MAESTRO_VALIDATION = %s;\n' % body)
+    if os.path.exists(PAGE):
+        page = open(PAGE, encoding='utf-8').read()
+        if VALIDATION_SNAPSHOT_RE.search(page):
+            updated = VALIDATION_SNAPSHOT_RE.sub(
+                lambda match: match.group(1) + '\nglobalThis.MAESTRO_VALIDATION_SNAPSHOT = '
+                + body + ';\n' + match.group(3), page, count=1)
+            atomic_text(PAGE, updated)
+
+
+def viewer_address(no_open=False):
+    """Keep an owned viewer reachable even when the first candidate is invalid."""
+    if not os.path.exists(PAGE):
+        return None
+    place_index()
+    pid, remembered = recorded()
+    if ours(command_of(pid)):
+        port = remembered
+    else:
+        adopted = adopt()
+        if adopted:
+            port = adopted[1]
+        else:
+            held = remembered is not None and not free(remembered)
+            chosen = pick_port(remembered if remembered is not None and not held else None)
+            port = serve(chosen, remembered if held else None)
+    url = 'file://' + PAGE if port is None else 'http://localhost:%d/dashboard.html' % port
+    if not no_open:
+        open_page(url, False)
+    return url
+
+
+def emit_json(result):
+    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+
+
+def candidate_mode(argv):
+    """Read-only validate/project, or validate and atomically publish a candidate."""
+    action = argv[0]
+    if len(argv) < 2:
+        emit_json({'status': 'unreadable', 'reason': 'candidate path is required'})
+        return 2
+    filename = argv[1]
+    try:
+        candidate = load_candidate(filename)
+    except (OSError, ValueError) as error:
+        log('ERROR', action, 'candidate could not be read', {'path': filename})
+        emit_json({'status': 'unreadable', 'reason': str(error)})
+        return 2
+
+    if action == '--project' and isinstance(candidate, dict) and candidate.get('contractVersion', 0) < 4:
+        old_g4 = next((item.get('status') for item in candidate.get('gates', [])
+                       if isinstance(item, dict) and item.get('id') == 'G4'), 'historical')
+        log('WARN', 'project', 'legacy verification is not established',
+            {'runId': candidate.get('runId'), 'contractVersion': candidate.get('contractVersion')})
+        emit_json({'status': 'legacy', 'verificationEstablished': False,
+                   'notice': 'verification not established', 'g4': old_g4})
+        return 0
+
+    try:
+        errors, summary = validate_candidate(candidate)
+        if not errors:
+            errors.extend(validate_files(candidate))
+    except (TypeError, KeyError, AttributeError, ValueError) as error:
+        log('ERROR', action, 'candidate shape is invalid', {'kind': type(error).__name__})
+        errors, summary = ([{'field': 'verification',
+                             'message': 'candidate contains malformed nested records'}], None)
+    if action == '--validate':
+        emit_json({'status': 'valid' if not errors else 'invalid',
+                   'violations': errors, 'projection': summary if not errors else None})
+        return 0 if not errors else 1
+    if action == '--project':
+        if errors:
+            emit_json({'status': 'invalid', 'violations': errors})
+            return 1
+        emit_json({'status': 'current', 'summary': summary,
+                   'lifecycle': candidate['lifecycle'], 'outcome': candidate.get('outcome'),
+                   'verificationEstablished': candidate['lifecycle'] == 'closed'
+                   and candidate.get('outcome') == 'completed' and summary['g4'] == 'passed'})
+        return 0
+
+    no_open = '--no-open' in argv
+    previous = None
+    if os.path.exists(STATE):
+        try:
+            previous = load_candidate(STATE)
+            if not isinstance(previous, dict):
+                errors.append({'field': 'state.js', 'message': 'existing state is not an object'})
+                previous = None
+        except (OSError, ValueError):
+            errors.append({'field': 'state.js', 'message': 'existing state cannot be read; recover explicitly'})
+    expected = None
+    if '--expect' in argv:
+        offset = argv.index('--expect') + 1
+        expected = argv[offset] if offset < len(argv) else None
+    holder = None
+    if '--holder' in argv:
+        offset = argv.index('--holder') + 1
+        holder = argv[offset] if offset < len(argv) else None
+    if previous is not None:
+        if expected is None or previous.get('updatedAt') != expected:
+            errors.append({'field': 'updatedAt', 'message': 'stale or missing expected revision'})
+        prior_holder = previous.get('heldBy')
+        if isinstance(prior_holder, dict) and prior_holder.get('token') != holder:
+            errors.append({'field': 'heldBy', 'message': 'holder token does not match prior snapshot'})
+        if not errors:
+            errors.extend(validate_transition(previous, candidate))
+    elif expected is not None:
+        errors.append({'field': 'updatedAt', 'message': 'expected revision has no state to match'})
+    candidate_holder = candidate.get('heldBy') if isinstance(candidate, dict) else None
+    if isinstance(candidate_holder, dict) and candidate_holder.get('token') != holder:
+        errors.append({'field': 'heldBy', 'message': 'holder token does not match candidate'})
+
+    if errors:
+        validation_envelope('invalid', candidate, errors, previous)
+        url = viewer_address(no_open)
+        log('ERROR', 'publish', 'candidate rejected before publication',
+            {'violations': len(errors), 'candidateRevision': candidate.get('updatedAt')
+             if isinstance(candidate, dict) else None})
+        emit_json({'status': 'rejected', 'violations': errors, 'url': url})
+        return 1
+
+    body = '// Written by Maestro. Contract: docs/spec/state-contract.md\n'
+    body += ASSIGNMENT + ' ' + json.dumps(candidate, ensure_ascii=False, indent=2) + ';\n'
+    atomic_text(STATE, body)
+    validation_envelope('valid', candidate, [], candidate)
+    if os.path.exists(PAGE):
+        mirror(json.dumps(candidate, ensure_ascii=False))
+    url = viewer_address(no_open)
+    log('INFO', 'publish', 'candidate published',
+        {'runId': candidate['runId'], 'revision': candidate['updatedAt'], 'g4': summary['g4']})
+    emit_json({'status': 'published', 'revision': candidate['updatedAt'],
+               'path': STATE, 'url': url, 'projection': summary})
+    return 0
+
+
 def main(argv):
+    if argv and argv[0] in ('--validate', '--project', '--publish'):
+        return candidate_mode(argv)
     # Two flags, and both exist because the run needs a way back. `--reopen`
     # is what a user saying "the panel is gone" turns into; `--no-open` is for
     # the host that has a preview pane of its own and drives it itself, which
@@ -488,6 +1320,25 @@ def main(argv):
     except ValueError as error:
         print('sync: %s — the page reads this file, so the прогон is now invisible' % error)
         return 1
+
+    try:
+        candidate = json.loads(text)
+    except ValueError:
+        candidate = None
+    if isinstance(candidate, dict) and candidate.get('contractVersion') == 4:
+        try:
+            violations, _summary = validate_candidate(candidate)
+            if not violations:
+                violations.extend(validate_files(candidate))
+        except (TypeError, KeyError, AttributeError, ValueError):
+            violations = [{'field': 'verification',
+                           'message': 'candidate contains malformed nested records'}]
+        if violations:
+            validation_envelope('invalid', candidate, violations)
+            url = viewer_address('--no-open' in argv)
+            print('sync: version-4 state rejected before mirroring; diagnostic at %s' % url)
+            return 1
+        validation_envelope('valid', candidate, [], candidate)
 
     mirrored = mirror(text)
     linked = place_index()

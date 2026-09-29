@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { checkG3, type GateFinding } from './check-g3.ts';
+import { verifiedState } from '../state/fixtures/verification.ts';
 import {
   CONTRACT_VERSION,
   type RequirementEntry,
@@ -36,6 +37,36 @@ function stateWith(
 }
 
 const ids = (findings: GateFinding[]): string[] => findings.map(f => f.requirementId);
+
+test('V03/V09: source signature cannot replace the required menu behavior check', () => {
+  const state = verifiedState();
+  state.verification!.checks[0]!.method = 'source-signature';
+  assert.ok(checkG3(state).some(item => /source-only check C-1/.test(item.message)));
+});
+
+test('V05: a required check needs an execution owner and integration prerequisites', () => {
+  const state = verifiedState();
+  delete state.verification!.checks[0]!.executionTaskId;
+  state.verification!.checks[0]!.integrationDependencies = [];
+  const findings = checkG3(state);
+  assert.ok(findings.some(item => /check C-1 has no matching execution owner/.test(item.message)));
+  assert.ok(findings.some(item => /omits implementation prerequisite 01/.test(item.message)));
+});
+
+test('a verification-only task can own the check without implementation ownership', () => {
+  const state = verifiedState();
+  state.tasks.push({ ...state.tasks[0]!, id: '02', title: 'Verify menu', blockedBy: ['01'] });
+  state.verification!.obligations[0]!.implementationTaskIds = [];
+  state.verification!.checks[0]!.executionTaskId = '02';
+  state.verification!.checks[0]!.integrationDependencies = ['01'];
+  assert.deepEqual(checkG3(state), []);
+});
+
+test('a cyclic task graph is rejected at G3', () => {
+  const state = verifiedState();
+  state.tasks[0]!.blockedBy = ['01'];
+  assert.ok(checkG3(state).some(item => /dependency cycle/.test(item.message)));
+});
 
 test('a map that holds in both directions passes', () => {
   assert.deepEqual(checkG3(stateWith(

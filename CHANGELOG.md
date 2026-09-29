@@ -14,6 +14,27 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+## v0.0.4-alpha — 2026-09-29
+
+**Verification contract v4 (preview).** The run now separates planning
+status, task activity, observed conformance, and closure outcome. Reference
+preservation is registered from user intent, independently inventoried from raw
+authority at G2 and G4, and remains mandatory when optional polish is off.
+Obligations, checks, executions, findings, decisions, coverage reviews, and
+promised work live in one atomic state snapshot; immutable captures are
+referenced by hash. The bundled Python helper validates candidates before
+publication, while the dashboard, report projection, and metrics show failed,
+incomplete, exception, and legacy-unverified states distinctly. Structural and
+contract checks pass. The browser suite passes against the correct menu and
+rejects ten broken variants using the same real-input oracle. `npm run check`
+passes 667 tests, including Python helper integration.
+
+**Known verification limit:** the independent end-to-end workflow evaluation was
+stopped before final acceptance. Its harness now checks actual child-agent
+dispatches and grades the final build with the browser oracle, but the copied
+bundle has not passed the full acceptance matrix. This alpha release does not
+claim that the new workflow is fully verified.
+
 ## v0.0.3-alpha — 2026-09-27
 
 **The бриф grows, and the blind check reads what the user said after it was frozen.** `brief.md` was written once in phase 1 and never edited, and `manifest.md` holds requirement text and no statuses by design — so a требование the user withdraws at таск four was `dropped` in the run state, where nothing in the acceptance path reads it, and the blind reader reported a false «R03 не реализовано»; one the user *adds* at таск four was in no document that reader was handed, and was checked by nobody at all. The two independent gates are the only checks capable of catching a lost требование, and a change that reached the run state and not the бриф was invisible to both. `brief.md` is now append-only: the phase-1 text frozen, then one dated entry per change, so the numbered list a gate measures against and the words it measures stay in step. The additions are **quoted rather than translated** — each entry is the user's words verbatim, in the language they were said in, with one line of the прогон's own under it naming the `R##` and what was done about it — because the block is the ruler the blind reader holds the build against, and a ruler the прогон translated is a ruler the прогон wrote. G4 is handed the manifest plus the additions and still **not** the бриф's original text: that text already became the manifest and was shown back to the user at G1 as the agreed contract, while an addition never passed a gate and so travels as the user's words alone. The reader is told the two rules it needs to use them honestly — a quotation is not evidence of anything by itself, and where our line under it disagrees with it the quotation wins — and a требование the additions show was withdrawn now comes back as withdrawn rather than as missing, which is the false finding this change exists to stop. The briefing phase owns the one procedure for a change arriving mid-прогон and every later phase cites it: the additions first, the run state second, the plan third, and one sentence to the user saying what it costs the schedule. The state is second and never first because writing a status feels like having recorded the change, and the two readers that could catch a loss are forbidden to read the state. `S1`, which had sent the quote into the манифест — a file that holds no statuses and is never edited — now names the additions block and the run state, the two places the quote and the decision actually go. Two rules that lived only in prose gained a mechanical half: `Mutable` in the artifact table is held to three values, and `npm run readers` holds each blind reader's declared inputs to what `docs/spec/gates.md` says it is handed.

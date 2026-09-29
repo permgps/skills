@@ -76,6 +76,43 @@ export function checkG2(state: RunState): GateFinding[] {
     });
   }
 
+  const verification = state.verification;
+  if (state.contractVersion >= 4 && verification) {
+    const requiredReferences = verification.references.filter(reference =>
+      reference.role === 'authoritative_behavior' || reference.role === 'visual_reference');
+    for (const reference of requiredReferences) {
+      const surfaces = verification.surfaces.filter(surface => surface.referenceId === reference.id);
+      const obligations = verification.obligations.filter(obligation =>
+        obligation.referenceIds.includes(reference.id)
+        && obligation.targetRevision === verification.targetRevision);
+      if (!reference.available) {
+        findings.push({ requirementId: '',
+          message: `reference ${reference.id} is unavailable: ${reference.limitation ?? 'no limitation recorded'}` });
+      }
+      if (surfaces.length === 0 || surfaces.some(surface => !surface.inspected)) {
+        findings.push({ requirementId: '',
+          message: `reference ${reference.id} has no complete inspected surface map` });
+      }
+      if (obligations.length === 0 || obligations.some(obligation => obligation.discovery === 'unresolved')) {
+        findings.push({ requirementId: '',
+          message: `reference ${reference.id} has missing or unresolved behavior obligations` });
+      }
+      for (const requirementId of new Set(obligations.flatMap(obligation => obligation.requirementIds))) {
+        const review = verification.coverageReviews.find(item => item.requirementId === requirementId
+          && item.targetRevision === verification.targetRevision
+          && item.inputDigest === verification.acceptanceInputDigest
+          && item.status === 'complete' && item.uninspectedSurfaceIds.length === 0);
+        if (!review) findings.push({ requirementId,
+          message: `requirement ${requirementId} lacks a complete current independent coverage review` });
+      }
+    }
+    log.info('references', 'reference coverage checked', {
+      required: requiredReferences.length,
+      surfaces: verification.surfaces.length,
+      obligations: verification.obligations.length,
+    });
+  }
+
   log.info('g2', 'requirements checked', {
     total: state.requirements.length,
     ...Object.fromEntries(counts),

@@ -21,8 +21,12 @@
  * against. The dashboard has no handling to add because it never read the field
  * under either name, but it does carry its own copy of this number, and
  * `scripts/validate/state-matches-spec.ts` holds the two together.
+ * Version 4 changes completion semantics: lifecycle, outcome and a versioned
+ * verification index are required for a new state. Earlier states remain
+ * readable without inferred verification; validateState enforces the version
+ * boundary rather than narrowing this reader-facing interface.
  */
-export const CONTRACT_VERSION = 3;
+export const CONTRACT_VERSION = 4;
 
 /** The stage ids from docs/spec/phases.md, in run order. */
 export type StageId =
@@ -109,6 +113,232 @@ export const GATE_STATUSES: readonly GateStatus[] = ['pending', 'passed', 'faile
 
 export type GateId = 'G1' | 'G2' | 'G3' | 'G4';
 export const GATE_IDS: readonly GateId[] = ['G1', 'G2', 'G3', 'G4'];
+
+export type Lifecycle = 'active' | 'closed';
+export const LIFECYCLES: readonly Lifecycle[] = ['active', 'closed'];
+
+export type ClosureOutcome = 'completed' | 'closed_with_exceptions' | 'stopped_incomplete';
+export const CLOSURE_OUTCOMES: readonly ClosureOutcome[] =
+  ['completed', 'closed_with_exceptions', 'stopped_incomplete'];
+
+export type VerificationResult = 'passed' | 'failed' | 'incomplete';
+export const VERIFICATION_RESULTS: readonly VerificationResult[] =
+  ['passed', 'failed', 'incomplete'];
+
+export type CheckResult = 'not_run' | 'passed' | 'failed' | 'unavailable' | 'stale';
+export const CHECK_RESULTS: readonly CheckResult[] =
+  ['not_run', 'passed', 'failed', 'unavailable', 'stale'];
+
+export type ReferenceRole = 'authoritative_behavior' | 'visual_reference' | 'contextual_example' | 'other';
+export type DiscoveryStatus = 'observed' | 'source_derived' | 'unresolved';
+export type FindingStatus = 'open' | 'resolved';
+export type CoverageStatus = 'complete' | 'incomplete';
+
+/** The source identity and access limits survive even when access is unavailable. */
+export interface VerificationReference {
+  id: string;
+  statement: string;
+  role: ReferenceRole;
+  roleDescription?: string;
+  location: string;
+  accessMethod: string;
+  available: boolean;
+  limitation?: string;
+  revision: string;
+  conditions: string[];
+  approvedDeviationIds: string[];
+}
+
+/** An inspected or deliberately uninspected reference surface. */
+export interface ReferenceSurface {
+  id: string;
+  referenceId: string;
+  source: string;
+  inspected: boolean;
+  equivalenceGroup?: string;
+  variantIds: string[];
+  limitation?: string;
+}
+
+export interface VerificationObligation {
+  id: string;
+  requirementIds: string[];
+  referenceIds: string[];
+  surfaceIds: string[];
+  expectation: string;
+  discovery: DiscoveryStatus;
+  sourceEvidenceIds: string[];
+  variantIds: string[];
+  checkIds: string[];
+  implementationTaskIds: string[];
+  targetRevision: number;
+  supersedes?: string;
+}
+
+export interface VerificationCheck {
+  id: string;
+  obligationIds: string[];
+  method: string;
+  target: string;
+  procedure: string[];
+  oracle: string;
+  oracleEvidenceIds: string[];
+  variantIds: string[];
+  executionTaskId?: string;
+  integrationDependencies: string[];
+  required: boolean;
+  /** Fingerprint for this check's declared relevant inputs now. */
+  currentFingerprint: EvidenceFingerprint;
+  /** A changed oracle/mask creates a new check with an authorized basis. */
+  supersedes?: string;
+  basisDecisionId?: string;
+  oracleChangeBasis?: string;
+  ignoreMask?: string[];
+}
+
+/** Only declared relevant inputs are fingerprinted; no credential values. */
+export interface EvidenceFingerprint {
+  reference: string;
+  build: string;
+  data: string;
+  runtime: string;
+  acceptanceInput: string;
+  relevantPaths: string[];
+  /** Relative project paths and hashes for declared relevant files. */
+  inputHashes: Record<string, string>;
+}
+
+export interface VerificationEvidence {
+  id: string;
+  path: string;
+  sha256: string;
+  mediaType: string;
+  capturedAt: string;
+  origin: 'reference' | 'execution';
+  basis?: string;
+}
+
+export interface CheckAssertion {
+  name: string;
+  result: 'passed' | 'failed';
+  evidenceIds: string[];
+}
+
+export interface CheckExecution {
+  id: string;
+  checkId: string;
+  result: CheckResult;
+  fingerprint: EvidenceFingerprint;
+  invocation: string;
+  tool: string;
+  host: string;
+  executor: string;
+  executedAt: string;
+  viewport?: string;
+  locale?: string;
+  authVariant?: string;
+  assertions: CheckAssertion[];
+  evidenceIds: string[];
+  limitation?: string;
+  supersedes?: string;
+}
+
+export interface VerificationFinding {
+  id: string;
+  requirementIds: string[];
+  obligationIds: string[];
+  checkIds: string[];
+  evidenceIds: string[];
+  origin: 'coordinator' | 'executor' | 'reviewer' | 'independent' | 'user' | 'validator';
+  description: string;
+  status: FindingStatus;
+  resolutionExecutionId?: string;
+  supersedes?: string;
+}
+
+export interface VerificationDecision {
+  id: string;
+  kind: 'scope_amendment' | 'accepted_exception';
+  authorizedBy: string;
+  authorizedAt: string;
+  authorization: string;
+  /** The exact choices shown to the user when the decision was made. */
+  presentedFindingIds: string[];
+  presentedObligationIds: string[];
+  selectedFindingIds: string[];
+  selectedObligationIds: string[];
+  previousTargetRevision?: number;
+  targetRevision?: number;
+  basis?: string;
+}
+
+export interface CoverageReview {
+  id: string;
+  requirementId: string;
+  targetRevision: number;
+  status: CoverageStatus;
+  inspectedSurfaceIds: string[];
+  uninspectedSurfaceIds: string[];
+  reviewer: string;
+  reviewedAt: string;
+  inputDigest: string;
+  limitation?: string;
+}
+
+export interface AcceptanceRound {
+  id: string;
+  targetRevision: number;
+  inputDigest: string;
+  referenceIds: string[];
+  executionIds: string[];
+  findingIds: string[];
+  coverageReviewIds: string[];
+  requirementResults: Record<string, VerificationResult>;
+  g4: GateStatus;
+  performedAt: string;
+  supersedes?: string;
+}
+
+export interface PromisedWork {
+  id: string;
+  description: string;
+  status: 'open' | 'done' | 'cancelled';
+  acceptanceRoundId?: string;
+  authorizationDecisionId?: string;
+}
+
+export interface RepairAttempt {
+  id: string;
+  findingId: string;
+  taskId: string;
+  at: string;
+  outcome: 'repaired' | 'still_failing' | 'unavailable';
+}
+
+export interface RepairLimits {
+  perFinding: number;
+  total: number;
+}
+
+/** The single authoritative verification index, embedded in the state snapshot. */
+export interface VerificationRecord {
+  version: 1;
+  targetRevision: number;
+  acceptanceInputDigest: string;
+  references: VerificationReference[];
+  surfaces: ReferenceSurface[];
+  obligations: VerificationObligation[];
+  checks: VerificationCheck[];
+  executions: CheckExecution[];
+  evidence: VerificationEvidence[];
+  findings: VerificationFinding[];
+  decisions: VerificationDecision[];
+  coverageReviews: CoverageReview[];
+  acceptanceRounds: AcceptanceRound[];
+  promisedWork: PromisedWork[];
+  repairLimits: RepairLimits;
+  repairAttempts: RepairAttempt[];
+}
 
 /** Which dial moved, and at which phase boundary it took effect. */
 export interface DialChange {
@@ -259,6 +489,14 @@ export interface RunState {
   tasks: TaskEntry[];
   requirements: RequirementEntry[];
   gates: GateEntry[];
+  /** Required for contract 4; absent in a read-only historical state. */
+  lifecycle?: Lifecycle;
+  /** Required only for a closed contract-4 state. */
+  outcome?: ClosureOutcome;
+  /** Required for a stopped incomplete run. */
+  stopReason?: string;
+  /** Required for contract 4; records and verdicts publish atomically. */
+  verification?: VerificationRecord;
   debt?: Debt;
   /** Delivered beyond what was asked, one line apiece, with the требование it served. */
   additions?: string[];

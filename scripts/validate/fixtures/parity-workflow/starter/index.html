@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Northstar services</title>
+<style>
+  body { font: 16px system-ui, sans-serif; margin: 0; }
+  header { padding: 20px; background: #173058; color: white; }
+  nav { position: relative; padding: 16px 20px; }
+  #services { padding: 10px 18px; }
+  #details { display: none; position: absolute; top: 62px; left: 20px;
+    width: 600px; min-height: 180px; background: white; border: 1px solid #173058; }
+  #details.open { display: flex; }
+  #details article { width: 190px; padding: 12px; }
+</style>
+<header>Northstar</header>
+<nav id="navigation">
+  <button id="services">Services</button>
+  <section id="details" aria-label="Services">
+    <article>Accounts</article>
+    <article>Cards</article>
+    <article>Featured offer</article>
+  </section>
+</nav>
+<main><h1>Everyday banking</h1><p>Find the right service for you.</p></main>
+</html>

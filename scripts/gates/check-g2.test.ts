@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { checkG2, type GateFinding } from './check-g2.ts';
+import { verifiedState } from '../state/fixtures/verification.ts';
 import {
   CONTRACT_VERSION,
   type GateEntry,
@@ -124,4 +125,28 @@ test('a state with no G2 entry at all is reported', () => {
 test('a requirement with no id is still reported, anchored to its index', () => {
   const findings = checkG2(stateWith([{ id: '', status: 'open' }]));
   assert.deepEqual(ids(findings), ['requirements[0]']);
+});
+
+test('V04: an omitted authoritative menu cannot pass G2 because the reference map is empty', () => {
+  const state = verifiedState();
+  state.verification!.surfaces = [];
+  state.verification!.obligations = [];
+  const findings = checkG2(state);
+  assert.ok(findings.some(item => /reference REF-1 has no complete inspected surface map/.test(item.message)));
+  assert.ok(findings.some(item => /missing or unresolved behavior obligations/.test(item.message)));
+});
+
+test('V16: unavailable declared authority remains a G2 coverage gap', () => {
+  const state = verifiedState();
+  state.verification!.references[0]!.available = false;
+  state.verification!.references[0]!.limitation = 'No browser access';
+  assert.ok(checkG2(state).some(item => /REF-1 is unavailable/.test(item.message)));
+});
+
+test('V24: a non-UI request with no declared authority needs no UI surface map', () => {
+  const state = stateWith([{ id: 'R01', status: 'in-spec' }]);
+  state.contractVersion = 4;
+  state.verification = { ...verifiedState().verification!, references: [], surfaces: [],
+    obligations: [], coverageReviews: [] };
+  assert.deepEqual(checkG2(state), []);
 });

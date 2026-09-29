@@ -16,6 +16,7 @@ import { pathToFileURL } from 'node:url';
 
 import { createLogger } from '../shared/log.ts';
 import type { RunState } from '../state/contract.ts';
+import { deriveVerification } from '../state/verification.ts';
 import { runGate, targetFromArgv, type GateFinding } from './cli.ts';
 
 export type { GateFinding };
@@ -30,6 +31,30 @@ export function checkG4(state: RunState): GateFinding[] {
 
   const known = new Set(state.requirements.map(requirement => requirement.id).filter(id => id !== ''));
   const gate = state.gates.find(entry => entry.id === 'G4');
+
+  if (state.contractVersion >= 4 && state.verification) {
+    const summary = deriveVerification(state);
+    if (!gate || gate.status !== summary.g4) findings.push({ requirementId: '',
+      message: `G4 must equal the current derived result ${summary.g4}` });
+    if (!summary.currentRoundId && state.lifecycle === 'closed'
+      && state.outcome === 'completed') findings.push({ requirementId: '',
+        message: 'completed closure has no current acceptance round' });
+    for (const id of summary.failedIds) findings.push({ requirementId: id,
+      message: `requirement ${id} has a current failed verification result` });
+    for (const id of summary.incompleteIds) findings.push({ requirementId: id,
+      message: `requirement ${id} has incomplete current coverage or execution` });
+    if (state.lifecycle === 'closed' && state.outcome === 'completed' && summary.g4 !== 'passed') {
+      findings.push({ requirementId: '', message: 'completed closure requires current passing G4' });
+    }
+    if (state.lifecycle === 'closed'
+      && state.verification.promisedWork.some(item => item.status === 'open')) findings.push({
+      requirementId: '', message: 'open promised work blocks closure' });
+    log.info('g4', 'verification result checked', {
+      g4: summary.g4, round: summary.currentRoundId ?? null,
+      failed: summary.failedIds.length, incomplete: summary.incompleteIds.length,
+    });
+    return findings;
+  }
 
   // --- the blind check actually ran -----------------------------------------
   if (gate === undefined) {

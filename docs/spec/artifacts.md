@@ -16,6 +16,7 @@ project that was built, not with Maestro.
 │   ├── tasks/NN-<slug>.md
 │   ├── tasks/NN-<slug>-handoff.md
 │   ├── reviews/NN-<slug>.md
+│   ├── evidence/<execution-id>/...
 │   ├── report.md
 │   ├── decisions.md
 │   └── amendments.md
@@ -45,7 +46,7 @@ actually built.
 | `brief.md` | manifest | manifest, G2, acceptance (the manifest plus the additions) | append-only |
 | `manifest.md` | manifest | briefing, spec, plan, acceptance, G1, G2, G3, G4 | append-only |
 | `answers.md` | briefing | spec | append-only |
-| `reference.md` | briefing | polish | append-only |
+| `reference.md` | briefing | G2 reference reader, acceptance reference reader, polish | append-only |
 | `spec.md` | spec | plan, build, review | yes, by amendment only |
 | `interfaces.md` | plan | build, review | no |
 | `discovered-interfaces.md` | build | build, memory | append-only |
@@ -53,10 +54,11 @@ actually built.
 | `tasks/NN-<slug>-handoff.md` | build | build, review | no |
 | `reviews/NN-<slug>.md` | review | repair, acceptance | append-only |
 | `report.md` | acceptance | the user | append-only |
+| `evidence/<execution-id>/...` | acceptance | verification validator, acceptance | no |
 | `decisions.md` | memory | the user, a later прогон | append-only |
 | `amendments.md` | repair | build, review, acceptance | append-only |
 | `config.json` | preflight | preflight | yes |
-| `state.js` | preflight | dashboard | yes |
+| `state.js` | preflight | dashboard, gates, metrics | yes |
 | `dashboard.html` | preflight | the user | no |
 
 The single-writer rule is the reason two artifacts exist where one would read
@@ -70,11 +72,30 @@ the task file its executor was handed and the boundaries in `interfaces.md`;
 what other таски discovered afterwards was not part of that contract, and
 measuring against it would be judging an executor by words it never saw.
 
-`reference.md` has exactly one reader and it is доводка. Приёмка never opens it:
-that phase measures the build against the манифест, and a reader holding the
-user's comparables beside it would start reporting distance from the reference
-as a disagreement with the требования. The two questions are asked by two phases
-against two documents, which is why the run keeps both.
+Each task file contains the relevant user-contract and reference excerpts, the
+observable obligation IDs and check IDs it serves, its implementation owner
+when implementation is required, the check execution owner, variants, and
+integration prerequisites. `interfaces.md` carries shared boundaries; the
+executor does not receive the unrelated full specification. A verification-only
+task can own an execution without claiming implementation files. G3 validates
+both requirement-to-obligation-to-task and obligation-to-check-to-owner paths,
+including dependency cycles and integrated-app prerequisites. Headless rendered
+criteria are valid task checks; a visible viewer takeover is not.
+
+`reference.md` is a neutral projection of declared source identity, role,
+availability, and conditions. The independent G2 and G4 reference passes may
+open it and inspect the raw reference. It carries no check verdicts, accepted
+exceptions, or implementation rationale. A contextual example cannot silently
+become authoritative behavior. The verification index in `state.js` is the
+single verdict source; neither this file nor `report.md` may override it.
+
+Executors and browser runners write captures in their own temporary locations.
+The orchestrator imports verified captures into the immutable run-owned
+`evidence/<execution-id>/` directory before publishing the new snapshot.
+The table names acceptance as the owner of the evidence shape; imports may occur
+during build or review as well, under the same orchestrator-owned protocol.
+Evidence paths and hashes are indexed in `state.js`; the dashboard still reads
+no artifact files. See [`verification.md`](verification.md).
 
 A handoff exists only for a таск that ran out of context before it was done. It
 is written by the orchestrator from what the executor returned — the executor's

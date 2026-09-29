@@ -45,7 +45,8 @@ Three rules decide the cut, and they outrank the table:
    reaches at least one таск. That is G3, and it is what stops the cut from
    drifting into work nobody asked for.
 
-A tiny project produces **one** таск carrying the whole spec — one, not none.
+A tiny project produces **one** таск carrying every relevant spec criterion in
+its own file — one, not none. The executor is not given `spec.md` separately.
 Somebody is handed the work either way, and the unit one executor is handed is a
 таск. Cutting one требование into three таски to look thorough costs three
 contexts and three reviews to build what one executor finishes in one pass.
@@ -78,9 +79,20 @@ Each file carries:
 | Id and title | `NN` and one line saying what will exist when it is done |
 | Требования | the ids it serves, so the review and G3 can both find them |
 | What to build | the relevant part of the spec, restated in full — not a pointer to it |
+| User contract and authority | relevant request/addition excerpts, neutral raw reference locations and conditions, and approved deviations; no unrelated spec or rationale |
+| Verification map | obligation/check IDs, observable behavior, implementation owner if needed, execution owner, integration prerequisites, and applicable variants |
 | Boundaries | which files this таск owns, and which signatures from `interfaces.md` it must meet |
 | Done means | what the executor checks before returning, in terms it can check |
-| Depends on | the таск ids that must finish first, or none |
+| Depends on | the таск ids that must finish first, or none; execution-only tasks may have no implementation files |
+
+First map each live requirement to grounded obligations, then each obligation
+to implementation tasks when code is needed and to required executable checks
+with an execution owner. A verification-only task is legitimate: it has a
+requirement and check to execute, but invents no implementation ownership.
+Required integrated checks depend on the tasks that provide their application
+surface. Preserve `NN` task IDs, `blockedBy`, stable waves, and file zones.
+Size tasks around observable surfaces and independent ownership, without a
+fixed line-count limit.
 
 A task file that assumes context the executor does not have is the defect this
 phase produces most often. Read each one back as if you had never seen the spec.
@@ -101,15 +113,14 @@ exit code. A count that includes work other таски produce belongs to при
 which measures the whole build and is the only reader entitled to a whole-build
 number.
 
-**And an item of *done means* is phrased so it can be answered without putting
-anything in front of the user.** «The checks page shows all green» is not such an
-item: the only way to satisfy it is to open the page, and an executor that opens
-a page takes over the screen the прогон is being watched on. Write what can be
-run and read instead — the command, its exit code, the assertions, what the code
-produces. An item that genuinely needs a rendered page is one this таск cannot
-close: leave it out of *done means* and carry it, named, to the отчёт's
-assumptions or to приёмка, where the build is exercised by somebody whose whole
-job is exercising it.
+**A rendered behavior can be a required *done means* item** when an existing
+headless browser can execute it without taking over the user's dashboard. Name
+the integrated route, trigger, visible state, exit, variant, and evidence
+required. A component fixture may support diagnosis but cannot replace an
+integrated-app check. If the browser is unavailable, the owner records an
+unavailable check and limitation for later acceptance; it cannot silently
+substitute source signatures or a synthetic event. A human-visible viewer still
+belongs to the orchestrator and never to a task.
 
 ### 5. Have each task file read by somebody standing where the executor will
 
@@ -122,12 +133,11 @@ one question: could you build this without asking a question?
 They are independent of each other, so they go out at once and the wave is as
 wide as the host allows.
 
-Both tests above belong to that reading: **a task file whose *done means* can
-only be satisfied by opening something is a finding, and so is one that can only
-be answered by looking at work this таск does not own.** The reader is standing
-exactly where the executor will stand, so it is the one place either question can
-be asked before the answer costs the user their screen or costs a reviewer an
-item nobody can check.
+The reader checks ownership and feasibility: **a task requiring a visible
+viewer takeover, a missing headless prerequisite, or work another task owns is
+a finding.** A required rendered criterion with an executable headless path is
+valid. The reader must also see each obligation/check ID and enough raw oracle
+provenance to know what result the task should test.
 
 Act on every finding by editing the task file, here, before any executor sees
 it. Then record them in the G3 entry of the run state — an empty list is a real

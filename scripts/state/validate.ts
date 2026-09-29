@@ -8,10 +8,12 @@
 import { createLogger } from '../shared/log.ts';
 import {
   CONTRACT_VERSION,
+  CLOSURE_OUTCOMES,
   DEPTHS,
   GATE_IDS,
   GATE_STATUSES,
   LANGUAGES,
+  LIFECYCLES,
   MODES,
   REGISTERS,
   REQUIREMENT_STATUSES,
@@ -20,6 +22,7 @@ import {
   TASK_STATUSES,
   type RunState,
 } from './contract.ts';
+import { validateVerificationRecord } from './verification.ts';
 
 const log = createLogger('state');
 
@@ -173,6 +176,7 @@ export function validateState(value: unknown): StateViolation[] {
    * field is not a run that lost one.
    */
   const atLeastV3 = typeof version === 'number' && version >= 3;
+  const atLeastV4 = typeof version === 'number' && version >= 4 && version <= CONTRACT_VERSION;
 
   // --- heldBy ---------------------------------------------------------------
   // Optional at every version, and absent means unclaimed rather than free: the
@@ -504,6 +508,22 @@ export function validateState(value: unknown): StateViolation[] {
       }
     }
     requireStringArray('additions', value['additions']);
+  }
+
+  if (atLeastV4) {
+    if (typeof value['slug'] !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value['slug'])) {
+      add('slug', 'contract-4 slug must be a canonical safe path segment');
+    }
+    requireOneOf('lifecycle', value['lifecycle'], LIFECYCLES);
+    optionalOneOf('outcome', value['outcome'], CLOSURE_OUTCOMES);
+    optionalString('stopReason', value['stopReason']);
+    if (!isRecord(value['verification'])) {
+      add('verification', 'contract 4 requires a verification object');
+    } else if (Array.isArray(tasks) && Array.isArray(requirements) && Array.isArray(gates)) {
+      for (const violation of validateVerificationRecord(value as unknown as RunState)) {
+        add(violation.field, violation.message);
+      }
+    }
   }
 
   log.debug('validate', 'validation finished', { violations: violations.length });

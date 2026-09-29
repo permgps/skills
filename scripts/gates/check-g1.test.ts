@@ -9,11 +9,11 @@ import { readState, parseStateSource, UnreadableStateError } from '../state/read
 import { writeState } from '../state/write.ts';
 import { InvalidStateError } from '../state/validate.ts';
 import { STATE_FILE } from '../state/paths.ts';
-import { CONTRACT_VERSION, type RequirementEntry, type RunState } from '../state/contract.ts';
+import { type RequirementEntry, type RunState } from '../state/contract.ts';
 
 function stateWith(requirements: RequirementEntry[]): RunState {
   return {
-    contractVersion: CONTRACT_VERSION,
+    contractVersion: 3,
     runId: 'run-1',
     slug: 'landing-page',
     startedAt: '2026-08-19T09:00:00Z',

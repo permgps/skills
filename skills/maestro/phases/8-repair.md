@@ -1,7 +1,7 @@
 # Phase 8 — Repair
 
 Read when a таск needs another attempt. It runs outside the sequence, and there
-are exactly four doors into it:
+are five doors into it:
 
 | Door | Arrived from | State of the таск | What is known |
 |---|---|---|---|
@@ -9,6 +9,7 @@ are exactly four doors into it:
 | blocking-review | Ревью | `repair` — the review found a blocking finding | the таск is committed, and the finding names what it contradicts |
 | g4-disagreement | Приёмка | `done`, and G4 disagreed about a `R##` it carries | the build is finished and the disagreement is against the манифест |
 | recorded-divergence | Разработка, after its last wave | `review` or `done` | a `D##` says a delivered file disagrees with what the build does, and no review or gate will say it again |
+| coverage-omission | G2, Ревью, or Приёмка | any relevant task state | a valid existing requirement lacked a grounded obligation, implementation assignment, or executable check |
 
 The fourth exists because the other three cannot see it. A review judges one
 таск against the contract that таск was given; G4 reads the build against the
@@ -47,19 +48,28 @@ Not `spec.md`, not the манифест, not the other таски. You are decid
 таск against the contract it was given, and the withholding that makes a review
 worth reading makes a retry worth running.
 
-### 2. Decide: retry, or amendment
+### 2. Decide: retry, coverage repair, or scope amendment
 
-Two answers, and no third.
+Three distinct paths preserve the user's contract.
 
 | Answer | Means | Requires |
 |---|---|---|
 | retry | the таск can be built as specified; the attempt was wrong | nothing beyond the failure itself |
-| amendment | the specification was wrong, and the build demonstrated it | a specific thing that was tried and a specific way it failed |
+| coverage repair | the existing requirement omitted a behavior, owner, or check | a grounded reference/source observation and stable finding ID; no new user scope |
+| scope amendment | the user explicitly changed the target, or demonstrated impossibility needs their decision | exact authorization, old/new target revisions, and the demonstrated fact |
 
 **The test is evidence, not effort.** A signature that cannot exist, a
 dependency that does not do what the spec assumed, two требования that
-contradict each other — those are amendments. "It was hard", "the executor
-misread it" and "there is a simpler design" are retries.
+contradict each other — those may need a user-authorized scope amendment.
+An omitted menu state is coverage repair: the user already asked for fidelity.
+"It was hard", "the executor misread it" and "there is a simpler design" are
+retries.
+
+For coverage repair, preserve the original `R##` and prior records. Add the
+missing grounded obligation and required check, amend task ownership and
+integration dependencies, invalidate affected earlier passes, implement,
+execute, review, and rerun affected acceptance and shared-component variants.
+Do not rewrite the old oracle or present this correction as new user scope.
 
 **A second reading of the specification is never an amendment.** If the words
 were ambiguous, they were ambiguous before anybody built anything; what changed
@@ -78,7 +88,14 @@ both attempts, and what each produced. That is the number
 [`../SKILL.md`](../SKILL.md) already uses for a gate failing on the same
 finding, and it is the same number on purpose.
 
-### 4. If it is an amendment — write it down
+Also count repair attempts by stable finding identity and under the finite
+overall `verification.repairLimits` budget. Repeated attempts to fix the same
+failure retain its root ID even if wording or task splits change. A newly
+discovered, unrelated omission gets its own identity, while the overall budget
+still limits the run. Exhaustion records an unresolved failure and presents
+concrete remaining options; it never creates a pass or broad waiver.
+
+### 4. If it is a user-authorized scope amendment — write it down
 
 Append to `.maestro/<slug>/amendments.md`:
 
@@ -91,6 +108,10 @@ Append to `.maestro/<slug>/amendments.md`:
 Then move that requirement's status in the run state, with the reason recorded —
 `deferred` when it waits for something, `dropped` only when the user said so in
 their own words (`S1`).
+
+Append a `scope_amendment` decision to verification history with exact user
+authorization and the old/new target revisions. Preserve old obligations and
+checks as history; create current replacements and require new acceptance.
 
 **Do not edit `spec.md`.** It has one writer and this phase is not it. An
 amendment is a new fact about what the build demonstrated, not a correction of

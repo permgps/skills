@@ -61,6 +61,15 @@ Give each reviewer its task file, that таск's diff, and `interfaces.md`, bri
 by [`../prompts/reviewer.md`](../prompts/reviewer.md). **Nothing else** — not
 `spec.md`, not the манифест, not another таск's file or diff.
 
+Include the task-owned check result records and capture index for criteria the
+task was assigned to execute. The reviewer checks whether the invocation,
+assertions, integrated target, oracle, variants, and hashes adequately support
+the claimed result. Static diff review and executed verification are separate:
+the former cannot turn a missing or unavailable interaction check into `passed`.
+The reviewer may inspect raw reference authority to identify an omitted
+behavior outside the generated task list; report that as an upstream coverage
+finding rather than quietly expanding this task's scope.
+
 A review reads the project and writes nothing into it, so nothing here needs a
 worktree, an order, or a wave. Every таск is reviewed at the same time as every
 other.
@@ -73,6 +82,11 @@ observation. A reviewer's keyboard does not reach `.maestro/`, and a review
 rewritten in your words is a review whose original nobody can check.
 
 An observation is recorded and stops nothing; the отчёт reads these files later.
+Import every substantiated finding into `verification.findings` with a stable ID,
+origin, affected requirement/obligation/check IDs, and evidence links. Route an
+upstream omitted obligation to coverage repair and an integration-evidence gap
+to its execution owner. A reviewer's note never overrides a structured check
+result or silently accepts a defect.
 
 ### 5. Move each таск
 

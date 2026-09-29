@@ -10,6 +10,7 @@ import path from 'node:path';
 
 import { createLogger } from '../shared/log.ts';
 import type { RunState } from './contract.ts';
+import { validateEvidence } from './evidence.ts';
 import { STATE_FILE } from './paths.ts';
 // The conditional write has to see what is on disk, and unwrapping the
 // assignment is the reader's job. It is a one-way edge: `STATE_FILE` and
@@ -17,6 +18,7 @@ import { STATE_FILE } from './paths.ts';
 // back here for them.
 import { parseStateSource } from './read.ts';
 import { InvalidStateError, validateState } from './validate.ts';
+import { validateVerificationTransition } from './verification.ts';
 
 const log = createLogger('state');
 
@@ -143,6 +145,9 @@ export async function writeState(
   expect?: string,
 ): Promise<WriteResult> {
   const violations = validateState(state);
+  if (violations.length === 0 && state.contractVersion >= 4) {
+    violations.push(...await validateEvidence(state, path.dirname(dir)));
+  }
   if (violations.length > 0) {
     log.error('write', 'state failed validation; nothing was written', {
       dir,
@@ -152,6 +157,21 @@ export async function writeState(
   }
 
   const target = path.join(dir, STATE_FILE);
+
+  if (state.contractVersion >= 4) {
+    try {
+      const previous = parseStateSource(await readFile(target, 'utf8')) as RunState;
+      if (previous.contractVersion >= 4 && validateState(previous).length === 0) {
+        const transition = validateVerificationTransition(previous, state);
+        if (transition.length > 0) throw new InvalidStateError(transition);
+      }
+    } catch (error) {
+      if (error instanceof InvalidStateError) throw error;
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        log.warn('write', 'prior snapshot could not be compared as history', { target });
+      }
+    }
+  }
 
   if (expect !== undefined) {
     const found = await readStamp(target);

@@ -15,8 +15,10 @@ Install both, or install one; the section below is about how to say which.
 
 ## Requirements
 
-- **To use the skill:** an agent that reads Agent Skills. Nothing else — the
-  skill is Markdown, and it carries no runtime dependencies.
+- **To use the skill:** an agent that reads Agent Skills and Python 3 for the
+  bundled standard-library state helper. Browser checks use an available
+  headless browser capability; an unavailable browser leaves affected checks
+  incomplete. The bundle installs no application dependencies.
 - **To develop it:** Node.js 22.18 or newer, because the repository's own scripts
   are TypeScript executed by Node's native type stripping.
 
@@ -29,9 +31,9 @@ leaves it unable to raise a worktree for the rest of that session, so every wave
 of the прогон narrows to one таск. Both are announced rather than silent, and
 both are avoided by running `git init` first.
 
-`python3` is used for one thing: mirroring the run state into the dashboard and
-serving it on the loopback interface so the page stays live inside an in-app
-pane. Without it the dashboard still opens in a browser.
+`python3` runs the bundled helper that validates a complete state candidate,
+publishes it atomically, and serves the dashboard on the loopback interface.
+Without it the version-4 publication path cannot run.
 
 ## From the published repository
 
@@ -292,11 +294,15 @@ npm run check     # everything below, in this order
 | `npm run hosts` | every host capability that degrades is probed in preflight and spent in a phase |
 | `npm run doors` | every door into the repair phase is listed there and opened by some phase |
 | `npm run dials` | the mode set and its built-in default agree across spec, phase and `SKILL.md` |
-| `npm run readers` | each blind check's reader declares the inputs `docs/spec/gates.md` says it is handed |
+| `npm run readers` | each blind check's reader declares both given and withheld inputs from `docs/spec/gates.md` |
 | `npm run view` | `SKILL.md` states the view boundary, every prompt carries it, and only preflight opens a page |
 | `npm run test` | the checkers' own tests |
+| `npm run parity:browser` | separate required real-browser pointer suite; unavailable exits 2 |
+| `npm run parity:workflow` | separate required independent agent evaluation; unavailable exits 2 |
 
 `npm run metrics -- <run-dir>` measures a finished run. It is not part of
 `npm run check`, because this repository contains no run for it to measure.
 
 Individual checks are documented in [the specification README](spec/README.md).
+The [parity verification record](parity-verification.md) names the separate
+browser and workflow prerequisites and the current execution limits.

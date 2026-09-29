@@ -9,6 +9,14 @@ never reads `manifest.md`, `spec.md`, a task file, or any path in the
 repository. A view that reaches into artifacts becomes a second source of truth,
 and the second one is silently wrong.
 
+Contract-4 verification records and their validation envelope arrive through
+that same snapshot. The page derives requirement results and run outcome from
+them; it does not open evidence files or treat `finishedAt`, completed tasks,
+or a finished acceptance stage as proof of conformance. An invalid candidate
+must leave an accessible error tied to its revision and suppress an older green
+success display. A historical pre-verification state remains readable with an
+explicit “verification not established” label, including its original G4.
+
 A **view preference** is not data about the прогон, and the rule above does not
 reach it. Which theme the page is painted in, and which of its two languages a
 particular reader is reading, are properties of that reader's eyes and their
@@ -34,11 +42,11 @@ like to look at it.
 | `tasks` | Таски | Finished out of cut, with what is in motion and what was retried | `tasks[]` |
 | `debt` | Долг | Заглушки, допущения and переменные as one number and three | `debt` |
 | `tests` | Тесты | The last full suite | `tests`, or the last таск's own |
-| `requirements` | Требования (счёт) | The манифест counted by status | `requirements[]` |
+| `requirements` | Требования (счёт) | Planning status and separately derived verification results | `requirements[]`, `verification` |
 | `stages` | Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
 | `build` | Ход разработки | The таски grouped by волна, each with its status, phase and clock | `tasks[]` |
-| `requirement-list` | Требования (список) | The манифест one требование at a time | `requirements[]` |
-| `gates` | Gates | G1–G4 with status, findings when failed, and a folded count of them when passed | `gates[]` |
+| `requirement-list` | Требования (список) | The манифест one требование at a time, with technical result | `requirements[]`, `verification` |
+| `gates` | Gates | G1–G4 with status, derived G4 evidence, and findings | `gates[]`, `verification`, `lifecycle`, `outcome` |
 
 The `Key` column is the region's name in the page: it is the `data-region`
 attribute in the markup and the entry in `EXPLAIN_ORDER` in the logic block.
@@ -287,8 +295,9 @@ same number, which is the whole run's elapsed time wearing a stage's label.
 - Re-reads `state.js` on its own on a short interval. It never waits for the
   orchestrator to tell it to refresh, because the orchestrator is often busy for
   minutes at a time.
-- Survives the run: after `finishedAt` it stays a readable record of what
-  happened, with every clock stopped.
+- Survives the run: after contract-4 `lifecycle: closed` and `finishedAt` it
+  stays a readable record of what happened, with every clock stopped. Earlier
+  versions remain historical and unverified.
 
 ## Failed And Interrupted Runs
 
@@ -334,13 +343,11 @@ it is unreachable from a `null` origin. That number is not noise on the user's
 screen; it contradicts an отчёт about to call the build finished, and the
 failure belongs to the route rather than to the code.
 
-**A page that must be seen is seen once, and by arrangement.** If something
-other than the panel truly has to be looked at, the orchestrator shows it —
-never a субагент — in a browser window of its own rather than in the pane
-holding the panel, and says in one line what it is and why. Everything else is
-checked without a viewer, or written down as unchecked and carried to the
-section that already exists for it: *What You Could Not Check* at приёмка, the
-отчёт's assumptions elsewhere.
+**Verification pages stay out of the user's viewer.** An owned temporary local
+server and available headless browser may exercise a reference or integrated
+build with real input and recorded evidence. Neither may take over the dashboard
+pane or an unowned server. If the capability is absent, affected checks remain
+unavailable and reach *What You Could Not Check* at приёмка and the отчёт.
 
 **A moved address is announced.** The panel's server can lose its port to
 another process between one state write and the next. When that happens the

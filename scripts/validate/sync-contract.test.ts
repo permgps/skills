@@ -19,9 +19,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import net from 'node:net';
-import { mkdtemp, writeFile, copyFile, readFile, rm, unlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, copyFile, readFile, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { CAPTURES, verifiedState } from '../state/fixtures/verification.ts';
+import { deriveVerification } from '../state/verification.ts';
+import { validateState } from '../state/validate.ts';
 
 const SYNC = 'skills/maestro/tools/sync.py';
 const PAGE = 'skills/maestro/assets/dashboard.html';
@@ -63,6 +66,19 @@ interface Outcome { status: number; out: string }
  * this — see `opener()`.
  */
 const SEALED = { MAESTRO_SYNC_NO_OPEN: '1' };
+
+/** The new machine-readable modes put one JSON object on stdout. */
+function jsonResult(outcome: Outcome): Record<string, unknown> {
+  return JSON.parse(outcome.out.split('\n')[0] ?? '{}') as Record<string, unknown>;
+}
+
+async function addV4Captures(root: string): Promise<void> {
+  for (const [relative, body] of Object.entries(CAPTURES)) {
+    const filename = path.join(root, 'synthetic-menu', relative);
+    await mkdir(path.dirname(filename), { recursive: true });
+    await writeFile(filename, body);
+  }
+}
 
 /** Run the script with the sealed environment, plus whatever a test adds. */
 function run(script: string, extra: Record<string, string>, args: string[] = []): Outcome {
@@ -536,6 +552,172 @@ test('a state written before the language dial existed is not held to the rule',
       gates: [{ id: 'G1', status: 'passed', findings: ['Every requirement carries a status'] }],
     });
     assert.equal(done.status, 0, done.out);
+  });
+
+test('version-4 candidate validates and publishes atomically through the copied helper',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      const state = verifiedState();
+      await addV4Captures(target.root);
+      const candidate = path.join(target.root, 'candidate.json');
+      await writeFile(candidate, JSON.stringify(state));
+      const checked = await target.run({}, ['--validate', candidate]);
+      assert.equal(checked.status, 0, checked.out);
+      assert.equal(jsonResult(checked)['status'], 'valid');
+      assert.deepEqual((jsonResult(checked)['projection'] as Record<string, unknown>)['requirementResults'],
+        deriveVerification(state).requirementResults);
+
+      const published = await target.run({}, ['--publish', candidate, '--no-open']);
+      assert.equal(published.status, 0, published.out);
+      assert.equal(jsonResult(published)['status'], 'published');
+      assert.match(await readFile(path.join(target.root, 'state.js'), 'utf8'), /"outcome": "completed"/);
+      const projected = await target.run({}, ['--project', path.join(target.root, 'state.js')]);
+      assert.equal(projected.status, 0, projected.out);
+      assert.equal(jsonResult(projected)['verificationEstablished'], true);
+    } finally {
+      await target.dispose();
+    }
+  });
+
+test('version-4 invalid first candidate exposes diagnostics without publishing a green state',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      const state = verifiedState();
+      state.gates[3]!.status = 'failed';
+      await addV4Captures(target.root);
+      const candidate = path.join(target.root, 'candidate.json');
+      await writeFile(candidate, JSON.stringify(state));
+      const done = await target.run({}, ['--publish', candidate, '--no-open']);
+      assert.equal(done.status, 1, done.out);
+      assert.equal(jsonResult(done)['status'], 'rejected');
+      assert.match(await readFile(path.join(target.root, 'validation.js'), 'utf8'), /"status": "invalid"/);
+      assert.match(await readFile(path.join(target.root, 'dashboard.html'), 'utf8'),
+        /MAESTRO_VALIDATION_SNAPSHOT = \{"candidateRevision": "2026-09-29T09:20:00Z"/);
+      await assert.rejects(readFile(path.join(target.root, 'state.js'), 'utf8'));
+      assert.match(String(jsonResult(done)['url']), /dashboard\.html/);
+    } finally {
+      await target.dispose();
+    }
+  });
+
+test('version-4 publication refuses a changed capture and keeps its prior coherent state',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      const state = verifiedState();
+      await addV4Captures(target.root);
+      const candidate = path.join(target.root, 'candidate.json');
+      await writeFile(candidate, JSON.stringify(state));
+      assert.equal((await target.run({}, ['--publish', candidate, '--no-open'])).status, 0);
+      const before = await readFile(path.join(target.root, 'state.js'), 'utf8');
+      await writeFile(path.join(target.root, 'synthetic-menu', 'evidence/X-1/pointer.txt'), 'tampered');
+      const changed = { ...state, updatedAt: '2026-09-29T09:21:00Z' };
+      await writeFile(candidate, JSON.stringify(changed));
+      const rejected = await target.run({}, ['--publish', candidate, '--expect', state.updatedAt!, '--no-open']);
+      assert.equal(rejected.status, 1, rejected.out);
+      assert.equal(jsonResult(rejected)['status'], 'rejected');
+      assert.match(String(jsonResult(rejected)['url']), /dashboard\.html/);
+      assert.match(await readFile(path.join(target.root, 'dashboard.html'), 'utf8'),
+        /MAESTRO_VALIDATION_SNAPSHOT = \{"candidateRevision": "2026-09-29T09:21:00Z"/);
+      assert.equal(await readFile(path.join(target.root, 'state.js'), 'utf8'), before);
+    } finally {
+      await target.dispose();
+    }
+  });
+
+test('version-4 publication rejects stale revisions and unrelated holders',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      const state = verifiedState();
+      state.heldBy = { token: 'session-1', since: state.startedAt };
+      await addV4Captures(target.root);
+      const candidate = path.join(target.root, 'candidate.json');
+      await writeFile(candidate, JSON.stringify(state));
+      assert.equal((await target.run({}, ['--publish', candidate, '--holder', 'session-1', '--no-open'])).status, 0);
+      const changed = { ...state, updatedAt: '2026-09-29T09:22:00Z' };
+      await writeFile(candidate, JSON.stringify(changed));
+      const stale = await target.run({}, ['--publish', candidate, '--expect', 'older', '--holder', 'session-1', '--no-open']);
+      assert.equal(stale.status, 1);
+      assert.ok((jsonResult(stale)['violations'] as { field: string }[]).some(item => item.field === 'updatedAt'));
+      const stranger = await target.run({}, ['--publish', candidate, '--expect', state.updatedAt!, '--holder', 'session-2', '--no-open']);
+      assert.equal(stranger.status, 1);
+      assert.ok((jsonResult(stranger)['violations'] as { field: string }[]).some(item => item.field === 'heldBy'));
+      const accepted = await target.run({}, ['--publish', candidate, '--expect', state.updatedAt!, '--holder', 'session-1', '--no-open']);
+      assert.equal(accepted.status, 0, accepted.out);
+    } finally {
+      await target.dispose();
+    }
+  });
+
+test('legacy projection remains unverified and malformed nested candidates are rejected',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      const candidate = path.join(target.root, 'candidate.json');
+      await writeFile(candidate, JSON.stringify(STATE));
+      const legacy = await target.run({}, ['--project', candidate]);
+      assert.equal(legacy.status, 0, legacy.out);
+      assert.equal(jsonResult(legacy)['verificationEstablished'], false);
+      const malformed = verifiedState();
+      malformed.verification!.checks[0]!.currentFingerprint.inputHashes = null as never;
+      await writeFile(candidate, JSON.stringify(malformed));
+      const checked = await target.run({}, ['--validate', candidate]);
+      assert.equal(checked.status, 1, checked.out);
+      assert.equal(jsonResult(checked)['status'], 'invalid');
+    } finally {
+      await target.dispose();
+    }
+  });
+
+test('version-4 TypeScript and copied Python agree on closure and incomplete controls',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      await addV4Captures(target.root);
+      const candidate = path.join(target.root, 'candidate.json');
+      const passing = verifiedState();
+      const failed = structuredClone(passing);
+      failed.verification!.executions[0]!.result = 'failed';
+      failed.gates[3]!.status = 'failed';
+      const exception = structuredClone(failed);
+      exception.outcome = 'closed_with_exceptions';
+      exception.verification!.decisions.push({
+        id: 'D-1', kind: 'accepted_exception', authorizedBy: 'user',
+        authorizedAt: '2026-09-29T09:19:00Z', authorization: 'Close with menu defect',
+        presentedFindingIds: [], presentedObligationIds: ['O-1'],
+        selectedFindingIds: [], selectedObligationIds: ['O-1'],
+      });
+      exception.verification!.acceptanceRounds[0]!.requirementResults = { R01: 'failed' };
+      exception.verification!.acceptanceRounds[0]!.g4 = 'failed';
+      const incomplete = structuredClone(passing);
+      incomplete.lifecycle = 'active';
+      delete incomplete.outcome;
+      delete incomplete.finishedAt;
+      incomplete.gates[3]!.status = 'pending';
+      incomplete.verification!.executions = [];
+      incomplete.verification!.acceptanceRounds = [];
+      const stale = structuredClone(passing);
+      stale.verification!.checks[0]!.currentFingerprint.build = 'changed-build';
+      const verificationOnly = structuredClone(passing);
+      verificationOnly.verification!.obligations[0]!.implementationTaskIds = [];
+      for (const state of [passing, failed, exception, incomplete, stale, verificationOnly]) {
+        await writeFile(candidate, JSON.stringify(state));
+        const pythonResult = await target.run({}, ['--validate', candidate]);
+        const tsValid = validateState(state).length === 0;
+        assert.equal(pythonResult.status === 0, tsValid,
+          `parity for ${state.outcome ?? 'active'}: ${pythonResult.out}`);
+        if (tsValid) {
+          const projected = jsonResult(pythonResult)['projection'] as Record<string, unknown>;
+          assert.deepEqual(projected['requirementResults'], deriveVerification(state).requirementResults);
+          assert.equal(projected['g4'], deriveVerification(state).g4);
+        }
+      }
+    } finally {
+      await target.dispose();
+    }
   });
 
 test('the address still comes first when the only complaint is the language',

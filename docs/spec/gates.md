@@ -6,18 +6,18 @@ that fails is not a warning: the phase is redone.
 | Gate | After phase | Pass condition |
 |---|---|---|
 | G1 | briefing | Every требование has a status, and none is left open without a recorded reason |
-| G2 | spec | Every live требование is in-spec, deferred, or dropped with zero left open, **and** an independent reader given only `brief.md` and `spec.md` finds nothing missing |
-| G3 | plan | Every in-spec требование maps to at least one таск, **and** every таск traces back to at least one требование, **and** a reader given exactly what an executor will be given finds every task file buildable without asking a question |
-| G4 | acceptance | The build is checked against `manifest.md` and the dated additions in `brief.md`, with `spec.md` and the бриф's original text withheld, and every disagreement is reported |
+| G2 | spec | Every live требование is dispositioned; independent intent and raw-reference passes find no unresolved mandatory coverage gap |
+| G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner and integration dependency; a task reader finds each task executable |
+| G4 | acceptance | Current, applicable evidence and independent discovery cover the current contract; failures and incomplete checks are reconciled under [`verification.md`](verification.md) |
 
 ## Evidence
 
 | Gate | What proves it |
 |---|---|
 | G1 | The requirement status map in the run state has no `open` entries lacking a reason |
-| G2 | The status map plus the independent reader's findings, recorded as a list that is empty or acted upon |
-| G3 | The two-directional map between requirement ids and task ids, with no unmatched entry on either side, plus the task-file reader's findings, recorded as a list that is empty or acted upon |
-| G4 | The acceptance findings, each naming the requirement id it disagrees with |
+| G2 | Status map, obligation/source coverage map, independent intent and raw-reference discovery findings |
+| G3 | Requirement → obligation → implementation task and obligation → check → execution task mappings, including verification-only tasks |
+| G4 | Current check executions, complete coverage reviews, union of substantiated findings, and a fresh acceptance round |
 
 The requirement id is what makes a finding evidence rather than an opinion. A
 G4 finding that names no `R##` cannot be counted against the coverage the
@@ -66,13 +66,23 @@ places: this table, the phase table, the phase file, the reader's own brief, and
 nothing compares.
 
 So the list gets a machine-readable form. `scripts/validate/gate-readers.ts`
-holds every reader's brief to the two columns below, name for name: a name
+holds every reader's brief to the `Given` and `Withheld` columns below, name for name: a name
 present in one and not the other is a finding that names both places.
 
 | Gate | Reader's brief | Given | Withheld |
 |---|---|---|---|
-| G2 | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning |
-| G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, the running build | `spec.md`, the plan, the task files, `reviews/`, the бриф's original text |
+| G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning |
+| G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts |
+| G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, neutral raw reference register and capture identity, the running build | `spec.md`, the plan, the task files, `reviews/`, prior dispositions, the бриф's original text |
+
+The reference reader's first discovery pass is not bounded by the generated
+inventory. The orchestrator then reconciles its findings with all other
+origins and executes the scheduled checks. A source signature or matching
+digest cannot satisfy a browser behavior check. A browser capability limit
+makes affected checks incomplete, with G4 `pending` unless an established
+failure already makes it `failed`. Required parity is checked even when polish
+is disabled. A completed acceptance stage says the phase ran; it does not
+imply G4 passed or the product is verified.
 
 A name in `Given` is something the reader's brief must declare it has; a name in
 `Withheld` is one it must declare it does not have and will not ask for. The

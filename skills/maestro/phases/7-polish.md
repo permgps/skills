@@ -3,9 +3,11 @@
 Read only when the finish dial asked for доводка, and only after приёмка has
 written its отчёт. If the dial is off, this file is not opened at all.
 
-Приёмка asked whether the build does what the user said. This asks something the
-манифест cannot hold: whether it looks and feels like the thing they pointed at.
-That standard is in `reference.md`, and nowhere else.
+Приёмка already checks every appearance and behavior detail the user made
+mandatory, including authoritative reference fidelity. This phase handles
+discretionary refinement against a declared comparable after those required
+checks. `reference.md` supplies neutral source identity; it does not create an
+exemption from G4 when `polish` is false.
 
 The finish dial is the only dial that reaches this file — it decides whether the
 file is opened at all. Once it is, mode and depth change nothing: доводка asks
@@ -37,7 +39,8 @@ the budget comes back with differences invented to fill it.
 
 | What came back | It is |
 |---|---|
-| the build does something differently from the reference | a доводка таск |
+| an optional refinement differs from the comparable | a доводка таск |
+| a user-required reference behavior or appearance differs | a G4 finding routed to ordinary repair, even when `polish` is false |
 | the build would have to do something new | reported in the отчёт, **not built** |
 | something the reference does not show | not a difference; record it and move on |
 

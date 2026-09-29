@@ -33,6 +33,10 @@ const VALUE_SET_CONSTANTS: Record<string, string> = {
   'tasks[].status': 'TASK_STATUSES',
   'requirements[].status': 'REQUIREMENT_STATUSES',
   'gates[].status': 'GATE_STATUSES',
+  'lifecycle': 'LIFECYCLES',
+  'outcome': 'CLOSURE_OUTCOMES',
+  'verification.executions[].result': 'CHECK_RESULTS',
+  'verification.obligations[].result': 'VERIFICATION_RESULTS',
 };
 
 /** Stage ids belong to phases.md; the contract only mirrors them. */
@@ -43,7 +47,7 @@ const VERSION_CONSTANT = 'CONTRACT_VERSION';
 const DASHBOARD_VERSION_CONSTANT = 'KNOWN_CONTRACT_VERSION';
 
 /**
- * The four sets `sync.py` carries, field name → the constant that holds it.
+ * The value sets `sync.py` carries, field name → the constant that holds it.
  *
  * It is the only executable this repository copies into a real прогон, which is
  * why it holds a copy of the contract's value sets at all — and it says of
@@ -56,6 +60,10 @@ const SYNC_VALUE_SETS: Record<string, string> = {
   'tasks[].status': 'TASK_STATUSES',
   'requirements[].status': 'REQUIREMENT_STATUSES',
   'gates[].status': 'GATE_STATUSES',
+  'lifecycle': 'LIFECYCLES',
+  'outcome': 'CLOSURE_OUTCOMES',
+  'verification.executions[].result': 'CHECK_RESULTS',
+  'verification.obligations[].result': 'VERIFICATION_RESULTS',
 };
 
 /**
@@ -120,7 +128,7 @@ const bareName = (field: string): string => field.replace(/\[\]$/, '');
 export function parseUnionCell(cell: string): string[] | null {
   const parts = cell.split('|').map(part => part.trim()).filter(Boolean);
   if (parts.length < 2) return null;
-  if (!parts.every(part => /^`[a-z][a-z-]*`$/.test(part))) return null;
+  if (!parts.every(part => /^`[a-z][a-z_-]*`$/.test(part))) return null;
   return parts.map(part => part.replace(/`/g, ''));
 }
 

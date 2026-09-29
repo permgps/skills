@@ -24,6 +24,10 @@ of* the fact underneath it.
 | "It is a two-line fix, I will just do it." | `S5`. | Hand it to an executor. The прогон has no record of an edit made outside a таск, and the review that follows judges it as though it had. |
 | "The gate is being pedantic." | The gate is measuring against the user's words and something else was built. | Read the finding against the требование it names. If it is genuinely wrong, it is wrong about a specific `R##`; say which. |
 | "Nobody will notice." | A prediction about the user, offered instead of a fact about the build. | It goes in the отчёт. Deciding what the user will accept is the one judgement that is theirs. |
+| "Every inventory row has a task, so coverage is complete." | The inventory may omit an authoritative interaction; the map confirms its own omissions. | Start independent discovery from raw authority before showing the inventory, then reconcile. |
+| "The handler signature exists, so the hover works." | Source presence was substituted for integrated pointer execution. | Exercise the real trigger, panel entry and exit, and capture visible results. |
+| "The old screenshot matches." | A baseline may be stale or selected to fit the current build. | Bind it to reference identity, conditions, and an authorized mask/threshold basis; replay after relevant changes. |
+| "We recorded the defect, so acceptance can pass." | Documentation or a broad approval was treated as a passing check. | Keep the failed result; use exact bounded exception closure only with user authorization. |
 
 ## Red Flags
 
@@ -41,6 +45,8 @@ it surfaced.
 | A таск finished far faster than the others in its wave | Either it was cut too small or it did less than it says. Read its diff against its *done means* before believing either. |
 | The same difference survives three доводка rounds | Three executors failed at one visible thing. Report it; a fourth attempt hides the pattern. |
 | A phase produced an artifact another phase was supposed to write | Two writers on one file. Find which phase wrote it and why — the first disagreement between them will be unattributable. |
+| A shared CSS/JS change leaves earlier browser passes green | The stored execution fingerprint no longer describes the integrated build. Mark affected checks stale and replay them. |
+| An accepted finding is followed by another finding under the same requirement | The old selection did not include the new finding. Present and resolve the new identity separately. |
 
 ## The One Question Underneath All Of Them
 

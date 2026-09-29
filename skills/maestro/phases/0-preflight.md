@@ -46,6 +46,15 @@ says nothing about the next.
 **The dashboard is a fourth**: whether the user can watch the прогон depends on
 the viewer, not the host, and it is established in step 5 by looking.
 
+Record browser verification capability separately from the dashboard viewer:
+<!-- maestro:probes:browser-verification -->
+an existing headless browser or controlled browser tool must be able to load
+the integrated local app, send real pointer/keyboard input, inspect visibility,
+and capture evidence. A missing capability does not authorize installation or
+a fake pass. It makes affected checks unavailable and keeps their obligations
+incomplete. A headless test server owned by the run is not a user-visible
+viewer; do not replace the dashboard pane or take over an unowned server.
+
 Everything else Claude Code provides — file writes, a context you can withhold
 from — is assumed present here and fails loudly if it is not. **On any other
 host, open [`../references/hosts.md`](../references/hosts.md)** and establish
@@ -106,9 +115,11 @@ file exists to prevent.
 the only thing that changes it afterwards is the user editing it. A прогон that
 found no file, asked, and wrote one is the whole of this step.
 
-### 4. Write the first state
+### 4. Prepare and publish the first state
 
-Write `.maestro/state.js` through the state writer. It carries:
+Copy [`../assets/dashboard.html`](../assets/dashboard.html) and
+[`../tools/sync.py`](../tools/sync.py) into `.maestro/` before publication.
+Construct the complete contract-4 candidate in temporary JSON. It carries:
 
 | Field | Value at preflight |
 |---|---|
@@ -125,13 +136,18 @@ Write `.maestro/state.js` through the state writer. It carries:
 | `currentStage` | `preflight` |
 | `tasks`, `requirements` | empty |
 | `gates` | all four — `G1`, `G2`, `G3`, `G4` — `pending`, with no findings |
+| `lifecycle`, `outcome`, `finishedAt` | `active`, with no terminal outcome or closure timestamp |
+| `verification` | `version: 1`, `targetRevision: 1`, provisional acceptance input digest, empty record arrays, `repairLimits: { perFinding: 2, total: 8 }` |
 | `debt` | three empty lists: `placeholders`, `assumptions`, `emptyEnv` |
 | `additions` | empty |
 | `tests` | `null` — no suite has run |
 
-Write the whole file, validated, at once. Never edit it in place, and never
-write it on a timer — the state changes at phase boundaries and task transitions
-only.
+Use `python3 .maestro/sync.py --publish .maestro/.candidate.json` for this
+first write, adding `--holder '<token>'` when the run has a holder. The helper
+validates and atomically publishes `state.js`; delete the temporary candidate
+afterwards. Never edit `state.js` in place or write it on a timer — the state
+changes at phase boundaries and task transitions only. On a rejected candidate,
+read the returned violations and diagnostic URL before continuing.
 
 **Empty-but-valid is the point of the last three rows.** `debt` seeded here is a
 `debt` later phases append to; `debt` created the first time something is owed is
@@ -146,7 +162,7 @@ loose literal perfectly well — it is JavaScript, and the page is a browser —
 nothing on screen tells you the file is wrong. The tool that measures a finished
 прогон reads it through `JSON.parse` and cannot open it at all, which is
 discovered after the run, when the file is final and nothing can be measured
-again. `python3 .maestro/sync.py` checks this on every call; that is what the
+again. `python3 .maestro/sync.py --publish` checks this before publication; that is what the
 check is for.
 
 ### 5. Raise the dashboard
@@ -156,27 +172,21 @@ This is the one step in the bundle that opens a page in front of the user. The
 rule that makes it the only one is in `SKILL.md`, under *The Dashboard*, and it
 holds for every phase after this; what follows is this step's share of it.
 
-Copy two files into `.maestro/`, beside the state you just wrote —
-[`../assets/dashboard.html`](../assets/dashboard.html) and
-[`../tools/sync.py`](../tools/sync.py) — then run the tool once:
+The helper was copied and called during step 4. Its first successful
+publication also raises the dashboard.
 
-```bash
-python3 .maestro/sync.py
-```
-
-It mirrors the state into the page, puts `index.html` beside it, raises a static
+It mirrors the valid state into the page, puts `index.html` beside it, raises a static
 server for this directory on the loopback interface if one is not already
-answering, prints the address — **and opens it**. The opening is the tool's, not
+answering, returns the address — **and opens it**. The opening is the tool's, not
 yours. It was yours until a прогон on a desktop client printed the address,
 opened nothing, and the user found the дашборд minutes later by pressing the
 browser icon themselves; a step that depends on the orchestrator noticing it is
 a step that is sometimes skipped.
 
-What the tool leaves you is one job: **relay what it printed**. The address, and
-the line under it.
+What the tool leaves you is one job: **relay the URL and publication status**.
 
-- **The state is written first.** The mirror copies `state.js`; run before step
-  4 there is nothing to copy.
+- **Publish once.** Step 5 uses step 4's successful result; do not send the
+  same candidate a second time.
 - **Copy the page, never edit it.** Everything the user sees comes from the
   state. The one part of the page that changes is the snapshot block, and the
   tool is what changes it.
