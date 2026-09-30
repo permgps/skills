@@ -179,3 +179,18 @@ test('canonical discovery refuses a user-owned directory on link and unlink', as
     assert.equal(await readFile(path.join(occupied, 'SKILL.md'), 'utf8'), 'user owned');
   });
 });
+
+test('a linked installed Maestro exposes the complete autonomous runtime tree', async () => {
+  const { cp } = await import('node:fs/promises');
+  await withRepo(async root => {
+    await cp('skills/maestro/tools', path.join(root, BUNDLE, 'tools'), { recursive: true });
+    await linkLocal(root, { hosts: ['.agents'] });
+    const installed = path.join(root, '.agents/skills/maestro/tools');
+    assert.match(await readFile(path.join(installed, 'sync.mts'), 'utf8'), /runtime\/publication\.mts/);
+    for (const file of ['state/contract', 'state/validate', 'state/verification', 'state/evidence',
+      'state/projection', 'state/read', 'state/write', 'state/paths', 'shared/log',
+      'publication', 'legacy', 'dashboard', 'server', 'opener']) {
+      assert.ok((await readFile(path.join(installed, 'runtime', file + '.mts'), 'utf8')).length > 0);
+    }
+  });
+});

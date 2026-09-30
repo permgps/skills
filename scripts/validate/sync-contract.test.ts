@@ -1,4 +1,4 @@
-// The tests `sync.py` has.
+// The tests `sync.mts` has.
 //
 // It is the only executable this repository copies into a real прогон, and it
 // is the only place a status the contract does not define can be caught while
@@ -19,22 +19,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import net from 'node:net';
-import { mkdtemp, mkdir, writeFile, copyFile, readFile, rm, unlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, copyFile, readFile, rm, unlink, cp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, sha256, planningOwnershipState, correctedSourceAuditState, deferredScopeState, sourceVerifiedState, controlledState, verifiedState } from '../state/fixtures/verification.ts';
-import { projectState, prepareLegacyResume } from '../state/projection.ts';
-import { deriveVerification } from '../state/verification.ts';
-import { validateState } from '../state/validate.ts';
+import { prepareLegacyResume } from '../state/projection.ts';
 
-const SYNC = 'skills/maestro/tools/sync.py';
+const SYNC = 'skills/maestro/tools/sync.mts';
 const PAGE = 'skills/maestro/assets/dashboard.html';
-
-/** Whether a python3 is on this machine at all. */
-const python = ((): string | null => {
-  const probe = spawnSync('python3', ['--version'], { encoding: 'utf8' });
-  return probe.status === 0 ? 'python3' : null;
-})();
 
 const STATE = {
   contractVersion: 2,
@@ -56,7 +48,7 @@ const STATE = {
   tests: { passed: 3, failed: 0 },
 };
 
-interface Outcome { status: number; out: string }
+interface Outcome { status: number; out: string; err: string }
 
 /**
  * The environment every test runs the script in unless it says otherwise.
@@ -83,11 +75,11 @@ async function addV4Captures(root: string): Promise<void> {
 
 /** Run the script with the sealed environment, plus whatever a test adds. */
 function run(script: string, extra: Record<string, string>, args: string[] = []): Outcome {
-  const done = spawnSync(python as string, [script, ...args], {
+  const done = spawnSync(process.execPath, [script, ...args], {
     encoding: 'utf8',
     env: { ...process.env, ...SEALED, ...extra },
   });
-  return { status: done.status ?? -1, out: (done.stdout ?? '') + (done.stderr ?? '') };
+  return { status: done.status ?? -1, out: done.stdout ?? '', err: done.stderr ?? '' };
 }
 
 /**
@@ -98,12 +90,9 @@ function run(script: string, extra: Record<string, string>, args: string[] = [])
  * to open — the decision — and never a window that actually appeared.
  */
 async function opener(root: string): Promise<Record<string, string>> {
-  const script = path.join(root, 'opener.sh');
-  await writeFile(script, `#!/bin/sh\nprintf '%s\\n' "$1" >> "${path.join(root, 'opened.log')}"\n`,
-    'utf8');
-  // Through `sh` rather than the bare path: the file needs no execute bit, and
-  // the script splits this value the way a shell would.
-  return { MAESTRO_SYNC_OPENER: `/bin/sh ${script}`, MAESTRO_SYNC_NO_OPEN: '' };
+  const script = path.join(root, 'opener fixture.mjs');
+  await writeFile(script, "import { appendFileSync } from 'node:fs'; appendFileSync(" + JSON.stringify(path.join(root, 'opened.log')) + ", process.argv[2] + '\\n');\n");
+  return { MAESTRO_SYNC_OPENER: JSON.stringify(process.execPath) + ' ' + JSON.stringify(script), MAESTRO_SYNC_NO_OPEN: '', CI: '', SSH_CONNECTION: '', SSH_TTY: '' };
 }
 
 /** Every url the fake opener was handed, in order. */
@@ -135,13 +124,14 @@ async function openedAfter(root: string, expected: number): Promise<string[]> {
 const settle = (): Promise<void> => new Promise((done) => setTimeout(done, 400));
 
 /**
- * Run sync.py over a state, in a directory of its own, and stop the server it
+ * Run sync.mts over a state, in a directory of its own, and stop the server it
  * raises. Leaving that server running would leak a detached process per test.
  */
 async function sync(state: unknown): Promise<Outcome> {
   const root = await mkdtemp(path.join(tmpdir(), 'sync-contract-'));
   try {
-    await copyFile(SYNC, path.join(root, 'sync.py'));
+    await copyFile(SYNC, path.join(root, 'sync.mts'));
+  await cp('skills/maestro/tools/runtime', path.join(root, 'runtime'), { recursive: true });
     await copyFile(PAGE, path.join(root, 'dashboard.html'));
     await writeFile(
       path.join(root, 'state.js'),
@@ -149,7 +139,7 @@ async function sync(state: unknown): Promise<Outcome> {
       'utf8',
     );
 
-    return run(path.join(root, 'sync.py'), {});
+    return run(path.join(root, 'sync.mts'), {});
   } finally {
     try {
       const record = JSON.parse(await readFile(path.join(root, 'serve.json'), 'utf8')) as
@@ -163,7 +153,7 @@ async function sync(state: unknown): Promise<Outcome> {
 }
 
 /**
- * A directory `sync.py` can be called in more than once.
+ * A directory `sync.mts` can be called in more than once.
  *
  * The port tests are about what happens *between* calls — the address it hands
  * out the second time, and whether it says anything about the first — so they
@@ -179,7 +169,8 @@ interface Session {
 
 async function session(state: unknown, raw?: string): Promise<Session> {
   const root = await mkdtemp(path.join(tmpdir(), 'sync-session-'));
-  await copyFile(SYNC, path.join(root, 'sync.py'));
+  await copyFile(SYNC, path.join(root, 'sync.mts'));
+  await cp('skills/maestro/tools/runtime', path.join(root, 'runtime'), { recursive: true });
   await copyFile(PAGE, path.join(root, 'dashboard.html'));
   if (raw !== undefined) {
     await writeFile(path.join(root, 'state.js'), raw, 'utf8');
@@ -202,7 +193,7 @@ async function session(state: unknown, raw?: string): Promise<Session> {
   return {
     root,
     async run(extra: Record<string, string> = {}, args: string[] = []) {
-      const done = run(path.join(root, 'sync.py'), extra, args);
+      const done = run(path.join(root, 'sync.mts'), extra, args);
       try {
         raised.add((await record()).pid);
       } catch {
@@ -256,14 +247,13 @@ async function stop(pid: number, port: number): Promise<void> {
 /** The line that says the address moved, wherever it is, or -1. */
 const news = (out: string): number => out.search(/сменился|new address/);
 
-test('a state whose statuses are all the contract\'s passes', { skip: python === null }, async () => {
+test('a state whose statuses are all the contract\'s passes', async () => {
   const done = await sync(STATE);
   assert.equal(done.status, 0, done.out);
   assert.match(done.out, /http:\/\/localhost:\d+\/dashboard\.html/);
 });
 
-test('the address is followed by the line that says a folded pane opens',
-  { skip: python === null }, async () => {
+test('the address is followed by the line that says a folded pane opens', async () => {
     // Twice now a прогон has raised the panel, reported it live, and left the
     // user looking at a collapsed row they had to find by pressing it. The
     // instruction to say so was already written in the phase file both times,
@@ -277,8 +267,7 @@ test('the address is followed by the line that says a folded pane opens',
     assert.ok(address < hint, `the address must come first: ${done.out}`);
   });
 
-test('the folded-pane line is in the language the прогон speaks',
-  { skip: python === null }, async () => {
+test('the folded-pane line is in the language the прогон speaks', async () => {
     const russian = await sync({ ...STATE, language: 'ru' });
     assert.match(russian.out, /нажат/);
     const english = await sync({ ...STATE, language: 'en' });
@@ -290,8 +279,7 @@ test('the folded-pane line is in the language the прогон speaks',
     assert.match(older.out, /нажат/);
   });
 
-test('the state reaches the page beside it, so a pane with no address still shows the прогон',
-  { skip: python === null }, async () => {
+test('the state reaches the page beside it, so a pane with no address still shows the прогон', async () => {
     const run = await session(STATE);
     try {
       const done = await run.run();
@@ -305,8 +293,7 @@ test('the state reaches the page beside it, so a pane with no address still show
     }
   });
 
-test('a second call with the server still up hands back the same address, and says nothing about it',
-  { skip: python === null }, async () => {
+test('a second call with the server still up hands back the same address, and says nothing about it', async () => {
     const run = await session(STATE);
     try {
       const first = await run.run();
@@ -321,8 +308,7 @@ test('a second call with the server still up hands back the same address, and sa
     }
   });
 
-test('a server that died is raised again at the address the user already has',
-  { skip: python === null }, async () => {
+test('a server that died is raised again at the address the user already has', async () => {
     // The link was announced in the chat and may be open in front of somebody.
     // A restart that keeps the port costs them nothing and is not worth a word.
     const run = await session(STATE);
@@ -342,8 +328,7 @@ test('a server that died is raised again at the address the user already has',
     }
   });
 
-test('a port taken by something else moves the address, and the move is said before it',
-  { skip: python === null }, async () => {
+test('a port taken by something else moves the address, and the move is said before it', async () => {
     // F13: this used to print a new address in exactly the shape of the old
     // one. The user was left pressing a dead link with nothing anywhere saying
     // why, and `serve.json` had already forgotten the address it replaced.
@@ -374,8 +359,7 @@ test('a port taken by something else moves the address, and the move is said bef
     }
   });
 
-test('the moved-address line is in the language the прогон speaks',
-  { skip: python === null }, async () => {
+test('the moved-address line is in the language the прогон speaks', async () => {
     for (const [language, expected] of [['ru', /сменился/], ['en', /new address/]] as const) {
       const run = await session({ ...STATE, language });
       let stranger: net.Server | null = null;
@@ -393,8 +377,7 @@ test('the moved-address line is in the language the прогон speaks',
     }
   });
 
-test('a state that is valid JavaScript but not valid JSON still shows the address',
-  { skip: python === null }, async () => {
+test('a state that is valid JavaScript but not valid JSON still shows the address', async () => {
     // The page is the forgiving reader and the metrics tool is the strict one.
     // The прогон is worth showing either way, so the address comes first and the
     // complaint after it — and the exit code still carries the bad news.
@@ -412,8 +395,7 @@ test('a state that is valid JavaScript but not valid JSON still shows the addres
     }
   });
 
-test('no state.js beside the script is exit 2, and no server is raised',
-  { skip: python === null }, async () => {
+test('no state.js beside the script is exit 2, and no server is raised', async () => {
     const run = await session(null);
     try {
       const done = await run.run();
@@ -425,7 +407,7 @@ test('no state.js beside the script is exit 2, and no server is raised',
     }
   });
 
-test('a таск written `pending` is named, and the run is told', { skip: python === null }, async () => {
+test('a таск written `pending` is named, and the run is told', async () => {
   // The defect exactly as a real прогон wrote it: `pending` is a стадия's word
   // and a гейт's, and the phase file that cuts таски never said otherwise.
   const done = await sync({
@@ -437,8 +419,7 @@ test('a таск written `pending` is named, and the run is told', { skip: pytho
   assert.match(done.out, /the contract allows queued, running, review, repair, done, failed/);
 });
 
-test('the address comes first, because a wrong status is still worth showing',
-  { skip: python === null }, async () => {
+test('the address comes first, because a wrong status is still worth showing', async () => {
     const done = await sync({ ...STATE, gates: [{ id: 'G1', status: 'green' }] });
     assert.equal(done.status, 1, done.out);
     const address = done.out.indexOf('http://localhost');
@@ -447,14 +428,14 @@ test('the address comes first, because a wrong status is still worth showing',
       `the дашборд must be reachable before the complaint: ${done.out}`);
   });
 
-test('an entry with no status at all is reported too', { skip: python === null }, async () => {
+test('an entry with no status at all is reported too', async () => {
   // Absent is as uncountable on the page as wrong, and the contract requires it.
   const done = await sync({ ...STATE, stages: [{ id: 'build' }] });
   assert.equal(done.status, 1, done.out);
   assert.match(done.out, /stages\[0\]\.status is null/);
 });
 
-test('every offender is named, not just the first', { skip: python === null }, async () => {
+test('every offender is named, not just the first', async () => {
   const done = await sync({
     ...STATE,
     tasks: [{ id: '01', status: 'pending' }, { id: '02', status: 'blocked' }],
@@ -471,8 +452,7 @@ test('every offender is named, not just the first', { skip: python === null }, a
 // its таск titles in Russian and all seventeen of its gate findings in English,
 // and nothing anywhere noticed.
 
-test('a finding written in English while the прогон speaks Russian is named',
-  { skip: python === null }, async () => {
+test('a finding written in English while the прогон speaks Russian is named', async () => {
     const done = await sync({
       ...STATE,
       language: 'ru',
@@ -483,8 +463,7 @@ test('a finding written in English while the прогон speaks Russian is name
     assert.match(done.out, /this прогон speaks ru/);
   });
 
-test('the finding itself is quoted, because the line is what has to be rewritten',
-  { skip: python === null }, async () => {
+test('the finding itself is quoted, because the line is what has to be rewritten', async () => {
     const done = await sync({
       ...STATE,
       language: 'ru',
@@ -494,8 +473,7 @@ test('the finding itself is quoted, because the line is what has to be rewritten
     assert.match(done.out, /The room half recorded as a partial debt row/);
   });
 
-test('a finding in the прогон\'s own language raises nothing',
-  { skip: python === null }, async () => {
+test('a finding in the прогон\'s own language raises nothing', async () => {
     const done = await sync({
       ...STATE,
       language: 'ru',
@@ -504,8 +482,7 @@ test('a finding in the прогон\'s own language raises nothing',
     assert.equal(done.status, 0, done.out);
   });
 
-test('a таск title and a стадия note are held to the same rule as a finding',
-  { skip: python === null }, async () => {
+test('a таск title and a стадия note are held to the same rule as a finding', async () => {
     const done = await sync({
       ...STATE,
       language: 'ru',
@@ -517,8 +494,7 @@ test('a таск title and a стадия note are held to the same rule as a fi
     assert.match(done.out, /stages\[0\]\.note has no Russian in it/);
   });
 
-test('the fields the panel never prints as text are left alone',
-  { skip: python === null }, async () => {
+test('the fields the panel never prints as text are left alone', async () => {
     // `debt` reaches the page as three counts and `additions` is not rendered
     // there at all, so English in them is the rule rather than a breach of it.
     const done = await sync({
@@ -531,8 +507,7 @@ test('the fields the panel never prints as text are left alone',
     assert.equal(done.status, 0, done.out);
   });
 
-test('an English прогон is not held to the mirror of the rule',
-  { skip: python === null }, async () => {
+test('an English прогон is not held to the mirror of the rule', async () => {
     // Deliberate: an English finding quoting the user's Russian sentence is
     // correct, and a script-based check cannot tell it from a breach. The `ru`
     // half is decidable and is checked; the `en` half is not and is not.
@@ -544,8 +519,7 @@ test('an English прогон is not held to the mirror of the rule',
     assert.equal(done.status, 0, done.out);
   });
 
-test('a state written before the language dial existed is not held to the rule',
-  { skip: python === null }, async () => {
+test('a state written before the language dial existed is not held to the rule', async () => {
     // The contract makes `language` optional, and a reader supplying `ru` on the
     // writer's behalf would be reporting a choice nobody made.
     const done = await sync({
@@ -555,8 +529,7 @@ test('a state written before the language dial existed is not held to the rule',
     assert.equal(done.status, 0, done.out);
   });
 
-test('version-4 candidate validates and publishes atomically through the copied helper',
-  { skip: python === null }, async () => {
+test('version-4 candidate validates and publishes atomically through the copied helper', async () => {
     const target = await session(null);
     try {
       const state = verifiedState();
@@ -567,7 +540,7 @@ test('version-4 candidate validates and publishes atomically through the copied 
       assert.equal(checked.status, 0, checked.out);
       assert.equal(jsonResult(checked)['status'], 'valid');
       assert.deepEqual((jsonResult(checked)['projection'] as Record<string, unknown>)['requirementResults'],
-        deriveVerification(state).requirementResults);
+        { R01: 'passed' });
 
       const published = await target.run({}, ['--publish', candidate, '--no-open']);
       assert.equal(published.status, 0, published.out);
@@ -581,8 +554,7 @@ test('version-4 candidate validates and publishes atomically through the copied 
     }
   });
 
-test('version-4 invalid first candidate exposes diagnostics without publishing a green state',
-  { skip: python === null }, async () => {
+test('version-4 invalid first candidate exposes diagnostics without publishing a green state', async () => {
     const target = await session(null);
     try {
       const state = verifiedState();
@@ -593,9 +565,9 @@ test('version-4 invalid first candidate exposes diagnostics without publishing a
       const done = await target.run({}, ['--publish', candidate, '--no-open']);
       assert.equal(done.status, 1, done.out);
       assert.equal(jsonResult(done)['status'], 'rejected');
-      assert.match(await readFile(path.join(target.root, 'validation.js'), 'utf8'), /"status": "invalid"/);
+      assert.match(await readFile(path.join(target.root, 'validation.js'), 'utf8'), /"status"\s*:\s*"invalid"/);
       assert.match(await readFile(path.join(target.root, 'dashboard.html'), 'utf8'),
-        /MAESTRO_VALIDATION_SNAPSHOT = \{"candidateRevision": "2026-09-29T09:20:00Z"/);
+        /MAESTRO_VALIDATION_SNAPSHOT = .*"candidateRevision"\s*:\s*"2026-09-29T09:20:00Z"/);
       await assert.rejects(readFile(path.join(target.root, 'state.js'), 'utf8'));
       assert.match(String(jsonResult(done)['url']), /dashboard\.html/);
     } finally {
@@ -603,8 +575,7 @@ test('version-4 invalid first candidate exposes diagnostics without publishing a
     }
   });
 
-test('version-4 publication refuses a changed capture and keeps its prior coherent state',
-  { skip: python === null }, async () => {
+test('version-4 publication refuses a changed capture and keeps its prior coherent state', async () => {
     const target = await session(null);
     try {
       const state = verifiedState();
@@ -621,15 +592,14 @@ test('version-4 publication refuses a changed capture and keeps its prior cohere
       assert.equal(jsonResult(rejected)['status'], 'rejected');
       assert.match(String(jsonResult(rejected)['url']), /dashboard\.html/);
       assert.match(await readFile(path.join(target.root, 'dashboard.html'), 'utf8'),
-        /MAESTRO_VALIDATION_SNAPSHOT = \{"candidateRevision": "2026-09-29T09:21:00Z"/);
+        /MAESTRO_VALIDATION_SNAPSHOT = .*"candidateRevision"\s*:\s*"2026-09-29T09:21:00Z"/);
       assert.equal(await readFile(path.join(target.root, 'state.js'), 'utf8'), before);
     } finally {
       await target.dispose();
     }
   });
 
-test('version-4 publication rejects stale revisions and unrelated holders',
-  { skip: python === null }, async () => {
+test('version-4 publication rejects stale revisions and unrelated holders', async () => {
     const target = await session(null);
     try {
       const state = verifiedState();
@@ -653,8 +623,7 @@ test('version-4 publication rejects stale revisions and unrelated holders',
     }
   });
 
-test('legacy projection remains unverified and malformed nested candidates are rejected',
-  { skip: python === null }, async () => {
+test('legacy projection remains unverified and malformed nested candidates are rejected', async () => {
     const target = await session(null);
     try {
       const candidate = path.join(target.root, 'candidate.json');
@@ -673,8 +642,7 @@ test('legacy projection remains unverified and malformed nested candidates are r
     }
   });
 
-test('version-4 TypeScript and copied Python agree on closure and incomplete controls',
-  { skip: python === null }, async () => {
+test('version-4 copied runtime preserves closure and incomplete-control fixture outcomes', async () => {
     const target = await session(null);
     try {
       await addV4Captures(target.root);
@@ -704,16 +672,15 @@ test('version-4 TypeScript and copied Python agree on closure and incomplete con
       stale.verification!.checks[0]!.currentFingerprint.build = 'changed-build';
       const verificationOnly = structuredClone(passing);
       verificationOnly.verification!.obligations[0]!.implementationTaskIds = [];
-      for (const state of [passing, failed, exception, incomplete, stale, verificationOnly]) {
+      for (const [state, expectedValid, expectedG4] of [[passing, true, 'passed'], [failed, false, 'failed'], [exception, true, 'failed'], [incomplete, true, 'pending'], [stale, false, 'pending'], [verificationOnly, true, 'passed']] as const) {
         await writeFile(candidate, JSON.stringify(state));
-        const pythonResult = await target.run({}, ['--validate', candidate]);
-        const tsValid = validateState(state).length === 0;
-        assert.equal(pythonResult.status === 0, tsValid,
-          `parity for ${state.outcome ?? 'active'}: ${pythonResult.out}`);
-        if (tsValid) {
-          const projected = jsonResult(pythonResult)['projection'] as Record<string, unknown>;
-          assert.deepEqual(projected['requirementResults'], deriveVerification(state).requirementResults);
-          assert.equal(projected['g4'], deriveVerification(state).g4);
+        const cliResult = await target.run({}, ['--validate', candidate]);
+        assert.equal(cliResult.status === 0, expectedValid,
+          `parity for ${state.outcome ?? 'active'}: ${cliResult.out}`);
+        if (expectedValid) {
+          const projected = jsonResult(cliResult)['projection'] as Record<string, unknown>;
+          assert.equal(projected['g4'], expectedG4);
+          assert.deepEqual(projected['requirementResults'], { R01: expectedG4 === 'pending' ? 'incomplete' : expectedG4 });
         }
       }
     } finally {
@@ -721,8 +688,7 @@ test('version-4 TypeScript and copied Python agree on closure and incomplete con
     }
   });
 
-test('the address still comes first when the only complaint is the language',
-  { skip: python === null }, async () => {
+test('the address still comes first when the only complaint is the language', async () => {
     const done = await sync({
       ...STATE,
       language: 'ru',
@@ -741,7 +707,7 @@ test('the address still comes first when the only complaint is the language',
 // address, opened nothing, and the user found the дашборд minutes later by
 // pressing the browser icon themselves.
 
-test('the page is opened, not only printed', { skip: python === null }, async () => {
+test('the page is opened, not only printed', async () => {
   const held = await session(STATE);
   try {
     const first = await held.run(await opener(held.root));
@@ -756,8 +722,7 @@ test('the page is opened, not only printed', { skip: python === null }, async ()
   }
 });
 
-test('a second call opens nothing — the page is raised once and only once',
-  { skip: python === null }, async () => {
+test('a second call opens nothing — the page is raised once and only once', async () => {
     // `SKILL.md` says "raised in preflight and never opened a second time", and a
     // run calls this tool dozens of times. Remembering that is not the
     // orchestrator's job when the tool can hold it.
@@ -776,8 +741,7 @@ test('a second call opens nothing — the page is raised once and only once',
     }
   });
 
-test('an address that moved is opened again, because the tab the user has is dead',
-  { skip: python === null }, async () => {
+test('an address that moved is opened again, because the tab the user has is dead', async () => {
     const held = await session(STATE);
     let stranger: net.Server | null = null;
     try {
@@ -801,7 +765,7 @@ test('an address that moved is opened again, because the tab the user has is dea
     }
   });
 
-test('--reopen brings it back when the panel is gone', { skip: python === null }, async () => {
+test('--reopen brings it back when the panel is gone', async () => {
   const held = await session(STATE);
   try {
     const env = await opener(held.root);
@@ -818,8 +782,7 @@ test('--reopen brings it back when the panel is gone', { skip: python === null }
   }
 });
 
-test('a remote session opens nothing and says where the page is',
-  { skip: python === null }, async () => {
+test('a remote session opens nothing and says where the page is', async () => {
     // A window on someone else's machine helps nobody. This was a sentence in
     // `phases/0-preflight.md`; it belongs in the code that does the opening.
     for (const away of ['CI', 'SSH_CONNECTION']) {
@@ -837,8 +800,7 @@ test('a remote session opens nothing and says where the page is',
     }
   });
 
-test('MAESTRO_SYNC_NO_OPEN is honoured, so a host driving its own pane can say so',
-  { skip: python === null }, async () => {
+test('MAESTRO_SYNC_NO_OPEN is honoured, so a host driving its own pane can say so', async () => {
     const held = await session(STATE);
     try {
       const env = { ...await opener(held.root), MAESTRO_SYNC_NO_OPEN: '1' };
@@ -851,8 +813,7 @@ test('MAESTRO_SYNC_NO_OPEN is honoured, so a host driving its own pane can say s
     }
   });
 
-test('a live server for this directory is adopted, not duplicated',
-  { skip: python === null }, async () => {
+test('a live server for this directory is adopted, not duplicated', async () => {
     // The failure this encodes: `serve.json` lives inside `.maestro/`, which
     // preflight re-populates every run. A second run found no record, raised a
     // second server for the same directory, and handed out a new address in
@@ -877,8 +838,7 @@ test('a live server for this directory is adopted, not duplicated',
   });
 
 
-test('version-5 preflight publishes an empty provisional manifest without claiming agreement',
-  { skip: python === null }, async () => {
+test('version-5 preflight publishes an empty provisional manifest without claiming agreement', async () => {
     const target = await session(null);
     try {
       const state = sourceVerifiedState();
@@ -893,7 +853,6 @@ test('version-5 preflight publishes an empty provisional manifest without claimi
       record.coverageReviews = []; record.acceptanceRounds = []; record.promisedWork = []; record.repairAttempts = [];
       record.sourceSnapshots = []; record.sourceClauses = []; record.manifestAudits = [];
       record.scopeMappings = []; record.journeys = []; record.negativeControls = []; delete record.scopeBaseline;
-      assert.deepEqual(validateState(state), []);
       const runDir = path.join(target.root, state.slug);
       await mkdir(runDir, { recursive: true });
       await writeFile(path.join(runDir, 'manifest.md'), '');
@@ -912,8 +871,7 @@ test('version-5 preflight publishes an empty provisional manifest without claimi
     } finally { await target.dispose(); }
   });
 
-test('version-5 source and completion fixtures agree between TypeScript and copied Python',
-  { skip: python === null }, async () => {
+test('version-5 copied runtime preserves source-audit and completion fixture outcomes', async () => {
     const target = await session(null);
     try {
       for (const [relative, body] of Object.entries({ ...CAPTURES, ...CONTROL_CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
@@ -940,18 +898,16 @@ test('version-5 source and completion fixtures agree between TypeScript and copi
       contradicted.verification!.manifestAudits.push({ ...contradicted.verification!.manifestAudits[1]!, id: 'MA-3',
         result: 'failed', findings: ['Later reader found an omitted condition'], dispatchId: 'dispatch-3',
         readerId: 'reader-3', returnId: 'return-3', auditedAt: '2026-09-29T09:03:00Z' });
-      for (const state of [passing, sourceVerifiedState(), corrected, contradicted, missingReturn, wrongSpan, wrongHash, staleAudit, insensitive, unavailable, malformed, activeNull]) {
+      for (const [state, expectedValid, expectedG4] of [[passing, true, 'passed'], [sourceVerifiedState(), true, 'passed'], [corrected, true, 'passed'], [contradicted, false, 'pending'], [missingReturn, false, 'pending'], [wrongSpan, false, 'pending'], [wrongHash, false, 'pending'], [staleAudit, false, 'pending'], [insensitive, false, 'pending'], [unavailable, true, 'pending'], [malformed, false, 'pending'], [activeNull, false, 'pending']] as const) {
         await writeFile(candidate, JSON.stringify(state));
         const done = await target.run({}, ['--validate', candidate]);
-        const valid = validateState(state).length === 0;
-        assert.equal(done.status === 0, valid, done.out);
-        if (valid) assert.deepEqual(jsonResult(done)['projection'], deriveVerification(state));
+        assert.equal(done.status === 0, expectedValid, done.out);
+        if (expectedValid) assert.equal((jsonResult(done)['projection'] as { g4: string }).g4, expectedG4);
       }
     } finally { await target.dispose(); }
   });
 
-test('copied Python rejects overlapping stage clocks and agrees on complete stage handovers',
-  { skip: python === null }, async () => {
+test('copied runtime rejects overlapping stage clocks and preserves complete stage handovers', async () => {
     const target = await session(null);
     try {
       for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
@@ -982,7 +938,7 @@ test('copied Python rejects overlapping stage clocks and agrees on complete stag
         const candidate = path.join(target.root, 'candidate.json');
         await writeFile(candidate, JSON.stringify(state));
         const result = await target.run({}, ['--project', candidate]);
-        const valid = validateState(state).length === 0;
+        const valid = ['baseline', 'skipped', 'submillisecond'].includes(name);
         assert.equal(result.status === 0, valid, `${name}: ${result.out}`);
         if (!valid) assert.ok((jsonResult(result)['violations'] as { field: string }[]).some(item =>
           item.field.startsWith('stages')), `${name}: ${result.out}`);
@@ -990,8 +946,7 @@ test('copied Python rejects overlapping stage clocks and agrees on complete stag
     } finally { await target.dispose(); }
   });
 
-test('version-5 publication freezes original scope and rejects invalid first completion',
-  { skip: python === null }, async () => {
+test('version-5 publication freezes original scope and rejects invalid first completion', async () => {
     const target = await session(null);
     try {
       for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
@@ -1020,8 +975,7 @@ test('version-5 publication freezes original scope and rejects invalid first com
     } finally { await target.dispose(); }
   });
 
-test('copied Python publishes Plan ownership once and preserves holder and oracle boundaries',
-  { skip: python === null }, async () => {
+test('copied runtime publishes Plan ownership once and preserves holder and oracle boundaries', async () => {
     const target = await session(null);
     try {
       for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
@@ -1048,8 +1002,7 @@ test('copied Python publishes Plan ownership once and preserves holder and oracl
     } finally { await target.dispose(); }
   });
 
-test('copied Python projects original 18/20 and current 18/18 from the same valid fixture',
-  { skip: python === null }, async () => {
+test('copied runtime projects original 18/20 and current 18/18 from the same valid fixture', async () => {
     const target = await session(null);
     try {
       for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
@@ -1057,19 +1010,19 @@ test('copied Python projects original 18/20 and current 18/18 from the same vali
         await mkdir(path.dirname(filename), { recursive: true }); await writeFile(filename, body);
       }
       const state = deferredScopeState();
-      assert.deepEqual(validateState(state), []);
       const candidate = path.join(target.root, 'candidate.json');
       await writeFile(candidate, JSON.stringify(state));
       const done = await target.run({}, ['--project', candidate]);
       assert.equal(done.status, 0, done.out);
-      assert.deepEqual(jsonResult(done)['scopeProgress'], projectState(state).scopeProgress);
-      assert.deepEqual(jsonResult(done)['summary'], deriveVerification(state));
+      const progress = jsonResult(done)['scopeProgress'] as { original: { passed: number; total: number }; current: { passed: number; total: number } };
+      assert.equal(progress.original.passed, 18); assert.equal(progress.original.total, 20);
+      assert.equal(progress.current.passed, 18); assert.equal(progress.current.total, 18);
+      assert.equal((jsonResult(done)['summary'] as { g4: string }).g4, 'passed');
       assert.equal(jsonResult(done)['completionSafeguards'], 'established');
     } finally { await target.dispose(); }
   });
 
-test('v4-to-v5 resume publishes without deleting historical evidence or fabricating safeguards',
-  { skip: python === null }, async () => {
+test('v4-to-v5 resume publishes without deleting historical evidence or fabricating safeguards', async () => {
     const target = await session(null);
     try {
       for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
@@ -1088,7 +1041,237 @@ test('v4-to-v5 resume publishes without deleting historical evidence or fabricat
       const done = await target.run({}, ['--publish', filename, '--expect', old.updatedAt!, '--no-open']);
       assert.equal(done.status, 0, done.out);
       assert.equal(resumed.verification!.executions.length, old.verification!.executions.length);
-      assert.equal(projectState(resumed).g4, 'pending');
-      assert.deepEqual(jsonResult(done)['projection'], deriveVerification(resumed));
+      assert.equal((jsonResult(done)['projection'] as { g4: string }).g4, 'pending');
     } finally { await target.dispose(); }
   });
+
+test('copied publication keeps validate and project read-only and distinguishes parse from shape failure', async () => {
+  const target = await session(null);
+  try {
+    await addV4Captures(target.root);
+    const candidate = path.join(target.root, 'candidate.json');
+    await writeFile(candidate, JSON.stringify(verifiedState()));
+    const before = await readdir(target.root);
+    for (const action of ['--validate', '--project']) {
+      const result = await target.run({}, [action, candidate]);
+      assert.equal(result.status, 0, result.out + result.err);
+      assert.deepEqual(await readdir(target.root), before);
+    }
+    await writeFile(candidate, '[]');
+    assert.equal((await target.run({}, ['--validate', candidate])).status, 1);
+    await writeFile(candidate, '{ broken');
+    assert.equal((await target.run({}, ['--validate', candidate])).status, 2);
+    assert.equal((await target.run({}, ['--validate', candidate + '.absent'])).status, 2);
+    assert.deepEqual(await readdir(target.root), before);
+  } finally { await target.dispose(); }
+});
+
+test('strict copied publication rejects missing expect, both holder mismatches and unreadable history', async () => {
+  const target = await session(null);
+  try {
+    await addV4Captures(target.root);
+    const state = verifiedState();
+    state.heldBy = { token: 'private-holder', since: state.startedAt };
+    const candidate = path.join(target.root, 'candidate.json');
+    await writeFile(candidate, JSON.stringify(state));
+    assert.equal((await target.run({}, ['--publish', candidate, '--holder', 'private-holder', '--no-open'])).status, 0);
+    const previous = await readFile(path.join(target.root, 'state.js'), 'utf8');
+    const next = structuredClone(state); next.updatedAt = '2026-08-21T12:01:00.000Z';
+    await writeFile(candidate, JSON.stringify(next));
+    for (const args of [[], ['--expect', state.updatedAt!, '--holder', 'wrong-holder'], ['--expect', 'stale', '--holder', 'private-holder']]) {
+      const outcome = await target.run({}, ['--publish', candidate, '--no-open', ...args]);
+      assert.equal(outcome.status, 1, outcome.out + outcome.err);
+      assert.equal(await readFile(path.join(target.root, 'state.js'), 'utf8'), previous);
+      assert.ok(!outcome.err.includes('private-holder') && !outcome.err.includes('wrong-holder'));
+    }
+    next.heldBy!.token = 'candidate-only-holder';
+    await writeFile(candidate, JSON.stringify(next));
+    assert.equal((await target.run({}, ['--publish', candidate, '--expect', state.updatedAt!, '--holder', 'private-holder'])).status, 1);
+    await writeFile(path.join(target.root, 'state.js'), 'not JSON');
+    assert.equal((await target.run({}, ['--publish', candidate, '--no-open'])).status, 1);
+    assert.equal(await readFile(path.join(target.root, 'state.js'), 'utf8'), 'not JSON');
+  } finally { await target.dispose(); }
+});
+
+test('copied publication accepts reordered object keys and rejects changed immutable history', async () => {
+  const target = await session(null);
+  try {
+    await addV4Captures(target.root);
+    const state = verifiedState();
+    state.verification!.checks[0]!.procedure.push('Move pointer away and verify close');
+    const candidate = path.join(target.root, 'candidate.json');
+    await writeFile(candidate, JSON.stringify(state));
+    assert.equal((await target.run({}, ['--publish', candidate, '--no-open'])).status, 0);
+    const next = structuredClone(state); next.updatedAt = '2026-08-21T12:01:00.000Z';
+    next.verification!.executions = next.verification!.executions.map(item => Object.fromEntries(Object.entries(item).reverse()) as typeof item);
+    await writeFile(candidate, JSON.stringify(next));
+    assert.equal((await target.run({}, ['--publish', candidate, '--expect', state.updatedAt!, '--no-open'])).status, 0);
+    const executedAt = next.verification!.executions[0]!.executedAt;
+    next.verification!.executions[0]!.executedAt = '2026-08-21T12:02:00.000Z';
+    await writeFile(candidate, JSON.stringify(next));
+    assert.equal((await target.run({}, ['--publish', candidate, '--expect', next.updatedAt!, '--no-open'])).status, 1);
+    next.verification!.executions[0]!.executedAt = executedAt;
+    next.verification!.checks[0]!.procedure.reverse();
+    await writeFile(candidate, JSON.stringify(next));
+    const reorderedArray = await target.run({}, ['--publish', candidate, '--expect', next.updatedAt!, '--no-open']);
+    assert.equal(reorderedArray.status, 1);
+    assert.ok((jsonResult(reorderedArray)['violations'] as { field: string }[]).some(item => item.field === 'verification.checks[C-1]'));
+    assert.ok(!(await readdir(target.root)).some(file => file.endsWith('.tmp')));
+  } finally { await target.dispose(); }
+});
+
+test('owned Node viewers serve two separate directories and confine decoded paths and symlinks', async () => {
+  const { symlink } = await import('node:fs/promises');
+  const first = await session({ ...STATE, runId: 'first-directory' });
+  const second = await session({ ...STATE, runId: 'second-directory' });
+  try {
+    assert.equal((await first.run()).status, 0);
+    assert.equal((await second.run()).status, 0);
+    const a = await first.record(); const b = await second.record();
+    assert.notEqual(a.pid, b.pid); assert.notEqual(a.port, b.port);
+    for (const [record, id] of [[a, 'first-directory'], [b, 'second-directory']] as const) {
+      const response = await fetch(`http://127.0.0.1:${record.port}/state.js`);
+      assert.match(response.headers.get('content-type') ?? '', /javascript/);
+      assert.ok((await response.text()).includes(id));
+      assert.ok((await (await fetch(`http://127.0.0.1:${record.port}/`)).text()).includes('MAESTRO_SNAPSHOT'));
+    }
+    const secret = path.join(first.root, '..', 'outside-' + a.port + '.txt');
+    await writeFile(secret, 'outside directory');
+    try {
+      await symlink(secret, path.join(first.root, 'external.txt'));
+      for (const resource of ['/external.txt', '/%2e%2e%2foutside.txt', '/..%5coutside.txt']) {
+        assert.equal((await fetch(`http://127.0.0.1:${a.port}${resource}`)).status, 403);
+      }
+    } finally { await rm(secret, { force: true }); }
+  } finally { await first.dispose(); await second.dispose(); }
+});
+
+test('a copied viewer refuses a foreign PID record and keeps an occupied foreign listener alive', async () => {
+  const { spawn } = await import('node:child_process');
+  const foreign = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  const target = await session(STATE);
+  const held = await occupy(0);
+  const address = held.address(); assert.ok(address && typeof address !== 'string');
+  try {
+    await writeFile(path.join(target.root, 'serve.json'), JSON.stringify({ pid: foreign.pid, port: address.port }));
+    assert.equal((await target.run()).status, 0);
+    const record = await target.record();
+    assert.notEqual(record.pid, foreign.pid); assert.notEqual(record.port, address.port);
+    process.kill(foreign.pid!, 0);
+    assert.ok(held.listening);
+  } finally {
+    foreign.kill();
+    await new Promise<void>(resolve => held.close(() => resolve()));
+    await target.dispose();
+  }
+});
+
+test('the copied Node viewer survives an unavailable index link and verifies instance identity before reuse', async () => {
+  const target = await session(STATE);
+  try {
+    await mkdir(path.join(target.root, 'index.html'));
+    assert.equal((await target.run()).status, 0);
+    const before = await target.record();
+    const rootResponse = await fetch(`http://127.0.0.1:${before.port}/`);
+    assert.equal(rootResponse.status, 200);
+    const wrong = JSON.parse(await readFile(path.join(target.root, 'serve.json'), 'utf8')) as Record<string, unknown>;
+    wrong['instance'] = 'wrong-instance';
+    await writeFile(path.join(target.root, 'serve.json'), JSON.stringify(wrong));
+    assert.equal((await target.run()).status, 0);
+    // The wrong record cannot authorize reuse; directory-bound discovery recovers it.
+    assert.equal((await target.record()).pid, before.pid);
+  } finally { await target.dispose(); }
+});
+
+test('platform opener commands and quoted overrides are selected without shell interpolation', async () => {
+  const { openerCommand, splitArguments } = await import('../../skills/maestro/tools/runtime/opener.mts');
+  assert.deepEqual(openerCommand('darwin', ''), ['open']);
+  assert.deepEqual(openerCommand('win32', ''), ['cmd', '/c', 'start', '']);
+  assert.deepEqual(openerCommand('linux', ''), ['xdg-open']);
+  assert.deepEqual(splitArguments(`node "path with spaces.mjs" 'literal $HOME' ""`), ['node', 'path with spaces.mjs', 'literal $HOME', '']);
+  assert.throws(() => splitArguments('node "unclosed'), /unclosed/);
+});
+
+test('a missing opener preserves the viewer and does not record a successful opening', async () => {
+  const target = await session(STATE);
+  try {
+    const done = await target.run({ ...(await opener(target.root)), MAESTRO_SYNC_OPENER: '/definitely/absent/maestro-opener' });
+    assert.equal(done.status, 0);
+    assert.ok(done.out.includes('http://localhost:'));
+    await assert.rejects(() => readFile(path.join(target.root, 'opened.json')));
+    assert.ok(!done.out.includes('панель открыта'));
+    assert.match(done.err, /opener could not be started/);
+  } finally { await target.dispose(); }
+});
+
+test('a viewer startup timeout falls back to a snapshot and tears down its own unready child', async () => {
+  const { ensureViewer } = await import('../../skills/maestro/tools/runtime/server.mts');
+  const target = await session(STATE);
+  try {
+    const unready = path.join(target.root, 'unready.mts');
+    await writeFile(unready, `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(path.join(target.root, 'unready.pid'))}, String(process.pid)); setInterval(() => {}, 1000);`);
+    const address = await ensureViewer(target.root, unready);
+    assert.equal(address.record, null); assert.match(address.url, /^file:/);
+    await assert.rejects(() => readFile(path.join(target.root, 'serve.json')));
+    const pid = Number(await readFile(path.join(target.root, 'unready.pid'), 'utf8'));
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      try { process.kill(pid, 0); }
+      catch { return; }
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    process.kill(pid, 'SIGTERM');
+    assert.fail('unready child survived startup timeout');
+  } finally { await target.dispose(); }
+});
+
+test('atomic file replacement preserves the previous snapshot and cleans up a failed final revision check', async () => {
+  const { atomicText } = await import('../../skills/maestro/tools/runtime/state/write.mts');
+  const target = await session(STATE);
+  try {
+    const file = path.join(target.root, 'state.js');
+    const previous = await readFile(file, 'utf8');
+    await assert.rejects(() => atomicText(file, 'replacement', async () => { throw new Error('revision moved'); }), /revision moved/);
+    assert.equal(await readFile(file, 'utf8'), previous);
+    await mkdir(path.join(target.root, 'blocked.js'));
+    await assert.rejects(() => atomicText(path.join(target.root, 'blocked.js'), 'replacement'));
+    assert.ok(!(await readdir(target.root)).some(file => file.endsWith('.tmp')));
+  } finally { await target.dispose(); }
+});
+
+test('exclusive temporary-file creation never removes an existing file it did not create', async () => {
+  const target = await session(STATE);
+  try {
+    const check = path.join(target.root, 'exclusive.mts');
+    await writeFile(check, `import { writeFile, readFile } from 'node:fs/promises';
+import { atomicText } from './runtime/state/write.mts';
+const target = new URL('./state.js', import.meta.url).pathname;
+const temporary = new URL('./.state.js.' + process.pid + '.1.tmp', import.meta.url).pathname;
+await writeFile(temporary, 'owned by another writer');
+try { await atomicText(target, 'replacement'); throw new Error('exclusive write unexpectedly succeeded'); }
+catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; }
+if (await readFile(temporary, 'utf8') !== 'owned by another writer') throw new Error('foreign temporary file was removed');
+`);
+    const done = spawnSync(process.execPath, [check], { encoding: 'utf8' });
+    assert.equal(done.status, 0, done.stderr);
+  } finally { await target.dispose(); }
+});
+
+test('legacy ownership checks require the exact directory command and ready page without invoking the old runtime', async () => {
+  const { legacyOwner } = await import('../../skills/maestro/tools/runtime/server.mts');
+  const { createServer } = await import('node:http');
+  const { realpath } = await import('node:fs/promises');
+  const target = await session(STATE);
+  const page = await target.page();
+  const server = createServer((_req, res) => res.end(page));
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address(); assert.ok(address && typeof address !== 'string');
+  const root = await realpath(target.root);
+  const command = `/usr/bin/python3 -m http.server ${address.port} --bind 127.0.0.1 --directory ${root}`;
+  try {
+    assert.equal(await legacyOwner(root, process.pid, address.port, command), true);
+    assert.equal(await legacyOwner(root, process.pid, address.port, command + '-other-project'), false);
+    assert.equal(await legacyOwner(root, process.pid, address.port, command.replace('127.0.0.1', '0.0.0.0')), false);
+    assert.equal(await legacyOwner(root, process.pid, address.port, command.replace('http.server', 'unrelated-server')), false);
+    assert.equal(await legacyOwner(root, process.pid, address.port, command.replace(String(address.port), '1')), false);
+  } finally { await new Promise<void>(resolve => server.close(() => resolve())); await target.dispose(); }
+});

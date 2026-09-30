@@ -21,7 +21,7 @@ established separately by live probes and workflow evaluation.
 | returns | observed-final-by-child-id |
 | workspace | absolute-explicit-cwd |
 | editing-wave | one-without-concurrency-or-worktrees |
-| state-writer | coordinator-sync.py |
+| state-writer | coordinator-sync.mts |
 | evidence | opaque-remains-unverified |
 | retries | 2 |
 
@@ -107,7 +107,7 @@ not resolve project code yourself. Remove only owned worktrees after their work
 is integrated or safely recorded. Keep task counters/statuses on actual events.
 
 Only the coordinator publishes the complete candidate through bundled
-`sync.py --publish`; children return results/captures, not state writes. The
+`sync.mts --publish`; children return results/captures, not state writes. The
 helper remains the sole shipped executable. Only the coordinator manages the
 visible dashboard. Browser checks use an owned headless server/surface and
 never replace that pane.

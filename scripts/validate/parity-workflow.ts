@@ -9,6 +9,7 @@ import { cp, mkdir, mkdtemp, readFile, readdir, realpath, stat, writeFile, symli
 import { tmpdir, hostname, homedir } from 'node:os';
 import path from 'node:path';
 
+import { stopOwnedViewer } from '../../skills/maestro/tools/runtime/server.mts';
 import { parseStateSource, readState } from '../state/read.ts';
 import type { RunState } from '../state/contract.ts';
 import { deriveVerification } from '../state/verification.ts';
@@ -235,8 +236,7 @@ export async function prepareWorkflowTarget(kind: 'broken' | 'fixed', root?: str
   if (entryMode === 'installed-link') {
     await symlink(path.relative(await realpath(path.dirname(installed)), await realpath(bundleRoot)), installed);
   } else {
-    await cp(bundleRoot, installed, { recursive: true,
-      filter: source => !source.split(path.sep).includes('__pycache__') });
+    await cp(bundleRoot, installed, { recursive: true });
   }
   log.info('prepare', 'workflow bundle installed', { target, entryMode, installed });
   const reference = await readFile(path.join(fixtureRoot, 'legacy', 'index.html'), 'utf8');
@@ -253,7 +253,7 @@ export async function prepareWorkflowTarget(kind: 'broken' | 'fixed', root?: str
     + '- Keep run artifacts inside this isolated target.\n'
     + '- Use actual separate agent dispatches for required readers and executors. A self-authored summary is not an independent pass.\n'
     + '- Use `MAESTRO_BROWSER` for browser checks.\n'
-    + '- Keep the dashboard server available, but do not launch a desktop browser. The host sets `MAESTRO_SYNC_NO_OPEN=1`; use `--no-open` when calling `sync.py` to open or refresh the viewer.\n');
+    + '- Keep the dashboard server available, but do not launch a desktop browser. The host sets `MAESTRO_SYNC_NO_OPEN=1`; use `--no-open` when calling `sync.mts` to open or refresh the viewer.\n');
   return { target, request: REQUEST, inputDigest: sha256(`${REQUEST}\n${reference}\n${starter}`) };
 }
 
@@ -412,22 +412,8 @@ async function runAgent(target: string, request: string, timeoutMs: number, entr
 }
 
 export async function stopTargetViewer(target: string): Promise<void> {
-  const servedDirectory = path.join(target, '.maestro');
-  try {
-    const record = JSON.parse(await readFile(path.join(servedDirectory, 'serve.json'), 'utf8')) as { pid?: unknown };
-    if (typeof record.pid !== 'number' || !Number.isSafeInteger(record.pid) || record.pid < 1) return;
-    const pid = record.pid;
-    const command = execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' });
-    const canonicalDirectory = await realpath(servedDirectory);
-    if (command.includes('http.server') && command.includes(canonicalDirectory)) {
-      process.kill(pid, 'SIGTERM');
-      log.info('cleanup', '[FIX] isolated viewer server stopped', { target, pid });
-    }
-  } catch (error) {
-    log.debug('cleanup', '[FIX] no isolated viewer server to stop', {
-      target, reason: error instanceof Error ? error.message : String(error),
-    });
-  }
+  try { await stopOwnedViewer(path.join(target, '.maestro')); }
+  catch { log.debug('cleanup', 'no verified owned viewer to stop', { target }); }
 }
 
 async function gradeExisting(outputDir: string): Promise<number> {

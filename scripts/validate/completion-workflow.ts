@@ -176,8 +176,7 @@ export async function prepareCompletionTarget(scenario: Scenario, target?: strin
   await mkdir(path.join(root, 'skills'), { recursive: true });
   await mkdir(path.join(root, 'src'), { recursive: true });
   await mkdir(path.join(root, '.maestro'), { recursive: true });
-  await cp(bundleRoot, path.join(root, 'skills', 'maestro'), { recursive: true,
-    filter: source => !source.split(path.sep).includes('__pycache__') });
+  await cp(bundleRoot, path.join(root, 'skills', 'maestro'), { recursive: true });
   let request = await readFile(path.join(fixtureRoot, 'source.txt'), 'utf8');
   let starter = await readFile(path.join(fixtureRoot, 'persistence.html'), 'utf8');
   const turns: WorkflowInput['turns'] = [];

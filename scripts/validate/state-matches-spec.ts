@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Keeps docs/spec/state-contract.md and scripts/state/contract.ts the same
+// Keeps docs/spec/state-contract.md and skills/maestro/tools/runtime/state/contract.mts the same
 // document in two languages.
 //
 // The value sets are compared against the exported constants, which are real
@@ -47,26 +47,6 @@ const VERSION_CONSTANT = 'CONTRACT_VERSION';
 const DASHBOARD_VERSION_CONSTANT = 'KNOWN_CONTRACT_VERSION';
 
 /**
- * The value sets `sync.py` carries, field name → the constant that holds it.
- *
- * It is the only executable this repository copies into a real прогон, which is
- * why it holds a copy of the contract's value sets at all — and it says of
- * itself that nothing here reads it. A copy nothing compares is a copy that
- * goes stale in silence, and the silence surfaces as a run whose statuses were
- * never checked.
- */
-const SYNC_VALUE_SETS: Record<string, string> = {
-  'stages[].status': 'STAGE_STATUSES',
-  'tasks[].status': 'TASK_STATUSES',
-  'requirements[].status': 'REQUIREMENT_STATUSES',
-  'gates[].status': 'GATE_STATUSES',
-  'lifecycle': 'LIFECYCLES',
-  'outcome': 'CLOSURE_OUTCOMES',
-  'verification.executions[].result': 'CHECK_RESULTS',
-  'verification.obligations[].result': 'VERIFICATION_RESULTS',
-};
-
-/**
  * Read an exported array of string literals out of the source.
  *
  * The constants are imported nowhere on purpose. A checker that imports one of
@@ -77,19 +57,6 @@ export function parseStringArrayConst(source: string, name: string): string[] | 
   const pattern = new RegExp(
     `export\\s+const\\s+${name}\\s*(?::[^=]*)?=\\s*\\[([^\\]]*)\\]`,
   );
-  const match = pattern.exec(source);
-  return match === null ? null : stringLiterals(match[1] ?? '');
-}
-
-/**
- * The same read, for the Python side.
- *
- * A module-level `NAME = ['a', 'b']` and nothing cleverer: the constant exists
- * to be compared, so the shape it is written in is part of what this checker
- * asks of it.
- */
-export function parsePythonListConst(source: string, name: string): string[] | null {
-  const pattern = new RegExp(`^${name}\\s*=\\s*\\[([^\\]]*)\\]`, 'm');
   const match = pattern.exec(source);
   return match === null ? null : stringLiterals(match[1] ?? '');
 }
@@ -165,16 +132,14 @@ export interface CheckOptions {
   specDir?: string;
   contractFile?: string;
   phasesFile?: string;
-  syncFile?: string;
   dashboardFile?: string;
 }
 
 export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise<Violation[]> {
   const specDir = options.specDir ?? 'docs/spec';
   const specFile = path.join(specDir, 'state-contract.md');
-  const contractFile = options.contractFile ?? 'scripts/state/contract.ts';
+  const contractFile = options.contractFile ?? 'skills/maestro/tools/runtime/state/contract.mts';
   const phasesFile = options.phasesFile ?? path.join(specDir, 'phases.md');
-  const syncFile = options.syncFile ?? 'skills/maestro/tools/sync.py';
   const dashboardFile = options.dashboardFile ?? 'skills/maestro/assets/dashboard.html';
 
   const violations: Violation[] = [];
@@ -269,57 +234,12 @@ export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise
   }
   log.info('values', 'value sets compared', { sets: declared.size });
 
-  // --- the third side: the copy the прогон itself runs ---------------------
-  let syncSource: string | null = null;
-  try {
-    syncSource = await readFile(syncFile, 'utf8');
-  } catch {
-    add('sync', syncFile, 0,
-      'the only checker a real прогон runs could not be read, so its copy of the '
-      + 'value sets is unchecked');
-  }
-
-  if (syncSource !== null) {
-    let compared = 0;
-    for (const [field, constant] of Object.entries(SYNC_VALUE_SETS)) {
-      const carried = parsePythonListConst(syncSource, constant);
-      const stated = declared.get(field);
-
-      // The contract is the authority on which sets exist. A set it does not
-      // state is not one sync.py owes a copy of — but a copy of a set nobody
-      // states is still a finding, because it is a rule with no source.
-      if (stated === undefined) {
-        if (carried !== null) {
-          add('sync', specFile, 0,
-            `${path.basename(syncFile)} carries ${constant}, and the contract states no `
-            + `value set for "${field}"`);
-        }
-        continue;
-      }
-      if (carried === null) {
-        add('sync', syncFile, 0,
-          `${constant} is absent, so "${field}" is not checked where it still matters`);
-        continue;
-      }
-      compared += 1;
-      if (carried.join(',') !== stated.values.join(',')) {
-        add('sync', syncFile, 0,
-          `value set for "${field}" differs — contract [${stated.values.join(', ')}], `
-          + `${path.basename(syncFile)} [${carried.join(', ')}]`);
-      }
-    }
-    log.info('sync', 'the run-side copies compared', {
-      file: path.basename(syncFile),
-      sets: compared,
-    });
-  }
-
   // --- the dashboard's copy of the contract version ------------------------
   // The dashboard is the contract's only reader outside this process, and it
   // keeps its own copy of this number so it can tell the user when a прогон
   // used a contract it does not know. A copy left behind says exactly that
   // about a version it does know: the notice fires on every run, over fields
-  // the page renders perfectly well. Compared here for `sync.py`'s reason — a
+  // the page renders perfectly well. Compared here because — a
   // copy nothing compares is a copy that goes stale in silence.
   //
   // Silent when the contract declares no version at all. Nothing can lose that
@@ -365,11 +285,7 @@ export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise
         }
       }
       log.info('extension-fields', 'completion record fields compared', { records: Object.keys(entities).length });
-      const pythonSource = await readFile(syncFile, 'utf8');
-      const pythonVersion = /^CURRENT_CONTRACT_VERSION\s*=\s*(\d+)$/m.exec(pythonSource)?.[1];
-      if (Number(pythonVersion) !== statedVersion) {
-        add('runtime-version', syncFile, 0, 'CURRENT_CONTRACT_VERSION must match the state contract');
-      }
+
     }
     log.info('version', 'the contract version and the page\'s copy compared', {
       contract: statedVersion,

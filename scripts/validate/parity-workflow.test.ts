@@ -180,7 +180,7 @@ for (const entryMode of ['installed-copy', 'installed-link'] as const) {
       assert.equal(await readFile(path.join(installed, 'SKILL.md'), 'utf8'),
         await readFile('skills/maestro/SKILL.md', 'utf8'));
       assert.ok((await readFile(path.join(installed, 'references/codex.md'), 'utf8')).includes('Native Codex Runtime'));
-      assert.equal((await lstat(path.join(installed, 'tools/sync.py'))).isFile(), true);
+      assert.equal((await lstat(path.join(installed, 'tools/sync.mts'))).isFile(), true);
       assert.match(workflowAgentPrompt(prepared.request, entryMode), /^\$maestro /);
       assert.doesNotMatch(workflowAgentPrompt(prepared.request, entryMode), /SKILL\.md|skills\/maestro/);
       if (entryMode === 'installed-link') assert.equal(await realpath(installed), await realpath('skills/maestro'));
@@ -202,4 +202,55 @@ test('installed discovery needs an actual successful host read of the selected s
   assert.equal(installedDiscoveryFindings(event('ls .agents/skills/maestro'), root).length, 1);
   assert.equal(installedDiscoveryFindings(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message',
     text: 'I read .agents/skills/maestro/SKILL.md' } }), root).length, 1);
+});
+
+test('evaluation cleanup stops only a verified directory-owned Node viewer and recovers forgotten records', async () => {
+  const { cp, copyFile, unlink } = await import('node:fs/promises');
+  const { spawn } = await import('node:child_process');
+  const { createServer } = await import('node:net');
+  const { stopTargetViewer } = await import('./parity-workflow.ts');
+  const root = await mkdtemp(path.join(tmpdir(), 'cleanup-viewer-'));
+  const foreign = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+  await new Promise<void>((resolve, reject) => { foreign.once('spawn', resolve); foreign.once('error', reject); });
+  const run = path.join(root, '.maestro');
+  await mkdir(run);
+  await cp('skills/maestro/tools/runtime', path.join(run, 'runtime'), { recursive: true });
+  await copyFile('skills/maestro/tools/sync.mts', path.join(run, 'sync.mts'));
+  await copyFile('skills/maestro/assets/dashboard.html', path.join(run, 'dashboard.html'));
+  let owned: ReturnType<typeof spawn> | undefined;
+  try {
+    await writeFile(path.join(run, 'serve.json'), JSON.stringify({ pid: foreign.pid, port: 1 }));
+    await stopTargetViewer(root);
+    process.kill(foreign.pid!, 0);
+    // Older invocations used the supplied /var path rather than its /private alias.
+    // Launch that real command explicitly so orphan recovery must canonicalize it.
+    const probe = createServer();
+    await new Promise<void>((resolve, reject) => { probe.once('error', reject); probe.listen(0, '127.0.0.1', resolve); });
+    const address = probe.address();
+    assert.ok(address && typeof address !== 'string');
+    await new Promise<void>((resolve, reject) => probe.close(error => error ? reject(error) : resolve()));
+    owned = spawn(process.execPath, [path.join(run, 'sync.mts'), '--serve', '--port', String(address.port), '--instance', 'cleanup-fixture-instance'], {
+      stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+    });
+    const record = await new Promise<{ pid: number; port: number }>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('owned viewer did not become ready')), 5000);
+      owned!.once('message', message => { clearTimeout(timer); resolve(message as { pid: number; port: number }); });
+      owned!.once('error', error => { clearTimeout(timer); reject(error); });
+    });
+    if (owned.connected) owned.disconnect();
+    await writeFile(path.join(run, 'serve.json'), JSON.stringify(record));
+    await unlink(path.join(run, 'serve.json'));
+    await stopTargetViewer(root);
+    assert.throws(() => process.kill(record.pid, 0));
+    process.kill(foreign.pid!, 0);
+  } finally {
+    await stopTargetViewer(root);
+    if (owned && owned.exitCode === null && owned.signalCode === null) {
+      owned.kill();
+      await new Promise<void>(resolve => owned!.once('exit', () => resolve()));
+    }
+    foreign.kill();
+    if (foreign.exitCode === null) await new Promise<void>(resolve => foreign.once('exit', () => resolve()));
+    await rm(root, { recursive: true, force: true });
+  }
 });

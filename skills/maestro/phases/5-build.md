@@ -123,7 +123,7 @@ For each таск that returns done, in this order:
     hashes, capture paths and SHA-256. Copy captures into
     `.maestro/<slug>/evidence/<execution-id>/` under orchestrator ownership,
     seal them, and add the execution/evidence records to the same state
-    candidate. Publish through `sync.py --publish` only after validation.
+    candidate. Publish through `sync.mts --publish` only after validation.
     Preserve an unavailable or failed result as such; missing capture or hash
     rejects a passing claim. Keep earlier executions immutable after replay.
 2. **Merge its worktree back**, if it had one.
@@ -140,7 +140,7 @@ For each таск that returns done, in this order:
    place and an unchecked one in another.
 
 **Before launching the next wave, check the panel is still there.** If anything
-in the wave's output mentions a user-visible page opened, or the `sync.py`
+in the wave's output mentions a user-visible page opened, or the `sync.mts`
 call after the state write reported that the address moved, bring the panel back
 the way step 5 of preflight says. This phase is the only one that runs субагенты,
 so it is the only one where the panel is at risk from the прогон's own work; the

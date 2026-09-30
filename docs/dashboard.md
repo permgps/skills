@@ -168,6 +168,27 @@ printed instead: a window on a machine you are not sitting at helps nobody. And
 a host that shows the page in a panel of its own tells the tool to stand down,
 so you get one page rather than two.
 
+## Viewer Runtime and Recovery
+
+`node .maestro/sync.mts` mirrors a validated snapshot and manages a detached
+Node viewer on `127.0.0.1`. Its directory, PID, port and instance identity are
+verified through local HTTP before reuse or cleanup. Both `/` and
+`/dashboard.html` work even without an index link. Decoded traversal and
+symlinks outside the run directory are refused.
+
+`serve.json` keeps the address across calls; a dead server may restart on its
+free old port. A foreign listener is preserved, with a new address reported.
+Forgotten-server recovery uses a platform process adapter when available;
+unavailable discovery is reported explicitly. Unix legacy-server adoption
+requires an exact directory/command match and a ready page, without launching
+the old runtime. Failure to start a viewer yields the file snapshot.
+
+Use `node .maestro/sync.mts --reopen` when the panel disappears. `--no-open` or
+`MAESTRO_SYNC_NO_OPEN` suppresses browser opening, as do SSH/CI sessions. A
+missing opener leaves the address available. `LOG_LEVEL=DEBUG` or
+`MAESTRO_SYNC_DEBUG=1` adds stderr diagnostics; JSON actions keep stdout parseable.
+See [the complete runtime layout](install.md#autonomous-runtime-layout).
+
 ## The fixtures behind these images
 
 `docs/assets/state-running.fixture.js` and `state-finished.fixture.js` are the

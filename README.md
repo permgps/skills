@@ -6,8 +6,8 @@ about the genuine forks, writes a specification, cuts it into tasks, builds them
 with parallel executors, reviews the result — and then checks the build against
 your original words with the specification withheld.
 
-It is an Agent Skill. Installing it copies a directory of Markdown; nothing is
-compiled, and nothing runs at install time.
+It is an Agent Skill. Installing it copies prompts, the dashboard, and an
+autonomous TypeScript helper; nothing is compiled, and nothing runs at install time.
 
 **The package holds a second skill: `scout`.** It is reconnaissance for the case
 Maestro deliberately does not handle — a ТЗ that is thin, or a domain the user
@@ -168,7 +168,7 @@ one that is thinking.
 
 **You do not have to go looking for it.** The tool that keeps the page current is
 what opens it, rather than a paragraph of prose asking the orchestrator to
-remember: `.maestro/sync.py` hands the address to the platform opener itself and
+remember: `.maestro/sync.mts` hands the address to the platform opener itself and
 records in `opened.json` that it did, so a run that writes state dozens of times
 raises exactly one tab. An address that *moved* is opened again, because by then
 the tab you are holding is dead. Nothing opens over SSH or in CI, where a window
@@ -216,9 +216,10 @@ No mode, depth or finish removes any of them.
 | `scripts/` | this repository's own tooling: validators, the state contract, the gate checks, the metrics tool |
 | `CHANGELOG.md` | every tagged release and what it shipped, newest first |
 
-The bundle installs no application dependencies; its state helper needs Python
-3. Repository tooling needs Node.js 22.18 or newer, because it is TypeScript
-executed by Node's native type stripping.
+Maestro requires Node.js 22.18+ with native TypeScript stripping enabled. Its
+helper and repository tooling run source directly; the installed helper needs
+no Python, compiler, loader, target build or npm install. Preflight checks the
+actual capability. See [runtime installation](docs/install.md#autonomous-runtime-layout).
 
 ```bash
 npm run check     # typecheck, eleven validator runs across two skills, and their tests
@@ -257,7 +258,7 @@ composed line against — so those three follow the dial while every other field
 stays English. `debt` reaches the page as three counts, `additions` is not drawn
 there at all, and a требование's `reason` is read out of the отчёт, which is why
 none of them moves. A quotation keeps the language it was said in, so an English
-отчёт carries Russian findings inside it. `python3 .maestro/sync.py` holds the
+отчёт carries Russian findings inside it. `node .maestro/sync.mts` holds the
 rule for `ru`, naming and quoting each offending line after it has printed the
 address — a дашборд nobody can reach helps nobody. It deliberately does not hold
 `en`: a Russian line carries Cyrillic and an English one does not, while an

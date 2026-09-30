@@ -3,8 +3,9 @@
 // dependency rule that keeps the context budget honest — a phase file never
 // links to another phase file.
 
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readFile, readdir, stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
+import { builtinModules } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 import { checkCodexRuntime } from './host-degradation.ts';
@@ -312,6 +313,15 @@ export async function checkBundle(
     linkedPrompts: promptFiles.filter(file => linkedAnywhere.has(file)).length,
   });
 
+  if (skill.includes('<!-- maestro:delegation:native-explicit -->') || skill.includes('<!-- maestro:runtime:node -->')) {
+    if (!skill.includes('<!-- maestro:runtime:node -->')) add('runtime', 'SKILL.md', 0, 'declare the autonomous Node runtime marker');
+    violations.push(...await checkRuntimeImports(path.join(bundleDir, 'tools')));
+    for (const file of ['SKILL.md', ...phaseFiles, ...await listMarkdown(bundleDir, 'references')]) {
+      const body = await readFile(path.join(bundleDir, file), 'utf8');
+      if (/python(?:3)?\s+[^\n]*sync\.py|coordinator-sync\.py/.test(body)) add('runtime', file, 0, 'replace the obsolete helper invocation with node sync.mts');
+    }
+  }
+
   if (skill.includes('<!-- maestro:delegation:native-explicit -->')) {
     violations.push(...await checkCodexRuntime(bundleDir));
   }
@@ -325,6 +335,83 @@ export async function checkBundle(
     }
     log.info('procedure', 'completion procedure scaffolding checked', { count: COMPLETION_PROCEDURES.length });
   }
+  return violations;
+}
+
+/** Tokenize enough syntax to avoid treating quoted data or comments as imports. */
+export function runtimeImports(source: string): { imports: string[]; computed: boolean } {
+  const tokens = [...source.matchAll(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`|[A-Za-z_$][\w$]*|[^\s]/g)]
+    .map(match => match[0]).filter(token => !token.startsWith('//') && !token.startsWith('/*'));
+  const imports: string[] = [];
+  let computed = false;
+  const literal = (token: string | undefined): boolean => token?.startsWith("'") === true || token?.startsWith('"') === true;
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (token?.startsWith('`') && /\b(?:import|require)\s*\(/.test(token)) computed = true;
+    if (token === 'require' && tokens[index + 1] === '(') computed = true;
+    if (token === 'import' && tokens[index + 1] === '(') {
+      if (!literal(tokens[index + 2]) || tokens[index + 3] !== ')') computed = true;
+      else imports.push(tokens[index + 2]!.slice(1, -1));
+    } else if ((token === 'from' || token === 'import') && literal(tokens[index + 1])) {
+      imports.push(tokens[index + 1]!.slice(1, -1));
+    }
+  }
+  return { imports, computed };
+}
+
+/** The installed executable import closure cannot rely on the repository or packages. */
+export async function checkRuntimeImports(toolsDir: string): Promise<Violation[]> {
+  const root = path.resolve(toolsDir);
+  const violations: Violation[] = [];
+  const add = (file: string, message: string): void => {
+    violations.push({ check: 'runtime', file, line: 0, message });
+    log.error('runtime', message, { file });
+  };
+  if (!await exists(path.join(root, 'sync.mts'))) add('tools/sync.mts', 'ship the sole Node command entrypoint');
+  if (!await exists(path.join(root, 'runtime'))) add('tools/runtime', 'ship the complete autonomous runtime tree');
+  const files: string[] = [];
+  const walk = async (dir: string): Promise<void> => {
+    for (const entry of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+      const file = path.join(dir, entry.name);
+      if (entry.isDirectory()) await walk(file);
+      else if (entry.name.endsWith('.mts')) files.push(file);
+      else if (entry.name.endsWith('.py')) add(path.relative(root, file), 'remove the obsolete Python helper from the shipped bundle');
+    }
+  };
+  await walk(root);
+  for (const file of files) {
+    const relative = path.relative(root, file);
+    const source = await readFile(file, 'utf8');
+    const parsed = runtimeImports(source);
+    if (parsed.computed) {
+      add(relative, 'use explicit static bundle-local imports or node:* built-ins');
+    }
+    if (/\b(?:spawn|execFile)\s*\(\s*['"]python(?:3)?['"]/.test(source)) {
+      add(relative, 'do not invoke a Python runtime');
+    }
+    for (const target of parsed.imports) {
+      if (target.startsWith('node:')) {
+        if (!builtinModules.includes(target.slice(5)) && !builtinModules.includes(target)) add(relative, `unknown Node built-in ${target}`);
+        continue;
+      }
+      if (!target.startsWith('.') || !target.endsWith('.mts')) {
+        add(relative, `import ${target} must be an explicit relative .mts module`);
+        continue;
+      }
+      const resolved = path.resolve(path.dirname(file), target);
+      if (!resolved.startsWith(root + path.sep)) {
+        add(relative, `import ${target} escapes the installed tools tree`);
+        continue;
+      }
+      try {
+        const actual = await realpath(resolved);
+        if (!actual.startsWith((await realpath(root)) + path.sep) || !(await stat(actual)).isFile()) {
+          add(relative, `import ${target} does not resolve to a confined runtime file`);
+        }
+      } catch { add(relative, `import ${target} resolves to a missing runtime file`); }
+    }
+  }
+  log.info('runtime', 'autonomous import closure checked', { files: files.length, violations: violations.length });
   return violations;
 }
 

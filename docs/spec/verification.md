@@ -91,8 +91,9 @@ All records below are embedded in the same atomic snapshot. Arrays are required,
 including empty arrays during preflight; `manifestDigest` is required; `scopeBaseline` is optional until
 agreement. `manifestDigest` is SHA-256 of UTF-8 manifest.md bytes (LF endings,
 no other normalization). Source text is redacted before hashing or offsetting;
-its SHA-256 uses its exact UTF-8 bytes. Offsets count Unicode code points,
-zero-based, with end exclusive, so Python and JavaScript agree on emoji.
+its SHA-256 uses its exact UTF-8 bytes. Offsets are zero-based with end exclusive
+and count Unicode code points rather than UTF-16 code units so emoji retain
+stable offsets.
 Identifiers are monotonically allocated, never recycled: `SRC-N`, `CL-N`,
 `MA-N`, `J-N`, `NC-N`, `RA-N`, and `AG-N` for sources, clauses, audits,
 journeys, controls, repair attempts, and agreements respectively (N positive
@@ -345,7 +346,7 @@ evidence. Their `finishedAt` is historical activity, not a version-4
 contract-5 candidate from current sources, fresh source audit/agreement and obligations, open findings, stale evidence,
 and promised work; fresh checks are required to complete it.
 
-The shipped Python helper validates a complete candidate before atomically
+The shipped TypeScript helper validates a complete candidate before atomically
 publishing `state.js`. It may inspect declared evidence files and relevant
 fingerprint inputs, but cannot execute checks, invent records, select decisions,
 or author transitions. It rechecks the expected revision and holder at
@@ -369,5 +370,14 @@ and nonsecret fingerprints. Machine-readable stdout remains parseable.
 | M07–M08 | Union of findings, bounded exception decisions, derived failed/incomplete outcomes. |
 | M09 | Explicit lifecycle/outcome/G4 separation in state and consumers. |
 | M10 | Relevant fingerprints, capture integrity and stale-evidence regression. |
-| M11 | Shipped Python validation before atomic publication. |
+| M11 | Shipped TypeScript validation before atomic publication. |
 | M12 | Missing hover binding fails with the original oracle, then passes after repair; negative bypass controls and positive runs. |
+
+Runtime diagnostics use the shared configurable logger on stderr. LOG_LEVEL
+selects INFO/WARN/ERROR or diagnostic DEBUG; MAESTRO_SYNC_DEBUG=1 retains
+compatibility debug control. JSON action stdout contains one parseable result.
+Logs name safe paths, affected fields and counts, never state/source bodies,
+evidence content or holder credentials. The autonomous TypeScript helper and
+repository consumers share schema, evidence and transition implementations;
+installed-copy tests establish execution independence rather than comparing a
+shared function to itself.

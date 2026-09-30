@@ -2,9 +2,9 @@
 
 # Installing
 
-This package holds **two** Agent Skills, and installing copies directories of
-Markdown into the place your agent looks for skills; nothing is compiled, and
-nothing runs at install time.
+This package holds **two** Agent Skills. Installation copies their directories,
+including Maestro's dashboard and Node helper, into the place your agent looks
+for skills; nothing is compiled, and nothing runs at install time.
 
 | Skill | What it does | Needs the other |
 |---|---|---|
@@ -17,8 +17,8 @@ Install both, or install one; the section below is about how to say which.
 
 ## Requirements
 
-- **To use the skill:** an agent that reads Agent Skills and Python 3 for the
-  bundled standard-library state helper. Browser checks use an available
+- **To use the skill:** an agent that reads Agent Skills and Node.js 22.18+
+  with native TypeScript stripping enabled for Maestro. Scout needs no runtime. Browser checks use an available
   headless browser capability; an unavailable browser leaves affected checks
   incomplete. The bundle installs no application dependencies.
 - **To develop it:** Node.js 22.18 or newer, because the repository's own scripts
@@ -33,9 +33,55 @@ leaves it unable to raise a worktree for the rest of that session, so every wave
 of the прогон narrows to one таск. Both are announced rather than silent, and
 both are avoided by running `git init` first.
 
-`python3` runs the bundled helper that validates a complete state candidate,
+`node` runs the bundled helper that validates a complete state candidate,
 publishes it atomically, and serves the dashboard on the loopback interface.
-Without it the version-4 publication path cannot run.
+Preflight executes a real `.mts` capability probe before publishing state; a
+version string alone is insufficient. Missing/disabled stripping stops with the
+Node prerequisite named, without installing anything.
+
+## Autonomous Runtime Layout
+
+Preflight copies the installed skill's helper and complete runtime tree into
+the target, without replacing the populated run directory:
+
+```text
+.maestro/
+  sync.mts
+  runtime/
+    state/*.mts
+    shared/log.mts
+    publication.mts, legacy.mts, dashboard.mts, server.mts, opener.mts
+  dashboard.html
+  state.js, validation.js
+  serve.json, opened.json
+  <slug>/
+```
+
+The installed helper uses only Node built-ins and its relative modules. It works
+without a target `package.json`, with CommonJS or ESM, from a different cwd and
+with spaces in paths. It needs no Python, target dependencies, compiler,
+loader, build or external network after installation. Local loopback HTTP is
+used for the dashboard; browser and agent capabilities remain separate.
+
+```bash
+node .maestro/sync.mts --validate .maestro/.candidate.json
+node .maestro/sync.mts --project .maestro/state.js
+node .maestro/sync.mts --no-open
+node .maestro/sync.mts --reopen
+LOG_LEVEL=DEBUG node .maestro/sync.mts --no-open
+```
+
+`--validate` and `--project` are read-only and launch no viewer or opener.
+`--publish` accepts a complete candidate and returns one JSON result. Existing
+state requires `--expect` with its last-read `updatedAt`; claimed runs require
+`--holder` matching both snapshots. Exit codes are 0 for success, 1 for
+invalid/rejected state and 2 for unreadable input/JSON parsing failure. See the
+[state contract](spec/state-contract.md#autonomous-runtime-and-publication-boundary).
+
+On upgrade, copy `sync.mts` and `runtime/` together, preserving run artifacts,
+state and viewer/opened records. Validate the copied runtime before deleting
+only the obsolete `.maestro/sync.py` file. Never reset the run to change runtime.
+Unverifiable old servers are left untouched and reported as a limitation.
 
 ## From the published repository
 
@@ -104,13 +150,14 @@ If the dashboard itself is what looks wrong — no address, an address that
 changed, a page that will not tick — run its tool with `MAESTRO_SYNC_DEBUG=1`:
 
 ```bash
-MAESTRO_SYNC_DEBUG=1 python3 .maestro/sync.py
+MAESTRO_SYNC_DEBUG=1 node .maestro/sync.mts
 ```
 
-It adds one line on `stderr` saying which port it remembered, whether that port
-was still free, what was holding it, which port it chose and why. The address on
-`stdout` is unchanged, so the line a прогон reads to the user stays the only
-thing on that channel.
+Diagnostic DEBUG logs on `stderr` report safe paths, identity/port checks and
+publication checkpoints. `LOG_LEVEL=DEBUG` also enables diagnostics; INFO is
+the default, with WARN/ERROR available. JSON actions emit one result on stdout;
+historical refresh prints localized address and viewer guidance. Holder tokens,
+source bodies and evidence content are never logged.
 
 The `skills-lock.json` written beside it records `"source": "permgps/skills"`
 with `"sourceType": "github"`; the local form below records a relative path and
@@ -276,7 +323,7 @@ $maestro Build a notes page with local saving.
 
 There is no need to supply `SKILL.md` to the prompt. Supporting files resolve
 relative to the installed skill, including `references/codex.md`, prompts,
-`tools/sync.py` and the dashboard asset. If a changed skill does not appear,
+`tools/sync.mts`, the complete `tools/runtime/` tree and the dashboard asset. If a changed skill does not appear,
 restart the client. Avoid keeping legacy and canonical copies with the same
 name: duplicate skill names can appear separately in the selector.
 
@@ -290,7 +337,7 @@ only their role prompt and allowed inputs, with the specification withheld
 from blind acceptance. Filesystem visibility is recorded separately.
 
 Executors use absolute owned workspaces and explicit shell cwd. The coordinator
-integrates work and publishes state through the bundled Python helper. Relay
+integrates work and publishes state through the bundled TypeScript helper. Relay
 its dashboard URL; if opening fails, open that local URL yourself. A visible
 dashboard does not prove browser verification of the built app: missing required
 UI evidence keeps its obligations incomplete. `--no-open` accommodates clients
@@ -339,7 +386,7 @@ npm run check     # everything below, in this order
 | `npm run bundle` | frontmatter, links, phase boundaries, reachable prompts, and declared completion procedure scaffolding |
 | `npm run bundle:scout` | the same over Scout, whose steps live in `steps/` |
 | `npm run dashboard` | the dashboard asset's regions, labels and pure logic |
-| `npm run state` | `docs/spec/state-contract.md` and `scripts/state/contract.ts` still agree |
+| `npm run state` | `docs/spec/state-contract.md` and the shipped `tools/runtime/state/contract.mts` still agree |
 | `npm run hosts` | every host capability that degrades is probed in preflight and spent in a phase |
 | `npm run doors` | every door into the repair phase is listed there and opened by some phase |
 | `npm run dials` | the mode set and its built-in default agree across spec, phase and `SKILL.md` |
@@ -368,18 +415,22 @@ integrations, and proportional output checks for non-UI work. Sandbox evidence
 establishes sandbox behavior only.
 
 Selected controls need an owned disposable copy and unchanged oracle. Neither
-`sync.py` nor the dashboard executes project checks. The Python helper remains
-standard-library-only; browser and agent clients are external prerequisites and
+`sync.mts` nor the dashboard executes project checks. The TypeScript helper uses
+only Node built-ins and its bundled modules; browser and agent clients are external prerequisites and
 are never installed by the evaluation commands. Historical states are readable;
 explicit resume must reconstruct actual v5 guarantees instead of inferring them
 from prior completion.
 
 ## Verification Checkpoint
 
+The Node runtime migration is recorded in the
+[runtime migration checkpoint](parity-verification.md#node-runtime-migration-checkpoint--2026-09-30).
+The Python results below are historical checkpoints before that replacement.
+
 The Codex compatibility work in the unrestricted 2026-09-30 environment passed
 `npm run check`: 739 tests, zero failures, zero skips, with Python 3.14.7 actually
 executing the helper integration tests. This supersedes the environment limit
-in the historical checkpoint below for the current working tree. It does not
+in the historical checkpoint below for the pre-migration revision. It does not
 establish complete CLI/app workflow support. Fresh CLI `$maestro` runs from a
 copy and a corrected development link loaded the skill and returned independent
 children, but both hit their 15-minute deadlines before acceptance/report/memory.

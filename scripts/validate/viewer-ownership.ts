@@ -54,7 +54,7 @@ const MARKER = /<!--\s*maestro:view:(owner|no-viewer|opens-panel)\s*-->/g;
  * merely *forbids* doing so. A phase file that acquires one has started
  * instructing an open, whatever the sentence around it says.
  */
-const OPENING_SIGNALS = ['localhost', 'preview_start', 'http.server', 'webbrowser'];
+const OPENING_SIGNALS = ['localhost', 'preview_start', 'http.server', 'webbrowser', 'sync.mts --serve', 'sync.mts --reopen', 'openPage('];
 
 export interface Found {
   mark: Mark;

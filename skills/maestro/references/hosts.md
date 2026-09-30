@@ -25,7 +25,7 @@ Answer these capabilities by observation rather than by belief about the product
 | Can you create a git worktree? | shell access plus a git repository |
 | Can you commit? | the same |
 | Can you write outside `.maestro/`? | the project code has to reach disk somehow |
-| Can the user watch the прогон change? | the page renders **and** a stage clock moved after a state write — the two halves you can check yourself. `sync.py` opens it and reports what it did; a host where the opener refuses is a host where the answer is no |
+| Can the user watch the прогон change? | the page renders **and** a stage clock moved after a state write — the two halves you can check yourself. `sync.mts` opens it and reports what it did; a host where the opener refuses is a host where the answer is no |
 | Can a task execute browser checks? | an existing browser/tool loads the integrated local app, sends real pointer/keyboard input, inspects visible geometry, and captures evidence without taking over the user's dashboard pane |
 
 If you cannot answer one of them, it is a **no** for this прогон. A capability
@@ -82,7 +82,7 @@ separate. A child's self-report does not establish an unseen host observation.
   nothing about the state; here, a state that ticks proves nothing about the
   window. A client may present a panel as a folded row in the chat, and a
   detached opener reports nothing at all about what appeared. Name the address,
-  and say the row opens with a press — `sync.py` prints both lines for you, and
+  and say the row opens with a press — `sync.mts` prints both lines for you, and
   relaying them is the whole of what you can do about this from here.
 - **Do not open a second page where the panel is.** The pane is the panel's for
   the rest of the прогон. Twice now a page opened beside it — a subagent's own

@@ -359,7 +359,7 @@ holding a link that will never tick again, with nothing anywhere explaining it.
 until a прогон on a desktop client printed the address, opened nothing, and the
 user found the дашборд minutes later by pressing the browser icon; a step carried
 only in prose is a step that is sometimes skipped, and this is the most visible
-step there is. So `sync.py` hands the address to the platform opener itself.
+step there is. So `sync.mts` hands the address to the platform opener itself.
 
 Four properties come with that, and each of them exists because the alternative
 was observed:
@@ -424,3 +424,28 @@ For v5, a missing fresh source audit/agreement makes G4 pending. Required journe
 observations and selected control results affect coverage; a production pass
 cannot mask omitted restart evidence or unavailable controls. Completed tasks or
 stage clocks remain activity measures and cannot replace verified scope.
+
+## Node Viewer Ownership
+
+The helper starts its own absolute copied `sync.mts --serve` entry with
+`process.execPath`, detached with discarded stdout/stderr. The server binds
+only `127.0.0.1` and serves the canonical run directory. Decoded request paths
+and symlinks must stay inside it; `/` and `/dashboard.html` show the same page
+even when an index symlink is unavailable. HTML and JavaScript use their proper
+MIME types. The viewer reads state and diagnostics; it never decides closure.
+
+`serve.json` retains pid, port and optional previousPort, adding canonical
+root and a per-instance identity. A directory-bound HTTP identity and ready
+listener are verified before success, reuse or owned cleanup. Ordinary startup
+and reuse require no process-table command. Forgotten-process discovery uses
+a platform adapter and reports its limitation when unavailable. A foreign PID
+or listener is preserved; the helper never kills one to free a port. A verified
+legacy server may be reused on Unix after exact command/directory validation;
+no new legacy runtime is invoked. All lifecycle callers share ownership logic.
+
+`opened.json` retains its URL semantics. Open once per address, again for a
+moved address or `--reopen`. `--no-open`, MAESTRO_SYNC_NO_OPEN and SSH/CI
+suppression remain supported. MAESTRO_SYNC_OPENER is parsed into argv and never
+executed through interpolated shell text. An opener failure preserves the state
+and address. Localized address, moved, folded and opening messages retain their
+ordering; JSON actions keep these messages off stdout.

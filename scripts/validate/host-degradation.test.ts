@@ -233,3 +233,14 @@ test('the router cannot preload coordinator-only Codex mechanics', async () => {
   const findings = await codexViolations('SKILL.md', '## Start', '[preload](references/codex.md)\n\n## Start');
   assert.ok(findings.some(item => /demand/.test(item.message)));
 });
+
+test('a stale state-writer declaration cannot claim the autonomous Node runtime', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'codex-writer-'));
+  try {
+    await cp('skills/maestro', root, { recursive: true });
+    const file = path.join(root, 'references/codex.md');
+    await writeFile(file, (await readFile(file, 'utf8')).replace('coordinator-sync.mts', 'coordinator-sync.py'));
+    const findings = await checkCodexRuntime(root);
+    assert.ok(findings.some(item => item.message.includes('state-writer')));
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

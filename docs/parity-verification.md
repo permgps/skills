@@ -13,7 +13,7 @@ on the source file's local path.
 
 | Command | What it checks | Completion role |
 |---|---|---|
-| `npm run check` | Types, both specifications and bundles, state/dashboard/host/reader boundaries, and unit/integration tests | Required; Python integration tests must actually execute |
+| `npm run check` | Types, both specifications and bundles, state/dashboard/host/reader boundaries, and unit/integration tests | Required; copied Node runtime integration tests must execute without skips |
 | `npm run parity:browser` | Actual pointer input on an integrated local fixture through installed Chrome/Chromium and CDP | Required for UI parity acceptance; exits 1 on failed assertions and 2 when browser or loopback is unavailable |
 | `npm run parity:workflow` | Two isolated targets dispatched to the current Codex CLI configuration with hidden grading truth | Required for independent discovery; exits 2 when agent execution is unavailable |
 | `npm run completion:workflow` | Caller-supplied provider-neutral adapter; capability probe, eleven completion scenarios and three fresh omitted-limit runs | Required less-capable-model sample; exits 2 when unconfigured/unavailable |
@@ -64,6 +64,51 @@ agents to pass `--no-open` to the viewer helper. It stops each target's
 viewer server after grading. The CLI run is saved locally because its
 `--ephemeral` mode cannot provide the child-thread evidence needed for this
 evaluation.
+
+## Node Runtime Migration Checkpoint — 2026-09-30
+
+Maestro now ships `tools/sync.mts` and its complete relative `tools/runtime/`
+tree. Canonical state/schema/evidence logic lives in that tree; repository
+`scripts/state/*.ts` exports retain their existing APIs. The Python helper has
+been removed. Contract 5, verification 2, digest algorithms and gate semantics
+remain unchanged. Python execution results later on this page describe earlier
+checkpoints, not this runtime.
+
+The migration was exercised on **macOS with Node v26.8.1**. The final
+`npm run check` passed typechecking, all eleven validator runs and **763 tests**,
+with zero failures or skips. The targeted copied-runtime,
+installation-independence and bundle checks passed **96 tests**. All owned
+temporary viewer processes were stopped, updated documentation's relative
+file links resolve, and `git diff --check` passed.
+
+The installed-runtime suite exports the actual skill to temporary directories
+outside the repository and installs it by copy or link. All six combinations of
+installation mode and target package type (absent, CommonJS, ESM) pass with
+spaces in paths, another cwd, an empty child PATH, no Python executable, no
+target node_modules, compiler, loader or build. It executes read-only validation,
+first publication, an expected-revision update, projection and actual loopback
+state polling. These operations need no external network. Disabled native
+TypeScript stripping fails before creating state, validation or viewer records.
+
+Copied-helper regressions cover immutable history, reordered object keys versus
+significant array order, evidence and source audits, strict revision/holder
+checks, atomic replacement failures, localized legacy views and opener behavior.
+Real Node HTTP tests cover directory isolation, forgotten-record adoption,
+restart/collision, foreign-process preservation, path confinement, MIME types,
+index fallback, macOS path aliases and startup timeout cleanup. Upgrade tests preserve run history,
+viewer/opened records and unrelated files, removing only the obsolete copied
+helper after validating its replacement. Legacy ownership is tested through an
+injected exact command and a real ready HTTP page without launching Python.
+
+**Limits:** Node 22.18 itself was not available for execution, so the advertised
+minimum is not verified by this newer runtime. Linux/Windows execution and real
+platform browser opening were not performed; platform argument selection is
+covered deterministically with fake openers. A real pre-existing Python server
+was not used for adoption. Orphan discovery uses Unix process-table commands
+when available and reports its limitation otherwise; normal Node startup/reuse
+does not require them. These checks do not complete the pending Codex CLI/app,
+Gemini or less-capable-model workflow acceptance recorded below, and no release
+was published.
 
 ## Codex Compatibility Checkpoint — 2026-09-30
 

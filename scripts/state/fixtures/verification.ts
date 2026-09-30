@@ -1,6 +1,6 @@
 // Shared synthetic version-4 state and immutable capture contents.
 //
-// The strings are deliberately credential-free so TS, Python, and the copied
+// The strings are deliberately credential-free so repository tooling and the copied
 // runtime can exercise the same artifact hashes without production data.
 
 import { createHash } from 'node:crypto';

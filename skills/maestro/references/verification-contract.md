@@ -3,7 +3,7 @@
 Open this file when writing obligations, checks, executions, findings, or
 acceptance rounds. The exact fields and result rules are in the bundled
 contract-4 state shape described by `docs/spec/verification.md` in the source
-repository; an installed run uses the candidate schema enforced by `sync.py`.
+repository; an installed run uses the candidate schema enforced by `sync.mts`.
 
 Each live requirement has grounded obligations. Each obligation names its
 source, relevant surfaces and variants, the expected observable state, its
@@ -17,7 +17,7 @@ fixture conditions, assertions, result, capture IDs, and the fingerprint of
 reference, build, data, runtime, acceptance input, and declared relevant files.
 The executor writes task-owned captures first. The orchestrator validates paths
 and hashes, imports them under `.maestro/<slug>/evidence/<execution-id>/`, then
-publishes one coherent candidate with `sync.py --publish`. Never let a task
+publishes one coherent candidate with `sync.mts --publish`. Never let a task
 write the shared state or report a check as passed solely from source inspection.
 
 After a relevant input changes, retain the old execution as history and mark it

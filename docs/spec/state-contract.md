@@ -232,7 +232,7 @@ from one that was met.
 
   **The enforcement reaches each publication boundary.** Repository readers
   and writers use `scripts/state/validate.ts`; a real run supplies the complete
-  candidate to the bundled `.maestro/sync.py`, which validates before atomic
+  candidate to the bundled `.maestro/sync.mts`, which validates before atomic
   publication. It checks the same version-4 graph, lifecycle, evidence
   integrity, statuses, timestamps, and spoken-field constraints. A rejected
   candidate is exposed as a diagnostic, never as an apparent successful run.
@@ -258,7 +258,7 @@ from one that was met.
 
   `scripts/state/write.ts` enforces it — `writeState` accepts the `updatedAt`
   the caller last read and refuses when the file on disk carries a different one.
-  A real прогон asks `.maestro/sync.py` to publish the complete candidate with
+  A real прогон asks `.maestro/sync.mts` to publish the complete candidate with
   the expected revision and holder. This optimistic check detects a stale
   candidate; it is not a lock or a full compare-and-swap. That is why
   [`../../skills/maestro/SKILL.md`](../../skills/maestro/SKILL.md) still states
@@ -280,7 +280,7 @@ from one that was met.
   [`../../skills/maestro/SKILL.md`](../../skills/maestro/SKILL.md) under
   *Language*, because it is the orchestrator that has to obey it.
 
-  **`.maestro/sync.py` holds it for `ru` only, and that edge is written here
+  **`.maestro/sync.mts` holds it for `ru` only, and that edge is written here
   beside the enforcer.** A Russian line contains Cyrillic and an English one
   does not, so `ru` is decided by the alphabet. The mirror is not decidable — an
   English finding quoting the user's own Russian sentence is correct — and a
@@ -307,7 +307,7 @@ not recoverable from the result:
 Both are settled here, and this document is where they are settled: any
 illustration of the state elsewhere shows the shape, not the whole field list.
 `scripts/validate/state-matches-spec.ts` checks this document against
-`scripts/state/contract.ts` — never against an illustration.
+`skills/maestro/tools/runtime/state/contract.mts` — never against an illustration.
 
 ## Version 5 Extension
 
@@ -378,3 +378,34 @@ the number that moves with it — a dashboard left behind at `2` tells the user
 their прогон "used a newer contract" over a field it does not render.
 `scripts/validate/state-matches-spec.ts` compares the two, so the copy cannot be
 left behind quietly.
+
+## Autonomous Runtime and Publication Boundary
+
+The sole installed command is `node .maestro/sync.mts`; its relative
+`runtime/` tree ships beside it. Canonical state modules live in
+`skills/maestro/tools/runtime/state/*.mts`; repository `scripts/state/*.ts`
+exports are compatibility facades. The installed helper imports only its own
+modules and `node:*` built-ins. It resolves the run directory from the copied
+entrypoint and the project root from that directory's parent, irrespective of
+cwd or the target's package type. Contract 5 and verification 2 remain unchanged.
+
+`--validate <candidate>` and `--project <candidate>` are read-only: no state,
+diagnostic, snapshot, viewer or opener writes. JSON actions emit one result on
+stdout: exit 0 for valid/current/legacy/published, 1 for invalid/rejected state,
+2 for unreadable input or JSON parsing failure. Legacy projection preserves
+historical gates with verification explicitly not established.
+
+Strict `--publish <candidate> [--expect <revision>] [--holder <token>]`
+requires a matching expected revision whenever state exists, checks both prior
+and candidate holders, refuses unreadable or invalid history, and validates
+immutable records and confined evidence/input hashes. Object key order does not
+change record identity; array order remains significant. Digest algorithms do
+not change. The compatibility `writeState` API retains its documented optional
+expect behavior; it is not the strict publication boundary.
+
+Each replacement uses an exclusive temporary file in the destination directory,
+write, fsync, close and rename, removing temporary files on failure. Immediately
+before replacing state, publication re-reads the prior revision and holder.
+This detects concurrent changes without claiming a lease, exclusive lock or
+multi-file transaction. Rejection preserves the last state and updates the
+validation envelope/snapshot; a viewer failure may yield the file snapshot.

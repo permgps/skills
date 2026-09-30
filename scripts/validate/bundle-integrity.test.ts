@@ -378,3 +378,38 @@ test('procedure scaffold rejects missing evidence/outcome instructions', () => {
   assert.deepEqual(checkProcedure(body.replace('Return fields: id, result', '')), ['output fields']);
   assert.deepEqual(checkProcedure(body.replace('Unavailable stays incomplete.', '')), ['missing-capability outcome']);
 });
+
+test('autonomous runtime imports reject external, missing, escaped and obsolete executable dependencies', async () => {
+  const { checkRuntimeImports } = await import('./bundle-integrity.ts');
+  const dir = await mkdtemp(path.join(tmpdir(), 'runtime-closure-'));
+  const tools = path.join(dir, 'tools');
+  try {
+    await mkdir(path.join(tools, 'runtime'), { recursive: true });
+    await writeFile(path.join(tools, 'runtime', 'module.mts'), 'export const value = 1;');
+    const entry = path.join(tools, 'sync.mts');
+    await writeFile(entry, "import { value } from './runtime/module.mts';");
+    assert.deepEqual(await checkRuntimeImports(tools), []);
+    for (const source of ["import 'third-party';", "import './runtime/missing.mts';",
+      "import '../../scripts/state/read.ts';", "import '/absolute/development/file.mts';",
+      "import(variable);", "import 'node:missing-builtin';", "spawn('python3', ['sync.py']);"]) {
+      await writeFile(entry, source);
+      assert.ok((await checkRuntimeImports(tools)).length > 0, source);
+    }
+    await writeFile(entry, "import './runtime/module.mts';");
+    await writeFile(path.join(tools, 'sync.py'), '# obsolete helper');
+    assert.ok((await checkRuntimeImports(tools)).some(item => item.message.includes('obsolete Python')));
+    await rm(path.join(tools, 'sync.py'));
+    await rm(entry);
+    assert.ok((await checkRuntimeImports(tools)).some(item => item.message.includes('entrypoint')));
+    await rm(path.join(tools, 'runtime'), { recursive: true });
+    assert.ok((await checkRuntimeImports(tools)).some(item => item.message.includes('runtime tree')));
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('runtime import scanning ignores quoted data and comments and rejects imports hidden in template expressions', async () => {
+  const { runtimeImports } = await import('./bundle-integrity.ts');
+  assert.deepEqual(runtimeImports("const data = { from: 'value' }; // import 'external';\nimport './runtime/module.mts';").imports, ['./runtime/module.mts']);
+  // Object data has a colon, so the scanner must not treat it as a from declaration.
+  assert.deepEqual(runtimeImports("const data = { 'from': 'value' }; // import 'external';\nimport './runtime/module.mts';").imports, ['./runtime/module.mts']);
+  assert.equal(runtimeImports('const data = `${await import("external")}`;').computed, true);
+});

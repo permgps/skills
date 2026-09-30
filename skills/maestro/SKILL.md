@@ -110,7 +110,7 @@ executions as history and replay stale checks before claiming conformance. The
 dashboard and report derive their verdicts from this same record.
 
 If `contractVersion` is below 4, inspect it with
-`python3 .maestro/sync.py --project .maestro/state.js`. Its historical G4 and
+`node .maestro/sync.mts --project .maestro/state.js`. Its historical G4 and
 finished timestamp remain readable, but verification is not established.
 Resuming is an explicit candidate transition: retain the old record, create
 contract-4 verification entries for the still-applicable requirements with
@@ -159,7 +159,7 @@ The sentence is the point. Both прогоны that hit this had nothing to say,
 neither said anything, and the user found out from the file.
 
 `scripts/state/write.ts` guards repository writes. A real прогон uses the
-bundled `sync.py --publish` path below: supply the complete candidate and the
+bundled `sync.mts --publish` path below: supply the complete candidate and the
 last `updatedAt` plus your holder token. The helper rechecks them immediately
 before publication. This is an optimistic guard, not a lock; the re-read is
 still a step you perform.
@@ -204,7 +204,7 @@ the bundled validator. On the first write omit `--expect`; afterwards pass the
 `updatedAt` you last read. Pass the current holder token when one is claimed:
 
 ```bash
-python3 .maestro/sync.py --publish .maestro/.candidate.json --expect '<last-updatedAt>' --holder '<token>'
+node .maestro/sync.mts --publish .maestro/.candidate.json --expect '<last-updatedAt>' --holder '<token>'
 ```
 
 The helper validates the candidate and its evidence, then atomically replaces
@@ -219,7 +219,7 @@ server that died since the last update.
 call in a directory puts it in front of the user, later calls open nothing, and
 an address that moved is opened again because the tab the user holds is dead.
 None of that is yours to track. What is yours is to relay its `url`. If
-the user says the panel is gone, `python3 .maestro/sync.py --reopen` is the
+the user says the panel is gone, `node .maestro/sync.mts --reopen` is the
 whole of the answer; if your harness shows the page in a pane of its own, pass
 `--no-open` in preflight so the user does not get two.
 
@@ -235,7 +235,7 @@ their viewer by you or by anything you launch. A question that can only be
 answered by *looking* at a rendered page uses an available owned headless browser
 and a controlled local server, with actual input and recorded evidence. If that
 capability is absent, the affected check stays unavailable and the requirement
-incomplete. Never take over the dashboard pane or an unowned server. When `sync.py` reports that
+incomplete. Never take over the dashboard pane or an unowned server. When `sync.mts` reports that
 the panel's address moved, say the new address in the chat once — the link the
 user is holding is dead, and that tool is the only thing that knows it.
 
@@ -442,6 +442,7 @@ compose, so the discipline is the whole of the guarantee.
 Four gates. Each runs after a phase, in every mode, at every depth. **A gate that
 fails is not a warning: the phase is redone.**
 
+<!-- maestro:runtime:node -->
 <!-- maestro:delegation:native-explicit -->
 This skill explicitly requests native subagent delegation for its independent
 roles, including executors, audits, readers, review, polish and diagnosis.
@@ -564,7 +565,7 @@ the приёмка reader measures against. That is the same rule as everywhere 
 quotation is evidence, and evidence that has been translated is no longer the
 thing that was said.
 
-`python3 .maestro/sync.py` holds the three fields for `ru` and says which line
+`node .maestro/sync.mts` holds the three fields for `ru` and says which line
 is wrong. It cannot hold `en`: an English finding quoting the user's own Russian
 sentence is correct, and no check can tell that from a breach. For `en` this
 paragraph is the whole of the guarantee.

@@ -746,3 +746,24 @@ test('a стадия missing from the list breaks the chain rather than inventin
     [],
   );
 });
+
+test('the canonical shipped state modules import only bundle-local modules and Node built-ins', async () => {
+  const { readFile, readdir, stat } = await import('node:fs/promises');
+  const path = await import('node:path');
+  const root = path.resolve('skills/maestro/tools/runtime');
+  for (const area of ['state', 'shared']) {
+    for (const file of await readdir(path.join(root, area))) {
+      if (!file.endsWith('.mts')) continue;
+      const source = await readFile(path.join(root, area, file), 'utf8');
+      for (const match of source.matchAll(/from\s+['"]([^'"]+)['"]/g)) {
+        const specifier = match[1]!;
+        if (specifier.startsWith('node:')) continue;
+        assert.ok(specifier.startsWith('.'), `${file}: ${specifier}`);
+        assert.ok(specifier.endsWith('.mts'), `${file}: ${specifier}`);
+        const target = path.resolve(root, area, specifier);
+        assert.ok(target.startsWith(root + path.sep), `${file}: ${specifier}`);
+        assert.ok((await stat(target)).isFile(), `${file}: ${specifier}`);
+      }
+    }
+  }
+});

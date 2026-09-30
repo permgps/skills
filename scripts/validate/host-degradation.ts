@@ -107,7 +107,7 @@ export async function checkCodexRuntime(bundleDir: string): Promise<Violation[]>
     discovery: '.agents/skills/maestro', delegation: 'native-explicit', context: 'fresh',
     fork_turns: 'none', inputs: 'role-prompt-and-allowed-artifacts', returns: 'observed-final-by-child-id',
     workspace: 'absolute-explicit-cwd', 'editing-wave': 'one-without-concurrency-or-worktrees',
-    'state-writer': 'coordinator-sync.py', evidence: 'opaque-remains-unverified', retries: '2',
+    'state-writer': 'coordinator-sync.mts', evidence: 'opaque-remains-unverified', retries: '2',
   };
   for (const [rule, value] of Object.entries(expected)) {
     const rows = rules?.rows.filter(row => clean(row['Rule']) === rule) ?? [];

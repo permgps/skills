@@ -71,6 +71,26 @@ whose context you control, and no way to write project files.
 Record what you found. A capability that came back missing goes into the
 announcement in step 6, and the phase that spends it says what it costs.
 
+### 1c. Probe the installed runtime
+
+Before creating or publishing run state, require Node.js 22.18+ and actually
+execute an erasable temporary `.mts` file with the same Node command that
+will run the helper. A version string alone is insufficient: early 23.x or
+`NODE_OPTIONS=--no-experimental-strip-types` may disable the capability.
+Create the probe in the OS temporary directory, with this exact body:
+
+```typescript
+const nativeTypeProbe: number = 1;
+if (nativeTypeProbe !== 1) throw new Error('native TypeScript stripping required');
+```
+
+Run `node <absolute-probe-path.mts>`, check exit 0, and remove that owned
+probe in both outcomes. If Node is absent, too old, or the real probe fails,
+stop before state publication and name the prerequisite in the run language:
+Node.js 22.18+ with native TypeScript stripping enabled. Do not install Node,
+a loader, a compiler, or target dependencies automatically. No Python or
+external network is needed after installation; loopback HTTP remains available.
+
 ### 2. Choose the slug
 
 The slug names the run's directory and appears in every artifact path.
@@ -81,8 +101,9 @@ The slug names the run's directory and appears in every artifact path.
   choice for the отчёт rather than inventing a translation of their words.
 - Lowercase, dash-separated, no other characters.
 - If `.maestro/<slug>/` already exists, this is a second прогон for the same
-  feature. Do not reuse it and do not delete it: add a numeric suffix. Nothing
-  under `.maestro/` is ever removed by a later прогон.
+  feature. Do not reuse it and do not delete it: add a numeric suffix. No run
+  artifact under `.maestro/` is removed by a later прогон; step 4 may remove
+  only the obsolete copied helper after verifying its replacement.
 
 ### 3. Create the run directory
 
@@ -128,7 +149,16 @@ found no file, asked, and wrote one is the whole of this step.
 ### 4. Prepare and publish the first state
 
 Copy [`../assets/dashboard.html`](../assets/dashboard.html) and
-[`../tools/sync.py`](../tools/sync.py) into `.maestro/` before publication.
+[`../tools/sync.mts`](../tools/sync.mts) into `.maestro/` before publication,
+plus the entire `../tools/runtime/` tree as `.maestro/runtime/`. Resolve all
+source paths from the installed skill, including a linked discovery directory,
+never from the repository or cwd. Copy helper files individually and runtime
+recursively; never replace the populated `.maestro/` directory. Retain state,
+run artifacts, `serve.json` and `opened.json`. Verify the copied runtime with
+`node .maestro/sync.mts --validate .maestro/.candidate.json` before first
+publication. Only after it succeeds, remove the obsolete copied `.maestro/sync.py`
+file, if present; remove no other target file. The helper and runtime are one
+self-contained installation, without npm install, package.json or a build.
 Construct the complete contract-5 candidate in temporary JSON. It carries:
 
 | Field | Value at preflight |
@@ -157,7 +187,7 @@ Omit optional fields that have no value. In an active run, do not include
 timestamps. Only fields explicitly defined as nullable (such as `tests`) use
 `null`.
 
-Use `python3 .maestro/sync.py --publish .maestro/.candidate.json` for this
+Use `node .maestro/sync.mts --publish .maestro/.candidate.json` for this
 first write, adding `--holder '<token>'` when the run has a holder. The helper
 validates and atomically publishes `state.js`; delete the temporary candidate
 afterwards. Never edit `state.js` in place or write it on a timer — the state
@@ -177,7 +207,7 @@ loose literal perfectly well — it is JavaScript, and the page is a browser —
 nothing on screen tells you the file is wrong. The tool that measures a finished
 прогон reads it through `JSON.parse` and cannot open it at all, which is
 discovered after the run, when the file is final and nothing can be measured
-again. `python3 .maestro/sync.py --publish` checks this before publication; that is what the
+again. `node .maestro/sync.mts --publish` checks this before publication; that is what the
 check is for.
 
 ### 5. Raise the dashboard
@@ -233,10 +263,10 @@ times. A phase file is read once, several steps before the sentence is needed;
 the tool's output is read at the moment of saying it.
 
 **If the panel is gone, bring it back with one line.** Two things say so: the
-user, and a `sync.py` call reporting that the address moved.
+user, and a `sync.mts` call reporting that the address moved.
 
 ```bash
-python3 .maestro/sync.py --reopen
+node .maestro/sync.mts --reopen
 ```
 
 It is not an occasion for a second announcement block: one line with the
@@ -252,7 +282,7 @@ pages, which is the one thing [`../references/hosts.md`](../references/hosts.md)
 forbids outright:
 
 ```bash
-python3 .maestro/sync.py --no-open
+node .maestro/sync.mts --no-open
 ```
 
 Four things about such a pane are worth knowing before you take that trade,
@@ -324,7 +354,7 @@ nothing yet to check against the user's words.
 | `.maestro/<slug>/` | created with a zero-byte provisional `manifest.md`; no source agreement yet |
 | `.maestro/state.js` | written, `preflight` active |
 | `.maestro/dashboard.html` | copied, mirrored, and opened |
-| `.maestro/sync.py`, `index.html` | copied and placed |
+| `.maestro/sync.mts`, `runtime/`, `index.html` | complete helper copied and index placed when available |
 | the dashboard address | said in the chat, with the tool's folded-pane line beside it |
 | the announcement | shown, with any missing host capability named |
 

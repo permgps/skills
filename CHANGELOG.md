@@ -14,6 +14,30 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+## v0.0.6-alpha — 2026-09-30
+
+**Autonomous Node runtime.** Replace the Python helper with `sync.mts` and a
+self-contained `.mts` runtime for Node.js 22.18+ with native type stripping.
+Repository state/logger exports now reuse the shipped implementations. Strict
+publication retains revision/holder, immutable-history, evidence and diagnostic
+guarantees; the owned detached viewer verifies readiness and directory/instance
+identity. Preflight probes actual capability and copies the whole runtime.
+Copied and installed-copy/link regressions run without Python, target build,
+compiler, loader or npm install. Contract 5/verification 2 and client support
+claims remain unchanged; historical Python evidence below remains historical.
+
+**Runtime requirement:** Maestro now requires Node.js 22.18+ with native
+TypeScript stripping enabled instead of Python. Upgrade by copying `sync.mts`
+and the complete `runtime/` tree together, preserving run history and viewer
+records; remove only the obsolete copied helper after validating the replacement.
+
+**Verification status:** `npm run check` passes 763 tests with zero failures
+and zero skips on macOS with Node v26.8.1. Installed-copy/link tests execute
+outside the repository with an empty child PATH, no Python and no target
+toolchain. Node 22.18 itself, Linux/Windows execution and real legacy Python
+server adoption remain unverified. Pending full client/workflow acceptance is
+unchanged. See [the migration checkpoint](docs/parity-verification.md#node-runtime-migration-checkpoint--2026-09-30).
+
 ## v0.0.5-alpha — 2026-09-30
 
 **Native Codex compatibility (verification pending).** Maestro's development

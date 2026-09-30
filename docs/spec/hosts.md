@@ -99,7 +99,7 @@ representative scenario are a recorded sample, never a reliability guarantee.
 
 Codex CLI and the app use the same self-contained bundle, discovered from
 `.agents/skills/maestro` (copy or relative symlink) and invoked as `$maestro`.
-Resolve assets, prompts, references and the Python helper relative to the
+Resolve assets, prompts, references and the TypeScript helper relative to the
 installed skill, never relative to this repository. The runtime recipe is
 `skills/maestro/references/codex.md`, opened on demand by preflight and dispatch
 sites. It is coordinator guidance and never part of a blind reader's handoff.
@@ -134,7 +134,7 @@ observed native concurrency and actual separate git worktrees, created and
 integrated by the coordinator. Before integration check ownership, result and
 commit; preserve other edits and report conflicts. Without either capability,
 use one editing task per wave and dispatch fresh readers sequentially.
-Only the coordinator publishes state via the bundled `sync.py` and owns the
+Only the coordinator publishes state via the bundled `sync.mts` and owns the
 visible dashboard. Browser checks use an owned separate headless surface;
 missing required UI capability keeps obligations incomplete. Opener failure
 alone preserves the run and yields the dashboard address/file and a visibility
@@ -146,3 +146,15 @@ Use existing capability, verification and outcome records without changing the
 state contract, adding a writer, or persisting source text or secrets in logs.
 An enabled tool is only a candidate capability; a successful probe is observed
 capability; only a complete client-specific run establishes verified support.
+
+## Installed Runtime Prerequisite
+
+Maestro requires Node.js 22.18+ with native TypeScript stripping actually
+enabled. Preflight executes an erasable `.mts` capability probe; a version
+string alone is insufficient. Missing or disabled capability stops before
+state publication, names the prerequisite and never installs it automatically.
+Copy `tools/sync.mts` and the complete `tools/runtime/` tree into `.maestro/`
+alongside the dashboard, retaining run state and viewer/opened records. Verify
+the replacement before removing the obsolete copied helper. No target build,
+npm install, TS compiler, loader, Python or external network is needed after
+installation. Local loopback HTTP remains available. Scout gains no runtime.

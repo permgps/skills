@@ -152,3 +152,8 @@ test('an opening signal is a line number, and prose about panes is not one', () 
   assert.deepEqual(openingLines('one\nopen http://localhost:9/x\nthree\n'), [2]);
   assert.deepEqual(openingLines('The pane is the panel\'s, and nothing else goes in it.\n'), []);
 });
+
+test('Node server and reopening instructions retain the coordinator viewer boundary', () => {
+  assert.deepEqual(openingLines('node .maestro/sync.mts --serve\nnode .maestro/sync.mts --reopen'), [1, 2]);
+  assert.deepEqual(openingLines('node .maestro/sync.mts --publish candidate.json --no-open'), []);
+});
