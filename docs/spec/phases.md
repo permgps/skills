@@ -9,7 +9,7 @@ right thing was built.
 | Id | Name | Stage | Reads | Produces |
 |---|---|---|---|---|
 | preflight | Preflight | yes | user arguments, repository state | resolved dials, run state created, dashboard raised |
-| manifest | Manifest | yes | бриф from the user | `brief.md` — written once, then grown by its additions block — and `manifest.md` |
+| manifest | Manifest | yes | бриф from the user, redacted source snapshots and independent audit return | `brief.md` — written once, then grown by its additions block — and `manifest.md` |
 | briefing | Briefing | yes | `manifest.md`, declared references | `answers.md`, neutral `reference.md` |
 | spec | Specification | yes | `manifest.md`, `answers.md`, raw reference | `spec.md`, obligation and source coverage map |
 | plan | Plan | yes | `spec.md`, obligations and checks | `tasks/`, `interfaces.md`, ownership map |
@@ -18,12 +18,12 @@ right thing was built.
 | acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md` |
 | polish | Доводка | no | `reference.md`, project code after required parity | optional polished build, `tasks/` of its own |
 | memory | Memory | no | `discovered-interfaces.md`, `spec.md`, project code, run state | the memory block in `AGENTS.md`, `decisions.md` |
-| repair | Repair | no | whatever one of its five doors provides | retried таск, `amendments.md` |
+| repair | Repair | no | whatever one of its six doors provides | retried таск, `amendments.md` |
 
 `polish` runs only when the finish dial asked for it, inside the acceptance
 stage and after приёмка. `memory` runs twice — once during `build`, when the
 build discovers something worth outliving the run, and once after `acceptance`,
-when the finished code can be described. `repair` runs on demand, through the four doors its own section lists.
+when the finished code can be described. `repair` runs on demand, through the six doors its own section lists.
 
 ## A Change That Arrives Mid-Прогон
 
@@ -349,6 +349,16 @@ The initial pass can find behavior absent from the generated inventory. The
 orchestrator subsequently reconciles that discovery with scheduled checks and
 all other findings. See [`verification.md`](verification.md).
 
+### Startup And Scheduled Verification
+
+Startup code defects route to bounded repair with the startup-defect inputs.
+Unavailable tool/service/value marks affected checks unavailable; independent
+checks continue. After initial blind discovery reconcile and execute integrated
+journeys, applicable startup/persistence/real-integration checks, and selected
+isolated controls. Controls never pollute production executions. Pending G4 is
+a first-class result. Original/current scope counts derive from one baseline
+and verification graph, not task/stage activity.
+
 ### The Phase And Its Reader Are Not One Actor
 
 The *phase* opens `brief.md`, `manifest.md`, `reviews/` and the run state,
@@ -543,7 +553,7 @@ is being checked is the build the user will keep.
 
 ### The Doors
 
-Five things arrive here, and they are the only five. Each names the phase that
+Six things arrive here, and they are the only six. Each names the phase that
 opens it, because a door nobody opens is a promise the прогон cannot keep — the
 first end-to-end run wrote «carried to the repair phase» into a `D##` row that
 had no door, and the divergence it described shipped.
@@ -554,7 +564,8 @@ had no door, and the divergence it described shipped.
 | blocking-review | review | `repair` | committed, and the finding names what it contradicts |
 | g4-disagreement | acceptance | `done` | the disagreement and the `R##` it names |
 | recorded-divergence | build | `review` or `done` | the `D##`, and what the таск it depends on actually built |
-| coverage-omission | acceptance | any relevant task state | grounded missing behavior, source provenance, and a stable finding ID |
+| coverage-omission | acceptance | any relevant task state | stable finding/root ID, R IDs, missing observation, source provenance/evidence, affected obligations/checks, task ownership and current fingerprint |
+| startup-defect | acceptance | any relevant task state | exact documented launch command, sanitized error evidence, build fingerprint, affected R/check IDs, owning task and prerequisite assessment |
 
 The first has not been committed. The second has — the build committed it before
 the review looked — which is why the build stops short of calling it done.
@@ -597,6 +608,17 @@ times do we try again before admitting we cannot" would be two answers to one
 question, and the second one would be found only by somebody who read the
 document that disagreed with what they had just done.
 
+### Diagnosis After A Failed Repair
+
+Before another retry, independently dispatch prior hypothesis, action, result,
+root finding and sanitized evidence to a bounded diagnosis context. Obtain a
+returned falsifying observation and grounded different strategy; unchanged
+wording or merely switching executor cannot qualify. Record predecessor/root,
+evidence, diagnosis dispatch/return, strategy, action and follow-up check IDs.
+Missing diagnosis keeps repair incomplete. Counts follow the stable root across
+renames, task splits and executors; per-root at most two and finite global budget
+never increases. See [verification.md](verification.md).
+
 ### Retry Or Amendment
 
 A retry says the таск can be built as specified and the attempt was wrong. An
@@ -634,6 +656,17 @@ answer to give about it, and G4 still measures the whole build against the
 манифест afterwards — a repair that quietly built something else is caught
 there, by a reader that never saw any of this.
 
+## Repair Door Inputs
+
+| Door | Required inputs |
+|---|---|
+| not-done | taskFile, executorReturn, handoffIfPresent |
+| blocking-review | taskFile, executorReturn, blockingFinding, handoffIfPresent |
+| g4-disagreement | taskFile, disagreement, requirementIds, fingerprint |
+| recorded-divergence | taskFile, divergenceId, dependencyResult |
+| coverage-omission | taskFile, rootFindingId, requirementIds, missingObservation, sourceEvidence, obligationIds, checkIds, ownership, fingerprint |
+| startup-defect | taskFile, rootFindingId, launchCommand, errorEvidence, fingerprint, requirementIds, checkIds, ownership, prerequisiteAssessment |
+
 ## Mode Matrix
 
 | Phase | full | semi | interview | manual |
@@ -668,3 +701,13 @@ is how much lands there — not whether the section exists.
 No cell in this table removes a gate from `gates.md` or a rule from
 `safety.md`. Those run identically in all four columns, because they are checks
 against the user's own words rather than requests for the user's time.
+
+## Codex Dispatch And Ownership
+
+On Codex CLI or app, apply the shared execution contract in
+[`hosts.md`](hosts.md#shared-codex-execution-contract). Each independent role
+uses a native fresh-context dispatch with its existing allowed artifact inputs
+and an observed final return. The coordinator owns orchestration, worktree
+integration and state publication; executors own project edits in their named
+absolute workspaces. Missing concurrency or worktrees narrows editing waves to
+one without removing independent sequential readers.

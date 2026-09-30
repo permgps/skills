@@ -22,7 +22,8 @@ import net from 'node:net';
 import { mkdtemp, mkdir, writeFile, copyFile, readFile, rm, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { CAPTURES, verifiedState } from '../state/fixtures/verification.ts';
+import { CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, sha256, planningOwnershipState, correctedSourceAuditState, deferredScopeState, sourceVerifiedState, controlledState, verifiedState } from '../state/fixtures/verification.ts';
+import { projectState, prepareLegacyResume } from '../state/projection.ts';
 import { deriveVerification } from '../state/verification.ts';
 import { validateState } from '../state/validate.ts';
 
@@ -873,4 +874,221 @@ test('a live server for this directory is adopted, not duplicated',
     } finally {
       await held.dispose();
     }
+  });
+
+
+test('version-5 preflight publishes an empty provisional manifest without claiming agreement',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      const state = sourceVerifiedState();
+      state.lifecycle = 'active'; delete state.outcome; delete state.finishedAt;
+      state.currentStage = 'preflight'; state.stages = [{ id: 'preflight', status: 'active', startedAt: state.startedAt }];
+      state.requirements = []; state.tasks = [];
+      state.gates = state.gates.map(gate => ({ ...gate, status: 'pending', findings: [] }));
+      const record = state.verification!;
+      record.manifestDigest = sha256(''); record.acceptanceInputDigest = sha256('');
+      record.references = []; record.surfaces = []; record.obligations = []; record.checks = [];
+      record.executions = []; record.evidence = []; record.findings = []; record.decisions = [];
+      record.coverageReviews = []; record.acceptanceRounds = []; record.promisedWork = []; record.repairAttempts = [];
+      record.sourceSnapshots = []; record.sourceClauses = []; record.manifestAudits = [];
+      record.scopeMappings = []; record.journeys = []; record.negativeControls = []; delete record.scopeBaseline;
+      assert.deepEqual(validateState(state), []);
+      const runDir = path.join(target.root, state.slug);
+      await mkdir(runDir, { recursive: true });
+      await writeFile(path.join(runDir, 'manifest.md'), '');
+      const candidate = path.join(target.root, 'candidate.json');
+      await writeFile(candidate, JSON.stringify(state));
+      const published = await target.run({}, ['--publish', candidate, '--no-open']);
+      assert.equal(published.status, 0, published.out);
+      assert.equal((jsonResult(published)['projection'] as { g4: string }).g4, 'pending');
+      const before = await readFile(path.join(target.root, 'state.js'), 'utf8');
+      await unlink(path.join(runDir, 'manifest.md'));
+      state.updatedAt = '2026-09-30T10:00:00Z';
+      await writeFile(candidate, JSON.stringify(state));
+      const rejected = await target.run({}, ['--publish', candidate, '--no-open']);
+      assert.equal(rejected.status, 1, rejected.out);
+      assert.equal(await readFile(path.join(target.root, 'state.js'), 'utf8'), before);
+    } finally { await target.dispose(); }
+  });
+
+test('version-5 source and completion fixtures agree between TypeScript and copied Python',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      for (const [relative, body] of Object.entries({ ...CAPTURES, ...CONTROL_CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
+        const filename = path.join(target.root, 'synthetic-menu', relative);
+        await mkdir(path.dirname(filename), { recursive: true }); await writeFile(filename, body);
+      }
+      const candidate = path.join(target.root, 'candidate.json');
+      const passing = controlledState();
+      const missingReturn = sourceVerifiedState(); delete missingReturn.verification!.manifestAudits[0]!.returnId;
+      const wrongSpan = sourceVerifiedState(); wrongSpan.verification!.sourceClauses[0]!.end = 999;
+      const wrongHash = sourceVerifiedState(); wrongHash.verification!.sourceSnapshots[0]!.sha256 = '0'.repeat(64);
+      const staleAudit = sourceVerifiedState(); staleAudit.verification!.manifestAudits[0]!.manifestDigest = '0'.repeat(64);
+      const insensitive = controlledState(); insensitive.verification!.negativeControls[0]!.runs[1]!.result = 'passed';
+      insensitive.verification!.negativeControls[0]!.runs[1]!.assertions[0]!.result = 'passed';
+      const unavailable = controlledState(); unavailable.lifecycle = 'active'; delete unavailable.outcome; delete unavailable.finishedAt;
+      unavailable.gates[3]!.status = 'pending'; unavailable.verification!.acceptanceRounds = [];
+      unavailable.verification!.negativeControls[0]!.result = 'unavailable';
+      unavailable.verification!.negativeControls[0]!.runs = []; unavailable.verification!.negativeControls[0]!.limitation = 'Browser unavailable';
+      const malformed = sourceVerifiedState(); malformed.verification!.scopeBaseline!.expectations = null as never;
+      const activeNull = sourceVerifiedState(); activeNull.lifecycle = 'active';
+      activeNull.outcome = null as never; activeNull.finishedAt = null as never;
+      const corrected = correctedSourceAuditState();
+      const contradicted = correctedSourceAuditState();
+      contradicted.verification!.manifestAudits.push({ ...contradicted.verification!.manifestAudits[1]!, id: 'MA-3',
+        result: 'failed', findings: ['Later reader found an omitted condition'], dispatchId: 'dispatch-3',
+        readerId: 'reader-3', returnId: 'return-3', auditedAt: '2026-09-29T09:03:00Z' });
+      for (const state of [passing, sourceVerifiedState(), corrected, contradicted, missingReturn, wrongSpan, wrongHash, staleAudit, insensitive, unavailable, malformed, activeNull]) {
+        await writeFile(candidate, JSON.stringify(state));
+        const done = await target.run({}, ['--validate', candidate]);
+        const valid = validateState(state).length === 0;
+        assert.equal(done.status === 0, valid, done.out);
+        if (valid) assert.deepEqual(jsonResult(done)['projection'], deriveVerification(state));
+      }
+    } finally { await target.dispose(); }
+  });
+
+test('copied Python rejects overlapping stage clocks and agrees on complete stage handovers',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
+        const filename = path.join(target.root, 'synthetic-menu', relative);
+        await mkdir(path.dirname(filename), { recursive: true }); await writeFile(filename, body);
+      }
+      const baseline = sourceVerifiedState();
+      baseline.stages.unshift(
+        { id: 'preflight', status: 'done', startedAt: baseline.startedAt, finishedAt: '2026-09-29T09:01:00Z' },
+        { id: 'manifest', status: 'done', startedAt: '2026-09-29T09:01:00Z', finishedAt: '2026-09-29T09:02:00Z' });
+      const overlap = structuredClone(baseline); overlap.stages[1]!.startedAt = '2026-09-29T09:00:30Z';
+      const gap = structuredClone(baseline); gap.stages[1]!.startedAt = '2026-09-29T09:01:30Z';
+      const open = structuredClone(baseline); open.stages[0]!.status = 'active'; delete open.stages[0]!.finishedAt;
+      const missing = structuredClone(baseline); delete missing.stages[1]!.startedAt;
+      const unreadable = structuredClone(baseline); unreadable.stages[1]!.startedAt = 'not a timestamp';
+      const pending = structuredClone(baseline); pending.stages[1]!.status = 'pending';
+      const unknown = structuredClone(baseline);
+      (unknown.stages[1] as unknown as Record<string, unknown>)['id'] = ['manifest'];
+      unknown.stages[1]!.status = 'active'; delete unknown.stages[1]!.finishedAt;
+      const skipped = structuredClone(baseline); skipped.stages[1] = { id: 'manifest', status: 'skipped', note: 'Already available' };
+      skipped.stages.splice(2, 0, { id: 'briefing', status: 'done',
+        startedAt: '2026-09-29T09:01:00Z', finishedAt: '2026-09-29T09:02:00Z' });
+      const submillisecond = structuredClone(baseline);
+      submillisecond.stages[0]!.finishedAt = '2026-09-29T09:01:00.123400Z';
+      submillisecond.stages[1]!.startedAt = '2026-09-29T09:01:00.123900Z';
+      // A skipped stage owns no clock; an absent stage breaks the temporal chain.
+      for (const [name, state] of Object.entries({ baseline, overlap, gap, open, missing, unreadable, pending, unknown, skipped, submillisecond })) {
+        const candidate = path.join(target.root, 'candidate.json');
+        await writeFile(candidate, JSON.stringify(state));
+        const result = await target.run({}, ['--project', candidate]);
+        const valid = validateState(state).length === 0;
+        assert.equal(result.status === 0, valid, `${name}: ${result.out}`);
+        if (!valid) assert.ok((jsonResult(result)['violations'] as { field: string }[]).some(item =>
+          item.field.startsWith('stages')), `${name}: ${result.out}`);
+      }
+    } finally { await target.dispose(); }
+  });
+
+test('version-5 publication freezes original scope and rejects invalid first completion',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
+        const filename = path.join(target.root, 'synthetic-menu', relative);
+        await mkdir(path.dirname(filename), { recursive: true }); await writeFile(filename, body);
+      }
+      const candidate = path.join(target.root, 'candidate.json');
+      const state = sourceVerifiedState();
+      const invalid = structuredClone(state); delete invalid.verification!.manifestAudits[0]!.returnId;
+      await writeFile(candidate, JSON.stringify(invalid));
+      const rejected = await target.run({}, ['--publish', candidate, '--no-open']);
+      assert.equal(rejected.status, 1, rejected.out);
+      await assert.rejects(() => readFile(path.join(target.root, 'state.js')));
+      assert.match(await target.page(), /MAESTRO_VALIDATION_SNAPSHOT/);
+      await writeFile(candidate, JSON.stringify(state));
+      const accepted = await target.run({}, ['--publish', candidate, '--no-open']);
+      assert.equal(accepted.status, 0, accepted.out);
+      const before = await readFile(path.join(target.root, 'state.js'), 'utf8');
+      const changed = structuredClone(state); changed.updatedAt = '2026-09-30T10:00:00Z';
+      changed.verification!.scopeBaseline!.expectations[0]!.text = 'Relaxed original limit';
+      await writeFile(candidate, JSON.stringify(changed));
+      const edited = await target.run({}, ['--publish', candidate, '--expect', state.updatedAt!, '--no-open']);
+      assert.equal(edited.status, 1, edited.out);
+      assert.equal(await readFile(path.join(target.root, 'state.js'), 'utf8'), before);
+      assert.ok((jsonResult(edited)['violations'] as { field: string }[]).some(item => item.field === 'verification.scopeBaseline'));
+    } finally { await target.dispose(); }
+  });
+
+test('copied Python publishes Plan ownership once and preserves holder and oracle boundaries',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
+        const filename = path.join(target.root, 'synthetic-menu', relative);
+        await mkdir(path.dirname(filename), { recursive: true }); await writeFile(filename, body);
+      }
+      const before = planningOwnershipState();
+      before.heldBy = { token: 'planning-holder', since: before.startedAt };
+      const after = planningOwnershipState(true); after.heldBy = before.heldBy;
+      after.updatedAt = '2026-09-29T09:21:00Z';
+      const candidate = path.join(target.root, 'candidate.json');
+      await writeFile(candidate, JSON.stringify(before));
+      const first = await target.run({}, ['--publish', candidate, '--holder', 'planning-holder', '--no-open']);
+      assert.equal(first.status, 0, first.out);
+      await writeFile(candidate, JSON.stringify(after));
+      const assigned = await target.run({}, ['--publish', candidate, '--expect', before.updatedAt!, '--holder', 'planning-holder', '--no-open']);
+      assert.equal(assigned.status, 0, assigned.out);
+      const snapshot = await readFile(path.join(target.root, 'state.js'), 'utf8');
+      after.verification!.checks[0]!.oracle = 'A weaker replacement'; after.updatedAt = '2026-09-29T09:22:00Z';
+      await writeFile(candidate, JSON.stringify(after));
+      const rejected = await target.run({}, ['--publish', candidate, '--expect', '2026-09-29T09:21:00Z', '--holder', 'planning-holder', '--no-open']);
+      assert.equal(rejected.status, 1, rejected.out);
+      assert.equal(await readFile(path.join(target.root, 'state.js'), 'utf8'), snapshot);
+    } finally { await target.dispose(); }
+  });
+
+test('copied Python projects original 18/20 and current 18/18 from the same valid fixture',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
+        const filename = path.join(target.root, 'synthetic-menu', relative);
+        await mkdir(path.dirname(filename), { recursive: true }); await writeFile(filename, body);
+      }
+      const state = deferredScopeState();
+      assert.deepEqual(validateState(state), []);
+      const candidate = path.join(target.root, 'candidate.json');
+      await writeFile(candidate, JSON.stringify(state));
+      const done = await target.run({}, ['--project', candidate]);
+      assert.equal(done.status, 0, done.out);
+      assert.deepEqual(jsonResult(done)['scopeProgress'], projectState(state).scopeProgress);
+      assert.deepEqual(jsonResult(done)['summary'], deriveVerification(state));
+      assert.equal(jsonResult(done)['completionSafeguards'], 'established');
+    } finally { await target.dispose(); }
+  });
+
+test('v4-to-v5 resume publishes without deleting historical evidence or fabricating safeguards',
+  { skip: python === null }, async () => {
+    const target = await session(null);
+    try {
+      for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
+        const filename = path.join(target.root, 'synthetic-menu', relative);
+        await mkdir(path.dirname(filename), { recursive: true }); await writeFile(filename, body);
+      }
+      const old = verifiedState(); const filename = path.join(target.root, 'candidate.json');
+      await writeFile(filename, JSON.stringify(old));
+      const published = await target.run({}, ['--publish', filename, '--no-open']);
+      assert.equal(published.status, 0, published.out);
+      const candidate = sourceVerifiedState().verification!;
+      candidate.acceptanceInputDigest = 'actual-resumed-source-input';
+      candidate.manifestAudits = []; delete candidate.scopeBaseline;
+      const resumed = prepareLegacyResume(old, candidate);
+      await writeFile(filename, JSON.stringify(resumed));
+      const done = await target.run({}, ['--publish', filename, '--expect', old.updatedAt!, '--no-open']);
+      assert.equal(done.status, 0, done.out);
+      assert.equal(resumed.verification!.executions.length, old.verification!.executions.length);
+      assert.equal(projectState(resumed).g4, 'pending');
+      assert.deepEqual(jsonResult(done)['projection'], deriveVerification(resumed));
+    } finally { await target.dispose(); }
   });

@@ -18,3 +18,8 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# Owned development links; other agent tooling remains trackable.
+/.agents/skills/maestro
+/.claude/skills/maestro
+/.gemini/skills/maestro

@@ -388,3 +388,20 @@ here.
 
 Held against every `Label (en)` column, on word boundaries, for the reason given
 under *Plain Words*: `build` must fail and `rebuilt` must not.
+
+## Scope Projection Labels
+
+These labels use the same plain wording in both registers. Fractions always
+include the denominator; unknown/empty scope never supplies a percentage.
+
+| Meaning | Russian | English |
+|---|---|---|
+| Frozen requested scope | Исходный объём | Original scope |
+| Authorized current scope | Текущий объём | Current scope |
+| Missing baseline/evidence | не установлено | not established |
+| Empty scope | не применимо | not applicable |
+| Scope additions | Добавлено | Added |
+| Authorized deferrals | Отложено | Deferred |
+| Withdrawals | Удалено | Dropped |
+| Changed original expectations | Изменено | Changed |
+| Residual accepted defects | Принятые исключения | Accepted exceptions |

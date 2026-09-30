@@ -1,3 +1,5 @@
+[Back to README](../README.md) · [Dashboard →](dashboard.md)
+
 # Installing
 
 This package holds **two** Agent Skills, and installing copies directories of
@@ -252,7 +254,52 @@ and worth knowing before it looks like one of them failed.
 What each host does about subagent fan-out, context isolation and worktrees — and
 what a run does when one of those is missing — is in
 [the hosts specification](spec/hosts.md), where both rows still read *unverified*
-because neither has hosted a run yet.
+until complete successful client-specific runs are established. Partial Codex
+CLI runs have been attempted; Gemini verification is unchanged.
+
+## Codex CLI And App
+
+Both clients use the same bundle and native runtime recipe. Codex discovers
+repository skills under `.agents/skills` and supports symlinked skill folders;
+see [official skill documentation](https://learn.chatgpt.com/docs/build-skills).
+From this development checkout, `npm run link` provides the canonical link.
+For another target, the copy command above selects `-a codex`; verify that
+`<target>/.agents/skills/maestro/SKILL.md` exists and compare the bundle with
+`diff -r`. Refuse or rename an existing user-owned directory before installing;
+do not silently replace it.
+
+Start Codex in the target directory (open that project in the app) and invoke:
+
+```text
+$maestro Build a notes page with local saving.
+```
+
+There is no need to supply `SKILL.md` to the prompt. Supporting files resolve
+relative to the installed skill, including `references/codex.md`, prompts,
+`tools/sync.py` and the dashboard asset. If a changed skill does not appear,
+restart the client. Avoid keeping legacy and canonical copies with the same
+name: duplicate skill names can appear separately in the selector.
+
+Maestro explicitly requests [native subagents](https://learn.chatgpt.com/docs/agent-configuration/subagents).
+Preflight inspects exposed tools and probes a fresh child and its final return.
+With `fork_turns`, every dispatch explicitly selects `"none"`; with another
+schema it requires the documented fresh-context mechanism. Missing concurrency
+or worktrees narrows editing waves to one and readers continue sequentially.
+Missing fresh contexts or returns leaves affected gates pending. Readers get
+only their role prompt and allowed inputs, with the specification withheld
+from blind acceptance. Filesystem visibility is recorded separately.
+
+Executors use absolute owned workspaces and explicit shell cwd. The coordinator
+integrates work and publishes state through the bundled Python helper. Relay
+its dashboard URL; if opening fails, open that local URL yourself. A visible
+dashboard does not prove browser verification of the built app: missing required
+UI evidence keeps its obligations incomplete. `--no-open` accommodates clients
+with their own pane and unattended checks; `--reopen` recovers the dashboard.
+
+CLI and app support remain **unverified** until each has complete brief-to-report
+evidence. Consult the [current execution record](parity-verification.md#codex-compatibility-checkpoint--2026-09-30)
+for what was actually run. Scout and Gemini execution support are outside this
+compatibility change.
 
 ## Developing against the checkout
 
@@ -260,7 +307,7 @@ To run the skill from the repository while working on it, link it into the local
 agent directories instead of installing a copy:
 
 ```bash
-npm run link      # symlink skills/maestro into .claude, .codex and .gemini
+npm run link      # link Maestro into .claude/skills, .agents/skills and .gemini/skills
 npm run unlink    # remove those symlinks
 ```
 
@@ -268,13 +315,15 @@ npm run unlink    # remove those symlinks
 a symlink into three agent directories before one exists would put it in front of
 a session that did not ask for it.
 
-Verified on 2026-08-19: all three symlinks are created and removed, and the
-script refuses any path that is not already a symlink.
+Verified on 2026-09-30: twelve real-directory regressions pass, including the
+literal `.agents/skills/maestro` destination, relocation, idempotent link/unlink,
+shared-destination deduplication and existing-directory refusal. `npm run link`
+created all three owned relative links in this checkout. It creates no legacy
+`.codex/skills/maestro` copy and does not remove user-owned legacy installations.
 
-The links are deliberately not tracked by git: `.claude/`, `.codex/` and
-`.gemini/` are ignored wholesale, and the script exists so that rule does not
-need an exception. It refuses to touch any path that is not a symlink, so an
-existing directory of your own skills is never overwritten.
+Only the owned `maestro` entries are ignored. The rest of `.agents/` remains
+trackable because it contains project tooling. Real directories are refused
+on both linking and unlinking.
 
 ## Checking the repository
 
@@ -287,7 +336,7 @@ npm run check     # everything below, in this order
 | `npm run typecheck` | `tsc --noEmit` over every script |
 | `npm run spec` | Maestro's behavior specification does not contradict itself |
 | `npm run spec:scout` | Scout's does not either, and its declared tables exist |
-| `npm run bundle` | frontmatter, link targets, no cross-phase links, no orphaned phase |
+| `npm run bundle` | frontmatter, links, phase boundaries, reachable prompts, and declared completion procedure scaffolding |
 | `npm run bundle:scout` | the same over Scout, whose steps live in `steps/` |
 | `npm run dashboard` | the dashboard asset's regions, labels and pure logic |
 | `npm run state` | `docs/spec/state-contract.md` and `scripts/state/contract.ts` still agree |
@@ -299,6 +348,8 @@ npm run check     # everything below, in this order
 | `npm run test` | the checkers' own tests |
 | `npm run parity:browser` | separate required real-browser pointer suite; unavailable exits 2 |
 | `npm run parity:workflow` | separate required independent agent evaluation; unavailable exits 2 |
+| `npm run completion:workflow` | provider-neutral completion evaluation with explicit authorized adapter; unconfigured/unavailable exits 2 |
+| `npm run completion:workflow:prepare` | isolated target preparation only, no agent execution credit |
 
 `npm run metrics -- <run-dir>` measures a finished run. It is not part of
 `npm run check`, because this repository contains no run for it to measure.
@@ -306,3 +357,45 @@ npm run check     # everything below, in this order
 Individual checks are documented in [the specification README](spec/README.md).
 The [parity verification record](parity-verification.md) names the separate
 browser and workflow prerequisites and the current execution limits.
+
+## Completion Prerequisites
+
+New runs use contract 5/verification 2. Source auditing and repeated-repair
+diagnosis need actual fresh independent contexts and returned identities. If a
+host cannot provide them, affected gates remain pending. Readiness checks follow
+the request: clean startup/restart for runnable persistent apps, actual promised
+integrations, and proportional output checks for non-UI work. Sandbox evidence
+establishes sandbox behavior only.
+
+Selected controls need an owned disposable copy and unchanged oracle. Neither
+`sync.py` nor the dashboard executes project checks. The Python helper remains
+standard-library-only; browser and agent clients are external prerequisites and
+are never installed by the evaluation commands. Historical states are readable;
+explicit resume must reconstruct actual v5 guarantees instead of inferring them
+from prior completion.
+
+## Verification Checkpoint
+
+The Codex compatibility work in the unrestricted 2026-09-30 environment passed
+`npm run check`: 739 tests, zero failures, zero skips, with Python 3.14.7 actually
+executing the helper integration tests. This supersedes the environment limit
+in the historical checkpoint below for the current working tree. It does not
+establish complete CLI/app workflow support. Fresh CLI `$maestro` runs from a
+copy and a corrected development link loaded the skill and returned independent
+children, but both hit their 15-minute deadlines before acceptance/report/memory.
+The app has no separate execution evidence. See the parity record for details.
+
+
+The earlier 2026-09-30 implementation checkpoint passed `npm run check` with 725 tests,
+zero failures and zero skips, including actual copied-helper Python subprocesses.
+The separate real-browser suite also passed. Actual agent workflow acceptance is
+still pending. After the latest stage-clock and transcript corrections, the
+managed environment ran 727 tests: 691 passed and 36 viewer/publication tests
+failed because local port operations were prohibited. Types, validators and the
+new regression checks passed. The full check remains unestablished in this
+environment; see the execution checkpoint in the parity verification record.
+
+## See Also
+
+- [Dashboard](dashboard.md)
+- [Parity Verification](parity-verification.md)

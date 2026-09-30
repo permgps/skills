@@ -201,3 +201,13 @@ test('a name is compared without the decoration it was written with', () => {
   assert.equal(normalizeName('the   additions  block of `brief.md`'), 'the additions block of brief.md');
   assert.deepEqual(splitNames('`a.md`, the b of `c.md`'), ['a.md', 'the b of c.md']);
 });
+
+test('a reader cannot both receive and withhold the same source interpretation', async () => {
+  const violations = await violationsFor({ spec: SPEC.replace(
+    '| G2 | `independent-reader.md` | `brief.md`, `spec.md` | the манифест |',
+    '| G2 | `independent-reader.md` | `brief.md`, `spec.md`, the манифест | the манифест |'),
+    independent: INDEPENDENT.replace('| `spec.md` | what is going to be built |',
+      '| `spec.md` | what is going to be built |\n| the манифест | supplied interpretation |'),
+  });
+  assert.ok(violations.some(item => item.check === 'boundary'));
+});

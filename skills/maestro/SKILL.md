@@ -181,7 +181,8 @@ clock on a phase that has already finished, and the tool that measures the пр�
 cannot see the interval either, because it measures `stages[]`.
 
 So `finishedAt` of one стадия and `startedAt` of the next are the same instant.
-`scripts/state/validate.ts` rejects a state where they are not.
+`scripts/state/validate.ts` and the bundled publisher reject a state where they
+are not.
 
 **A стадия's status and its stamps are written in the same breath**, because the
 status is a claim about the clock. `active` means a `startedAt` and no
@@ -441,6 +442,12 @@ compose, so the discipline is the whole of the guarantee.
 Four gates. Each runs after a phase, in every mode, at every depth. **A gate that
 fails is not a warning: the phase is redone.**
 
+<!-- maestro:delegation:native-explicit -->
+This skill explicitly requests native subagent delegation for its independent
+roles, including executors, audits, readers, review, polish and diagnosis.
+On Codex use the demand-loaded runtime recipe selected by preflight and each
+dispatch phase. Never inherit coordinator history into an independent role.
+
 An independent reader, reviewer, or executor is a separate agent dispatch with
 its own bounded inputs and a returned result. A summary you write yourself is
 not that dispatch, even if it names the reader and its supposed findings. When
@@ -453,10 +460,10 @@ finding or pass.
 
 | Gate | After phase | Pass condition |
 |---|---|---|
-| G1 | briefing | Every требование has a status, and none is left open without a recorded reason |
+| G1 | briefing | Every требование has a status and no unexplained open entry; contract 5 also requires a fresh returned independent source audit and frozen initial agreement |
 | G2 | spec | Every live требование is in-spec, deferred, or dropped with zero left open, **and** the independent intent reader and separate raw-reference reader return no unresolved mandatory gap |
 | G3 | plan | Every in-spec требование maps to at least one таск, **and** every таск traces back to at least one требование |
-| G4 | acceptance | The build is checked against `manifest.md` and the dated additions in `brief.md`, with `spec.md` and the бриф's original text withheld, and every disagreement is reported |
+| G4 | acceptance | Current required checks and complete coverage pass after blind discovery against manifest/additions; failures give `failed`, missing or stale evidence gives `pending` |
 
 At G4 the reader has `manifest.md`, the dated additions in `brief.md`, and the
 running build, and does **not** have `spec.md`, the plan, the task files, the
@@ -578,3 +585,5 @@ the register.
 
 Read [`phases/0-dials.md`](phases/0-dials.md), resolve the dials, then read
 [`phases/0-preflight.md`](phases/0-preflight.md). Nothing else until then.
+
+<!-- maestro:completion-protocols -->

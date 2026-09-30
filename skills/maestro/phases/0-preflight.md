@@ -20,6 +20,13 @@ question about the бриф is asked.
 
 ### 1b. Resolve the host
 
+<!-- maestro:codex:preflight -->
+On Codex CLI or app, identify actual exposed native delegation tools, open
+[the Codex recipe](../references/codex.md), and perform its real fresh child/return
+probe before independent work. Inspect the current schema; an enabled tool
+alone is not observed capability. Record identities and limits in existing
+records. Missing fresh context/return leaves the affected gates pending.
+
 Three capabilities are established by trying them, on every host, this one
 included. They are the three that narrow a прогон instead of stopping it, and a
 прогон that assumed one and lost it halfway through a wave is worse off than one
@@ -83,8 +90,11 @@ The slug names the run's directory and appears in every artifact path.
 .maestro/<slug>/
 ```
 
-Create the directory and nothing inside it yet. The manifest phase writes the
-first two files.
+Create the directory and an empty `manifest.md` (zero bytes) inside it. This
+provisional file has no requirements or agreement; the manifest phase replaces
+it with the candidate before source audit. The first published state binds its
+SHA-256 to these actual bytes, because publication validates the manifest file
+even before source capture. Do not invent brief text or audit records here.
 
 ### 3b. Write the project config, if the dials phase produced a decision
 
@@ -119,11 +129,11 @@ found no file, asked, and wrote one is the whole of this step.
 
 Copy [`../assets/dashboard.html`](../assets/dashboard.html) and
 [`../tools/sync.py`](../tools/sync.py) into `.maestro/` before publication.
-Construct the complete contract-4 candidate in temporary JSON. It carries:
+Construct the complete contract-5 candidate in temporary JSON. It carries:
 
 | Field | Value at preflight |
 |---|---|
-| `contractVersion` | the current contract version |
+| `contractVersion` | `5` for a new run; never auto-upgrade a historical state |
 | `runId` | stable for the whole прогон |
 | `slug` | from step 2 |
 | `startedAt` | now, ISO 8601, written once and never again |
@@ -137,10 +147,15 @@ Construct the complete contract-4 candidate in temporary JSON. It carries:
 | `tasks`, `requirements` | empty |
 | `gates` | all four — `G1`, `G2`, `G3`, `G4` — `pending`, with no findings |
 | `lifecycle`, `outcome`, `finishedAt` | `active`, with no terminal outcome or closure timestamp |
-| `verification` | `version: 1`, `targetRevision: 1`, provisional acceptance input digest, empty record arrays, `repairLimits: { perFinding: 2, total: 8 }` |
+| `verification` | `version: 2`, `targetRevision: 1`, provisional acceptance input digest, `manifestDigest` as SHA-256 of empty draft, empty existing record arrays plus `sourceSnapshots`, `sourceClauses`, `manifestAudits`, `scopeMappings`, `journeys`, `negativeControls`; no invented `scopeBaseline`, `repairLimits: { perFinding: 2, total: 8 }` |
 | `debt` | three empty lists: `placeholders`, `assumptions`, `emptyEnv` |
 | `additions` | empty |
 | `tests` | `null` — no suite has run |
+
+Omit optional fields that have no value. In an active run, do not include
+`outcome` or `finishedAt`, even as JSON `null`; do the same for absent stage/task
+timestamps. Only fields explicitly defined as nullable (such as `tests`) use
+`null`.
 
 Use `python3 .maestro/sync.py --publish .maestro/.candidate.json` for this
 first write, adding `--holder '<token>'` when the run has a holder. The helper
@@ -306,7 +321,7 @@ nothing yet to check against the user's words.
 
 | Artifact | State |
 |---|---|
-| `.maestro/<slug>/` | created, empty |
+| `.maestro/<slug>/` | created with a zero-byte provisional `manifest.md`; no source agreement yet |
 | `.maestro/state.js` | written, `preflight` active |
 | `.maestro/dashboard.html` | copied, mirrored, and opened |
 | `.maestro/sync.py`, `index.html` | copied and placed |
@@ -314,3 +329,40 @@ nothing yet to check against the user's words.
 | the announcement | shown, with any missing host capability named |
 
 Then read the manifest phase file.
+
+## Source Audit Capability
+
+Before claiming independent context, probe a real fresh-context dispatch, wait
+for its return, and record actual dispatch/model/tool/return identity. Never fork
+coordinator context into blind readers. Missing isolation or returned identity
+keeps the source audit incomplete and G1 pending; sequential execution may
+replace fan-out, but the coordinator never supplies its own audit pass.
+Valid: actual child receipt and returned result. Invalid: a label “independent”
+on a coordinator-authored summary. Continue independent setup work only; do not
+start agreed design without audited agreement.
+
+## Explicit Historical Resume
+
+Entry inputs: historical state, preserved run artifacts, redacted original source
+when actually available, and the user's authorized current target.
+
+1. Read historical conformance using its original contract. Do not rewrite it.
+2. On explicit resume, prepare an active contract-5/verification-2 candidate.
+   Reconstruct obligations, unresolved findings, planning, debt, and additions
+   from actual artifacts; leave G1 and G4 pending. Preserve published v4 graph,
+   execution and round history. A fresh acceptance input identity invalidates
+   old coverage/passes; never delete old evidence to make resume look fresh.
+3. Capture available original source verbatim after redaction. If it was lost,
+   record the limitation; do not reconstruct a supposed quote from a translation.
+4. Dispatch the source reader, receive a fresh audit, and establish actual
+   agreement before setting a new baseline. Do not infer any of these receipts
+   from a historical green gate, finished timestamp, or completed task.
+5. Execute fresh checks/coverage/acceptance before closing the resumed target.
+
+Return fields: `contractVersion`, `lifecycle`, `verification`, `gates`, and the
+historical limitation if any. Valid: v4 remains readable and explicit v5 resume
+has no audit/baseline until actually established. Invalid: copying a synthetic
+passed audit to preserve a former completed label. Missing source/independent
+capability leaves relevant guarantees not established and G1/G4 pending.
+
+Next action: fresh source audit and agreement, then the ordinary phase sequence.

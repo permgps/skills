@@ -7,6 +7,7 @@ import path from 'node:path';
 import {
   bundleProfileFor,
   checkBundle,
+  checkProcedure,
   findRelativeLinks,
   parseFrontmatter,
   type Violation,
@@ -369,4 +370,11 @@ test('bundleProfileFor picks the profile from the bundle directory name', () => 
   assert.equal(bundleProfileFor('skills/scout').steps, 'steps');
   assert.equal(bundleProfileFor('skills/maestro').steps, 'phases');
   assert.equal(bundleProfileFor('/tmp/whatever').steps, 'phases');
+});
+
+test('procedure scaffold rejects missing evidence/outcome instructions', () => {
+  const body = 'Entry: inputs\n1. Run check\nReturn fields: id, result\nUnavailable stays incomplete. Next action: review.\nValid: capture passes. Invalid: fabricated pass.';
+  assert.deepEqual(checkProcedure(body), []);
+  assert.deepEqual(checkProcedure(body.replace('Return fields: id, result', '')), ['output fields']);
+  assert.deepEqual(checkProcedure(body.replace('Unavailable stays incomplete.', '')), ['missing-capability outcome']);
 });

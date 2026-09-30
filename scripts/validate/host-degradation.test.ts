@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, cp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
   checkHostDegradation,
+  checkCodexRuntime,
   findMarkers,
   readsAsStop,
   slugify,
@@ -201,4 +202,34 @@ test('readsAsStop reads the word only where the cell declares it', () => {
   assert.equal(readsAsStop('every wave is one таск wide'), false);
   // The dashboard row ends this way; it is advice about wording, not a stop.
   assert.equal(readsAsStop('the прогон runs, and stop promising a live one'), false);
+});
+
+
+async function codexViolations(file: string, before: string, after: string): Promise<Violation[]> {
+  const root = await mkdtemp(path.join(tmpdir(), 'codex-runtime-'));
+  try {
+    await cp('skills/maestro', root, { recursive: true });
+    const target = path.join(root, file);
+    await writeFile(target, (await readFile(target, 'utf8')).replace(before, after));
+    return await checkCodexRuntime(root);
+  } finally { await rm(root, { recursive: true, force: true }); }
+}
+
+test('the actual bundle declares reachable native Codex dispatch without preloading the recipe', async () => {
+  assert.deepEqual(await checkCodexRuntime('skills/maestro'), []);
+});
+
+test('Codex inherited context is rejected by the declared runtime contract', async () => {
+  const findings = await codexViolations('references/codex.md', '| fork_turns | none |', '| fork_turns | all |');
+  assert.ok(findings.some(item => item.check === 'codex-runtime' && /fork_turns/.test(item.message)));
+});
+
+test('a Codex dispatch phase cannot lose its recipe reachability marker', async () => {
+  const findings = await codexViolations('phases/7-acceptance.md', '<!-- maestro:codex:dispatch -->', '');
+  assert.ok(findings.some(item => /7-acceptance/.test(item.file)));
+});
+
+test('the router cannot preload coordinator-only Codex mechanics', async () => {
+  const findings = await codexViolations('SKILL.md', '## Start', '[preload](references/codex.md)\n\n## Start');
+  assert.ok(findings.some(item => /demand/.test(item.message)));
 });

@@ -1,3 +1,5 @@
+[← Installing](install.md) · [Back to README](../README.md) · [Parity Verification →](parity-verification.md)
+
 # The Dashboard
 
 One self-contained HTML file, copied into `.maestro/` during preflight and
@@ -14,6 +16,25 @@ does to it; the file is what makes the clocks move. Whichever valid snapshot loa
 and a load that fails never replaces a state that worked. It never opens
 `manifest.md`, a task file, or any path in the repository — a view that reaches into artifacts becomes a second
 source of truth about a run, and the second one is silently wrong.
+
+## Verified Original And Current Scope
+
+The requirements block shows original and current scope once each, with explicit
+fractions. Two authorized deferrals out of twenty original requirements read
+`18/20` original and `18/18` current. Additions, deferrals, withdrawals, changed
+expectations, and accepted exceptions have separate counts. Task/stage progress
+still measures activity; it does not establish delivery.
+
+A relaxed replacement cannot confirm the original expectation without fresh
+compatible checks. Missing historical baseline reads “not established”; an
+empty denominator reads “not applicable”. Russian/English labels use ordinary
+wording in both explanation registers.
+
+Contract-5 G4 remains pending without a fresh source audit/agreement, required
+journey observations, or selected controls. A finished stage cannot override
+this result. Contract 4 retains its previous conformance result while the new
+completion safeguards remain unestablished. Explicit resume reconstructs actual
+sources and independent returns before passing new gates.
 
 ## A run in flight
 
@@ -306,3 +327,8 @@ reimplementing it.
 
 The behavior this page owes the user is specified in
 [`spec/dashboard.md`](spec/dashboard.md).
+
+## See Also
+
+- [Install](install.md)
+- [Parity Verification](parity-verification.md)

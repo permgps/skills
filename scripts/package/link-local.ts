@@ -2,9 +2,8 @@
 // Puts the skill bundle where the local agents look for it, by symlink, so the
 // repository can run its own skill while developing it.
 //
-// The links are never committed: .gitignore excludes .claude/, .codex/ and
-// .gemini/ wholesale, and punching a hole in that rule to track three symlinks
-// would trade a real protection for a convenience a script already provides.
+// Only the owned Maestro link is ignored under .agents/: other entries there
+// are repository tooling and must remain trackable. Legacy paths are untouched.
 
 import { lstat, mkdir, readlink, rm, symlink } from 'node:fs/promises';
 import path from 'node:path';
@@ -15,7 +14,7 @@ import { createLogger } from '../shared/log.ts';
 const log = createLogger('link-local');
 
 /** Agent directories that look for skills in `<dir>/skills/<name>`. */
-export const HOSTS = ['.claude', '.codex', '.gemini'];
+export const HOSTS = ['.claude', '.agents', '.gemini'];
 
 export const BUNDLE = path.join('skills', 'maestro');
 
@@ -43,8 +42,10 @@ async function inspect(absolute: string): Promise<'symlink' | 'other' | 'nothing
   try {
     const stats = await lstat(absolute);
     return stats.isSymbolicLink() ? 'symlink' : 'other';
-  } catch {
-    return 'nothing';
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'nothing';
+    log.error('inspect', 'path could not be inspected', { path: absolute });
+    throw error;
   }
 }
 
@@ -65,12 +66,16 @@ export async function linkLocal(root: string, options: LinkOptions = {}): Promis
 
   const bundleAbsolute = path.resolve(root, bundle);
   if ((await inspect(bundleAbsolute)) === 'nothing') {
+    log.error('link', 'bundle not found', { bundle });
     throw new Error(`bundle not found: ${bundle}`);
   }
 
+  const visited = new Set<string>();
   for (const host of hosts) {
     const target = linkPathFor(host, bundle);
     const absolute = path.resolve(root, target);
+    if (visited.has(absolute)) continue;
+    visited.add(absolute);
     const kind = await inspect(absolute);
 
     if (kind === 'other') {
@@ -112,9 +117,12 @@ export async function unlinkLocal(root: string, options: LinkOptions = {}): Prom
   const bundle = options.bundle ?? BUNDLE;
   const results: LinkResult[] = [];
 
+  const visited = new Set<string>();
   for (const host of hosts) {
     const target = linkPathFor(host, bundle);
     const absolute = path.resolve(root, target);
+    if (visited.has(absolute)) continue;
+    visited.add(absolute);
     const kind = await inspect(absolute);
 
     if (kind === 'nothing') {

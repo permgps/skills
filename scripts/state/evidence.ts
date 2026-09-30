@@ -6,7 +6,7 @@
 
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { copyFile, mkdir, realpath, rename, rm, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, realpath, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import { createLogger } from '../shared/log.ts';
@@ -107,6 +107,13 @@ export async function validateEvidence(
     }
   }
 
+  if (record.version === 2) {
+    const field = 'verification.manifestDigest';
+    const file = await checkedFile(runDir, 'manifest.md', field, violations);
+    if (file && createHash('sha256').update(await readFile(file)).digest('hex') !== record.manifestDigest) {
+      violations.push({ field, message: 'manifest changed; source audit is stale' });
+    }
+  }
   log.debug('evidence', 'checking capture integrity', {
     runId: state.runId, captures: record.evidence.length, checks: record.checks.length,
   });

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, readlink, lstat, rm, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readlink, lstat, rm, symlink, rename, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -125,5 +125,57 @@ test('unlink refuses to remove a real directory', async () => {
 
     assert.deepEqual(actions(results), ['refused']);
     assert.equal((await lstat(occupied)).isDirectory(), true);
+  });
+});
+
+
+test('Codex uses the literal canonical discovery path without touching legacy directories', async () => {
+  await withRepo(async root => {
+    const legacy = path.join(root, '.codex/skills/maestro');
+    await mkdir(legacy, { recursive: true });
+    await writeFile(path.join(legacy, 'SKILL.md'), 'user owned');
+    const first = await linkLocal(root);
+    assert.equal(first.find(item => item.target === '.agents/skills/maestro')?.action, 'created');
+    assert.equal(first.some(item => item.target === '.codex/skills/maestro'), false);
+    assert.equal((await linkLocal(root)).find(item => item.target === '.agents/skills/maestro')?.action, 'unchanged');
+    await unlinkLocal(root);
+    await unlinkLocal(root);
+    assert.equal(await readFile(path.join(legacy, 'SKILL.md'), 'utf8'), 'user owned');
+  });
+});
+
+test('shared normalized host destinations perform one link and unlink operation', async () => {
+  await withRepo(async root => {
+    const options = { hosts: ['.agents', './.agents', '.agents'] };
+    assert.deepEqual(actions(await linkLocal(root, options)), ['created']);
+    assert.deepEqual(actions(await unlinkLocal(root, options)), ['removed']);
+  });
+});
+
+test('the canonical relative link survives checkout relocation', async () => {
+  const parent = await mkdtemp(path.join(tmpdir(), 'link-relocate-'));
+  try {
+    const root = path.join(parent, 'before');
+    await mkdir(path.join(root, BUNDLE), { recursive: true });
+    await writeFile(path.join(root, BUNDLE, 'SKILL.md'), 'relocated bundle');
+    await linkLocal(root);
+    const moved = path.join(parent, 'after');
+    await rename(root, moved);
+    assert.equal(await readFile(path.join(moved, '.agents/skills/maestro/SKILL.md'), 'utf8'), 'relocated bundle');
+    assert.ok(actions(await linkLocal(moved)).every(action => action === 'unchanged'));
+    await unlinkLocal(moved);
+  } finally {
+    await rm(parent, { recursive: true, force: true });
+  }
+});
+
+test('canonical discovery refuses a user-owned directory on link and unlink', async () => {
+  await withRepo(async root => {
+    const occupied = path.join(root, '.agents/skills/maestro');
+    await mkdir(occupied, { recursive: true });
+    await writeFile(path.join(occupied, 'SKILL.md'), 'user owned');
+    assert.equal((await linkLocal(root)).find(item => item.target === '.agents/skills/maestro')?.action, 'refused');
+    assert.equal((await unlinkLocal(root)).find(item => item.target === '.agents/skills/maestro')?.action, 'refused');
+    assert.equal(await readFile(path.join(occupied, 'SKILL.md'), 'utf8'), 'user owned');
   });
 });

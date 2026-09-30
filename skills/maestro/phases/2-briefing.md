@@ -136,14 +136,31 @@ review — this is what to do, in this order.
    date — and one line of your own beneath them naming the `R##` it touches and
    what was done about it. That line is English; the quotation is not. The
    quotation goes down first and wins any disagreement with your line.
-2. **Then the run state.** A withdrawal is `dropped`, with the user's answer
+2. **Then the run state.** Capture this redacted quotation as a new SRC-N
+   `sourceSnapshot` with origin addition, exact text/hash/time and the next target
+   revision. Retain original snapshots/baseline. Record the scope_amendment with
+   exact user authorization, old/new targetRevision. Append scopeMappings for
+   each original affected R (originalRequirementId, currentRequirementIds,
+   unchanged/changed/split/withdrawn relation, originalCheckIds and decisionId).
+   New requirements get new stable R IDs; the baseline denominator never moves.
+   Update manifest/additions digest, set affected G1/G4 pending, and invalidate
+   affected coverage/checks. A withdrawal is `dropped`, with the user's answer
    recorded as its reason; an addition is a new `Rnn` in `requirements[]` with its
    own status and reason. Written with the ordinary ritual, stamp check included.
-3. **Then the plan.** An added требование gets a таск cut for it, or a `deferred`
+3. **Audit before subsequent agreement/design.** Give a fresh
+   [manifest-reader.md](../prompts/manifest-reader.md) only all redacted source
+   snapshots and updated candidate manifest. Wait for the real returned receipt;
+   import anchored CL/MA records with current digests. Correct omissions and
+   redispatch at most twice. Incomplete capability/return leaves G1 pending;
+   failed audit cannot become an agreement. Preserve the blind acceptance
+   additions handoff: original sources/audit conclusions do not enter its initial
+   inputs. Valid: quoted withdrawal, authorized mapping, fresh source audit.
+   Invalid: remove the original baseline row or silently renumber R IDs.
+4. **Then the plan.** An added требование gets a таск cut for it, or a `deferred`
    row if it will not be built in this прогон. A withdrawn one stops the таски
    that carried it, and each of those is said out loud rather than performed
    quietly.
-4. **Then one sentence to the user**, saying what the change costs the schedule.
+5. **Then one sentence to the user**, saying what the change costs the schedule.
    A требование accepted silently is a schedule the user never agreed to.
 
 ### Why the additions come first
@@ -171,7 +188,9 @@ filename marks the sitting, and one sitting is one бриф.
 ## Gates
 
 **G1 runs after this phase.** It passes when every требование has a status and
-none is left open without a recorded reason.
+none is left open without a recorded reason, and contract 5 has a fresh actual
+source audit plus the frozen initial agreement. An unavailable reader/return
+keeps G1 pending; never replace it with your own pass.
 
 - The count is mechanical; whether a recorded reason is a real answer or a
   placeholder typed to get past the gate is yours to judge, because you have the
@@ -188,6 +207,6 @@ none is left open without a recorded reason.
 |---|---|
 | `.maestro/<slug>/answers.md` | appended, English, redacted, one entry per answer |
 | `.maestro/<slug>/reference.md` | neutral projection of the declared reference register, or an explicit none |
-| `.maestro/state.js` | every требование has a status; `G1` recorded as passed |
+| `.maestro/state.js` | every требование has a status; `G1` passed only after statuses, fresh source audit and frozen agreement; otherwise pending/failed |
 
 Then read the specification phase file.

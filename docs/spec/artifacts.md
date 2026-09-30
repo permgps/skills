@@ -205,9 +205,9 @@ once, in the manifest phase, and never again — with one exception, under *The
 Additions Block* below, which is the user's own words quoted and not a text this
 прогон composed:
 
-1. The user's бриф is redacted, then rendered into English as `brief.md`.
+1. Capture the redacted original-language text and SHA-256 in `verification.sourceSnapshots` before rendering English `brief.md`.
 2. The requirements are numbered from that English text into `manifest.md`.
-3. The numbered манифест is **shown to the user in Russian** before any other
+3. Independently audit source snapshots against the candidate manifest; correct omissions and redispatch before agreement. Then the numbered манифест is **shown to the user in Russian** before any other
    work begins, so the translated contract is agreed rather than substituted.
 4. In `full` mode the манифест is still shown, without a question, and any
    wording whose translation was uncertain is listed under Assumptions in
@@ -243,3 +243,16 @@ An entry is two parts, and the order is the rule:
 
 The appends happen in whichever phase the user speaks in; the shape above is the
 manifest phase's, which is the phase this table names as the writer.
+
+## Embedded Completion Records
+
+Manifest owns the source snapshots, anchored clauses, independent audit records
+and initial scope baseline inside `state.js`; briefing owns amendment mappings.
+Plan owns journeys and control selections; execution returns sealed temporary
+captures and the orchestrator imports them. Repair owns extended attempt records.
+These are fields in the existing snapshot, never additional editable verdict
+files. Original text remains JSON in state; no second translated Markdown
+authority is introduced. Reports and scope percentages are projections only.
+History is append-only; the agreement baseline is immutable. Negative-control
+captures use their control-run ID directories, separate from production runs.
+Exact shapes and publication conditions: [verification.md](verification.md).

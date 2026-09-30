@@ -132,3 +132,24 @@ nothing worth keeping rather than failing at something.
 | `AGENTS.md` | the owned block replaced or appended; everything outside it byte for byte as it was |
 | `.maestro/<slug>/decisions.md` | one appended entry per decision, each naming the `D##` or `R##` it came from |
 | project code | unchanged — this phase writes none of it |
+
+## Scope Progress Projection
+
+Entry: frozen source agreement and current verification graph.
+1. Derive original/current ScopeProgress from the same state as G4; do not count
+   task/stage activity. Original denominator includes later exclusions.
+2. Original numerator needs full frozen expectations with fresh evidence on
+   this candidate. Unchanged conditions may reuse complete current checks;
+   changed/split conditions require explicit original-compatible checks and
+   complete coverage. Easier replacement, exclusion, split IDs or exceptions
+   cannot inflate it. Current numerator counts fully passing live R IDs only.
+3. Report each ratio once: e.g. original 18/20, current 18/18, two authorized
+   deferrals. List added/deferred/dropped/changed R IDs and exception decisions
+   separately. Missing baseline means not-established; empty scope means
+   not-applicable, never 100%.
+4. Current authorized target may close while original scope remains incomplete;
+   preserve this distinction in report and memory. A historical v4 outcome stays
+   meaningful while its new source/coverage safeguards remain unestablished.
+Valid: 18/20 beside 18/18 and quoted decisions. Invalid: rewrite original total
+into 18, count commits as proof, or turn accepted defects into passed R IDs.
+Output: projection, not an independently editable scope verdict.

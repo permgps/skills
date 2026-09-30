@@ -5,7 +5,7 @@ that fails is not a warning: the phase is redone.
 
 | Gate | After phase | Pass condition |
 |---|---|---|
-| G1 | briefing | Every требование has a status, and none is left open without a recorded reason |
+| G1 | briefing | Every требование has a status and no unexplained open entry; contract 5 also requires a fresh returned independent source audit and frozen initial agreement |
 | G2 | spec | Every live требование is dispositioned; independent intent and raw-reference passes find no unresolved mandatory coverage gap |
 | G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner and integration dependency; a task reader finds each task executable |
 | G4 | acceptance | Current, applicable evidence and independent discovery cover the current contract; failures and incomplete checks are reconciled under [`verification.md`](verification.md) |
@@ -14,7 +14,7 @@ that fails is not a warning: the phase is redone.
 
 | Gate | What proves it |
 |---|---|
-| G1 | The requirement status map in the run state has no `open` entries lacking a reason |
+| G1 | The status map has no unexplained open entries; v5 has a current source/manifest audit and initial agreement baseline |
 | G2 | Status map, obligation/source coverage map, independent intent and raw-reference discovery findings |
 | G3 | Requirement → obligation → implementation task and obligation → check → execution task mappings, including verification-only tasks |
 | G4 | Current check executions, complete coverage reviews, union of substantiated findings, and a fresh acceptance round |
@@ -59,7 +59,8 @@ brief, that the quotation wins over any line the прогон wrote beside it.
 
 ### What Each Independent Reader Is Given
 
-Two gates are decided in part by a subagent — G2 and G4 — and each of those
+Source audit precedes agreement and is a G1 prerequisite; G2 and G4 also use
+independent subagents. Each of those
 readers is handed a fixed list of things. The same list otherwise lives in five
 places: this table, the phase table, the phase file, the reader's own brief, and
 `SKILL.md`. The last of those is the one that drifts, because it is the one
@@ -71,6 +72,7 @@ present in one and not the other is a finding that names both places.
 
 | Gate | Reader's brief | Given | Withheld |
 |---|---|---|---|
+| G1 source | `manifest-reader.md` | redacted source snapshots, candidate manifest | coordinator clause inventory, spec.md, answers.md, tasks, prior audit conclusions |
 | G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning |
 | G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts |
 | G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, neutral raw reference register and capture identity, the running build | `spec.md`, the plan, the task files, `reviews/`, prior dispositions, the бриф's original text |
@@ -119,3 +121,28 @@ The two-failure budget above is what stops this from circling. A disagreement
 that survives two repairs stops the прогон, which names the требования and both
 attempts. A требование nobody can build is a fact about the требование, and it
 is reported rather than retried a third time.
+
+## Completion Extension Routing
+
+Source audit is not a fifth gate. Read the bounded original-language snapshots
+and candidate manifest in a fresh dispatch, discover clauses independently, and
+return anchored mappings/findings before agreement. Later blind acceptance gets
+neither snapshots, clause/audit conclusions, nor planned journeys or controls
+in its initial handoff. Scheduled execution follows independent discovery.
+
+G4 `pending` is an explicit output when checks, controls, independent returns or
+required external prerequisites are missing. A startup code defect opens
+`startup-defect`; a service/tool/value limitation records unavailable checks.
+A coverage omission opens `coverage-omission` and adds check/task ownership,
+invalidating affected passes. Repair never passes G4 itself. All mode/depth
+combinations and polish off keep these rules. Exact records and transitions
+live in [verification.md](verification.md).
+
+## Codex Gate Dispatch
+
+The [shared host contract](hosts.md#shared-codex-execution-contract) applies to
+CLI and app independently. No reader receives coordinator history or the runtime
+recipe. Use the declared Given/Withheld inputs and a full role prompt, with
+fresh context explicitly selected. Missing isolation, an actual final return,
+or trustworthy input evidence cannot establish a gate pass. Opaque envelopes
+remain opaque; filesystem visibility and prompt inputs are separate evidence.

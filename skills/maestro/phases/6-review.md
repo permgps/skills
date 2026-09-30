@@ -15,6 +15,12 @@ the file its executor was given, and that file did not change. It goes through
 the briefing phase's procedure, in that phase's order: the additions block of
 `brief.md` first, then the run state, then the plan.
 
+<!-- maestro:codex:dispatch -->
+On Codex CLI or app, open [the native runtime recipe](../references/codex.md)
+before each independent role dispatch in this phase. Use a fresh native child,
+the full role prompt and only this role's allowed inputs; observe its actual
+final return before importing results. The recipe is coordinator-only.
+
 ## Steps
 
 ### 1. Read the таски
@@ -152,3 +158,19 @@ said is one gate, at the end, blind.
 | project code | unchanged — this phase writes none of it |
 
 Then read the acceptance phase file.
+
+## Verify Execution Handoffs
+
+Entry: task-owned journey/control returns and capture identities. Open
+[verification-procedures.md](../references/verification-procedures.md).
+1. Reviewer receives relevant task procedures/results, not unrelated spec.
+2. Check all ordered journey observations, startup command, restart process
+   identity and promised integration environment against actual captures.
+3. Check control separation, critical selection basis, clean/mutated/restored
+   sequence, unchanged oracle and main fingerprint. An insensitive detector
+   creates a blocking check-quality finding; static review cannot fill evidence.
+4. Return findings with R/O/C and capture IDs; missing execution/capability is
+   unchecked/incomplete, never passed. Orchestrator records and routes them.
+Valid: failed persistence observation goes to owning implementation task.
+Invalid: call a missing restart assertion a non-blocking note because unit tests
+passed. Output: returned evidence review; next action repair or acceptance.

@@ -15,6 +15,12 @@ then the plan — and the plan is that third step, so an added требован�
 таск here, a `deferred` row if it will not be built, and a withdrawn one stops
 the таски that carried it.
 
+<!-- maestro:codex:dispatch -->
+On Codex CLI or app, open [the native runtime recipe](../references/codex.md)
+before each independent role dispatch in this phase. Use a fresh native child,
+the full role prompt and only this role's allowed inputs; observe its actual
+final return before importing results. The recipe is coordinator-only.
+
 ## Steps
 
 ### 1. Read `spec.md`
@@ -79,7 +85,7 @@ Each file carries:
 | Id and title | `NN` and one line saying what will exist when it is done |
 | Требования | the ids it serves, so the review and G3 can both find them |
 | What to build | the relevant part of the spec, restated in full — not a pointer to it |
-| User contract and authority | relevant request/addition excerpts, neutral raw reference locations and conditions, and approved deviations; no unrelated spec or rationale |
+| User contract and authority | exact redacted request/addition quotations with their SRC/CL IDs and source digest; neutral raw reference locations and conditions, and approved deviations; no unrelated spec or rationale |
 | Verification map | obligation/check IDs, observable behavior, implementation owner if needed, execution owner, integration prerequisites, and applicable variants |
 | Boundaries | which files this таск owns, and which signatures from `interfaces.md` it must meet |
 | Done means | what the executor checks before returning, in terms it can check |
@@ -96,6 +102,13 @@ fixed line-count limit.
 
 A task file that assumes context the executor does not have is the defect this
 phase produces most often. Read each one back as if you had never seen the spec.
+
+An ID or hash names an input; it does not supply its content. For each relevant
+source clause, copy the exact quotation into the task file and define how its
+check observes that condition. For example, `CL-1 / SRC-1 / sha256: …` alone
+leaves the reader unable to tell what C01 must test. The quotation plus ordered
+actions, named assertions and capture paths supplies that boundary. Do not send
+the full manifest or other clauses to fill the gap.
 
 **An item of *done means* is answerable against this таск's own diff.** The
 executor is judged on what it did, and the review reads exactly that — the union
@@ -267,3 +280,24 @@ itself.
 | `.maestro/state.js` | `tasks[]` filled whole — ids, `requirementIds`, `blockedBy`, `wave`, `zone`, counters at zero; `G3` recorded as passed |
 
 Then read the build phase file.
+
+## Journey And Control Ownership
+
+Entry: current journey/check specifications and selected critical controls.
+Open [verification-procedures.md](../references/verification-procedures.md).
+1. Allocate J-N and required C IDs. Record complete journey fields and ordered
+   actions/assertions, fixture/variants/reset/cleanup. Check/task owners match.
+2. Cut verification-only tasks after every integration dependency; populate
+   blockedBy, executionTaskId and integrationDependencies accordingly. Their
+   briefs contain commands, setup, expected observations, oracle provenance,
+   relevant inputs, tool requirements, capture schema and cleanup, not a link
+   to full spec or phase files.
+3. Allocate NC-N not_run selections with critical basis/applicability and named
+   defect, unchanged expectedAssertion/oracleDigest, main/isolation fingerprints.
+4. Task-reader checks the actual complete brief with the executor's bounded
+   inputs. Missing procedure, assertion, isolation or dependency is a finding.
+5. Publish graph before G3. Valid: verification task waits for reviewed startup
+   and persistence implementation. Invalid: execution scheduled before required
+   dependency or a task that must open spec.md to discover its assertions.
+Output: executable owned journeys/control selections. Next action: G3 and build dispatch. Missing tool/capability
+remains an explicit unavailable path in the task, never permission to pass.

@@ -4,7 +4,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
-import { readFile, mkdtemp, rm, writeFile, mkdir, copyFile, realpath } from 'node:fs/promises';
+import { readFile, mkdtemp, rm, writeFile, mkdir, copyFile, cp, realpath } from 'node:fs/promises';
 import { tmpdir, hostname, homedir } from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -57,6 +57,7 @@ export interface BrowserSuiteResult {
   fixtureSha256: string;
   evidenceState: string;
   changedInputInvalidated: boolean;
+  persistenceControls: PersistenceControls;
   workflowFixtureOracle: { reference: WorkflowPageProbe; broken: WorkflowPageProbe };
 }
 
@@ -107,11 +108,15 @@ class Cdp {
   private nextId = 1;
   private pending = new Map<number, { resolve: (value: any) => void; reject: (error: Error) => void }>();
   private socket: WebSocket;
+  private listeners = new Map<string, Array<(params: any) => void>>();
   constructor(socket: WebSocket) {
     this.socket = socket;
     socket.addEventListener('message', event => {
       const message = JSON.parse(String(event.data));
-      if (!message.id) return;
+      if (!message.id) {
+        for (const listener of this.listeners.get(message.method) ?? []) listener(message.params);
+        return;
+      }
       const entry = this.pending.get(message.id);
       if (!entry) return;
       this.pending.delete(message.id);
@@ -125,6 +130,9 @@ class Cdp {
       this.pending.set(id, { resolve, reject });
       this.socket.send(JSON.stringify({ id, method, params }));
     });
+  }
+  on(method: string, listener: (params: any) => void): void {
+    this.listeners.set(method, [...(this.listeners.get(method) ?? []), listener]);
   }
   close(): void { this.socket.close(); }
 }
@@ -530,8 +538,9 @@ export async function runBrowserSuite(outputDir: string): Promise<BrowserSuiteRe
     if (!workflowFixtureOracle.reference.passed || workflowFixtureOracle.broken.passed) {
       throw new Error('workflow fixture pointer oracle failed its positive or negative control');
     }
+    const persistenceControls = await runPersistenceControls(path.join(outputDir, 'persistence'));
     return {
-      scenarios, browser: executable, browserVersion: String(version.product ?? 'Chrome/Chromium'),
+      persistenceControls, scenarios, browser: executable, browserVersion: String(version.product ?? 'Chrome/Chromium'),
       host: hostname(), fixtureSha256, evidenceState: evidence.statePath,
       changedInputInvalidated: evidence.changedInputInvalidated, workflowFixtureOracle,
     };
@@ -541,6 +550,117 @@ export async function runBrowserSuite(outputDir: string): Promise<BrowserSuiteRe
     await new Promise<void>(resolve => server.close(() => resolve()));
     await rm(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     log.info('cleanup', '[FIX] browser profile removed', { profile });
+  }
+}
+
+export interface PersistenceObservation {
+  variant: string;
+  saved: boolean;
+  retainedAfterRestart: boolean;
+  limitRespected?: boolean;
+  noOutboundRequests?: boolean;
+  captures: Record<string, { path: string; sha256: string }>;
+  browserVersion: string;
+}
+
+export interface PersistenceControls {
+  observations: PersistenceObservation[];
+  oracle: string;
+  fixtureSha256: string;
+  mainUnchanged: boolean;
+}
+
+export function assessPersistence(observation: Pick<PersistenceObservation, 'saved' | 'retainedAfterRestart'>): string[] {
+  return [...(!observation.saved ? ['save action did not retain entry'] : []),
+    ...(!observation.retainedAfterRestart ? ['entry lost after process restart'] : [])];
+}
+
+/** Disposable fixture and browser profiles; the authority and production inputs stay unchanged. */
+export async function runPersistenceControls(outputDir: string, fixtureFile?: string, variants = ['clean', 'disabled-save', 'volatile-only', 'restored'], entryLimit?: number): Promise<PersistenceControls> {
+  const executable = browserExecutable();
+  if (!executable) throw new BrowserUnavailableError('browser unavailable for persistence control');
+  const source = fixtureFile ?? path.join(import.meta.dirname, 'fixtures', 'completion-workflow', 'persistence.html');
+  const original = await readFile(source);
+  const root = await mkdtemp(path.join(tmpdir(), 'maestro-persistence-copy-'));
+  await mkdir(outputDir, { recursive: true });
+  if (fixtureFile) await cp(path.dirname(fixtureFile), root, { recursive: true });
+  await writeFile(path.join(root, 'index.html'), original);
+  const { server, port } = await startPageServer(root);
+  const observations: PersistenceObservation[] = [];
+  const oracle = 'save action retains entry; same entry remains after process restart';
+  let child: ChildProcess | undefined;
+  let closed: Promise<void> | undefined;
+  let cdp: Cdp | undefined;
+  const navigate = async (variant: string): Promise<void> => {
+    await cdp!.send('Page.enable'); await cdp!.send('Runtime.enable');
+    await cdp!.send('Page.navigate', { url: `http://127.0.0.1:${port}/index.html?variant=${variant}` });
+    for (let attempt = 0; attempt < 100; attempt++) {
+      if (await evaluate<boolean>(cdp!, `document.readyState === 'complete' && Boolean(document.querySelector('#entry')) && location.search === '?variant=${variant}'`)) return;
+      await sleep(20);
+    }
+    throw new Error('persistence fixture did not start');
+  };
+  const click = async (selector: string): Promise<void> => {
+    const point = await evaluate<{ x: number; y: number }>(cdp!, `(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+r.height/2}; })()`);
+    await cdp!.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
+    await cdp!.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
+  };
+  try {
+    for (const variant of variants) {
+      const requests: string[] = [];
+      const profile = path.join(root, `profile-${variant}`);
+      await mkdir(profile);
+      const start = async (): Promise<void> => {
+        await rm(path.join(profile, 'DevToolsActivePort'), { force: true });
+        const started = await startBrowser(executable, profile);
+        child = started.process; closed = started.closed; cdp = started.cdp;
+        cdp.on('Network.requestWillBeSent', params => requests.push(String(params.request?.url ?? '')));
+        await cdp.send('Network.enable');
+      };
+      await start(); await navigate(variant);
+      const captures: PersistenceObservation['captures'] = {};
+      captures.initial = await screenshot(cdp!, outputDir, `${variant}-initial`);
+      await click('#entry'); await cdp!.send('Input.insertText', { text: 'retained-example' });
+      await click('#save');
+      const saved = await evaluate<boolean>(cdp!, `document.querySelector('#entries').textContent.includes('retained-example')`);
+      captures.saved = await screenshot(cdp!, outputDir, `${variant}-saved`);
+      cdp!.close(); cdp = undefined;
+      await stopBrowser(child!, closed!); child = undefined; closed = undefined;
+      await start(); await navigate(variant);
+      const retainedAfterRestart = await evaluate<boolean>(cdp!, `document.querySelector('#entries').textContent.includes('retained-example')`);
+      captures.reopened = await screenshot(cdp!, outputDir, `${variant}-reopened`);
+      const version = await cdp!.send('Browser.getVersion');
+      let limitRespected: boolean | undefined;
+      if (entryLimit !== undefined) {
+        for (let index = 2; index <= entryLimit + 1; index++) {
+          await evaluate(cdp!, `document.querySelector('#entry').value = ''`);
+          await click('#entry'); await cdp!.send('Input.insertText', { text: `limit-${index}` });
+          await click('#save');
+        }
+        const text = await evaluate<string>(cdp!, `document.querySelector('#entries').textContent`);
+        limitRespected = text.includes('retained-example') && text.includes(`limit-${entryLimit}`)
+          && !text.includes(`limit-${entryLimit + 1}`);
+        captures.limit = await screenshot(cdp!, outputDir, `${variant}-limit`);
+      }
+      const noOutboundRequests = requests.every(url => url.startsWith(`http://127.0.0.1:${port}/`)
+        || /^(?:data|blob|about):/.test(url));
+      observations.push({ variant, saved, retainedAfterRestart,
+        ...(limitRespected !== undefined ? { limitRespected } : {}), noOutboundRequests, captures, browserVersion: String(version.product) });
+      cdp!.close(); cdp = undefined;
+      await stopBrowser(child!, closed!); child = undefined; closed = undefined;
+      log.info('persistence', 'restart journey executed', { variant, saved, retainedAfterRestart });
+    }
+    const mainUnchanged = digest(await readFile(source)) === digest(original);
+    if (!mainUnchanged) throw new Error('persistence authority changed during control');
+    for (const observation of observations) {
+      const shouldPass = observation.variant === 'clean' || observation.variant === 'restored';
+      if ((assessPersistence(observation).length === 0) !== shouldPass) throw new Error(`persistence oracle failed control ${observation.variant}`);
+    }
+    return { observations, oracle, mainUnchanged, fixtureSha256: digest(original) };
+  } finally {
+    cdp?.close(); if (child && closed) await stopBrowser(child, closed);
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 }
 

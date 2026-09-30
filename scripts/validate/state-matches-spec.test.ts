@@ -7,6 +7,7 @@ import path from 'node:path';
 import {
   checkStateMatchesSpec,
   parseRunStateFields,
+  parseInterfaceFields,
   parseUnionCell,
   parseStringArrayConst,
   parsePythonListConst,
@@ -322,4 +323,8 @@ test('a contract that declares no version says nothing about the page', async ()
   // typecheck is already the check. Demanding it of a fixture would make this
   // rule about the shape of a test rather than about the two files it holds.
   assert.deepEqual(await violationsFor({ dropDashboard: true }), []);
+});
+
+test('completion interface fields exclude nested members and include optional declarations', () => {
+  assert.deepEqual(parseInterfaceFields('export interface A extends B {\n  id: string;\n  optional?: string;\n  nested: Array<{ inner: string }>;\n}', 'A'), ['id', 'optional', 'nested']);
 });

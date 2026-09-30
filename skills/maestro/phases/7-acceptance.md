@@ -16,6 +16,12 @@ then the plan — and that happens before the reader is handed anything, because
 the additions are one of its inputs and a change that reached the state and not
 the бриф is invisible to it.
 
+<!-- maestro:codex:dispatch -->
+On Codex CLI or app, open [the native runtime recipe](../references/codex.md)
+before each independent role dispatch in this phase. Use a fresh native child,
+the full role prompt and only this role's allowed inputs; observe its actual
+final return before importing results. The recipe is coordinator-only.
+
 ## Steps
 
 ### 1. Bring the build up
@@ -23,10 +29,21 @@ the бриф is invisible to it.
 The reader is given the project as it runs, not as it reads. Start it, or bring
 it to the closest thing a project of this kind has to running.
 
-If it will not come up, **that is not a failed gate — it is a build defect.**
-Report it, stop, and say what would not start. A gate that could not be run has
-checked nothing, and recording it as failed would send a прогон into repair over
-a требование nobody looked at.
+If startup fails, classify before routing:
+1. Capture exact documented launch command, sanitized error evidence, current
+   build fingerprint, affected R/check IDs and owning task.
+2. Assess prerequisites: missing external tool/service/value makes affected
+   checks unavailable and G4 pending unless another observed failure exists.
+   Continue independent checks; do not retry code for an absent service.
+3. Reproducible syntax/import/startup code defect creates a stable finding and
+   opens startup-defect with command/error/fingerprint/ownership/prerequisites.
+   <!-- maestro:opens:startup-defect -->
+4. Missing owner first repairs task coverage. Dispatch bounded repair via the
+   resident router; it returns through review, relaunch and fresh acceptance.
+   The startup observation can fail its check; an unperformed blind pass is
+   still missing, never fabricated. Report both observed failure and unchecked work.
+Valid: wrong import routes to owning task. Invalid: missing browser/service
+starts an import-edit retry loop, or failure merely stops without repair route.
 
 ### 2. Hand it over blind
 
@@ -220,8 +237,10 @@ asked.
 **G4**, and it is the last one. Mandatory appearance and behavior fidelity
 remain in G4 for every mode, depth, and `polish` setting.
 
-It passes when the build has been checked against `manifest.md` with `spec.md`
-withheld, and every disagreement has been reported. It is the twin of G2 asked at
+It passes only when current required evidence and complete coverage pass after
+blind discovery against manifest/additions, with spec withheld. Current failure
+means failed; missing/unavailable/stale evidence or return means pending.
+Reporting disagreements alone cannot pass. It is the twin of G2 asked at
 the other end of the прогон: the same question — does this match what the user
 actually said, with our paraphrase of it taken away — asked when it is the last
 chance to know rather than when it is still cheap to change.
@@ -231,10 +250,55 @@ chance to know rather than when it is still cheap to change.
 | Artifact | State |
 |---|---|
 | `.maestro/<slug>/report.md` | five sections for this round, appended; findings quoted as they came back |
-| `.maestro/state.js` | G4 `passed` or `failed` with its findings; the stage `done` and `finishedAt` only when nothing else is due |
+| `.maestro/state.js` | G4 `passed`, `failed`, or `pending`; stage activity separate; `finishedAt` only at authorized lifecycle closure |
 | project code | unchanged — this phase writes none of it |
 
 The прогон is over unless one of two things is due, and both have rules of their
 own that `SKILL.md` names: **доводка**, if the finish dial asked for it, and then
 the **memory** phase, which runs last because it describes the code as it finally
 is.
+
+## Scope Progress Projection
+
+Entry: frozen source agreement and current verification graph.
+1. Derive original/current ScopeProgress from the same state as G4; do not count
+   task/stage activity. Original denominator includes later exclusions.
+2. Original numerator needs full frozen expectations with fresh evidence on
+   this candidate. Unchanged conditions may reuse complete current checks;
+   changed/split conditions require explicit original-compatible checks and
+   complete coverage. Easier replacement, exclusion, split IDs or exceptions
+   cannot inflate it. Current numerator counts fully passing live R IDs only.
+3. Report each ratio once: e.g. original 18/20, current 18/18, two authorized
+   deferrals. List added/deferred/dropped/changed R IDs and exception decisions
+   separately. Missing baseline means not-established; empty scope means
+   not-applicable, never 100%.
+4. Current authorized target may close while original scope remains incomplete;
+   preserve this distinction in report and memory. A historical v4 outcome stays
+   meaningful while its new source/coverage safeguards remain unestablished.
+Valid: 18/20 beside 18/18 and quoted decisions. Invalid: rewrite original total
+into 18, count commits as proof, or turn accepted defects into passed R IDs.
+Output: projection, not an independently editable scope verdict.
+
+## Completion Reconciliation After Blind Discovery
+
+Entry inputs: actual blind-reader return, current verification graph, integrated
+build fingerprints, scheduled journey/control/readiness records, and scope
+projection. Initial blind discovery keeps its existing withheld inputs.
+
+1. Import the blind return and compare its independent observations with the
+   scheduled graph only after discovery returns.
+2. Execute every missing required journey step, clean start, restart, and real
+   integration check under the declared scope. An omitted observation remains
+   incomplete; a sandbox result covers its sandbox only.
+3. Complete selected isolated controls with the unchanged oracle. Keep expected
+   defect-copy failures out of production execution history.
+4. Route reproducible startup defects and coverage omissions through repair,
+   review, then fresh affected acceptance. Missing capability remains unavailable.
+5. Derive G4 and scope progress, append the actual round, and use that projection
+   for final wording. Full/strict/polish=false keeps every mandatory check.
+
+Return: acceptance round identity, execution/finding/coverage IDs, projected G4,
+original/current scope fractions or explicit unknown states, and limitations.
+Valid: authorized deferral yields original 18/20 and current 18/18, with current
+target completed only if G4 passes. Invalid: stage done or passing unit tests
+called completed while restart was unobserved. Missing evidence keeps G4 pending.

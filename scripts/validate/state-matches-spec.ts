@@ -149,6 +149,15 @@ export function parseRunStateFields(source: string): string[] {
   return fields;
 }
 
+/** Direct declared fields only; inherited historical fields retain their own contract. */
+export function parseInterfaceFields(source: string, name: string): string[] {
+  const header = new RegExp(`export interface ${name}[^\n]*\\{\n`);
+  const match = header.exec(source);
+  if (!match) return [];
+  const body = source.slice(match.index + match[0].length).split('\n}')[0] ?? '';
+  return [...body.matchAll(/^  ([A-Za-z][A-Za-z0-9_]*)\??:/gm)].map(item => item[1]!);
+}
+
 const findTable = (tables: Table[], required: string[]): Table | undefined =>
   tables.find(table => required.every(column => table.columns.includes(column)));
 
@@ -335,6 +344,32 @@ export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise
       add('version', dashboardFile, 0,
         `${DASHBOARD_VERSION_CONSTANT} is ${knownVersion} and the contract is ${statedVersion} — `
         + 'the page will call every прогон newer than itself');
+    }
+    if (statedVersion >= 5) {
+      const verificationFile = path.join(specDir, 'verification.md');
+      const extension = findTable(parseTables(await readFile(verificationFile, 'utf8')), ['Entity', 'Exact fields (a trailing ? means optional)']);
+      const entities: Record<string, string> = {
+        'verification-2 record': 'VerificationRecordV2', 'sourceSnapshots[]': 'SourceSnapshot',
+        'sourceClauses[]': 'SourceClause', 'manifestAudits[]': 'ManifestAudit',
+        'scopeBaseline': 'ScopeBaseline', 'scopeMappings[]': 'ScopeMapping',
+        'journeys[]': 'VerificationJourney', 'negativeControls[]': 'NegativeControl',
+        'control run': 'ControlRun', 'extended repairAttempts[]': 'RepairAttemptV2',
+      };
+      for (const [entity, name] of Object.entries(entities)) {
+        const row = extension?.rows.find(item => clean(item['Entity']) === entity);
+        const declared = String(row?.['Exact fields (a trailing ? means optional)'] ?? '').replace(/\([^)]*\)/g, '').split(',')
+          .flatMap(part => /`([A-Za-z][A-Za-z0-9_]*)(?:\[\])?\??`/.exec(part)?.[1] ?? []);
+        const implemented = parseInterfaceFields(source, name);
+        if (!row || implemented.length === 0 || [...declared].sort().join(',') !== [...implemented].sort().join(',')) {
+          add('extension-fields', verificationFile, row?.__line ?? 0, `${name} direct fields disagree with its exact extension declaration`);
+        }
+      }
+      log.info('extension-fields', 'completion record fields compared', { records: Object.keys(entities).length });
+      const pythonSource = await readFile(syncFile, 'utf8');
+      const pythonVersion = /^CURRENT_CONTRACT_VERSION\s*=\s*(\d+)$/m.exec(pythonSource)?.[1];
+      if (Number(pythonVersion) !== statedVersion) {
+        add('runtime-version', syncFile, 0, 'CURRENT_CONTRACT_VERSION must match the state contract');
+      }
     }
     log.info('version', 'the contract version and the page\'s copy compared', {
       contract: statedVersion,

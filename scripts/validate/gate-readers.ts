@@ -170,6 +170,12 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
 
     const declaredSet = new Set(row.given);
     const briefSet = new Set(inputs);
+    for (const name of row.given) {
+      if (row.withheld.includes(name)) {
+        add('boundary', specFile, row.line,
+          `gate ${row.gate} both gives and withholds "${name}" — remove it from the allowed handoff`);
+      }
+    }
 
     for (const name of declaredSet) {
       if (!briefSet.has(name)) {

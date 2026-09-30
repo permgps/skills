@@ -14,6 +14,12 @@ briefing phase's procedure, in that phase's order — the additions block of
 which is handed the whole бриф, meets the change itself rather than a design that
 quietly answered it.
 
+<!-- maestro:codex:dispatch -->
+On Codex CLI or app, open [the native runtime recipe](../references/codex.md)
+before each independent role dispatch in this phase. Use a fresh native child,
+the full role prompt and only this role's allowed inputs; observe its actual
+final return before importing results. The recipe is coordinator-only.
+
 ## Steps
 
 ### 1. Read the манифест and the answers
@@ -158,3 +164,22 @@ that reached the run state and not the бриф.
 | `.maestro/state.js` | no требование left `open`; `G2` recorded as passed |
 
 Then read the plan phase file.
+
+## Integrated Outcomes And Readiness
+
+Entry: current audited R requirements and reference observations. Open
+[verification-procedures.md](../references/verification-procedures.md).
+1. Derive journeys spanning requested outcomes, including save/restart/reopen
+   where persistence is promised. Enumerate fixture, variants, ordered actions
+   and observable assertions, reset/cleanup, required C IDs and dependencies.
+2. For runnable apps require clean startup by the documented command; for
+   promised integrations require real integration behavior. Sandbox checks
+   prove only sandbox outcomes. Non-UI work gets proportional output checks.
+3. State selected critical controls and their applicability: explicit user
+   condition, acceptance-critical outcome, or observed severe defect. Leave
+   other checks unmutated. Never infer production deployment from “prototype.”
+4. Hand these specifications to plan. Missing capability is a declared
+   unavailable prerequisite, not a reason to omit a required observation.
+Valid: restart retention is an integrated check. Invalid: replace it with
+passing save/read unit tests. Output: journey/check specifications and control
+selection basis; next action plan ownership, never an invented execution pass.

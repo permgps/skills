@@ -7,6 +7,13 @@ Three of the questions below are asked on **every** host, this one included, and
 preflight asks them there: subagent fan-out, worktrees and commits. What this
 file adds for another host is the rest of the list and what each answer costs.
 
+## Codex CLI And App
+
+When the actual session exposes Codex native delegation, open
+[`codex.md`](codex.md) for preflight and every independent dispatch.
+This explicitly requests the native independent roles; the recipe is
+coordinator-only and never travels to blind readers.
+
 ## What To Establish
 
 Answer these capabilities by observation rather than by belief about the product:
@@ -54,6 +61,13 @@ each.
 Then continue. **A degraded прогон is a прогон**, and the отчёт it produces is
 measured against the same манифест by the same gates. What the announcement buys
 is that nobody later mistakes a host limitation for a decision the прогон made.
+
+For independent audits, preserve the actual dispatch, child-context and return
+identities exposed by the tool. A canonical child name is acceptable when the
+host really uses it for those events; UUID syntax is not required. Record the
+format limit and never substitute an invented label. Keep model configuration,
+observed model identity, exact input visibility and filesystem-read visibility
+separate. A child's self-report does not establish an unseen host observation.
 
 ## What Not To Do
 

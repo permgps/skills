@@ -13,6 +13,12 @@ The finish dial is the only dial that reaches this file — it decides whether t
 file is opened at all. Once it is, mode and depth change nothing: доводка asks
 the user nothing and approves nothing with them.
 
+<!-- maestro:codex:dispatch -->
+On Codex CLI or app, open [the native runtime recipe](../references/codex.md)
+before each independent role dispatch in this phase. Use a fresh native child,
+the full role prompt and only this role's allowed inputs; observe its actual
+final return before importing results. The recipe is coordinator-only.
+
 ## Steps
 
 ### 1. Check that there is a standard to compare against
@@ -105,3 +111,8 @@ gate of its own because it has no document of the user's to be measured against
 | project code | changed by executors, one commit per доводка таск, each reviewed |
 | `.maestro/state.js` | the доводка таски in `tasks[]`, each ending at `done` through ревью |
 | `.maestro/<slug>/report.md` | one more приёмка round appended after the last доводка round |
+
+Mandatory source audit, integrated journeys, readiness, and selected controls
+remain acceptance work when this optional phase is disabled. A polishing change
+invalidates affected fingerprints and returns through fresh acceptance; the
+final report uses the same original/current scope projection.

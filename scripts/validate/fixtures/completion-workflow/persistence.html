@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Persistence fixture</title>
+<label>Entry <input id="entry"></label><button id="save">Save</button><output id="entries"></output>
+<script>
+const variant = new URLSearchParams(location.search).get('variant') || 'clean';
+const key = 'maestro-disposable-persistence';
+let entries = JSON.parse(localStorage.getItem(key) || '[]');
+const render = () => { document.querySelector('#entries').textContent = entries.join(', '); };
+document.querySelector('#save').addEventListener('click', () => {
+  if (variant === 'disabled-save' || entries.length >= 3) return;
+  entries.push(document.querySelector('#entry').value);
+  if (variant !== 'volatile-only') localStorage.setItem(key, JSON.stringify(entries));
+  render();
+});
+render();
+</script></html>

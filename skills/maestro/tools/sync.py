@@ -16,13 +16,14 @@ keeping the dashboard reachable. The envelope is mirrored into the page so a
 file snapshot also exposes the failure.
 
 With no mode argument, the historical mirror/server behavior remains available
-for old states and for reopening the dashboard. Contract-4 candidates are
+for old states and for reopening the dashboard. Contract-4/5 candidates are
 validated before this compatibility path mirrors them. Server failures do not
 invalidate an otherwise coherent snapshot. The helper uses only Python's
 standard library, and tests exercise this copied file without opening windows.
 """
 
 import json
+import datetime
 import hashlib
 import os
 import re
@@ -31,6 +32,8 @@ import socket
 import subprocess
 import sys
 import tempfile
+
+CURRENT_CONTRACT_VERSION = 5
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(DIR, 'state.js')
@@ -50,6 +53,8 @@ REMOTE = ('SSH_CONNECTION', 'SSH_TTY', 'CI')
 # four lists against docs/spec/state-contract.md and scripts/state/contract.ts,
 # so a set that drifts here is a finding rather than a silence.
 STAGE_STATUSES = ['pending', 'active', 'done', 'failed', 'skipped']
+STAGE_IDS = ('preflight', 'manifest', 'briefing', 'spec', 'plan',
+             'build', 'review', 'acceptance')
 TASK_STATUSES = ['queued', 'running', 'review', 'repair', 'done', 'failed']
 REQUIREMENT_STATUSES = ['open', 'in-spec', 'deferred', 'dropped', 'placeholder']
 GATE_STATUSES = ['pending', 'passed', 'failed']
@@ -496,7 +501,7 @@ def fingerprint_equal(left, right):
 
 
 def derive_verification(state):
-    """The deterministic v4 verdict; no file reads and no invented records."""
+    """The deterministic v4/v5 verdict; no file reads and no invented records."""
     record = state['verification']
     target = record['targetRevision']
     obligations = [item for item in record['obligations'] if item['targetRevision'] == target]
@@ -509,7 +514,9 @@ def derive_verification(state):
         live.sort(key=lambda item: (item['executedAt'], item['id']), reverse=True)
         execution = live[0] if live else None
         effective[check['id']] = execution
-        if execution is None:
+        if record['version'] == 2 and check['currentFingerprint']['acceptanceInput'] != record['acceptanceInputDigest']:
+            result = 'stale'
+        elif execution is None:
             result = 'not_run'
         elif not fingerprint_equal(execution['fingerprint'], check['currentFingerprint']):
             result = 'stale'
@@ -524,9 +531,10 @@ def derive_verification(state):
         contradicted = any(item['status'] == 'open'
                            and obligation['id'] in item['obligationIds']
                            for item in record['findings'])
-        if contradicted or any(check_results[check['id']] == 'failed' for check in required):
+        extension = extension_results(record, obligation, effective, check_results)
+        if contradicted or 'failed' in extension or any(check_results[check['id']] == 'failed' for check in required):
             result = 'failed'
-        elif obligation['discovery'] == 'unresolved' or not required:
+        elif obligation['discovery'] == 'unresolved' or not required or any(result != 'passed' for result in extension):
             result = 'incomplete'
         elif all(check_results[check['id']] == 'passed' for check in required):
             result = 'passed'
@@ -587,7 +595,8 @@ def derive_verification(state):
     promises_open = any(item['status'] == 'open' for item in record['promisedWork'])
     if failed_ids:
         g4 = 'failed'
-    elif not requirement_results or incomplete_ids or not round_current or promises_open:
+    elif (not requirement_results or incomplete_ids or not round_current or promises_open
+          or (record['version'] == 2 and (not record.get('scopeBaseline') or not fresh_manifest_audit(record, [item['id'] for item in state['requirements']])))):
         g4 = 'pending'
     else:
         g4 = 'passed'
@@ -602,6 +611,577 @@ def derive_verification(state):
     return result
 
 
+def derive_scope_progress(state, summary=None):
+    """Frozen original expectations, separate from authorized current commitments."""
+    record = state.get('verification')
+    if summary is None and state.get('contractVersion', 0) >= 4 and record:
+        summary = derive_verification(state)
+    requirements = state.get('requirements', [])
+    current_ids = [item['id'] for item in requirements if item['status'] not in ('deferred', 'dropped')]
+    baseline = record.get('scopeBaseline') if record and record['version'] == 2 else None
+    original_ids = baseline['requirementIds'] if baseline else []
+
+    def original_pass(identity):
+        if not baseline or not summary:
+            return False
+        planning = next((item for item in requirements if item['id'] == identity), None)
+        if not planning or planning['status'] in ('deferred', 'dropped'):
+            return False
+        if any(item['status'] == 'open' and identity in item['requirementIds'] for item in record['findings']):
+            return False
+        mappings = [item for item in record['scopeMappings'] if item['originalRequirementId'] == identity
+                    and item['targetRevision'] == record['targetRevision']]
+        mapping = mappings[-1] if mappings else None
+        initial = next((item['targetRevision'] for item in record['manifestAudits']
+                        if item['id'] == baseline['auditId']), 1)
+        if record['targetRevision'] > initial and not mapping:
+            return False
+        if mapping and mapping['relation'] == 'withdrawn':
+            return False
+        current = mapping['currentRequirementIds'] if mapping else [identity]
+        if not current or any(summary['requirementResults'].get(item) != 'passed' for item in current):
+            return False
+        expectation = next((item for item in baseline['expectations'] if item['requirementId'] == identity), None)
+        if not expectation or not expectation['clauseIds']:
+            return False
+        changed = mapping and mapping['relation'] != 'unchanged'
+        checks = mapping['originalCheckIds'] if changed else list(dict.fromkeys(
+            expectation.get('checkIds', []) + (mapping['originalCheckIds'] if mapping else [])))
+        if changed and not checks:
+            return False
+        return all(summary['checkResults'].get(item) == 'passed' for item in checks)
+
+    def measurement(ids, established, passed):
+        return {'status': 'not-established' if not established else 'established' if ids else 'not-applicable',
+                'passed': passed, 'total': len(ids), 'requirementIds': ids}
+
+    return {'original': measurement(original_ids, bool(baseline), sum(original_pass(item) for item in original_ids)),
+            'current': measurement(current_ids, summary is not None,
+                                   sum(summary['requirementResults'].get(item) == 'passed' for item in current_ids) if summary else 0),
+            'addedIds': [item['id'] for item in requirements if item['id'] not in original_ids] if baseline else [],
+            'deferredIds': [item['id'] for item in requirements if item['status'] == 'deferred'],
+            'droppedIds': [item['id'] for item in requirements if item['status'] == 'dropped'],
+            'changedIds': list(dict.fromkeys(item['originalRequirementId'] for item in record['scopeMappings']
+                            if item['targetRevision'] == record['targetRevision'] and item['relation'] in ('changed', 'split')))
+                            if record and record['version'] == 2 else [],
+            'exceptionDecisionIds': [item['id'] for item in record['decisions'] if item['kind'] == 'accepted_exception'] if record else []}
+
+
+def text_digest(text):
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()
+
+
+def oracle_digest(check):
+    return text_digest(json.dumps([check['procedure'], check['oracle'], check.get('ignoreMask', [])],
+                                  ensure_ascii=False, separators=(',', ':')))
+
+
+def same_ids(left, right):
+    return len(set(left)) == len(left) and len(left) == len(right) and set(left) == set(right)
+
+
+def fresh_manifest_audit(record, requirement_ids=()):
+    sources = record['sourceSnapshots']
+    candidates = [audit for audit in record['manifestAudits']
+        if audit['targetRevision'] == record['targetRevision']
+        and audit['manifestDigest'] == record['manifestDigest']
+        and same_ids(audit['sourceIds'], [source['id'] for source in sources])
+        and all(audit['sourceDigests'].get(source['id']) == source['sha256'] for source in sources)]
+    if not sources or not candidates:
+        return False
+    audit = candidates[-1]
+    if (audit['result'] != 'passed' or not audit['clauseIds'] or audit['findings']
+            or not all(audit.get(name, '').strip() for name in ('dispatchId', 'readerId', 'returnId'))):
+        return False
+    known = {clause['id']: clause for clause in record['sourceClauses']}
+    clauses = [known.get(identity) for identity in audit['clauseIds']]
+    return (all(clause and clause['sourceId'] in audit['sourceIds']
+                and (clause['classification'] == 'context' or clause['requirementIds']) for clause in clauses)
+            and all(any(clause and clause['sourceId'] == source['id'] for clause in clauses) for source in sources)
+            and all(any(clause and identity in clause['requirementIds'] for clause in clauses) for identity in requirement_ids))
+
+
+def extension_results(record, obligation, effective, check_results):
+    """Control failures do not rewrite the healthy production check result."""
+    if record['version'] != 2:
+        return []
+    results = []
+    superseded = {item.get('supersedes') for item in record['negativeControls']}
+    required = {check['id'] for check in record['checks'] if check['required']
+                and check['id'] in obligation['checkIds']}
+    checks = {check['id']: check for check in record['checks']}
+    for control in record['negativeControls']:
+        if (control['id'] in superseded or control['targetRevision'] != record['targetRevision']
+                or control['checkId'] not in required):
+            continue
+        check = checks.get(control['checkId'])
+        if (not check or not fingerprint_equal(control['mainFingerprint'], check['currentFingerprint'])
+                or control['oracleDigest'] != oracle_digest(check)):
+            results.append('incomplete')
+        else:
+            results.append(control['result'] if control['result'] in ('passed', 'failed') else 'incomplete')
+    for journey in record['journeys']:
+        if journey['targetRevision'] != record['targetRevision'] or obligation['id'] not in journey['obligationIds']:
+            continue
+        statuses = [check_results.get(identity) for identity in journey['checkIds']]
+        assertions = [assertion for identity in journey['checkIds']
+                      for assertion in (effective.get(identity) or {}).get('assertions', [])]
+        if 'failed' in statuses:
+            results.append('failed')
+        elif not statuses or any(status != 'passed' for status in statuses):
+            results.append('incomplete')
+        elif any(any(item['name'] == step['assertion'] and item['result'] == 'failed'
+                     for item in assertions) for step in journey['steps']):
+            results.append('failed')
+        elif all(any(item['name'] == step['assertion'] and item['result'] == 'passed'
+                     for item in assertions) for step in journey['steps']):
+            results.append('passed')
+        else:
+            results.append('incomplete')
+    return results
+
+
+def validate_extension(state):
+    """Version-2 source and completion graph; never executes checks or diagnoses."""
+    record = state['verification']
+    errors = []
+
+    def add(field, message):
+        errors.append({'field': field, 'message': message})
+        log('ERROR', 'extension', message, {'field': field})
+
+    def strings(value):
+        return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+    def moment(value):
+        if not isinstance(value, str):
+            return False
+        try:
+            datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+            return True
+        except ValueError:
+            return False
+
+    def fingerprint(value, at):
+        if (not isinstance(value, dict)
+                or not all(isinstance(value.get(name), str) and value[name]
+                           for name in ('reference', 'build', 'data', 'runtime', 'acceptanceInput'))
+                or not strings(value.get('relevantPaths')) or not isinstance(value.get('inputHashes'), dict)):
+            add(at, 'fingerprint needs identity, paths and input hash map')
+            return
+        if (len(set(value['relevantPaths'])) != len(value['relevantPaths'])
+                or set(value['relevantPaths']) != set(value['inputHashes'])
+                or any(not isinstance(hash_value, str) or not re.fullmatch('[a-f0-9]{64}', hash_value)
+                       for hash_value in value['inputHashes'].values())):
+            add(at, 'input hashes must match unique relevant paths exactly')
+
+    # Validate nested shapes before any typed graph traversal.
+    shapes = {
+        'sourceSnapshots': ('id origin text sha256 capturedAt', '', 'targetRevision'),
+        'sourceClauses': ('id sourceId quote classification', 'requirementIds', 'start end'),
+        'manifestAudits': ('id manifestDigest result auditedAt', 'sourceIds clauseIds findings', 'targetRevision'),
+        'scopeMappings': ('id originalRequirementId relation', 'currentRequirementIds originalCheckIds', 'targetRevision'),
+        'journeys': ('id fixture executionTaskId reset cleanup', 'requirementIds obligationIds checkIds variantIds integrationDependencies', 'targetRevision'),
+        'negativeControls': ('id checkId selectionBasis applicability defect expectedAssertion isolationFingerprint oracleDigest result', '', 'targetRevision'),
+        'repairAttempts': ('rootFindingId hypothesis diagnosis strategy action', 'evidenceIds followUpCheckIds', ''),
+    }
+    for name, (string_fields, arrays, counts) in shapes.items():
+        rows = record.get(name)
+        if not isinstance(rows, list):
+            add('verification.' + name, 'collection must be an array')
+            continue
+        seen = set()
+        for index, item in enumerate(rows):
+            at = 'verification.%s[%d]' % (name, index)
+            if not isinstance(item, dict):
+                add(at, 'entry must be an object')
+                continue
+            for field in string_fields.split():
+                if not isinstance(item.get(field), str) or not item[field]:
+                    add(at + '.' + field, 'nonempty string is required')
+            for field in arrays.split():
+                if not strings(item.get(field)):
+                    add(at + '.' + field, 'string array is required')
+            for field in counts.split():
+                if type(item.get(field)) is not int:
+                    add(at + '.' + field, 'integer is required')
+            for field in ('dispatchId', 'readerId', 'returnId', 'limitation', 'predecessorId',
+                          'diagnosisDispatchId', 'diagnosisReturnId', 'novelty', 'exclusionReason',
+                          'decisionId', 'findingId', 'supersedes'):
+                if field in item and not isinstance(item[field], str):
+                    add(at + '.' + field, 'optional field must be a string')
+            identity = item.get('id')
+            if not isinstance(identity, str) or identity in seen:
+                add(at + '.id', 'ID must be unique and a string')
+            else:
+                seen.add(identity)
+            if name == 'manifestAudits' and (not isinstance(item.get('sourceDigests'), dict)
+                    or any(not isinstance(value, str) for value in item.get('sourceDigests', {}).values())):
+                add(at + '.sourceDigests', 'source digest map is required')
+            if name == 'journeys' and (not isinstance(item.get('steps'), list)
+                    or any(not isinstance(step, dict) or not all(isinstance(step.get(field), str)
+                               and step[field].strip() for field in ('action', 'assertion'))
+                           for step in item.get('steps', []))):
+                add(at + '.steps', 'ordered steps need actions and assertions')
+            if name == 'negativeControls':
+                fingerprint(item.get('mainFingerprint'), at + '.mainFingerprint')
+                if not isinstance(item.get('runs'), list):
+                    add(at + '.runs', 'control runs must be an array')
+                    continue
+                for run in item['runs']:
+                    if not isinstance(run, dict):
+                        add(at + '.runs', 'control run must be an object')
+                        continue
+                    for field in ('id', 'phase', 'result', 'oracleDigest', 'executedAt', 'executor', 'invocation'):
+                        if not isinstance(run.get(field), str) or not run[field]:
+                            add(at + '.runs.' + field, 'nonempty string is required')
+                    if not strings(run.get('evidenceIds')):
+                        add(at + '.runs.evidenceIds', 'evidence IDs required')
+                    if (not isinstance(run.get('assertions'), list)
+                            or any(not isinstance(assertion, dict) or not isinstance(assertion.get('name'), str)
+                                   or assertion.get('result') not in ('passed', 'failed')
+                                   or not strings(assertion.get('evidenceIds'))
+                                   for assertion in run.get('assertions', []))):
+                        add(at + '.runs.assertions', 'assertions need name, result and evidence IDs')
+                    fingerprint(run.get('fingerprint'), at + '.runs.fingerprint')
+    baseline = record.get('scopeBaseline')
+    if baseline is not None:
+        if not isinstance(baseline, dict):
+            add('verification.scopeBaseline', 'baseline must be an object')
+        else:
+            for field in ('id', 'manifestDigest', 'auditId', 'agreementId', 'agreedAt'):
+                if not isinstance(baseline.get(field), str) or not baseline[field]:
+                    add('verification.scopeBaseline.' + field, 'nonempty string is required')
+            for field in ('sourceIds', 'requirementIds'):
+                if not strings(baseline.get(field)):
+                    add('verification.scopeBaseline.' + field, 'string array is required')
+            if (not isinstance(baseline.get('expectations'), list)
+                    or any(not isinstance(item, dict) or not isinstance(item.get('requirementId'), str)
+                           or not isinstance(item.get('text'), str) or not item['text']
+                           or not strings(item.get('clauseIds')) or not strings(item.get('checkIds'))
+                           for item in baseline.get('expectations', []))):
+                add('verification.scopeBaseline.expectations', 'original expectations need requirement/text/clauses/checks')
+    if not isinstance(record.get('manifestDigest'), str) or not re.fullmatch('[a-f0-9]{64}', record['manifestDigest']):
+        add('verification.manifestDigest', 'manifest SHA-256 is required')
+    if errors:
+        return errors
+
+    known = {name: {item['id']: item for item in record[name]} for name in shapes}
+    known.update({name: {item['id']: item for item in record[name]}
+                  for name in ('checks', 'obligations', 'evidence', 'findings', 'decisions')})
+    known['requirements'] = {item['id']: item for item in state['requirements']}
+    known['tasks'] = {item['id']: item for item in state['tasks']}
+
+    def refs(at, values, name):
+        if len(set(values)) != len(values):
+            add(at, 'linked IDs must be unique')
+        for identity in values:
+            if identity not in known[name]:
+                add(at, 'unknown ID %s' % identity)
+
+    def revision(at, item):
+        if not 1 <= item['targetRevision'] <= record['targetRevision']:
+            add(at, 'target revision is out of range')
+
+    for source in record['sourceSnapshots']:
+        at = 'verification.sourceSnapshots[%s]' % source['id']
+        if not re.fullmatch('SRC-[1-9][0-9]*', source['id']) or source['origin'] not in ('initial', 'addition'):
+            add(at, 'invalid source identity/origin')
+        if source['sha256'] != text_digest(source['text']):
+            add(at, 'source SHA-256 must match exact redacted text')
+        if not moment(source['capturedAt']):
+            add(at, 'timestamp must name a moment')
+        revision(at, source)
+    if sum(source['origin'] == 'initial' for source in record['sourceSnapshots']) > 1:
+        add('verification.sourceSnapshots', 'only one initial source is allowed')
+    for clause in record['sourceClauses']:
+        at = 'verification.sourceClauses[%s]' % clause['id']
+        refs(at, [clause['sourceId']], 'sourceSnapshots')
+        refs(at, clause['requirementIds'], 'requirements')
+        text = known['sourceSnapshots'].get(clause['sourceId'], {}).get('text', '')
+        if (not re.fullmatch('CL-[1-9][0-9]*', clause['id']) or clause['start'] < 0
+                or clause['end'] <= clause['start'] or clause['end'] > len(text)
+                or text[clause['start']:clause['end']] != clause['quote']):
+            add(at, 'clause offsets/quote must match source code points')
+        if clause['classification'] not in ('requirement', 'context'):
+            add(at, 'unknown clause classification')
+        if clause['classification'] == 'context' and (not clause.get('exclusionReason', '').strip() or clause['requirementIds']):
+            add(at, 'context requires reason and no R IDs')
+    dispatches, returns = set(), set()
+    for audit in record['manifestAudits']:
+        at = 'verification.manifestAudits[%s]' % audit['id']
+        refs(at, audit['sourceIds'], 'sourceSnapshots')
+        refs(at, audit['clauseIds'], 'sourceClauses')
+        if (not same_ids(list(audit['sourceDigests']), audit['sourceIds'])
+                or any(audit['sourceDigests'].get(identity) != known['sourceSnapshots'].get(identity, {}).get('sha256') for identity in audit['sourceIds'])):
+            add(at, 'audit source digests must match sources exactly')
+        if not re.fullmatch('MA-[1-9][0-9]*', audit['id']) or not re.fullmatch('[a-f0-9]{64}', audit['manifestDigest']):
+            add(at, 'invalid audit ID/manifest digest')
+        revision(at, audit)
+        if audit['result'] not in ('passed', 'failed', 'incomplete'):
+            add(at, 'unknown audit result')
+        if audit['result'] == 'passed' and (not all(audit.get(name, '').strip() for name in ('dispatchId', 'readerId', 'returnId'))
+                or audit['findings'] or not audit['sourceIds'] or not audit['clauseIds']):
+            add(at, 'passed audit needs independent returned identity and complete mappings')
+        if audit['result'] == 'failed' and not audit['findings']:
+            add(at, 'failed audit needs findings')
+        if audit['result'] == 'incomplete' and not audit.get('limitation', '').strip():
+            add(at, 'incomplete audit needs limitation')
+        if any(known['sourceClauses'].get(identity, {}).get('sourceId') not in audit['sourceIds'] for identity in audit['clauseIds']):
+            add(at, 'audit clauses must belong to its sources')
+        for field, seen in (('dispatchId', dispatches), ('returnId', returns)):
+            identity = audit.get(field)
+            if identity:
+                if identity in seen:
+                    add(at, 'audit dispatch/return cannot be reused')
+                seen.add(identity)
+        if not moment(audit['auditedAt']):
+            add(at, 'timestamp must name a moment')
+    if baseline is not None:
+        at = 'verification.scopeBaseline'
+        refs(at, baseline['sourceIds'], 'sourceSnapshots')
+        refs(at, baseline['requirementIds'], 'requirements')
+        audit = known['manifestAudits'].get(baseline['auditId'])
+        if (not audit or audit['result'] != 'passed' or audit['manifestDigest'] != baseline['manifestDigest']
+                or not audit.get('dispatchId') or not audit.get('returnId') or not re.fullmatch('AG-[1-9][0-9]*', baseline['agreementId'])):
+            add(at, 'baseline needs audited manifest and actual agreement')
+        if len(baseline['sourceIds']) != 1 or any(known['sourceSnapshots'].get(identity, {}).get('origin') != 'initial' for identity in baseline['sourceIds']):
+            add(at, 'baseline freezes the initial source only')
+        if not same_ids([item['requirementId'] for item in baseline['expectations']], baseline['requirementIds']):
+            add(at, 'baseline must freeze one expectation per original requirement')
+        for expectation in baseline['expectations']:
+            refs(at, expectation['clauseIds'], 'sourceClauses')
+            refs(at, expectation['checkIds'], 'checks')
+            if not expectation['clauseIds'] or any(known['sourceClauses'].get(identity, {}).get('sourceId') not in baseline['sourceIds']
+                    or identity not in (audit or {}).get('clauseIds', [])
+                    or expectation['requirementId'] not in known['sourceClauses'].get(identity, {}).get('requirementIds', []) for identity in expectation['clauseIds']):
+                add(at, 'original expectations need matching initial requirement clauses')
+        original = {identity for clause in record['sourceClauses'] if clause['id'] in (audit or {}).get('clauseIds', []) and clause['sourceId'] in baseline['sourceIds'] and clause['classification'] == 'requirement' for identity in clause['requirementIds']}
+        if not same_ids(list(original), baseline['requirementIds']):
+            add(at, 'baseline cannot omit initial requirements')
+        if not moment(baseline['agreedAt']):
+            add(at, 'timestamp must name a moment')
+    for mapping in record['scopeMappings']:
+        at = 'verification.scopeMappings[%s]' % mapping['id']
+        if not baseline or mapping['originalRequirementId'] not in baseline['requirementIds']:
+            add(at, 'mapping needs original requirement')
+        refs(at, mapping['currentRequirementIds'], 'requirements')
+        refs(at, mapping['originalCheckIds'], 'checks')
+        revision(at, mapping)
+        if mapping['relation'] not in ('unchanged', 'changed', 'split', 'withdrawn'):
+            add(at, 'unknown scope relation')
+        if mapping['relation'] != 'unchanged':
+            decision = known['decisions'].get(mapping.get('decisionId'))
+            if not decision or decision['kind'] != 'scope_amendment' or decision.get('targetRevision') != mapping['targetRevision']:
+                add(at, 'changed scope mapping needs authorized amendment')
+        if ((mapping['relation'] == 'withdrawn' and mapping['currentRequirementIds'])
+                or (mapping['relation'] != 'withdrawn' and not mapping['currentRequirementIds'])):
+            add(at, 'scope mapping current IDs disagree with relation')
+    if (state.get('outcome') == 'completed' or any(gate['id'] == 'G1' and gate['status'] == 'passed' for gate in state['gates'])) and (
+            not fresh_manifest_audit(record, known['requirements']) or not baseline):
+        add('gates[G1].status', 'passing G1 requires fresh independent source audit and frozen agreement')
+
+    for journey in record['journeys']:
+        at = 'verification.journeys[%s]' % journey['id']
+        if not re.fullmatch('J-[1-9][0-9]*', journey['id']):
+            add(at, 'journey ID must use J-N')
+        for field, name in (('requirementIds', 'requirements'), ('obligationIds', 'obligations'), ('checkIds', 'checks'), ('integrationDependencies', 'tasks')):
+            refs(at, journey[field], name)
+        refs(at, [journey['executionTaskId']], 'tasks')
+        revision(at, journey)
+        if any(not journey[name] for name in ('requirementIds', 'obligationIds', 'checkIds', 'steps')):
+            add(at, 'journey requires graph and ordered steps')
+        for identity in journey['checkIds']:
+            check = known['checks'].get(identity)
+            if (not check or not check['required'] or check.get('executionTaskId') != journey['executionTaskId']
+                    or not set(journey['obligationIds']).issubset(check['obligationIds'])
+                    or not set(journey['integrationDependencies']).issubset(check['integrationDependencies'])):
+                add(at, 'journey check needs required matching ownership/links')
+            if check:
+                positions = [check['procedure'].index(step['action']) if step['action'] in check['procedure'] else -1 for step in journey['steps']]
+                if -1 in positions or any(right <= left for left, right in zip(positions, positions[1:])):
+                    add(at, 'journey check must execute ordered actions')
+        for identity in journey['obligationIds']:
+            obligation = known['obligations'].get(identity)
+            if obligation and (obligation['targetRevision'] != journey['targetRevision']
+                    or not set(journey['requirementIds']).intersection(obligation['requirementIds'])
+                    or not set(journey['checkIds']).intersection(obligation['checkIds'])):
+                add(at, 'journey obligations need matching requirements/checks/revision')
+    run_ids = {item['id'] for item in record['executions']}
+    for index, control in enumerate(record['negativeControls']):
+        at = 'verification.negativeControls[%s]' % control['id']
+        refs(at, [control['checkId']], 'checks')
+        revision(at, control)
+        if not re.fullmatch('NC-[1-9][0-9]*', control['id']):
+            add(at, 'control ID must use NC-N')
+        check = known['checks'].get(control['checkId'])
+        if not check or not check['required']:
+            add(at, 'control needs required check')
+        if control['selectionBasis'] not in ('user_condition', 'acceptance_critical', 'severe_defect'):
+            add(at, 'control needs critical selection basis')
+        if control['result'] not in ('not_run', 'passed', 'failed', 'unavailable'):
+            add(at, 'unknown control result')
+        if not re.fullmatch('[a-f0-9]{64}', control['isolationFingerprint']) or control['isolationFingerprint'] == control['mainFingerprint']['build']:
+            add(at, 'control needs separate disposable identity')
+        if not re.fullmatch('[a-f0-9]{64}', control['oracleDigest']):
+            add(at, 'control needs oracle SHA-256')
+        if control['result'] == 'unavailable' and not control.get('limitation', '').strip():
+            add(at, 'unavailable control needs limitation')
+        if control.get('supersedes'):
+            previous = next((item for item in record['negativeControls'][:index] if item['id'] == control['supersedes']), None)
+            if not previous or any(previous[field] != control[field] for field in ('checkId', 'selectionBasis', 'targetRevision', 'applicability', 'defect', 'expectedAssertion')):
+                add(at, 'control supersession cannot change selection identity')
+            if sum(item.get('supersedes') == control['supersedes'] for item in record['negativeControls']) > 1:
+                add(at, 'control supersession cannot fork')
+        if control.get('findingId'):
+            refs(at, [control['findingId']], 'findings')
+        if control['result'] == 'failed':
+            finding = known['findings'].get(control.get('findingId'))
+            if not finding or control['checkId'] not in finding['checkIds']:
+                add(at, 'failed detector needs linked check-quality finding')
+        if control['result'] in ('passed', 'failed'):
+            if [run['phase'] for run in control['runs']] != ['clean', 'mutated', 'restored']:
+                add(at, 'finished control needs ordered clean/mutated/restored runs')
+            elif control['result'] == 'passed':
+                clean, mutated, restored = control['runs']
+                if (clean['result'] != 'passed' or restored['result'] != 'passed' or mutated['result'] != 'failed'
+                        or not any(item['name'] == control['expectedAssertion'] and item['result'] == 'failed' for item in mutated['assertions'])):
+                    add(at, 'passed control must detect expected assertion between clean/restored passes')
+        elif control['result'] == 'not_run' and control['runs']:
+            add(at, 'not-run selection cannot claim runs')
+        for run in control['runs']:
+            if run['id'] in run_ids:
+                add(at, 'control run must be separate from production/other runs')
+            run_ids.add(run['id'])
+            refs(at, run['evidenceIds'], 'evidence')
+            if run['phase'] not in ('clean', 'mutated', 'restored') or run['result'] not in ('passed', 'failed'):
+                add(at, 'unknown control run phase/result')
+            if not run['evidenceIds'] or not run['assertions'] or not moment(run['executedAt']):
+                add(at, 'control needs assertions/captures/timestamp')
+            if run['oracleDigest'] != control['oracleDigest']:
+                add(at, 'control oracle must be unchanged')
+            if run['result'] == 'passed' and any(item['result'] == 'failed' for item in run['assertions']):
+                add(at, 'passing control contains failed assertion')
+            if run['result'] == 'failed' and not any(item['result'] == 'failed' for item in run['assertions']):
+                add(at, 'failed control must name failed assertion')
+            if run['phase'] != 'mutated' and not fingerprint_equal(run['fingerprint'], control['mainFingerprint']):
+                add(at, 'clean/restored copy must match main input identity')
+            if run['phase'] == 'mutated' and run['fingerprint']['build'] == control['mainFingerprint']['build']:
+                add(at, 'mutated copy needs distinct build identity')
+            for assertion in run['assertions']:
+                if not assertion['evidenceIds'] or not set(assertion['evidenceIds']).issubset(run['evidenceIds']):
+                    add(at, 'assertion evidence must belong to control run')
+            for identity in run['evidenceIds']:
+                capture = known['evidence'].get(identity)
+                if not capture or capture['origin'] != 'execution' or not capture['path'].startswith('evidence/%s/' % run['id']):
+                    add(at, 'control capture must use separate run ID')
+    if record['repairLimits']['perFinding'] > 2:
+        add('verification.repairLimits', 'per-root retry ceiling is two')
+    latest = {}
+    for attempt in record['repairAttempts']:
+        at = 'verification.repairAttempts[%s]' % attempt['id']
+        root, seen = attempt['findingId'], set()
+        while known['findings'].get(root, {}).get('supersedes'):
+            if root in seen:
+                add('verification.findings', 'stable finding chain contains cycle')
+                break
+            seen.add(root)
+            root = known['findings'][root]['supersedes']
+        if attempt['rootFindingId'] != root:
+            add(at, 'attempt must retain stable root')
+        refs(at, attempt['evidenceIds'], 'evidence')
+        refs(at, attempt['followUpCheckIds'], 'checks')
+        if not re.fullmatch('RA-[1-9][0-9]*', attempt['id']) or not attempt['evidenceIds'] or not attempt['followUpCheckIds']:
+            add(at, 'repair needs stable ID/evidence/follow-up checks')
+        if attempt['strategy'] not in ('minimal_reproduction', 'interface_verification', 'dependency_correction', 'implementation_change', 'independent_executor'):
+            add(at, 'unknown strategy')
+        predecessor = latest.get(root)
+        if attempt.get('predecessorId') != predecessor:
+            add(at, 'repair predecessor must be preceding attempt for root')
+        if predecessor and (not attempt.get('diagnosisDispatchId', '').strip() or not attempt.get('diagnosisReturnId', '').strip() or attempt.get('novelty') != 'accepted'):
+            add(at, 'repeat repair needs returned independent accepted diagnosis')
+        if attempt.get('novelty') and attempt['novelty'] not in ('accepted', 'rejected', 'unavailable'):
+            add(at, 'unknown novelty')
+        latest[root] = attempt['id']
+    return errors
+
+
+def validate_stage_timeline(state, add):
+    """Stage clocks share the same handover boundary as the TypeScript reader."""
+    stages = state.get('stages')
+    if not isinstance(stages, list):
+        return
+
+    def moment(value):
+        if not isinstance(value, str) or not value:
+            return None
+        try:
+            clock = datetime.datetime.fromisoformat(value.replace('Z', '+00:00'))
+            if clock.tzinfo is None:
+                clock = clock.replace(tzinfo=datetime.timezone.utc)
+            # JavaScript readers compare Date.parse moments at millisecond precision.
+            clock = clock.replace(microsecond=(clock.microsecond // 1000) * 1000)
+            return round(clock.timestamp() * 1000)
+        except (ValueError, OverflowError):
+            return None
+
+    for index, stage in enumerate(stages):
+        if not isinstance(stage, dict):
+            continue
+        at = 'stages[%d]' % index
+        status = stage.get('status')
+        if stage.get('id') not in STAGE_IDS:
+            add(at + '.id', 'unknown stage ID')
+        for field in ('startedAt', 'finishedAt', 'note'):
+            if field in stage and not isinstance(stage[field], str):
+                add(at + '.' + field, 'field must be a string when present')
+        started = isinstance(stage.get('startedAt'), str) and bool(stage['startedAt'])
+        finished = isinstance(stage.get('finishedAt'), str) and bool(stage['finishedAt'])
+        if status == 'skipped' and (not isinstance(stage.get('note'), str) or not stage['note'].strip()):
+            add(at + '.note', 'skipped stage needs a reason')
+        if status == 'pending':
+            if started:
+                add(at + '.startedAt', 'pending stage has not begun')
+            if finished:
+                add(at + '.finishedAt', 'pending stage has not finished')
+        else:
+            for field, present in (('startedAt', started), ('finishedAt', finished)):
+                if present and moment(stage[field]) is None:
+                    add(at + '.' + field, 'stage timestamp must name a moment')
+        if status in ('active', 'done', 'failed') and not started:
+            add(at + '.startedAt', 'started stage needs its opening timestamp')
+        if status == 'active' and finished:
+            add(at + '.finishedAt', 'active stage cannot carry a closing timestamp')
+        if status == 'done' and not finished:
+            add(at + '.finishedAt', 'done stage needs its closing timestamp')
+
+    active = {stage['id'] for stage in stages if isinstance(stage, dict)
+              and stage.get('status') == 'active' and stage.get('id') in STAGE_IDS}
+    if len(active) > 1:
+        add('stages', 'only one stage may be active')
+    current = next((stage for stage in stages if isinstance(stage, dict)
+                    and stage.get('id') == state.get('currentStage')), None)
+    if current and current.get('status') == 'pending':
+        add('currentStage', 'current stage has not begun')
+    previous = None
+    for stage_id in STAGE_IDS:
+        stage = next((item for item in stages if isinstance(item, dict) and item.get('id') == stage_id), None)
+        if stage is None:
+            previous = None
+            continue
+        if stage.get('status') == 'skipped':
+            continue
+        before, previous = previous, stage
+        if before is None:
+            continue
+        closed, opened = moment(before.get('finishedAt')), moment(stage.get('startedAt'))
+        if closed is None and opened is not None:
+            add('stages[%s].finishedAt' % before['id'], 'previous stage is still open after the next began')
+        elif closed is not None and opened is not None and closed != opened:
+            add('stages[%s].startedAt' % stage_id,
+                'stage clocks overlap' if opened < closed else 'gap between stage clocks belongs to no stage')
+
+
 def validate_candidate(state):
     """Pure graph and closure validation equivalent to scripts/state/validate.ts."""
     errors = []
@@ -613,11 +1193,24 @@ def validate_candidate(state):
     if not isinstance(state, dict):
         add('', 'state must be an object')
         return errors, None
-    if state.get('contractVersion') != 4:
-        add('contractVersion', 'publication requires contract version 4')
+    if state.get('contractVersion') not in (4, 5):
+        add('contractVersion', 'publication requires contract version 4 or 5')
     for field in ('runId', 'slug', 'startedAt', 'updatedAt'):
         if not isinstance(state.get(field), str) or not state[field]:
             add(field, '%s must be a non-empty string' % field)
+    for field in ('finishedAt', 'interruptedAt', 'stopReason'):
+        if field in state and not isinstance(state[field], str):
+            add(field, '%s must be a string when present' % field)
+    if 'heldBy' in state:
+        holder = state['heldBy']
+        if (not isinstance(holder, dict) or not isinstance(holder.get('token'), str)
+                or not holder.get('token') or not isinstance(holder.get('since'), str)):
+            add('heldBy', 'heldBy must name a token and since timestamp')
+        else:
+            try:
+                datetime.datetime.fromisoformat(holder['since'].replace('Z', '+00:00'))
+            except (TypeError, ValueError):
+                add('heldBy.since', 'holder timestamp must name a moment')
     if not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', state.get('slug', '')):
         add('slug', 'contract-4 slug must be a canonical safe path segment')
     if state.get('lifecycle') not in LIFECYCLES:
@@ -638,10 +1231,9 @@ def validate_candidate(state):
                 add('%s[%d]' % (field, index), 'entry must be an object')
             elif item.get('status') not in allowed:
                 add('%s[%d].status' % (field, index), 'unknown status')
-    stage_ids = ('preflight', 'manifest', 'briefing', 'spec', 'plan',
-                 'build', 'review', 'acceptance')
-    if state.get('currentStage') not in stage_ids:
+    if state.get('currentStage') not in STAGE_IDS:
         add('currentStage', 'unknown current stage')
+    validate_stage_timeline(state, add)
     if not isinstance(state.get('dialChanges'), list):
         add('dialChanges', 'dial changes must be an array')
     if not isinstance(state.get('additions'), list):
@@ -687,8 +1279,8 @@ def validate_candidate(state):
     if not isinstance(record, dict):
         add('verification', 'contract 4 requires a verification object')
         return errors, None
-    if record.get('version') != 1:
-        add('verification.version', 'verification version must be 1')
+    if record.get('version') != (2 if state.get('contractVersion') == 5 else 1):
+        add('verification.version', 'contract 4 requires verification 1; contract 5 requires verification 2')
     if not isinstance(record.get('targetRevision'), int) or record['targetRevision'] < 1:
         add('verification.targetRevision', 'target revision must be positive')
     if not isinstance(record.get('acceptanceInputDigest'), str) or not record['acceptanceInputDigest']:
@@ -966,6 +1558,11 @@ def validate_candidate(state):
     if errors:
         return errors, None
 
+    if record['version'] == 2:
+        errors.extend(validate_extension(state))
+        if errors:
+            return errors, None
+
     summary = derive_verification(state)
     round_id = summary.get('currentRoundId')
     current_round = next((item for item in record['acceptanceRounds'] if item['id'] == round_id), None)
@@ -979,7 +1576,7 @@ def validate_candidate(state):
             g4 is None or g4.get('status') != summary['g4']):
         add('gates[G4].status', 'G4 must be %s from verification records' % summary['g4'])
     if state['lifecycle'] == 'active':
-        if state.get('outcome') or state.get('finishedAt'):
+        if 'outcome' in state or 'finishedAt' in state:
             add('lifecycle', 'active state cannot have outcome or finishedAt')
     else:
         if not state.get('finishedAt'):
@@ -1045,6 +1642,11 @@ def validate_files(state):
                     os.path.realpath(run_dir) + os.sep)):
             return [{'field': 'verification.evidence',
                      'message': 'evidence root escapes the project run'}]
+    if record['version'] == 2:
+        field = 'verification.manifestDigest'
+        filename = safe_file(run_dir, 'manifest.md', field, errors)
+        if filename and sha256_file(filename) != record['manifestDigest']:
+            errors.append({'field': field, 'message': 'manifest changed; source audit is stale'})
     for index, item in enumerate(record['evidence']):
         field = 'verification.evidence[%d].path' % index
         relative = item['path']
@@ -1115,6 +1717,10 @@ def validate_transition(previous, candidate):
     if not isinstance(old, dict) or not isinstance(new, dict):
         return []
     errors = []
+    planning_open = (previous.get('lifecycle') == 'active'
+                     and previous.get('currentStage') in ('preflight', 'manifest', 'briefing', 'spec', 'plan')
+                     and not any(stage.get('id') == 'plan' and stage.get('status') == 'done' for stage in previous.get('stages', []))
+                     and not any(gate.get('id') == 'G3' and gate.get('status') == 'passed' for gate in previous.get('gates', [])))
     names = ('references', 'surfaces', 'obligations', 'checks', 'executions',
              'evidence', 'decisions', 'acceptanceRounds', 'repairAttempts')
     for name in names:
@@ -1127,9 +1733,35 @@ def validate_transition(previous, candidate):
                 before.pop('currentFingerprint', None)
                 if after:
                     after.pop('currentFingerprint', None)
+                if planning_open and not any(execution['checkId'] == item['id'] for execution in old['executions']):
+                    fields = (["executionTaskId"] if 'executionTaskId' not in item else [])
+                    fields += (["integrationDependencies"] if not item['integrationDependencies'] else [])
+                    for field in fields:
+                        before.pop(field, None)
+                        if after is not None:
+                            after.pop(field, None)
+            if name == 'obligations' and planning_open and not any(
+                    execution['checkId'] == check['id'] and item['id'] in check['obligationIds']
+                    for execution in old['executions'] for check in old['checks']):
+                for field in ('implementationTaskIds', 'checkIds'):
+                    if not item[field]:
+                        before.pop(field, None)
+                        if after is not None:
+                            after.pop(field, None)
             if after != before:
                 errors.append({'field': 'verification.%s[%s]' % (name, item['id']),
                                'message': 'published record must remain immutable'})
+    if old.get('version') == 2:
+        if new.get('version') != 2 or candidate.get('contractVersion') != 5:
+            errors.append({'field': 'verification.version', 'message': 'published safeguards cannot be downgraded'})
+        else:
+            for name in ('sourceSnapshots', 'sourceClauses', 'manifestAudits', 'scopeMappings', 'journeys', 'negativeControls'):
+                if new[name][:len(old[name])] != old[name]:
+                    errors.append({'field': 'verification.' + name, 'message': 'source/completion history must remain append-only'})
+            if old.get('scopeBaseline') and old['scopeBaseline'] != new.get('scopeBaseline'):
+                errors.append({'field': 'verification.scopeBaseline', 'message': 'original baseline is frozen'})
+            if any(new['repairLimits'][name] > old['repairLimits'][name] for name in ('perFinding', 'total')):
+                errors.append({'field': 'verification.repairLimits', 'message': 'stable budgets cannot increase'})
     if new['targetRevision'] < old['targetRevision']:
         errors.append({'field': 'verification.targetRevision',
                        'message': 'target revision cannot decrease'})
@@ -1218,7 +1850,8 @@ def candidate_mode(argv):
         log('WARN', 'project', 'legacy verification is not established',
             {'runId': candidate.get('runId'), 'contractVersion': candidate.get('contractVersion')})
         emit_json({'status': 'legacy', 'verificationEstablished': False,
-                   'notice': 'verification not established', 'g4': old_g4})
+                   'notice': 'verification not established', 'g4': old_g4,
+                   'scopeProgress': derive_scope_progress(candidate), 'completionSafeguards': 'not-established'})
         return 0
 
     try:
@@ -1238,6 +1871,9 @@ def candidate_mode(argv):
             emit_json({'status': 'invalid', 'violations': errors})
             return 1
         emit_json({'status': 'current', 'summary': summary,
+                   'scopeProgress': derive_scope_progress(candidate, summary),
+                   'completionSafeguards': 'established' if candidate['verification']['version'] == 2
+                   and candidate['verification'].get('scopeBaseline') and fresh_manifest_audit(candidate['verification'], [item['id'] for item in candidate['requirements']]) else 'not-established',
                    'lifecycle': candidate['lifecycle'], 'outcome': candidate.get('outcome'),
                    'verificationEstablished': candidate['lifecycle'] == 'closed'
                    and candidate.get('outcome') == 'completed' and summary['g4'] == 'passed'})
@@ -1325,7 +1961,7 @@ def main(argv):
         candidate = json.loads(text)
     except ValueError:
         candidate = None
-    if isinstance(candidate, dict) and candidate.get('contractVersion') == 4:
+    if isinstance(candidate, dict) and isinstance(candidate.get('contractVersion'), int) and candidate['contractVersion'] >= 4:
         try:
             violations, _summary = validate_candidate(candidate)
             if not violations:
@@ -1336,7 +1972,7 @@ def main(argv):
         if violations:
             validation_envelope('invalid', candidate, violations)
             url = viewer_address('--no-open' in argv)
-            print('sync: version-4 state rejected before mirroring; diagnostic at %s' % url)
+            print('sync: verified-contract state rejected before mirroring; diagnostic at %s' % url)
             return 1
         validation_envelope('valid', candidate, [], candidate)
 

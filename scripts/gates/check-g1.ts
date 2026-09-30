@@ -12,6 +12,7 @@ import { pathToFileURL } from 'node:url';
 
 import { createLogger } from '../shared/log.ts';
 import type { RunState, RequirementStatus } from '../state/contract.ts';
+import { hasFreshManifestAudit } from '../state/verification.ts';
 import { runGate, targetFromArgv, type GateFinding } from './cli.ts';
 
 export type { GateFinding };
@@ -51,6 +52,11 @@ export function checkG1(state: RunState): GateFinding[] {
     });
   }
 
+  if (state.contractVersion === 5 && (!state.verification || state.verification.version !== 2
+    || !hasFreshManifestAudit(state.verification, state.requirements.map(item => item.id)) || !state.verification.scopeBaseline)) {
+    findings.push({ requirementId: '', message: 'G1 requires a fresh independent source audit and frozen original agreement' });
+    log.warn('audit', 'source agreement is not established', { runId: state.runId });
+  }
   log.info('g1', 'requirements checked', {
     total: state.requirements.length,
     ...Object.fromEntries(counts),

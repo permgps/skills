@@ -9,8 +9,8 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { CAPTURES, fingerprint, sha256, verifiedState } from './fixtures/verification.ts';
-import { deriveVerification } from './verification.ts';
+import { CAPTURES, fingerprint, planningOwnershipState, sha256, verifiedState } from './fixtures/verification.ts';
+import { deriveVerification, validateVerificationTransition } from './verification.ts';
 import { validateState, InvalidStateError } from './validate.ts';
 import { importEvidence, validateEvidence } from './evidence.ts';
 import { formatAcceptanceTable, prepareLegacyResume, projectAcceptanceReport, projectState } from './projection.ts';
@@ -19,6 +19,33 @@ import { writeState } from './write.ts';
 
 const copy = () => structuredClone(verifiedState());
 const fields = (state: ReturnType<typeof copy>) => validateState(state).map(item => item.field);
+
+test('Plan can assign previously absent owners without rewriting specification semantics', () => {
+  const before = planningOwnershipState();
+  const after = planningOwnershipState(true);
+  assert.deepEqual(validateState(before), []);
+  assert.deepEqual(validateState(after), []);
+  assert.deepEqual(validateVerificationTransition(before, after), []);
+  const changedOracle = structuredClone(after); changedOracle.verification!.checks[0]!.oracle = 'Weaker oracle';
+  assert.ok(validateVerificationTransition(before, changedOracle).some(item => item.field.includes('checks')));
+  const reassigned = structuredClone(after); reassigned.verification!.checks[0]!.executionTaskId = '02';
+  assert.ok(validateVerificationTransition(after, reassigned).some(item => item.field.includes('checks')));
+});
+
+test('G3, completed planning, and executed checks each freeze ownership assignment', () => {
+  for (const barrier of ['gate', 'plan', 'execution'] as const) {
+    const before = planningOwnershipState();
+    if (barrier === 'gate') before.gates[2]!.status = 'passed';
+    if (barrier === 'plan') before.stages[1]!.status = 'done';
+    if (barrier === 'execution') before.verification!.executions = verifiedState().verification!.executions;
+    const after = structuredClone(before);
+    after.verification!.checks[0]!.executionTaskId = '01';
+    after.verification!.checks[0]!.integrationDependencies = ['01'];
+    after.verification!.obligations[0]!.implementationTaskIds = ['01'];
+    assert.ok(validateVerificationTransition(before, after).some(item => item.field.includes('checks')), barrier);
+    assert.ok(validateVerificationTransition(before, after).some(item => item.field.includes('obligations')), barrier);
+  }
+});
 
 test('a current version-4 delivery has one derived passing verdict', () => {
   const state = copy();

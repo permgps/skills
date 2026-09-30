@@ -1,7 +1,7 @@
 # Phase 8 — Repair
 
 Read when a таск needs another attempt. It runs outside the sequence, and there
-are five doors into it:
+are six doors into it:
 
 | Door | Arrived from | State of the таск | What is known |
 |---|---|---|---|
@@ -10,6 +10,7 @@ are five doors into it:
 | g4-disagreement | Приёмка | `done`, and G4 disagreed about a `R##` it carries | the build is finished and the disagreement is against the манифест |
 | recorded-divergence | Разработка, after its last wave | `review` or `done` | a `D##` says a delivered file disagrees with what the build does, and no review or gate will say it again |
 | coverage-omission | G2, Ревью, or Приёмка | any relevant task state | a valid existing requirement lacked a grounded obligation, implementation assignment, or executable check |
+| startup-defect | Приёмка | any relevant task state | reproducible code startup failure, sanitized error and exact command; unavailable prerequisites use the incomplete path |
 
 The fourth exists because the other three cannot see it. A review judges one
 таск against the contract that таск was given; G4 reads the build against the
@@ -31,6 +32,12 @@ the one-line fix that looks too small to hand over. That fix is exactly where
 the rule earns its keep — the прогон has no record of an edit you made yourself,
 and the review that follows will judge it as if an executor had.
 
+<!-- maestro:codex:dispatch -->
+On Codex CLI or app, open [the native runtime recipe](../references/codex.md)
+before each independent role dispatch in this phase. Use a fresh native child,
+the full role prompt and only this role's allowed inputs; observe its actual
+final return before importing results. The recipe is coordinator-only.
+
 ## Steps
 
 ### 1. Read only what the door provides
@@ -43,6 +50,15 @@ and the review that follows will judge it as if an executor had.
   what the таск it depends on actually built — that is what the divergence has
   to be made true against, and it is the reason this door opens after the last
   wave rather than when the row was written.
+
+- From coverage omission: stable finding/root ID, R IDs, missing observation,
+  source evidence/provenance, affected obligation/check IDs, implementation/check
+  owner and integration dependencies, current fingerprint. Fix missing task
+  ownership before dispatch; coverage correction is not new scope.
+- From startup defect: exact documented launch command, sanitized error evidence,
+  build fingerprint, affected R/check IDs, owning task and prerequisite assessment.
+  Distinguish reproducible syntax/import/config code defect from missing external
+  tool/service/value. External absence records unavailable and avoids code retries.
 
 Not `spec.md`, not the манифест, not the other таски. You are deciding about one
 таск against the contract it was given, and the withholding that makes a review
@@ -75,6 +91,32 @@ Do not rewrite the old oracle or present this correction as new user scope.
 were ambiguous, they were ambiguous before anybody built anything; what changed
 is only who is inconvenienced by them. Re-reading your way out of a failure is
 the shortest route to a build that does something nobody asked for.
+
+### 2a. Diagnose before repeating a failed repair
+
+Entry: stable root and previous attempt, actual failure evidence and finite
+remaining budgets. This protocol runs before every repeated repair dispatch.
+1. Follow supersedes to the root finding; read all attempts for that root,
+   predecessor, hypothesis/action/outcome and affected check fingerprints.
+2. If two attempts or global budget exhausted, report unresolved result and
+   both attempts; do not dispatch. New task/name/executor is not a reset.
+3. Dispatch [repair-diagnostician.md](../prompts/repair-diagnostician.md) in a
+   fresh bounded context with the prior hypothesis/action/result, evidence,
+   task/interface/check excerpts, root/predecessor and remaining budgets.
+4. Wait for actual return. Accepted novelty needs falsifying evidence and a
+   substantively different diagnosis/action. Different text alone is rejected.
+   Missing context/return/evidence is unavailable; keep incomplete, no retry.
+5. Use accepted diagnosis in next executor brief. Append actual attempt RA-N
+   only after return: id, findingId, taskId, at, outcome, rootFindingId,
+   predecessorId, hypothesis, diagnosis, evidenceIds, strategy, action,
+   followUpCheckIds, diagnosisDispatchId, diagnosisReturnId and novelty accepted.
+   First attempt has no predecessor; repeats require actual diagnosis receipts.
+6. Fresh fingerprints and check executions return through review and affected
+   acceptance, including shared-input variants; repair cannot accept itself.
+Valid: minimal reproduction falsifies prior interface hypothesis; next action
+verifies exports. Invalid: same edit renamed, executor switched without new
+hypothesis, root ID changed, or budget increased. INFO door/diagnosis/strategy/
+attempt; WARN exhaustion/unavailability; ERROR reset/routing; DEBUG safe IDs.
 
 ### 3. If it is a retry — hand it over again
 
@@ -175,3 +217,14 @@ this.
 | project code | changed by an executor, never by you; one commit per retried таск, **appended** to that таск's `commits` |
 | `.maestro/<slug>/amendments.md` | one appended entry per amendment, each naming its `R##` and what demonstrated it |
 | `.maestro/state.js` | the таск back at `running` then `review`; its repair commit appended to `commits`; a requirement status moved where an amendment moved it |
+
+## Repair Door Inputs
+
+| Door | Required inputs |
+|---|---|
+| not-done | taskFile, executorReturn, handoffIfPresent |
+| blocking-review | taskFile, executorReturn, blockingFinding, handoffIfPresent |
+| g4-disagreement | taskFile, disagreement, requirementIds, fingerprint |
+| recorded-divergence | taskFile, divergenceId, dependencyResult |
+| coverage-omission | taskFile, rootFindingId, requirementIds, missingObservation, sourceEvidence, obligationIds, checkIds, ownership, fingerprint |
+| startup-defect | taskFile, rootFindingId, launchCommand, errorEvidence, fingerprint, requirementIds, checkIds, ownership, prerequisiteAssessment |

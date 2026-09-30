@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { assess, VARIANTS, type Probe } from './parity-browser.ts';
+import { assess, assessPersistence, VARIANTS, type Probe } from './parity-browser.ts';
 
 const hidden: Probe = {
   visible: false, columns: ['Accounts', 'Cards', 'Featured offer'],
@@ -40,4 +40,12 @@ test('the integrated fixture declares every tested variant and the same signatur
     assert.ok(html.includes(`'${variant}'`), `fixture omits ${variant}`);
   }
   assert.match(html, /window\.fixtureSignature = 'menu-handler-v1'/);
+});
+
+
+test('a successful save cannot mask data lost after an actual process restart', () => {
+  assert.deepEqual(assessPersistence({ saved: true, retainedAfterRestart: false }), ['entry lost after process restart']);
+  assert.deepEqual(assessPersistence({ saved: false, retainedAfterRestart: false }),
+    ['save action did not retain entry', 'entry lost after process restart']);
+  assert.deepEqual(assessPersistence({ saved: true, retainedAfterRestart: true }), []);
 });

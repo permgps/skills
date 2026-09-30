@@ -7,6 +7,8 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { checkCodexRuntime } from './host-degradation.ts';
+
 import { createLogger } from '../shared/log.ts';
 import { formatViolation, type Violation } from '../shared/violation.ts';
 
@@ -150,6 +152,43 @@ async function listMarkdown(bundleDir: string, directory: string): Promise<strin
   return found;
 }
 
+/** Declared procedure scaffolding; these checks do not establish semantic quality. */
+export function checkProcedure(body: string): string[] {
+  const requirements: Array<[string, RegExp]> = [
+    ['entry inputs', /(?:Entry|prerequisites|entry inputs)\s*:/i],
+    ['numbered actions', /^\s*1\. /m],
+    ['output fields', /(?:Return|Output|fields)\s*(?:JSON|fields)?\s*:/i],
+    ['missing-capability outcome', /unavailable|incomplete|pending/i],
+    ['valid example', /Valid:/], ['invalid example', /Invalid:/],
+    ['next action', /next action|exit|return once|For failed|For passed|then|next/i],
+  ];
+  return requirements.filter(([, pattern]) => !pattern.test(body)).map(([name]) => name);
+}
+
+const COMPLETION_PROCEDURES = [
+  ['prompts/manifest-reader.md', ''], ['prompts/repair-diagnostician.md', ''],
+  ['phases/1-manifest.md', '5a. Independently audit before agreement'],
+  ['phases/3-spec.md', 'Integrated Outcomes And Readiness'],
+  ['phases/4-plan.md', 'Journey And Control Ownership'],
+  ['phases/5-build.md', 'Execute Journeys And Selected Controls'],
+  ['phases/6-review.md', 'Verify Execution Handoffs'],
+  ['phases/7-acceptance.md', 'Completion Reconciliation After Blind Discovery'],
+  ['phases/0-preflight.md', 'Explicit Historical Resume'],
+  ['references/verification-procedures.md', 'Journey Protocol'],
+  ['references/verification-procedures.md', 'Selective Negative-Control Protocol'],
+] as const;
+
+function procedureSection(body: string, heading: string): string {
+  if (!heading) return body;
+  const lines = body.split('\n');
+  const index = lines.findIndex(line => line.replace(/^#+ /, '') === heading);
+  if (index < 0) return '';
+  const depth = /^#+/.exec(lines[index]!)![0].length;
+  const end = lines.findIndex((line, cursor) => cursor > index && /^#+ /.test(line)
+    && /^#+/.exec(line)![0].length <= depth);
+  return lines.slice(index + 1, end < 0 ? undefined : end).join('\n');
+}
+
 export async function checkBundle(
   bundleDir: string,
   profile: BundleProfile = MAESTRO_BUNDLE,
@@ -273,6 +312,19 @@ export async function checkBundle(
     linkedPrompts: promptFiles.filter(file => linkedAnywhere.has(file)).length,
   });
 
+  if (skill.includes('<!-- maestro:delegation:native-explicit -->')) {
+    violations.push(...await checkCodexRuntime(bundleDir));
+  }
+
+  if (skill.includes('<!-- maestro:completion-protocols -->')) {
+    for (const [file, heading] of COMPLETION_PROCEDURES) {
+      const body = await readFile(path.join(bundleDir, file), 'utf8').catch(() => '');
+      for (const missing of checkProcedure(procedureSection(body, heading))) {
+        add('procedure', file, 0, `declared procedure "${heading || file}" lacks ${missing}`);
+      }
+    }
+    log.info('procedure', 'completion procedure scaffolding checked', { count: COMPLETION_PROCEDURES.length });
+  }
   return violations;
 }
 

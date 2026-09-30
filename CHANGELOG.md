@@ -14,6 +14,46 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+## v0.0.5-alpha — 2026-09-30
+
+**Native Codex compatibility (verification pending).** Maestro's development
+link now uses `.agents/skills/maestro` for CLI and app discovery. A demand-loaded
+runtime recipe explicitly delegates independent roles through exposed native
+tools with fresh contexts, observed returns and absolute executor workspaces.
+Missing concurrency/worktrees narrows editing waves; missing isolation, returns
+or required browser evidence cannot become a passing gate. Structural checks
+and regressions enforce these declarations. The workflow evaluator adds
+`--entry installed-copy|installed-link` for `$maestro` discovery while preserving
+its direct-path mode. CLI and app support claims require separate complete runs;
+installation or synthetic parser receipts alone do not establish support.
+
+**Source-audited completion protocols (preview).** Contract 5/verification 2
+preserves redacted original-language source and requires an independent
+source-to-manifest audit before agreement. Integrated journeys, readiness checks
+and selected isolated negative controls contribute to acceptance. Repeated
+repairs retain stable finding identities and finite budgets and require an
+independent changed diagnosis. Original scope keeps its frozen denominator;
+current scope, deferrals, additions and exceptions are displayed separately.
+TypeScript, the bundled standard-library Python helper and the dashboard consume
+the same atomic state. Historical v4 outcomes remain readable; explicit resume
+reconstructs the new safeguards without inventing audits or evidence.
+
+Actual Luna evaluations exposed publication and handoff defects that were fixed:
+provisional manifest creation, retained audit history, planning-time owner
+assignment, optional null fields, inherited working directories and stage-clock
+overlaps. The provider-neutral evaluation harness now persists initial protected
+identities before dispatch and redacted host events before timeout or interruption.
+
+**Verification status:** `npm run check` passes all 739 tests with zero failures
+and zero skips, including actual Python helper integration. Fresh Codex CLI
+0.159.2 runs with observed gpt-6.1-sol discover Maestro through `$maestro` from
+copied and linked bundles and return fresh independent children. Both hit the
+15-minute deadline before final acceptance/report/memory; the Codex app has no
+separate run evidence. Encrypted saved handoffs prevent exact-input attestation.
+The fresh Luna samples and broader installed-bundle matrix remain open. This is
+an alpha preview, not a claim of fully verified completion. See
+[the execution record](docs/parity-verification.md).
+
 ## v0.0.4-alpha — 2026-09-29
 
 **Verification contract v4 (preview).** The run now separates planning

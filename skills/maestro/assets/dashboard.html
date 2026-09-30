@@ -357,7 +357,7 @@
 globalThis.MAESTRO_LOGIC = (function () {
   'use strict';
 
-  var KNOWN_CONTRACT_VERSION = 4;
+  var KNOWN_CONTRACT_VERSION = 5;
 
   // Mirrors docs/spec/phases.md. scripts/validate/dashboard-integrity.ts fails
   // the build when this set or any label below drifts from vocabulary.md.
@@ -604,6 +604,12 @@ globalThis.MAESTRO_LOGIC = (function () {
           if (value.outcome === 'stopped_incomplete') return 'Остановлено без полного подтверждения. G4: ' + value.g4 + '. ' + counts;
           return 'Проверка: G4 ' + value.g4 + '. ' + counts;
         },
+        scopeRows: function (value) {
+          var number = function (item) { return item.status === 'established' ? item.passed + '/' + item.total : item.status === 'not-applicable' ? 'не применимо' : 'не установлено'; };
+          return ['Исходный объём: ' + number(value.original), 'Текущий объём: ' + number(value.current),
+            'Добавлено: ' + value.addedIds.length + '; Отложено: ' + value.deferredIds.length + '; Удалено: ' + value.droppedIds.length
+            + '; Изменено: ' + value.changedIds.length + '; Принятые исключения: ' + value.exceptionDecisionIds.length];
+        },
         verificationRows: function (value) {
           return 'Результат требований — ошибки: ' + (value.failedIds.join(', ') || 'нет')
             + '; непроверено: ' + (value.incompleteIds.join(', ') || 'нет') + '.';
@@ -825,6 +831,12 @@ globalThis.MAESTRO_LOGIC = (function () {
           if (value.outcome === 'closed_with_exceptions') return 'Closed with accepted exceptions. G4: ' + value.g4 + '. ' + counts;
           if (value.outcome === 'stopped_incomplete') return 'Stopped without full verification. G4: ' + value.g4 + '. ' + counts;
           return 'Verification: G4 ' + value.g4 + '. ' + counts;
+        },
+        scopeRows: function (value) {
+          var number = function (item) { return item.status === 'established' ? item.passed + '/' + item.total : item.status === 'not-applicable' ? 'not applicable' : 'not established'; };
+          return ['Original scope: ' + number(value.original), 'Current scope: ' + number(value.current),
+            'Added: ' + value.addedIds.length + '; Deferred: ' + value.deferredIds.length + '; Dropped: ' + value.droppedIds.length
+            + '; Changed: ' + value.changedIds.length + '; Accepted exceptions: ' + value.exceptionDecisionIds.length];
         },
         verificationRows: function (value) {
           return 'Requirement results — failed: ' + (value.failedIds.join(', ') || 'none')
@@ -1459,6 +1471,140 @@ globalThis.MAESTRO_LOGIC = (function () {
       .sort(function (a, b) { return b.executedAt.localeCompare(a.executedAt) || b.id.localeCompare(a.id); })[0];
   }
 
+  // Synchronous UTF-8 SHA-256 keeps the standalone projection deterministic.
+  function textDigest(text) {
+    var bytes = [];
+    encodeURIComponent(text).replace(/%([0-9A-F]{2})|([^%])/g, function (_, hex, literal) {
+      bytes.push(hex ? parseInt(hex, 16) : literal.charCodeAt(0));
+      return '';
+    });
+    var length = bytes.length * 8;
+    bytes.push(128);
+    while (bytes.length % 64 !== 56) bytes.push(0);
+    for (var shift = 7; shift >= 0; shift -= 1) bytes.push(Math.floor(length / Math.pow(256, shift)) % 256);
+    var primes = [], initial = [], constants = [];
+    for (var candidate = 2; primes.length < 64; candidate += 1) {
+      if (primes.some(function (prime) { return candidate % prime === 0; })) continue;
+      primes.push(candidate);
+      if (initial.length < 8) initial.push((Math.sqrt(candidate) % 1 * 4294967296) | 0);
+      constants.push((Math.pow(candidate, 1 / 3) % 1 * 4294967296) | 0);
+    }
+    var rotate = function (word, count) { return (word >>> count) | (word << (32 - count)); };
+    for (var offset = 0; offset < bytes.length; offset += 64) {
+      var schedule = [];
+      for (var i = 0; i < 64; i += 1) {
+        if (i < 16) schedule[i] = (bytes[offset + i * 4] << 24) | (bytes[offset + i * 4 + 1] << 16)
+          | (bytes[offset + i * 4 + 2] << 8) | bytes[offset + i * 4 + 3];
+        else {
+          var x = schedule[i - 15], y = schedule[i - 2];
+          schedule[i] = (schedule[i - 16] + (rotate(x, 7) ^ rotate(x, 18) ^ (x >>> 3))
+            + schedule[i - 7] + (rotate(y, 17) ^ rotate(y, 19) ^ (y >>> 10))) | 0;
+        }
+      }
+      var work = initial.slice();
+      for (var j = 0; j < 64; j += 1) {
+        var t1 = (work[7] + (rotate(work[4], 6) ^ rotate(work[4], 11) ^ rotate(work[4], 25))
+          + ((work[4] & work[5]) ^ (~work[4] & work[6])) + constants[j] + schedule[j]) | 0;
+        var t2 = ((rotate(work[0], 2) ^ rotate(work[0], 13) ^ rotate(work[0], 22))
+          + ((work[0] & work[1]) ^ (work[0] & work[2]) ^ (work[1] & work[2]))) | 0;
+        work = [(t1 + t2) | 0, work[0], work[1], work[2], (work[3] + t1) | 0, work[4], work[5], work[6]];
+      }
+      initial = initial.map(function (value, index) { return (value + work[index]) | 0; });
+    }
+    return initial.map(function (value) { return ('00000000' + (value >>> 0).toString(16)).slice(-8); }).join('');
+  }
+
+  function freshManifestAudit(record, requirementIds) {
+    var sameIds = function (left, right) {
+      return new Set(left).size === left.length && left.length === right.length
+        && left.every(function (id) { return right.indexOf(id) !== -1; });
+    };
+    var candidates = record.manifestAudits.filter(function (audit) {
+      return audit.targetRevision === record.targetRevision && audit.manifestDigest === record.manifestDigest
+        && sameIds(audit.sourceIds, record.sourceSnapshots.map(function (source) { return source.id; }))
+        && record.sourceSnapshots.every(function (source) { return audit.sourceDigests[source.id] === source.sha256; });
+    });
+    var audit = candidates[candidates.length - 1];
+    if (!record.sourceSnapshots.length || !audit || audit.result !== 'passed' || !audit.clauseIds.length
+      || !(audit.dispatchId || '').trim() || !(audit.returnId || '').trim() || !(audit.readerId || '').trim()
+      || audit.findings.length) return false;
+    var clauses = audit.clauseIds.map(function (id) { return record.sourceClauses.filter(function (clause) { return clause.id === id; })[0]; });
+    return clauses.every(function (clause) {
+      return clause && audit.sourceIds.indexOf(clause.sourceId) !== -1 && (clause.classification === 'context' || clause.requirementIds.length > 0);
+    }) && record.sourceSnapshots.every(function (source) {
+      return clauses.some(function (clause) { return clause && clause.sourceId === source.id; });
+    }) && (requirementIds || []).every(function (id) {
+      return clauses.some(function (clause) { return clause && clause.requirementIds.indexOf(id) !== -1; });
+    });
+  }
+
+  function completionResults(record, obligation, checks) {
+    if (record.version !== 2) return [];
+    var required = record.checks.filter(function (check) { return check.required && obligation.checkIds.indexOf(check.id) !== -1; });
+    var superseded = record.negativeControls.map(function (item) { return item.supersedes; });
+    var controls = record.negativeControls.filter(function (item) {
+      return superseded.indexOf(item.id) === -1 && item.targetRevision === record.targetRevision
+        && required.some(function (check) { return check.id === item.checkId; });
+    }).map(function (control) {
+      var check = required.filter(function (item) { return item.id === control.checkId; })[0];
+      var oracleDigest = textDigest(JSON.stringify([check.procedure, check.oracle, check.ignoreMask || []]));
+      if (!sameFingerprint(control.mainFingerprint, check.currentFingerprint) || control.oracleDigest !== oracleDigest) return 'incomplete';
+      return control.result === 'failed' ? 'failed' : control.result === 'passed' ? 'passed' : 'incomplete';
+    });
+    var journeys = record.journeys.filter(function (item) {
+      return item.targetRevision === record.targetRevision && item.obligationIds.indexOf(obligation.id) !== -1;
+    }).map(function (journey) {
+      if (journey.checkIds.some(function (id) { return checks[id] === 'failed'; })) return 'failed';
+      if (!journey.checkIds.length || journey.checkIds.some(function (id) { return checks[id] !== 'passed'; })) return 'incomplete';
+      var assertions = [];
+      journey.checkIds.forEach(function (id) {
+        var check = record.checks.filter(function (item) { return item.id === id; })[0];
+        var execution = check && effectiveExecution(check, record);
+        assertions = assertions.concat(execution ? execution.assertions : []);
+      });
+      if (journey.steps.some(function (step) { return assertions.some(function (item) { return item.name === step.assertion && item.result === 'failed'; }); })) return 'failed';
+      return journey.steps.every(function (step) { return assertions.some(function (item) { return item.name === step.assertion && item.result === 'passed'; }); }) ? 'passed' : 'incomplete';
+    });
+    return controls.concat(journeys);
+  }
+
+  function scopeProgressOf(state, summary) {
+    var record = state && state.verification;
+    var requirements = (state && state.requirements) || [];
+    var currentIds = requirements.filter(function (item) { return item.status !== 'deferred' && item.status !== 'dropped'; }).map(function (item) { return item.id; });
+    var baseline = record && record.version === 2 && record.scopeBaseline;
+    var originalIds = baseline ? baseline.requirementIds : [];
+    var originalPass = function (id) {
+      if (!baseline || !summary || summary.legacy) return false;
+      var planning = requirements.filter(function (item) { return item.id === id; })[0];
+      if (!planning || planning.status === 'deferred' || planning.status === 'dropped') return false;
+      if (record.findings.some(function (item) { return item.status === 'open' && item.requirementIds.indexOf(id) !== -1; })) return false;
+      var mappings = record.scopeMappings.filter(function (item) { return item.originalRequirementId === id && item.targetRevision === record.targetRevision; });
+      var mapping = mappings[mappings.length - 1];
+      var audit = record.manifestAudits.filter(function (item) { return item.id === baseline.auditId; })[0];
+      if (record.targetRevision > (audit ? audit.targetRevision : 1) && !mapping) return false;
+      if (mapping && mapping.relation === 'withdrawn') return false;
+      var current = mapping ? mapping.currentRequirementIds : [id];
+      if (!current.length || current.some(function (identity) { return summary.requirementResults[identity] !== 'passed'; })) return false;
+      var expectation = baseline.expectations.filter(function (item) { return item.requirementId === id; })[0];
+      if (!expectation || !expectation.clauseIds.length) return false;
+      var changed = mapping && mapping.relation !== 'unchanged';
+      var checkIds = changed ? mapping.originalCheckIds : Array.from(new Set((expectation.checkIds || []).concat(mapping ? mapping.originalCheckIds : [])));
+      if (changed && !checkIds.length) return false;
+      return checkIds.every(function (check) { return summary.checkResults[check] === 'passed'; });
+    };
+    var measurement = function (ids, established, passed) {
+      return { status: !established ? 'not-established' : ids.length ? 'established' : 'not-applicable', passed: passed, total: ids.length, requirementIds: ids };
+    };
+    return { original: measurement(originalIds, !!baseline, originalIds.filter(originalPass).length),
+      current: measurement(currentIds, !!summary && !summary.legacy, currentIds.filter(function (id) { return summary && summary.requirementResults[id] === 'passed'; }).length),
+      addedIds: baseline ? requirements.filter(function (item) { return originalIds.indexOf(item.id) === -1; }).map(function (item) { return item.id; }) : [],
+      deferredIds: requirements.filter(function (item) { return item.status === 'deferred'; }).map(function (item) { return item.id; }),
+      droppedIds: requirements.filter(function (item) { return item.status === 'dropped'; }).map(function (item) { return item.id; }),
+      changedIds: record && record.version === 2 ? Array.from(new Set(record.scopeMappings.filter(function (item) { return item.targetRevision === record.targetRevision && (item.relation === 'changed' || item.relation === 'split'); }).map(function (item) { return item.originalRequirementId; }))) : [],
+      exceptionDecisionIds: record ? record.decisions.filter(function (item) { return item.kind === 'accepted_exception'; }).map(function (item) { return item.id; }) : [] };
+  }
+
   function verificationOf(state) {
     if (!state || state.contractVersion < 4 || !state.verification) {
       var old = ((state && state.gates) || []).filter(function (item) { return item.id === 'G4'; })[0];
@@ -1470,7 +1616,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     var checks = {};
     record.checks.forEach(function (check) {
       var execution = effectiveExecution(check, record);
-      checks[check.id] = !execution ? 'not_run'
+      checks[check.id] = record.version === 2 && check.currentFingerprint.acceptanceInput !== record.acceptanceInputDigest ? 'stale' : !execution ? 'not_run'
         : sameFingerprint(execution.fingerprint, check.currentFingerprint) ? execution.result : 'stale';
     });
     var obligationResults = {};
@@ -1481,8 +1627,9 @@ globalThis.MAESTRO_LOGIC = (function () {
       var contradicted = record.findings.some(function (finding) {
         return finding.status === 'open' && finding.obligationIds.indexOf(item.id) !== -1;
       });
-      obligationResults[item.id] = contradicted || required.some(function (check) { return checks[check.id] === 'failed'; })
-        ? 'failed' : item.discovery === 'unresolved' || required.length === 0
+      var extension = completionResults(record, item, checks);
+      obligationResults[item.id] = contradicted || extension.indexOf('failed') !== -1 || required.some(function (check) { return checks[check.id] === 'failed'; })
+        ? 'failed' : extension.some(function (result) { return result !== 'passed'; }) || item.discovery === 'unresolved' || required.length === 0
           ? 'incomplete' : required.every(function (check) { return checks[check.id] === 'passed'; })
             ? 'passed' : 'incomplete';
     });
@@ -1525,12 +1672,13 @@ globalThis.MAESTRO_LOGIC = (function () {
       && record.findings.filter(function (item) { return item.status === 'open'; })
         .every(function (item) { return round.findingIds.indexOf(item.id) !== -1; });
     var promised = record.promisedWork.some(function (item) { return item.status === 'open'; });
+    var safeguardsPending = record.version === 2 && (!record.scopeBaseline || !freshManifestAudit(record, (state.requirements || []).map(function (item) { return item.id; })));
     var g4 = failedIds.length ? 'failed'
-      : Object.keys(requirementResults).length === 0 || incompleteIds.length || !roundCurrent || promised
+      : Object.keys(requirementResults).length === 0 || incompleteIds.length || !roundCurrent || promised || safeguardsPending
         ? 'pending' : 'passed';
     return { legacy: false, lifecycle: state.lifecycle || 'active', outcome: state.outcome,
       g4: g4, failedIds: failedIds, incompleteIds: incompleteIds,
-      requirementResults: requirementResults, obligationResults: obligationResults,
+      checkResults: checks, requirementResults: requirementResults, obligationResults: obligationResults,
       currentRoundId: roundCurrent ? round.id : undefined,
       verificationEstablished: state.lifecycle === 'closed' && state.outcome === 'completed' && g4 === 'passed' };
   }
@@ -2747,6 +2895,8 @@ globalThis.MAESTRO_LOGIC = (function () {
     testsOf: testsOf,
     contractNotice: contractNotice,
     verificationOf: verificationOf,
+    scopeProgressOf: function (state) { return scopeProgressOf(state, verificationOf(state)); },
+    textDigest: textDigest,
     runNotice: runNotice,
     formatGap: formatGap,
     longestSilence: longestSilence,
@@ -3309,7 +3459,6 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     var counts = L.countRequirements(state.requirements);
     if (counts.total === 0) {
       empty(host, T.UI.noRequirements);
-      return;
     }
 
     L.REQUIREMENT_ORDER.forEach(function (status) {
@@ -3318,6 +3467,8 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       put(row, 'span', counts[status], 'count');
     });
     put(host, 'p', T.UI.requirementsTotal(counts.total), 'total');
+    try { T.UI.scopeRows(L.scopeProgressOf(state)).forEach(function (line) { put(host, 'p', line, 'total'); }); }
+    catch (error) { put(host, 'p', L.runNotice(state, lang), 'total'); }
     if (state.contractVersion >= 4) {
       try { put(host, 'p', T.UI.verificationRows(L.verificationOf(state)), 'total'); }
       catch (error) { put(host, 'p', L.runNotice(state, lang), 'total'); }

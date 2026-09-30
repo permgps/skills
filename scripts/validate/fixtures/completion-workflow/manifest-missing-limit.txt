@@ -1,0 +1,2 @@
+R01: Save entries locally.
+R02: Saved entries remain available after restarting.

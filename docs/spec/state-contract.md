@@ -27,14 +27,14 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason? }` | manifest | dashboard |
 | `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
-| `lifecycle` | `active` \| `closed` in contract 4 | preflight | dashboard |
+| `lifecycle` | `active` \| `closed` in contracts 4–5 | preflight | dashboard |
 | `outcome` | `completed` \| `closed_with_exceptions` \| `stopped_incomplete`, only when closed | acceptance | dashboard |
 | `stopReason` | string, required for `stopped_incomplete` | acceptance | dashboard |
-| `verification` | versioned verification index, required in contract 4 | preflight | dashboard |
+| `verification` | versioned verification index, required in contracts 4–5 | preflight | dashboard |
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
 | `tests` | `{ passed, failed }` | build | dashboard |
-| `finishedAt` | ISO 8601 closure timestamp, only when closed in contract 4 | acceptance | dashboard |
+| `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–5 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
 
 **`language` is the second such dial, and it is here for the same reason.** The
@@ -308,6 +308,19 @@ Both are settled here, and this document is where they are settled: any
 illustration of the state elsewhere shows the shape, not the whole field list.
 `scripts/validate/state-matches-spec.ts` checks this document against
 `scripts/state/contract.ts` — never against an illustration.
+
+## Version 5 Extension
+
+Contract 5 requires verification version 2, including `manifestDigest`,
+`sourceSnapshots`, `sourceClauses`, `manifestAudits`, `scopeMappings`, `journeys`,
+and `negativeControls`. `scopeBaseline` is created at initial agreement and
+then frozen. Exact nested fields, ownership, ID formats, digest/span rules and
+missing-capability outcomes are specified in
+[verification.md](verification.md#completion-extension-verification-2).
+Contract 4 continues to use verification 1 with its historical completion rules.
+Versions 1–3 keep their historical fields. New safeguards remain unestablished
+until explicitly reconstructed from actual inputs and independent returns.
+No version conversion invents an original source, agreement or audit.
 
 ## Versioning
 

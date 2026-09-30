@@ -14,6 +14,12 @@ procedure, in that phase's order — the additions block of `brief.md` first, th
 the run state, then the plan — and you stop handing out work in the files it
 changes until that has happened.
 
+<!-- maestro:codex:dispatch -->
+On Codex CLI or app, open [the native runtime recipe](../references/codex.md)
+before each independent role dispatch in this phase. Use a fresh native child,
+the full role prompt and only this role's allowed inputs; observe its actual
+final return before importing results. The recipe is coordinator-only.
+
 ## Steps
 
 ### 1. Read `tasks/` and `interfaces.md`
@@ -82,6 +88,12 @@ phase spends the answer.
 Give the executor its task file and `interfaces.md`, briefed by
 [`../prompts/executor.md`](../prompts/executor.md). **Nothing else** — not
 `spec.md`, not the манифест, not the other task files.
+
+Name the absolute owned workspace as operational metadata, including when the
+wave has one task and no worktree. Require the executor to verify it before any
+write and set it explicitly on every shell call. Parent shell `cwd` changes do
+not establish a child's default directory. Assign a capture location under that
+workspace; never accept a result captured in another project as its evidence.
 
 Set the таск to `running` in the run state at the moment you hand it over, and
 write the state then: at the transition, never on a timer.
@@ -254,3 +266,24 @@ not the бриф.
 | `.maestro/state.js` | every таск `review`, or `repair` where a recorded divergence sent it back; `currentStage` moved on |
 
 Then read the review phase file.
+
+## Execute Journeys And Selected Controls
+
+Entry: integrated reviewed prerequisites and complete verification-only brief.
+Open [verification-procedures.md](../references/verification-procedures.md).
+1. Dispatch the task with its full relevant journey/control procedure and no
+   unrelated specification. It returns captures/results; you do not execute
+   project code yourself or author its observations.
+2. Import actual journey observations into ordinary executions. Require every
+   ordered assertion and current fingerprint. Missing result stays not_run.
+3. Import control clean/mutated/restored returns separately. Compare unchanged
+   oracle, isolated identity and main before/after identity; seal immutable
+   captures under control-run IDs. Append superseding NC outcome, never a
+   production execution for the intentionally broken copy.
+4. A missed defect opens check-quality finding to check owner; unavailable tool
+   leaves selected control incomplete. Preserve unrelated actual passes.
+5. Cleanup only owned disposable servers/data. Route code/readiness failure to
+   repair and fresh review; review never accepts a repair's own assertion alone.
+Valid: restored pass and unchanged main input hashes. Invalid: oracle/mask
+changed to accommodate a defect, or sandbox pass reported as real integration.
+Output: sealed evidence and actual results; next action review then acceptance.

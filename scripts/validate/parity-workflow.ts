@@ -5,7 +5,7 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { cp, mkdir, mkdtemp, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, readdir, realpath, stat, writeFile, symlink } from 'node:fs/promises';
 import { tmpdir, hostname, homedir } from 'node:os';
 import path from 'node:path';
 
@@ -13,15 +13,18 @@ import { parseStateSource, readState } from '../state/read.ts';
 import type { RunState } from '../state/contract.ts';
 import { deriveVerification } from '../state/verification.ts';
 import { createLogger } from '../shared/log.ts';
+import { declaredInputs } from './gate-readers.ts';
 import { browserExecutable, probeWorkflowPage, type WorkflowPageProbe } from './parity-browser.ts';
 
 const log = createLogger('parity-workflow');
 
 const fixtureRoot = path.join(import.meta.dirname, 'fixtures', 'parity-workflow');
 const bundleRoot = path.resolve(import.meta.dirname, '..', '..', 'skills', 'maestro');
-const REQUEST = 'Clone the existing interface in legacy/ into src/. Preserve its visible content and behavior. Treat legacy/ as the authoritative source. Do not modify legacy/. Use the copied Maestro skill and report what was actually verified.';
-export const workflowAgentPrompt = (request: string): string =>
-  `${request}\n\nExecute skills/maestro/SKILL.md in this target.`;
+const REQUEST = 'Clone the existing interface in legacy/ into src/. Preserve its visible content and behavior. Treat legacy/ as the authoritative source. Do not modify legacy/. Use Maestro and report what was actually verified.';
+export type WorkflowEntryMode = 'direct' | 'installed-copy' | 'installed-link';
+export const workflowAgentPrompt = (request: string, entryMode: WorkflowEntryMode = 'direct'): string =>
+  entryMode === 'direct' ? `${request}\n\nExecute skills/maestro/SKILL.md in this target.`
+    : `$maestro ${request}`;
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 const codexVersion = (): string => {
   try { return execFileSync('codex', ['--version'], { encoding: 'utf8' }).trim(); }
@@ -64,19 +67,40 @@ export function collectDispatches(events: string): DispatchRecord[] {
 
 export function dispatchFindings(dispatches: DispatchRecord[]): string[] {
   const findings: string[] = [];
-  const rawReader = (item: DispatchRecord): boolean => item.agentPath !== undefined
-    ? item.completed === true && item.forkTurns === 'none'
-      && /reference/i.test(item.agentPath)
-      && (item.observedCalls ?? []).some(call => /legacy\//i.test(call))
-    : /legacy\//i.test(item.prompt)
-      && /raw.reference|reference.discovery|reference.reader|\bG2\b/i.test(item.prompt);
-  const acceptanceReader = (item: DispatchRecord): boolean => item.agentPath !== undefined
-    ? item.completed === true && item.forkTurns === 'none'
-      && (item.observedCalls ?? []).some(call => /manifest\.md/i.test(call))
-      && (item.observedCalls ?? []).some(call => /legacy\//i.test(call))
-      && (item.observedCalls ?? []).some(call => /src\//i.test(call))
-    : /manifest\.md/i.test(item.prompt) && /legacy\//i.test(item.prompt)
-      && /acceptance|G4/i.test(item.prompt);
+  const fresh = (item: DispatchRecord): boolean => item.completed === true
+    && item.forkTurns === 'none' && Boolean(item.senderThreadId)
+    && item.receiverThreadIds.length > 0
+    && item.receiverThreadIds.every(id => id !== '' && id !== item.senderThreadId);
+  const visible = (item: DispatchRecord): boolean => Boolean(item.prompt)
+    && !item.prompt.includes('[encrypted') && item.promptDigest === sha256(item.prompt);
+  const rawReader = (item: DispatchRecord): boolean => fresh(item)
+    && /reference/i.test(item.agentPath ?? item.prompt)
+    && (item.observedCalls ?? []).some(call => /legacy\//i.test(call));
+  const acceptanceReader = (item: DispatchRecord): boolean => fresh(item)
+    && /acceptance|G4/i.test(item.agentPath ?? item.prompt)
+    && (item.observedCalls ?? []).some(call => /manifest\.md/i.test(call))
+    && (item.observedCalls ?? []).some(call => /legacy\//i.test(call))
+    && (item.observedCalls ?? []).some(call => /src\//i.test(call));
+  for (const item of dispatches.filter(rawReader)) {
+    if (!visible(item)) {
+      findings.push('raw-reference input envelope is unavailable');
+      log.warn('dispatch', 'raw reader input envelope is unavailable', { childIds: item.receiverThreadIds });
+    }
+  }
+  for (const item of dispatches.filter(acceptanceReader)) {
+    if (!visible(item)) {
+      findings.push('blind acceptance input envelope is unavailable');
+      log.warn('dispatch', 'blind reader input envelope is unavailable', { childIds: item.receiverThreadIds });
+      continue;
+    }
+    const inputs = declaredInputs(item.prompt, 'Handoff Inputs');
+    if (!inputs?.length) findings.push('blind acceptance bounded input declaration is unavailable');
+    const withheld = /(?:spec\.md|plan\.md|tasks\/|review[^/]*\.md|brief\.md|SKILL\.md|phases\/)/i;
+    if ((inputs ?? []).some(input => withheld.test(input))
+      || (item.observedCalls ?? []).some(call => withheld.test(call))) {
+      findings.push('blind acceptance received or read a withheld artifact');
+    }
+  }
   if (!dispatches.some(rawReader)) {
     findings.push('no actual raw-reference reader dispatch was recorded');
   }
@@ -84,6 +108,25 @@ export function dispatchFindings(dispatches: DispatchRecord[]): string[] {
     findings.push('no actual blind acceptance dispatch was recorded');
   }
   return findings;
+}
+
+/** A command observation, not a claim that the client selector was visible. */
+export function installedDiscoveryFindings(events: string, installedRoot: string): string[] {
+  // Explicit skill invocation may inject SKILL.md before the first tool call.
+  // An installed entry-phase read still observes that routing, not a UI selector.
+  const candidates = ['SKILL.md', 'phases/0-dials.md', 'phases/0-preflight.md'].flatMap(file =>
+    [`.agents/skills/maestro/${file}`, `${installedRoot}/${file}`]);
+  for (const line of events.split('\n')) {
+    let event: { type?: string; item?: Record<string, unknown> };
+    try { event = JSON.parse(line) as typeof event; } catch { continue; }
+    const item = event.item;
+    if (event.type !== 'item.completed' || item?.type !== 'command_execution'
+      || item.status !== 'completed' || item.exit_code !== 0 || typeof item.command !== 'string') continue;
+    const command = item.command;
+    if (/\b(cat|sed|head)\b/.test(command) && candidates.some(file => command.includes(file))) return [];
+  }
+  log.warn('discovery', 'installed skill read observation unavailable', { installedRoot });
+  return ['installed Maestro discovery read was not observed'];
 }
 
 interface RolloutEvent { type?: string; payload?: Record<string, any> }
@@ -129,13 +172,16 @@ export async function collectRolloutDispatches(threadId: string, startedAt: numb
     && event.payload.namespace === 'collaboration'
     && event.payload.name === 'spawn_agent');
   if (calls.length === 0) return [];
-  const callByPath = new Map<string, { digest: string; forkTurns: string }>();
+  const callByPath = new Map<string, { prompt: string; digest: string; forkTurns: string }>();
   for (const call of calls) {
     const argumentsText = String(call.payload?.arguments ?? '');
     try {
-      const args = JSON.parse(argumentsText) as { task_name?: string; fork_turns?: string };
+      const args = JSON.parse(argumentsText) as { task_name?: string; fork_turns?: string; message?: unknown };
+      // Saved handoffs can be encrypted strings as well as encrypted objects.
+      const plaintext = typeof args.message === 'string' && !/^gAAAAA[A-Za-z0-9_-]{64,}={0,2}$/.test(args.message);
+      const prompt = plaintext ? args.message as string : '[encrypted in Codex rollout]';
       if (args.task_name) callByPath.set(`/root/${args.task_name}`, {
-        digest: sha256(argumentsText), forkTurns: args.fork_turns ?? 'all',
+        prompt, digest: sha256(plaintext ? prompt : argumentsText), forkTurns: args.fork_turns ?? 'all',
       });
     } catch { /* An unparseable call cannot establish a bounded handoff. */ }
   }
@@ -156,7 +202,7 @@ export async function collectRolloutDispatches(threadId: string, startedAt: numb
       && event.payload.item?.type === 'AgentMessage'
       && event.payload.item?.phase === 'final_answer');
     dispatches.push({
-      tool: 'spawn_agent', prompt: '[encrypted in Codex rollout]', promptDigest: call.digest,
+      tool: 'spawn_agent', prompt: call.prompt, promptDigest: call.digest,
       senderThreadId: threadId, receiverThreadIds: [String(meta.id ?? '')],
       agentPath, forkTurns: call.forkTurns, completed, observedCalls,
     });
@@ -177,15 +223,22 @@ export interface WorkflowGrade {
   reasons: string[];
 }
 
-export async function prepareWorkflowTarget(kind: 'broken' | 'fixed', root?: string): Promise<{
+export async function prepareWorkflowTarget(kind: 'broken' | 'fixed', root?: string, entryMode: WorkflowEntryMode = 'direct'): Promise<{
   target: string; request: string; inputDigest: string;
 }> {
   const target = root ?? await mkdtemp(path.join(tmpdir(), `maestro-workflow-${kind}-`));
-  await mkdir(path.join(target, 'skills'), { recursive: true });
+  const installed = path.join(target, entryMode === 'direct' ? 'skills/maestro' : '.agents/skills/maestro');
+  await mkdir(path.dirname(installed), { recursive: true });
   await mkdir(path.join(target, 'legacy'), { recursive: true });
   await mkdir(path.join(target, 'src'), { recursive: true });
   await mkdir(path.join(target, '.maestro'), { recursive: true });
-  await cp(bundleRoot, path.join(target, 'skills', 'maestro'), { recursive: true });
+  if (entryMode === 'installed-link') {
+    await symlink(path.relative(await realpath(path.dirname(installed)), await realpath(bundleRoot)), installed);
+  } else {
+    await cp(bundleRoot, installed, { recursive: true,
+      filter: source => !source.split(path.sep).includes('__pycache__') });
+  }
+  log.info('prepare', 'workflow bundle installed', { target, entryMode, installed });
   const reference = await readFile(path.join(fixtureRoot, 'legacy', 'index.html'), 'utf8');
   const starter = await readFile(path.join(fixtureRoot, kind === 'fixed' ? 'legacy' : 'starter', 'index.html'), 'utf8');
   await writeFile(path.join(target, 'legacy', 'index.html'), reference);
@@ -294,14 +347,25 @@ export async function gradeWorkflowTarget(
   return grade;
 }
 
-async function runAgent(target: string, request: string, timeoutMs: number): Promise<{
+/** The inherited scenarios can use the same explicitly supplied neutral adapter. */
+async function runNeutralAgent(target: string, request: string, filename: string, entryMode: WorkflowEntryMode = 'direct'): ReturnType<typeof runAgent> {
+  const { adapterConfig, invokeAdapter } = await import('./completion-workflow.ts');
+  const config = adapterConfig(JSON.parse(await readFile(path.resolve(filename), 'utf8')));
+  const output = path.join(path.dirname(target), `${path.basename(target)}-adapter`);
+  const result = await invokeAdapter(config, { target, prompt: workflowAgentPrompt(request, entryMode), turns: [] }, output);
+  return { ...result, eventLog: path.join(output, 'events.jsonl'), finalMessage: path.join(output, 'final.txt'),
+    elapsedMs: Date.now() - result.startedAt, threadId: '', model: result.observedModel,
+    finalText: result.finalText, eventDigest: result.eventDigest };
+}
+
+async function runAgent(target: string, request: string, timeoutMs: number, entryMode: WorkflowEntryMode = 'direct'): Promise<{
   exitCode: number; eventLog: string; eventDigest: string; finalMessage: string;
   finalText: string; timedOut: boolean; elapsedMs: number; startedAt: number;
   threadId: string; model: string | null;
 }> {
   const eventLog = path.join(target, 'agent-events.jsonl');
   const finalMessage = path.join(target, 'agent-final.txt');
-  const prompt = workflowAgentPrompt(request);
+  const prompt = workflowAgentPrompt(request, entryMode);
   const browser = browserExecutable();
   log.info('agent', '[FIX] noninteractive evaluation browser configured', { target, browser });
   const child = spawn('codex', [
@@ -347,7 +411,7 @@ async function runAgent(target: string, request: string, timeoutMs: number): Pro
     finalText, timedOut, elapsedMs, startedAt, threadId, model };
 }
 
-async function stopTargetViewer(target: string): Promise<void> {
+export async function stopTargetViewer(target: string): Promise<void> {
   const servedDirectory = path.join(target, '.maestro');
   try {
     const record = JSON.parse(await readFile(path.join(servedDirectory, 'serve.json'), 'utf8')) as { pid?: unknown };
@@ -369,10 +433,13 @@ async function stopTargetViewer(target: string): Promise<void> {
 async function gradeExisting(outputDir: string): Promise<number> {
   const source = JSON.parse(await readFile(path.join(outputDir, 'results.json'), 'utf8')) as {
     scenarios?: Record<string, { target?: string; agent?: { eventLog?: string } }>;
+    entryMode?: WorkflowEntryMode;
   };
   const results: Record<string, unknown> = { source: path.join(outputDir, 'results.json'), scenarios: {} };
   let unavailable = false;
-  for (const kind of ['broken', 'fixed'] as const) {
+  const kinds = (['broken', 'fixed'] as const).filter(kind => source.scenarios?.[kind]);
+  if (kinds.length === 0) return 2;
+  for (const kind of kinds) {
     const prior = source.scenarios?.[kind];
     const target = prior?.target;
     const eventLog = prior?.agent?.eventLog;
@@ -407,6 +474,11 @@ async function gradeExisting(outputDir: string): Promise<number> {
       [item.receiverThreadIds.join(','), item])).values()];
     const grade = await gradeWorkflowTarget(target, kind, path.join(outputDir, 'oracle', kind, 'continued'));
     grade.reasons.push(...dispatchFindings(uniqueDispatches));
+    if (source.entryMode && source.entryMode !== 'direct') {
+      const installed = await realpath(path.join(target, '.agents/skills/maestro'));
+      const events = (await Promise.all(eventFiles.map(file => readFile(path.join(target, file), 'utf8')))).join('\n');
+      grade.reasons.push(...installedDiscoveryFindings(events, installed));
+    }
     const finalFiles = (await readdir(target)).filter(name =>
       name.startsWith('agent-') && name.endsWith('-final.txt'));
     const newestFirst = await Promise.all(finalFiles.map(async name => ({
@@ -445,6 +517,25 @@ async function main(): Promise<number> {
     process.stderr.write('parity-workflow: use --prepare, --run, or --grade-existing\n');
     return 2;
   }
+  const entryIndex = process.argv.indexOf('--entry');
+  const entry = entryIndex >= 0 ? process.argv[entryIndex + 1] : 'direct';
+  if (entry !== 'direct' && entry !== 'installed-copy' && entry !== 'installed-link') {
+    process.stderr.write('parity-workflow: --entry requires direct, installed-copy, or installed-link\n');
+    return 2;
+  }
+  const scenarioIndex = process.argv.indexOf('--scenario');
+  const selected = scenarioIndex >= 0 ? process.argv[scenarioIndex + 1] : 'all';
+  if (selected !== 'all' && selected !== 'fixed' && selected !== 'broken') {
+    process.stderr.write('parity-workflow: --scenario requires all, fixed, or broken\n');
+    return 2;
+  }
+  const kinds: Array<'broken' | 'fixed'> = selected === 'all' ? ['broken', 'fixed'] : [selected];
+  const adapterIndex = process.argv.indexOf('--adapter');
+  const adapterFile = adapterIndex >= 0 ? process.argv[adapterIndex + 1] : process.env.MAESTRO_EVAL_ADAPTER;
+  if (adapterIndex >= 0 && (!adapterFile || adapterFile.startsWith('--'))) {
+    process.stderr.write('parity-workflow: --adapter requires a configuration file\n');
+    return 2;
+  }
   const outputDir = await mkdtemp(path.join(tmpdir(), 'maestro-parity-workflow-'));
   const timeoutMs = Number(process.env.MAESTRO_EVAL_TIMEOUT_MS ?? '900000');
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1_000) {
@@ -452,15 +543,16 @@ async function main(): Promise<number> {
     return 2;
   }
   const results: Record<string, unknown> = {
-    host: hostname(), agent: mode === '--run' ? 'codex CLI current configuration' : 'not run',
-    agentVersion: mode === '--run' ? codexVersion() : 'not run',
+    host: hostname(), agent: mode === '--run'
+      ? (adapterFile ? 'caller-supplied adapter' : 'codex CLI current configuration') : 'not run',
+    agentVersion: mode === '--run' && !adapterFile ? codexVersion() : 'not observed',
     model: 'not exposed by CLI',
     declaredModel: process.env.MAESTRO_EVAL_MODEL ?? null,
     alternateConfiguration: 'unavailable: no authorized alternate configuration was supplied',
-    outputDir, timeoutMs, scenarios: {},
+    outputDir, timeoutMs, entryMode: entry, client: adapterFile ? 'not established by adapter' : 'CLI', scenarios: {},
   };
-  const scenarios = await Promise.all((['broken', 'fixed'] as const).map(async kind => {
-    const prepared = await prepareWorkflowTarget(kind, path.join(outputDir, kind));
+  const scenarios = await Promise.all(kinds.map(async kind => {
+    const prepared = await prepareWorkflowTarget(kind, path.join(outputDir, kind), entry);
     const scenario: Record<string, unknown> = {
       target: prepared.target, inputDigest: prepared.inputDigest, request: prepared.request,
     };
@@ -481,17 +573,34 @@ async function main(): Promise<number> {
         scenario.initialOracleUnavailable = error instanceof Error ? error.message : String(error);
       }
       try {
-        const agent = await runAgent(prepared.target, prepared.request, timeoutMs);
+        const agent = adapterFile ? await runNeutralAgent(prepared.target, prepared.request, adapterFile, entry)
+          : await runAgent(prepared.target, prepared.request, timeoutMs, entry);
         scenario.agent = agent;
         const dispatches = [
           ...collectDispatches(await readFile(agent.eventLog, 'utf8')),
           ...await collectRolloutDispatches(agent.threadId, agent.startedAt),
         ];
+        if (adapterFile) {
+          const { normalizeTranscript, freshReturns } = await import('./completion-workflow.ts');
+          const normalized = normalizeTranscript(await readFile(agent.eventLog, 'utf8'));
+          for (const dispatch of freshReturns(normalized)) {
+            dispatches.push({ tool: 'caller-adapter', prompt: dispatch.prompt ?? '',
+              promptDigest: dispatch.promptDigest ?? '', senderThreadId: dispatch.parentContextId!,
+              receiverThreadIds: [dispatch.childContextId!], agentPath: dispatch.role ?? '',
+              forkTurns: dispatch.forkTurns ?? '', completed: true,
+              observedCalls: normalized.filter(item => item.type === 'read' && item.contextId === dispatch.childContextId)
+                .map(item => item.path ?? '') });
+          }
+          scenario.adapterFile = path.resolve(adapterFile);
+        }
         scenario.dispatches = dispatches;
+        const discovery = entry === 'direct' ? [] : installedDiscoveryFindings(
+          await readFile(agent.eventLog, 'utf8'), await realpath(path.join(prepared.target, '.agents/skills/maestro')));
+        scenario.discoveryFindings = discovery;
         if (agent.exitCode === 0) {
           const grade = await gradeWorkflowTarget(prepared.target, kind,
             path.join(outputDir, 'oracle', kind, 'final'));
-          grade.reasons.push(...dispatchFindings(dispatches));
+          grade.reasons.push(...discovery, ...dispatchFindings(dispatches));
           scenario.grade = grade;
         }
         else scenario.unavailable = agent.timedOut
@@ -518,7 +627,7 @@ async function main(): Promise<number> {
     item.unavailable || item.initialOracleUnavailable)) return 2;
   if (Object.values(results.scenarios as Record<string, any>).some(item => item.initialOracleFailure)) return 1;
   const grades = Object.values(results.scenarios as Record<string, any>).map(item => item.grade as WorkflowGrade | undefined);
-  return grades.length === 2 && grades.every(item => item?.stateReadable && item.reasons.length === 0) ? 0 : 1;
+  return grades.length === kinds.length && grades.every(item => item?.stateReadable && item.reasons.length === 0) ? 0 : 1;
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(import.meta.filename)) {

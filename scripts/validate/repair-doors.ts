@@ -71,7 +71,8 @@ export async function checkRepairDoors(options: CheckOptions = {}): Promise<Viol
     log.error(check, message, { file, line });
   };
 
-  const declared = findTable(parseTables(await readFile(specFile, 'utf8')), ['Door', 'Opened by']);
+  const specTables = parseTables(await readFile(specFile, 'utf8'));
+  const declared = findTable(specTables, ['Door', 'Opened by']);
   if (!declared) {
     add('doors', specFile, 0, 'no table with columns Door and Opened by');
     return violations;
@@ -94,7 +95,19 @@ export async function checkRepairDoors(options: CheckOptions = {}): Promise<Viol
 
   // --- the bundle's repair phase lists the same doors -----------------------
   const repairPath = path.join(phasesDir, REPAIR_FILE);
-  const repairTable = findTable(parseTables(await readFile(repairPath, 'utf8')), ['Door']);
+  const repairTables = parseTables(await readFile(repairPath, 'utf8'));
+  const repairTable = findTable(repairTables, ['Door']);
+  const requiredInputs = findTable(specTables, ['Door', 'Required inputs']);
+  const suppliedInputs = findTable(repairTables, ['Door', 'Required inputs']);
+  if (requiredInputs) {
+    const supplied = new Map(suppliedInputs?.rows.map(row => [clean(row['Door']), clean(row['Required inputs']).split(',').map(value => value.trim()).sort().join(',')]) ?? []);
+    for (const row of requiredInputs.rows) {
+      const door = clean(row['Door']);
+      const expected = clean(row['Required inputs']).split(',').map(value => value.trim()).sort().join(',');
+      if (!expected || supplied.get(door) !== expected) add('inputs', repairPath, row.__line, `door ${door} must declare its exact required inputs from ${specFile}`);
+    }
+    for (const door of doors.keys()) if (!requiredInputs.rows.some(row => clean(row['Door']) === door)) add('inputs', specFile, 0, `door ${door} has no declared required inputs`);
+  }
   if (!repairTable) {
     add('repair', repairPath, 0, 'no table with a Door column');
   } else {

@@ -2,7 +2,8 @@
 // G4 — the gate after приёмка, and the last one of the прогон.
 //
 // Pass condition, from docs/spec/gates.md: the build is checked against
-// manifest.md with spec.md withheld, and every disagreement is reported.
+// manifest/additions after blind discovery, with every current required check
+// passing and complete coverage; failed/incomplete evidence stays failed/pending.
 //
 // The withholding cannot be checked from here. What a script reads is the state
 // a прогон left behind, and no field in it records what a reader was handed. So

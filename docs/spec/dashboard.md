@@ -9,7 +9,7 @@ never reads `manifest.md`, `spec.md`, a task file, or any path in the
 repository. A view that reaches into artifacts becomes a second source of truth,
 and the second one is silently wrong.
 
-Contract-4 verification records and their validation envelope arrive through
+Contract-4/5 verification records and their validation envelope arrive through
 that same snapshot. The page derives requirement results and run outcome from
 them; it does not open evidence files or treat `finishedAt`, completed tasks,
 or a finished acceptance stage as proof of conformance. An invalid candidate
@@ -295,7 +295,7 @@ same number, which is the whole run's elapsed time wearing a stage's label.
 - Re-reads `state.js` on its own on a short interval. It never waits for the
   orchestrator to tell it to refresh, because the orchestrator is often busy for
   minutes at a time.
-- Survives the run: after contract-4 `lifecycle: closed` and `finishedAt` it
+- Survives the run: after contract-4/5 `lifecycle: closed` and `finishedAt` it
   stays a readable record of what happened, with every clock stopped. Earlier
   versions remain historical and unverified.
 
@@ -404,3 +404,23 @@ who has just been told the thing they were watching is gone.
   page, a coverage report, a built page, a log — is put in front of the user by
   the orchestrator or by anything it launches. The panel is what the run owns on
   their screen, and it owns nothing else there.
+
+## Original And Current Scope
+
+Render the pure scope projection once in the requirements region. Original scope
+uses the frozen baseline denominator; current scope uses committed requirements
+excluding authorized deferrals/withdrawals. For twenty original requirements with
+two deferred, show original `18/20` and current `18/18`. A relaxed target counts
+toward original scope only with fresh checks declared compatible with the full
+frozen expectation. Additions and splits never multiply original requirements.
+
+Show additions, deferred, dropped, changed, and accepted-exception counts beside
+those measurements. Use the same ordinary-language labels in normal/plain
+registers, in both Russian and English. Missing baseline reads “not established”;
+a zero denominator reads “not applicable”, never 100%. Historical v4 retains its
+original conformance verdict and marks completion safeguards unestablished.
+
+For v5, a missing fresh source audit/agreement makes G4 pending. Required journey
+observations and selected control results affect coverage; a production pass
+cannot mask omitted restart evidence or unavailable controls. Completed tasks or
+stage clocks remain activity measures and cannot replace verified scope.

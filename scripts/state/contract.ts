@@ -21,12 +21,13 @@
  * against. The dashboard has no handling to add because it never read the field
  * under either name, but it does carry its own copy of this number, and
  * `scripts/validate/state-matches-spec.ts` holds the two together.
+ * Version 5 requires source audit, frozen scope and completion safeguards.
  * Version 4 changes completion semantics: lifecycle, outcome and a versioned
  * verification index are required for a new state. Earlier states remain
  * readable without inferred verification; validateState enforces the version
  * boundary rather than narrowing this reader-facing interface.
  */
-export const CONTRACT_VERSION = 4;
+export const CONTRACT_VERSION = 5;
 
 /** The stage ids from docs/spec/phases.md, in run order. */
 export type StageId =
@@ -321,7 +322,7 @@ export interface RepairLimits {
 }
 
 /** The single authoritative verification index, embedded in the state snapshot. */
-export interface VerificationRecord {
+export interface VerificationRecordV1 {
   version: 1;
   targetRevision: number;
   acceptanceInputDigest: string;
@@ -339,6 +340,141 @@ export interface VerificationRecord {
   repairLimits: RepairLimits;
   repairAttempts: RepairAttempt[];
 }
+
+/** Completion safeguards use exact original-language anchors, never translations. */
+export interface SourceSnapshot {
+  id: string;
+  origin: 'initial' | 'addition';
+  text: string;
+  sha256: string;
+  capturedAt: string;
+  targetRevision: number;
+}
+
+export interface SourceClause {
+  id: string;
+  sourceId: string;
+  start: number;
+  end: number;
+  quote: string;
+  classification: 'requirement' | 'context';
+  requirementIds: string[];
+  exclusionReason?: string;
+}
+
+export interface ManifestAudit {
+  id: string;
+  sourceIds: string[];
+  sourceDigests: Record<string, string>;
+  manifestDigest: string;
+  targetRevision: number;
+  clauseIds: string[];
+  findings: string[];
+  result: 'passed' | 'failed' | 'incomplete';
+  dispatchId?: string;
+  readerId?: string;
+  returnId?: string;
+  auditedAt: string;
+  limitation?: string;
+}
+
+export interface ScopeBaseline {
+  id: string;
+  sourceIds: string[];
+  manifestDigest: string;
+  auditId: string;
+  agreementId: string;
+  agreedAt: string;
+  requirementIds: string[];
+  expectations: Array<{ requirementId: string; clauseIds: string[]; text: string; checkIds: string[] }>;
+}
+
+export interface ScopeMapping {
+  id: string;
+  decisionId?: string;
+  originalRequirementId: string;
+  currentRequirementIds: string[];
+  relation: 'unchanged' | 'changed' | 'split' | 'withdrawn';
+  originalCheckIds: string[];
+  targetRevision: number;
+}
+
+export interface VerificationJourney {
+  id: string;
+  requirementIds: string[];
+  obligationIds: string[];
+  checkIds: string[];
+  fixture: string;
+  variantIds: string[];
+  steps: Array<{ action: string; assertion: string }>;
+  integrationDependencies: string[];
+  executionTaskId: string;
+  targetRevision: number;
+  reset: string;
+  cleanup: string;
+}
+
+export interface ControlRun {
+  id: string;
+  phase: 'clean' | 'mutated' | 'restored';
+  result: 'passed' | 'failed';
+  oracleDigest: string;
+  assertions: CheckAssertion[];
+  evidenceIds: string[];
+  executedAt: string;
+  executor: string;
+  invocation: string;
+  fingerprint: EvidenceFingerprint;
+}
+
+export interface NegativeControl {
+  id: string;
+  checkId: string;
+  targetRevision: number;
+  selectionBasis: 'user_condition' | 'acceptance_critical' | 'severe_defect';
+  applicability: string;
+  defect: string;
+  expectedAssertion: string;
+  isolationFingerprint: string;
+  mainFingerprint: EvidenceFingerprint;
+  oracleDigest: string;
+  result: 'not_run' | 'passed' | 'failed' | 'unavailable';
+  runs: ControlRun[];
+  findingId?: string;
+  limitation?: string;
+  supersedes?: string;
+}
+
+export interface RepairAttemptV2 extends RepairAttempt {
+  rootFindingId: string;
+  predecessorId?: string;
+  hypothesis: string;
+  diagnosis: string;
+  evidenceIds: string[];
+  strategy: 'minimal_reproduction' | 'interface_verification' | 'dependency_correction'
+    | 'implementation_change' | 'independent_executor';
+  action: string;
+  followUpCheckIds: string[];
+  diagnosisDispatchId?: string;
+  diagnosisReturnId?: string;
+  novelty?: 'accepted' | 'rejected' | 'unavailable';
+}
+
+/** Version dispatch preserves historical verification-1 outcomes verbatim. */
+export interface VerificationRecordV2 extends Omit<VerificationRecordV1, 'version' | 'repairAttempts'> {
+  version: 2;
+  manifestDigest: string;
+  sourceSnapshots: SourceSnapshot[];
+  sourceClauses: SourceClause[];
+  manifestAudits: ManifestAudit[];
+  scopeBaseline?: ScopeBaseline;
+  scopeMappings: ScopeMapping[];
+  journeys: VerificationJourney[];
+  negativeControls: NegativeControl[];
+  repairAttempts: RepairAttemptV2[];
+}
+
+export type VerificationRecord = VerificationRecordV1 | VerificationRecordV2;
 
 /** Which dial moved, and at which phase boundary it took effect. */
 export interface DialChange {

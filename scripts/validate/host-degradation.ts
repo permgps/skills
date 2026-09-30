@@ -92,6 +92,59 @@ export interface CheckOptions {
  */
 export const readsAsStop = (cost: string): boolean => /^\**\s*stops?\b/i.test(cost.trim());
 
+/** Declared Codex mechanics only; live isolation remains the evaluator's job. */
+export async function checkCodexRuntime(bundleDir: string): Promise<Violation[]> {
+  const violations: Violation[] = [];
+  const add = (file: string, message: string): void => {
+    violations.push({ check: 'codex-runtime', file, line: 0, message });
+    log.error('codex-runtime', message, { file });
+  };
+  const read = (file: string): Promise<string> => readFile(path.join(bundleDir, file), 'utf8');
+  const recipeFile = 'references/codex.md';
+  const recipe = await read(recipeFile);
+  const rules = findTable(parseTables(recipe), ['Rule', 'Value']);
+  const expected: Record<string, string> = {
+    discovery: '.agents/skills/maestro', delegation: 'native-explicit', context: 'fresh',
+    fork_turns: 'none', inputs: 'role-prompt-and-allowed-artifacts', returns: 'observed-final-by-child-id',
+    workspace: 'absolute-explicit-cwd', 'editing-wave': 'one-without-concurrency-or-worktrees',
+    'state-writer': 'coordinator-sync.py', evidence: 'opaque-remains-unverified', retries: '2',
+  };
+  for (const [rule, value] of Object.entries(expected)) {
+    const rows = rules?.rows.filter(row => clean(row['Rule']) === rule) ?? [];
+    if (rows.length !== 1 || clean(rows[0]?.['Value']) !== value) {
+      add(recipeFile, `declare exactly one runtime rule ${rule} with value ${value}`);
+    }
+  }
+  const sites = ['0-preflight', '1-manifest', '3-spec', '4-plan', '5-build', '6-review',
+    '7-acceptance', '7-polish', '8-repair'];
+  for (const site of sites) {
+    const file = `phases/${site}.md`;
+    const body = await read(file);
+    const marker = `<!-- maestro:codex:${site === '0-preflight' ? 'preflight' : 'dispatch'} -->`;
+    if (!body.includes(marker) || !/\]\(\.\.\/references\/codex\.md\)/.test(body)) {
+      add(file, 'declare the Codex dispatch marker and demand-loaded recipe link');
+    }
+  }
+  const router = await read('SKILL.md');
+  if (!router.includes('<!-- maestro:delegation:native-explicit -->')) {
+    add('SKILL.md', 'declare explicit native delegation for the independent roles');
+  }
+  if (/\]\(references\/codex\.md\)/.test(router)) {
+    add('SKILL.md', 'keep the runtime recipe demand-loaded from preflight and dispatch phases');
+  }
+  if (!/\]\(codex\.md\)/.test(await read('references/hosts.md'))) {
+    add('references/hosts.md', 'link the Codex recipe from host resolution');
+  }
+  for (const file of await readdir(path.join(bundleDir, 'prompts'))) {
+    if (!file.endsWith('.md')) continue;
+    if (/\]\([^)]*references\/codex\.md\)/.test(await read(`prompts/${file}`))) {
+      add(`prompts/${file}`, 'withhold coordinator-only runtime mechanics from independent prompts');
+    }
+  }
+  log.info('codex-runtime', 'runtime declarations checked', { sites: sites.length, violations: violations.length });
+  return violations;
+}
+
 export async function checkHostDegradation(options: CheckOptions = {}): Promise<Violation[]> {
   const specDir = options.specDir ?? 'docs/spec';
   const bundleDir = options.bundleDir ?? 'skills/maestro';
@@ -103,7 +156,11 @@ export async function checkHostDegradation(options: CheckOptions = {}): Promise<
     log.error(check, message, { file, line });
   };
 
-  const table = findTable(parseTables(await readFile(specFile, 'utf8')), [
+  const spec = await readFile(specFile, 'utf8');
+  if (spec.includes('<!-- maestro:codex:contract -->')) {
+    violations.push(...await checkCodexRuntime(bundleDir));
+  }
+  const table = findTable(parseTables(spec), [
     'Capability',
     'Degrades',
   ]);

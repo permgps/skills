@@ -247,14 +247,13 @@ successfully as one that went well.
 node scripts/gates/check-g1.ts <run-dir>   # after брифинг: every требование has a status
 node scripts/gates/check-g2.ts <run-dir>   # after the spec: none left open
 node scripts/gates/check-g3.ts <run-dir>   # after the plan: the map holds both ways
-node scripts/gates/check-g4.ts <run-dir>   # after приёмка: the disagreements were recorded
+node scripts/gates/check-g4.ts <run-dir>   # after приёмка: current checks and coverage establish G4
 ```
 
-Two of the four have a half no script can reach: the reader at G2 and the blind
-reader at G4 are judged by what they were handed, and no field of the run state
-records that. Those two check what was written down afterwards instead — that a
-verdict exists, that it agrees with the findings under it, and that each finding
-names a требование somebody can act on.
+Independent G1 source audit, G2 intent/reference discovery, and G4 blind discovery
+have a semantic half no mechanical gate can establish. The scripts validate
+records and declared evidence. The shipped helper performs the same structured
+publication checks; actual reader execution remains a separate prerequisite.
 
 These are **not** part of `npm run check`, and no phase file names them. They
 read a прогон's `state.js` — a file this repository never contains — so there is
@@ -270,3 +269,13 @@ Exit codes: `0` the gate passes, `1` it fails with findings, `2` the state could
 not be read at all. The last is kept distinct because an unreadable state is not
 a failed gate — nothing was checked, and reporting it as a failure would send a
 phase back to redo work that was never judged.
+
+## Completion Protocol Structure
+
+Contract-5 completion records are compared with the exact field declarations in
+`verification.md`; the bundled helper and dashboard must declare the same
+version. `npm run bundle` checks entry inputs, numbered actions, output fields,
+missing-capability outcomes, examples, and next actions for eleven owning
+procedures. Existing reader, repair-door, host, and viewer checks preserve their
+handoff boundaries. These structural checks cannot establish source-inventory
+completeness or whether a repair strategy is substantively new.

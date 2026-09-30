@@ -1,9 +1,9 @@
 {
   "name": "maestro-skills",
-  "version": "0.0.4-alpha",
+  "version": "0.0.5-alpha",
   "private": true,
   "type": "module",
-  "description": "Maestro — an orchestrator skill that turns a dictated idea into a verified project",
+  "description": "Maestro \u2014 an orchestrator skill that turns a dictated idea into a verified project",
   "license": "MIT",
   "engines": {
     "node": ">=22.18"
@@ -28,7 +28,9 @@
     "metrics": "node scripts/metrics/measure.ts",
     "parity:browser": "node scripts/validate/parity-browser.ts",
     "parity:workflow": "node scripts/validate/parity-workflow.ts --run",
-    "parity:workflow:prepare": "node scripts/validate/parity-workflow.ts --prepare"
+    "parity:workflow:prepare": "node scripts/validate/parity-workflow.ts --prepare",
+    "completion:workflow": "node scripts/validate/completion-workflow.ts --run",
+    "completion:workflow:prepare": "node scripts/validate/completion-workflow.ts --prepare"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",

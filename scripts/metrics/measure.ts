@@ -26,6 +26,7 @@ import {
   type TaskStatus,
 } from '../state/contract.ts';
 import { readState } from '../state/read.ts';
+import type { ScopeProgress } from '../state/verification.ts';
 import { projectState } from '../state/projection.ts';
 
 const log = createLogger('metrics');
@@ -79,6 +80,7 @@ export interface Measurement {
   lifecycle: 'active' | 'closed' | 'historical';
   outcome: string | null;
   verificationEstablished: boolean;
+  scopeProgress: ScopeProgress;
   conformance: { g4: string; passed: number; failed: number; incomplete: number };
 }
 
@@ -160,6 +162,7 @@ export function measure(state: RunState): Measurement {
     lifecycle: projection.lifecycle,
     outcome: projection.outcome ?? null,
     verificationEstablished: projection.verificationEstablished,
+    scopeProgress: projection.scopeProgress,
     conformance: {
       g4: projection.g4,
       passed: results.filter(result => result === 'passed').length,
@@ -212,6 +215,11 @@ export function render(m: Measurement): string {
   row('  G4', m.conformance.g4);
   row('  requirements', `${m.conformance.passed} passed, ${m.conformance.failed} failed, ${m.conformance.incomplete} incomplete`);
 
+  for (const [name, scope] of Object.entries({ original: m.scopeProgress.original, current: m.scopeProgress.current })) {
+    row(`  ${name} scope`, scope.status === 'established' ? `${scope.passed}/${scope.total}` : scope.status);
+  }
+  row('  exclusions', `${m.scopeProgress.deferredIds.length} deferred, ${m.scopeProgress.droppedIds.length} dropped`);
+  row('  changes', `${m.scopeProgress.addedIds.length} added, ${m.scopeProgress.changedIds.length} changed, ${m.scopeProgress.exceptionDecisionIds.length} exceptions`);
   return `${lines.join('\n')}\n`;
 }
 

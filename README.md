@@ -32,6 +32,18 @@ Add `-s maestro` or `-s scout` to install one. Measured 2026-08-21 against a
 publish-shaped export of this repository — [`docs/install.md`](docs/install.md)
 has that run, the picker, the local-checkout form and their real output.
 
+For **Codex CLI or the Codex app**, install Maestro under
+`.agents/skills/maestro` and invoke `$maestro` from the target project, for example:
+
+```text
+$maestro Build a notes page with local saving.
+```
+
+Native subagents run independent roles with fresh contexts; missing concurrency
+or worktrees narrows editing to one task. Installation and probes do not prove
+complete host support. See [Codex setup](docs/install.md#codex-cli-and-app) and
+[client-specific verification](docs/parity-verification.md#codex-compatibility-checkpoint--2026-09-30).
+
 The first run in a project asks two things, and never asks them again. Both
 answers go to that project's `.maestro/config.json`, outside the bundle, where
 updating the skill cannot erase them.
@@ -76,10 +88,10 @@ a warning: the phase is redone.
 
 | Gate | After | Passes when |
 |---|---|---|
-| G1 | briefing | every requirement has a status, and none is open without a recorded reason |
+| G1 | briefing | every requirement has a status/reason; v5 also requires a fresh independent source audit and frozen agreement |
 | G2 | specification | intent and independent raw-reference readers find no unresolved mandatory gap |
 | G3 | plan | each required obligation has an implementation owner, each check has an execution owner, and the task reader finds the handoff executable |
-| G4 | acceptance | current evidence covers the agreed requirements and reference behavior; findings and missing checks are reconciled |
+| G4 | acceptance | all current required checks and coverage pass; missing evidence remains pending |
 
 Independent readings withhold earlier conclusions. G2 includes a separate reader
 of raw reference material; G4 can inspect that authority and exercise the
@@ -120,6 +132,14 @@ written against stays findable.
 
 The fields, and what may be left out of them, are in
 [`docs/spec/state-contract.md`](docs/spec/state-contract.md).
+
+Contract 5 preserves the redacted original request and requires an independent
+source audit before agreement. Required journeys cover integrated outcomes;
+selected isolated controls check whether critical checks detect defects. The
+report and dashboard distinguish frozen original scope from authorized current
+scope. Missing tools or independent returns remain incomplete. Historical v4
+outcomes stay readable under their original rules; see
+[verification and its limits](docs/parity-verification.md).
 
 ## A live dashboard
 

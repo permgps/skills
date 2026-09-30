@@ -21,6 +21,7 @@ import { pathToFileURL } from 'node:url';
 
 import { createLogger } from '../shared/log.ts';
 import type { RunState } from '../state/contract.ts';
+import { validateCompletionRecords } from '../state/verification.ts';
 import { runGate, targetFromArgv, type GateFinding } from './cli.ts';
 
 export type { GateFinding };
@@ -86,6 +87,10 @@ export function checkG3(state: RunState): GateFinding[] {
 
   if (state.contractVersion >= 4 && state.verification) {
     const record = state.verification;
+    if (record.version === 2) {
+      for (const violation of validateCompletionRecords(state, record)) findings.push({ requirementId: '',
+        message: `${violation.field}: ${violation.message}` });
+    }
     const tasks = new Map(state.tasks.map(task => [task.id, task]));
     const checks = new Map(record.checks.map(check => [check.id, check]));
     const obligations = record.obligations.filter(item => item.targetRevision === record.targetRevision);

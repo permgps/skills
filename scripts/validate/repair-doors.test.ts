@@ -129,3 +129,14 @@ test('findOpenings reports the door and its line', () => {
     { door: 'not-done', file: '5-build.md', line: 2 },
   ]);
 });
+
+
+test('a repair door cannot omit declared error evidence or prerequisite assessment', async () => {
+  const table = '\n## Repair Door Inputs\n\n| Door | Required inputs |\n|---|---|\n| not-done | errorEvidence, prerequisiteAssessment |\n| recorded-divergence | dependencyResult |\n';
+  const violations = await violationsFor({ spec: SPEC + table, repair: REPAIR + table.replace('errorEvidence, prerequisiteAssessment', 'errorEvidence') });
+  assert.deepEqual(checks(violations), ['inputs']);
+});
+
+test('the shipped startup and coverage repair routes declare their exact inputs', async () => {
+  assert.deepEqual(await checkRepairDoors(), []);
+});

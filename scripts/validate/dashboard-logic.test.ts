@@ -10,7 +10,8 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { evaluateLogic, scriptBlock } from './dashboard-integrity.ts';
-import { verifiedState } from '../state/fixtures/verification.ts';
+import { correctedSourceAuditState, controlledState, sourceVerifiedState, deferredScopeState, sha256, verifiedState } from '../state/fixtures/verification.ts';
+import { projectState } from '../state/projection.ts';
 import { deriveVerification } from '../state/verification.ts';
 
 const ASSET = 'skills/maestro/assets/dashboard.html';
@@ -18,6 +19,8 @@ const ASSET = 'skills/maestro/assets/dashboard.html';
 type Words = Record<string, Record<string, string>>;
 
 interface Logic {
+  scopeProgressOf: (state: unknown) => unknown;
+  textDigest: (value: string) => string;
   KNOWN_CONTRACT_VERSION: number;
   STAGE_ORDER: string[];
   L10N: { ru: Words; en: Words } & Record<string, Words>;
@@ -1258,4 +1261,41 @@ test('an id no registry holds returns nothing rather than throwing', () => {
   // the timeline never draws it and no registry holds it.
   assert.equal(L.explainStage('polish', run(), NOW, [], 'normal', 'ru').length, 0);
   assert.equal(L.explainStage('', run(), NOW, [], 'plain', 'en').length, 0);
+});
+
+test('v5 dashboard shares frozen scope and completion blockers with TypeScript', () => {
+  const state = deferredScopeState();
+  const progress = projectState(state).scopeProgress;
+  assert.deepEqual(JSON.parse(JSON.stringify(L.scopeProgressOf(state))), progress);
+  for (const language of ['ru', 'en']) {
+    const rows = (L.words(language).UI!['scopeRows'] as unknown as (value: unknown) => string[])(progress);
+    assert.match(rows[0]!, /18\/20/); assert.match(rows[1]!, /18\/18/);
+    assert.equal(rows.filter(row => row.includes('18/20')).length, 1);
+  }
+  const states = [state, controlledState(), sourceVerifiedState(), correctedSourceAuditState()];
+  const contradicted = correctedSourceAuditState();
+  contradicted.verification!.manifestAudits.push({ ...contradicted.verification!.manifestAudits[1]!, id: 'MA-3',
+    result: 'failed', findings: ['A later audit contradicts the pass'], dispatchId: 'dispatch-3', readerId: 'reader-3',
+    returnId: 'return-3', auditedAt: '2026-09-29T09:03:00Z' }); states.push(contradicted);
+  const missingAudit = sourceVerifiedState(); delete missingAudit.verification!.manifestAudits[0]!.returnId;
+  states.push(missingAudit);
+  const unavailable = controlledState(); unavailable.verification!.negativeControls[0]!.result = 'unavailable';
+  states.push(unavailable);
+  const stale = controlledState(); stale.verification!.checks[0]!.oracle = 'new oracle'; states.push(stale);
+  const staleInput = sourceVerifiedState(); staleInput.verification!.acceptanceInputDigest = 'new input'; states.push(staleInput);
+  const journey = sourceVerifiedState(); journey.verification!.journeys.push({ id: 'J-1', requirementIds: ['R01'],
+    obligationIds: ['O-1'], checkIds: ['C-1'], fixture: 'clean', variantIds: ['desktop'],
+    steps: [{ action: 'restart', assertion: 'saved entry survives restart' }], integrationDependencies: ['01'],
+    executionTaskId: '01', targetRevision: 1, reset: 'reset', cleanup: 'cleanup' }); states.push(journey);
+  for (const candidate of states) {
+    const actual = L.verificationOf(candidate);
+    assert.equal(actual.g4, deriveVerification(candidate).g4);
+    assert.deepEqual(JSON.parse(JSON.stringify(L.scopeProgressOf(candidate))), projectState(candidate).scopeProgress);
+  }
+});
+
+test('standalone UTF-8 digest matches source/oracle hashes including Russian and emoji', () => {
+  for (const value of ['', 'abc', 'Не больше трёх 😀', JSON.stringify([['Save'], 'persist', []])]) {
+    assert.equal(L.textDigest(value), sha256(value));
+  }
 });
