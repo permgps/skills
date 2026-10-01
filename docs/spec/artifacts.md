@@ -5,7 +5,7 @@ project that was built, not with Maestro.
 
 ```text
 <target-project>/.maestro/
-├── <feature-slug>/
+├── <YYYY-MM-DD>-<feature-slug>--wip/   (the suffix comes off when the run closes)
 │   ├── <YYYY-MM-DD>-brief.md
 │   ├── manifest.md
 │   ├── answers.md
@@ -20,19 +20,36 @@ project that was built, not with Maestro.
 │   ├── report.md
 │   ├── decisions.md
 │   └── amendments.md
+├── README.md                    (the register: one row per contract-7 run)
 ├── config.json
 ├── state.js
 └── dashboard.html
 ```
 
-**`config.json` is the one artifact that outlives the run that created it.** It
+**`config.json` is the one setting that outlives the run that created it.** It
 holds the mode this project starts in when the arguments do not say — its shape,
 its precedence and the question that fills it belong to
 [`dials.md`](dials.md). It sits beside the run directories rather than inside
-one because a setting that lived in `<feature-slug>/` would be a setting the
+one because a setting that lived in a run directory would be a setting the
 next прогон could not find. Preflight writes it on the first run in a project
 and never again; after that the user edits it, which is why it is the only
 mutable artifact here with no phase that rewrites it.
+
+**The run directory is named by its state, not by its slug.** Its name is the
+state's `dir` ([`state-contract.md`](state-contract.md), *Version 7 Extension*):
+`<YYYY-MM-DD>-<slug>`, the UTC day the run started, followed by `--wip` exactly
+while the run is active. The name answers «этот ещё делается или уже сдан» in a
+collapsed file tree without opening anything. Every path below is relative to
+that directory, and every phase builds it from `dir`.
+
+**`README.md` is the register.** One row per contract-7 run — when it started,
+its directory, whether it is in progress, completed, closed with exceptions or
+stopped incomplete, and when it finished — between the owned markers
+`<!-- maestro:runs:begin -->` and `<!-- maestro:runs:end -->`. The first publish
+of a run in preflight creates the file and the row; every later publish
+rewrites that row from the published state, so the row closes when the run
+does. Text outside the markers belongs to the user and is never touched. Runs
+from before contract 7 have no row, and the file's header says so.
 
 The dashboard is opened directly and there is no second entry point beside it.
 An `index.html` pointing at a self-contained page would be an artifact with no
@@ -58,6 +75,7 @@ actually built.
 | `decisions.md` | memory | the user, a later прогон | append-only |
 | `amendments.md` | repair | build, review, acceptance | append-only |
 | `config.json` | preflight | preflight | yes |
+| `README.md` | preflight | the user, a later прогон | yes, its owned rows rewritten by publication |
 | `state.js` | preflight | dashboard, gates, metrics | yes |
 | `dashboard.html` | preflight | the user | no |
 
@@ -190,8 +208,19 @@ comparison of them has two answers to choose from.
 - `.maestro/` is committed, not ignored. It is the user's record of what was
   promised and what was delivered; a прогон that leaves nothing behind did not
   happen.
-- Nothing under `.maestro/` is deleted by a later прогон. A second feature gets
-  a second slug directory.
+- Nothing under `.maestro/` is deleted by a later прогон. A second прогон gets
+  a second directory under its own start date; when `<YYYY-MM-DD>-<slug>`
+  already exists, with or without `--wip`, the slug takes a numeric suffix.
+- The run directory is renamed only by publication, and only to take `--wip`
+  off when the run closes or to put it back when a closed contract-7 run is
+  explicitly reopened. The date and the slug never change. The rename is
+  `git mv` when the folder is tracked, so history follows it.
+- The closing publish of the round that closes the run comes **before** that
+  round's `report.md` is written, because the отчёт names files inside the
+  directory. The отчёт also cites run artifacts by paths relative to its own
+  directory, so a later reopening cannot break it.
+- Runs from before contract 7 keep the names they were written under. Commits
+  and отчёты the user already has point at them, so they are never renamed.
 
 ## Redaction Gate
 

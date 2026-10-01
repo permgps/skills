@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 
 import { validateState, isValidState, type StateViolation } from './validate.ts';
 import { CONTRACT_VERSION, type RunState, type VerificationRecordV3 } from './contract.ts';
-import { contract6State, sourceVerifiedState } from './fixtures/verification.ts';
+import { activeContract7State, contract6State, contract7State, sourceVerifiedState } from './fixtures/verification.ts';
+import { validateStateTransition } from './closure.ts';
 import { prepareLegacyResume } from './projection.ts';
 
 /** A state that passes every rule; each test bends exactly one thing. */
@@ -839,4 +840,60 @@ test('resuming a contract-5 run as contract 6 carries every record verbatim and 
   assert.deepEqual([readiness, defects, strategyReviews], [[], [], []]);
   assert.throws(() => prepareLegacyResume(old, { ...candidate, inheritedExecutionIds: [] }), /inherited/);
   assert.throws(() => prepareLegacyResume(old, { ...candidate, readiness: contract6State().verification!.readiness }), /infers no readiness/);
+});
+
+const dirMessages = (state: unknown): string[] =>
+  validateState(state).filter(item => item.field === 'dir').map(item => item.message);
+
+test('a contract-7 run in progress and a closed one are each valid under their own name', () => {
+  assert.equal(activeContract7State().dir, '2026-09-29-synthetic-menu--wip');
+  assert.deepEqual(validateState(activeContract7State()), []);
+  assert.equal(contract7State().dir, '2026-09-29-synthetic-menu');
+  assert.deepEqual(validateState(contract7State()), []);
+});
+
+test('contract 7 requires dir', () => {
+  const { dir: _dir, ...state } = contract7State();
+  assert.deepEqual(dirMessages(state), ['contract 7 requires dir, the run directory under .maestro/']);
+});
+
+test('an active run whose directory lost --wip is refused with the name to write', () => {
+  const state = activeContract7State(); state.dir = '2026-09-29-synthetic-menu';
+  assert.deepEqual(dirMessages(state), ['dir must end in --wip while the прогон is active — write "2026-09-29-synthetic-menu--wip"']);
+});
+
+test('a closed run still carrying --wip is refused with the name to write', () => {
+  const state = contract7State(); state.dir = '2026-09-29-synthetic-menu--wip';
+  assert.deepEqual(dirMessages(state), ['dir must not end in --wip once the прогон is closed — write "2026-09-29-synthetic-menu"']);
+});
+
+test('a dir whose date or slug disagrees with the state is refused with the expected name', () => {
+  const late = contract7State(); late.dir = '2026-09-30-synthetic-menu';
+  assert.match(dirMessages(late)[0]!, /dated 2026-09-30, but the run started on 2026-09-29 \(UTC\) — write "2026-09-29-synthetic-menu"/);
+  const renamed = contract7State(); renamed.dir = '2026-09-29-other-menu';
+  assert.match(dirMessages(renamed)[0]!, /names slug "other-menu", but the state's slug is "synthetic-menu"/);
+  const garbled = contract7State(); garbled.dir = 'synthetic-menu';
+  assert.match(dirMessages(garbled)[0]!, /is not <YYYY-MM-DD>-<slug> with an optional --wip — write "2026-09-29-synthetic-menu"/);
+});
+
+test('a contract-6 state carrying dir is refused, because the field means nothing there', () => {
+  const state = { ...contract6State(), dir: '2026-09-29-synthetic-menu' };
+  assert.match(dirMessages(state)[0]!, /dir arrives with contract 7/);
+  assert.deepEqual(validateState(contract6State()), []);
+});
+
+test('a contract-7 write cannot change slug, runId or startedAt', () => {
+  const prior = activeContract7State();
+  for (const [field, value] of [['slug', 'other-menu'], ['runId', 'run-synthetic-2'], ['startedAt', '2026-09-28T09:00:00Z']] as const) {
+    const next = { ...structuredClone(prior), [field]: value };
+    assert.ok(validateStateTransition(prior, next).some(item => item.field === field
+      && /fixed for the life of a contract-7 run/.test(item.message)), field);
+  }
+});
+
+test('closing a contract-7 run with the suffix taken off is a lawful write', () => {
+  const prior = activeContract7State();
+  const next = structuredClone(prior);
+  next.dir = '2026-09-29-synthetic-menu';
+  assert.ok(!validateStateTransition(prior, next).some(item => ['dir', 'slug', 'runId', 'startedAt', 'contractVersion'].includes(item.field)));
 });

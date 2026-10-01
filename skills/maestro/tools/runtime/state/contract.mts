@@ -21,6 +21,8 @@
  * against. The dashboard has no handling to add because it never read the field
  * under either name, but it does carry its own copy of this number, and
  * `scripts/validate/state-matches-spec.ts` holds the two together.
+ * Version 7 requires `dir`, the run directory named by its start date with a
+ * `--wip` suffix exactly while the run is active. It keeps verification 3.
  * Version 6 requires verification 3: readiness, defects closing apart from
  * their task, strategy reviews and an authorized limit raise. It changes the
  * repair outcome and decision value sets and defines a finished blocker.
@@ -30,7 +32,7 @@
  * readable without inferred verification; validateState enforces the version
  * boundary rather than narrowing this reader-facing interface.
  */
-export const CONTRACT_VERSION = 6;
+export const CONTRACT_VERSION = 7;
 
 /** The stage ids from docs/spec/phases.md, in run order. */
 export type StageId =
@@ -740,6 +742,12 @@ export interface RunState {
   contractVersion: number;
   runId: string;
   slug: string;
+  /**
+   * The run directory under `.maestro/`, required from contract 7:
+   * `<YYYY-MM-DD>-<slug>` plus `--wip` while active. Optional in the type
+   * because an older state has none and resolves its directory from `slug`.
+   */
+  dir?: string;
   /** ISO 8601, written once. */
   startedAt: string;
   /** ISO 8601, restamped at every write — what lets the page say how old it is. */

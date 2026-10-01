@@ -24,6 +24,7 @@ import {
 } from './contract.mts';
 import { validateClosureRecord } from './closure.mts';
 import { validateVerificationRecord } from './verification.mts';
+import { WIP_SUFFIX, parseRunDir, toRunDir } from './paths.mts';
 
 const log = createLogger('state');
 
@@ -68,6 +69,54 @@ const describeGap = (ms: number): string => {
   const rest = seconds % 60;
   return rest === 0 ? `${minutes}m` : `${minutes}m ${rest}s`;
 };
+
+/**
+ * The run directory name against the state that names it.
+ *
+ * From contract 7 `dir` is the only thing paths are built from, so a name whose
+ * date, slug or suffix disagrees with the state is a run that would be written
+ * somewhere its own record says it is not. Each message carries the name the
+ * state actually implies, because the repair is to write exactly that.
+ */
+function checkRunDir(value: Record<string, unknown>, add: (field: string, message: string) => void): void {
+  const version = value['contractVersion'];
+  const dir = value['dir'];
+  // A newer contract is refused as a whole; guessing which of its fields it kept is the mistake.
+  if (typeof version === 'number' && version > CONTRACT_VERSION) return;
+  if (typeof version !== 'number' || version < 7) {
+    if (dir !== undefined) add('dir', 'dir arrives with contract 7 — a run written under an older contract keeps its slug directory and carries no dir');
+    return;
+  }
+  if (typeof dir !== 'string' || dir === '') {
+    add('dir', 'contract 7 requires dir, the run directory under .maestro/');
+    return;
+  }
+  const slug = value['slug'];
+  const startedAt = value['startedAt'];
+  const active = value['lifecycle'] === 'active';
+  let expected: string | undefined;
+  try {
+    if (typeof slug === 'string' && typeof startedAt === 'string') expected = toRunDir(startedAt, slug, active);
+  } catch {
+    // slug or startedAt is already reported by its own rule; there is no name to compare with.
+  }
+  const parsed = parseRunDir(dir);
+  if (!parsed) {
+    add('dir', `dir "${dir}" is not <YYYY-MM-DD>-<slug> with an optional --wip${expected ? ` — write "${expected}"` : ''}`);
+    return;
+  }
+  if (expected === undefined || dir === expected) return;
+  log.debug('validate', 'run directory disagrees with the state', { expected, found: dir });
+  if (typeof startedAt === 'string' && parsed.date !== expected.slice(0, 10)) {
+    add('dir', `dir is dated ${parsed.date}, but the run started on ${expected.slice(0, 10)} (UTC) — write "${expected}"`);
+  } else if (parsed.slug !== slug) {
+    add('dir', `dir names slug "${parsed.slug}", but the state's slug is "${String(slug)}" — write "${expected}"`);
+  } else if (active) {
+    add('dir', `dir must end in ${WIP_SUFFIX} while the прогон is active — write "${expected}"`);
+  } else {
+    add('dir', `dir must not end in ${WIP_SUFFIX} once the прогон is closed — write "${expected}"`);
+  }
+}
 
 /** Statuses whose meaning is incomplete without a reason. */
 const REASON_REQUIRED = ['open', 'deferred', 'dropped', 'placeholder'];
@@ -534,6 +583,10 @@ export function validateState(value: unknown): StateViolation[] {
     if (typeof value['slug'] !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value['slug'])) {
       add('slug', 'contract-4 slug must be a canonical safe path segment');
     }
+  }
+  checkRunDir(value, add);
+
+  if (atLeastV4) {
     requireOneOf('lifecycle', value['lifecycle'], LIFECYCLES);
     optionalOneOf('outcome', value['outcome'], CLOSURE_OUTCOMES);
     optionalString('stopReason', value['stopReason']);

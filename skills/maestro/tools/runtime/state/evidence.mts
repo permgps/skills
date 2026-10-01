@@ -13,6 +13,7 @@ import { createLogger } from '../shared/log.mts';
 import type { EvidenceFingerprint, RunState } from './contract.mts';
 import type { StateViolation } from './validate.mts';
 import { sameFingerprint } from './verification.mts';
+import { parseRunDir, runDirName } from './paths.mts';
 
 const log = createLogger('state');
 const HASH = /^[a-f0-9]{64}$/;
@@ -94,7 +95,10 @@ export async function validateEvidence(
   const record = state.verification;
   if (!record || state.contractVersion < 4) return [];
   const violations: StateViolation[] = [];
-  const runDir = path.join(runRoot, state.slug);
+  let runName: string;
+  try { runName = runDirName(state); }
+  catch { return [{ field: state.contractVersion >= 7 ? 'dir' : 'slug', message: 'run directory name is not a safe path segment' }]; }
+  const runDir = path.join(runRoot, runName);
   if (record.evidence.length > 0) {
     try {
       if (!inside(await realpath(projectRoot), await realpath(runDir))
@@ -171,12 +175,15 @@ export async function importEvidence(
   const record = state.verification;
   if (!record || state.contractVersion < 4) return [{ field: 'verification', message: 'contract-4 verification is required' }];
   const violations: StateViolation[] = [];
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(state.slug)) {
-    return [{ field: 'slug', message: 'run slug is not a safe directory name' }];
+  // Below contract 7 the slug is the directory; from 7 it is `dir`, parsed
+  // rather than trusted, because a name that fails the grammar fails it here too.
+  const runName = state.contractVersion >= 7 ? state.dir ?? '' : state.slug;
+  if (state.contractVersion >= 7 ? !parseRunDir(runName) : !/^[a-z0-9][a-z0-9-]*$/.test(runName)) {
+    return [{ field: state.contractVersion >= 7 ? 'dir' : 'slug', message: 'run directory is not a safe directory name' }];
   }
   const project = await realpath(projectRoot);
   const maestroDir = path.join(project, '.maestro');
-  const runDir = path.join(maestroDir, state.slug);
+  const runDir = path.join(maestroDir, runName);
   const runEvidence = path.join(runDir, 'evidence');
   for (const [parent, child] of [
     [project, maestroDir],

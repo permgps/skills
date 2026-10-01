@@ -152,10 +152,10 @@ function readinessViolations(
   return problems;
 }
 
-/** Validate the verification-3 graph of a contract-6 snapshot. */
+/** Validate the verification-3 graph of a contract-6 or contract-7 snapshot. */
 export function validateClosureRecord(state: RunState): VerificationViolation[] {
   const raw = state.verification;
-  if (state.contractVersion !== 6 || !isRecord(raw) || raw['version'] !== 3) return [];
+  if (state.contractVersion < 6 || !isRecord(raw) || raw['version'] !== 3) return [];
   const shape = validateClosureShape(raw);
   if (shape.length > 0) {
     for (const item of shape) log.error('closure', item.message, { field: item.field });
@@ -412,7 +412,7 @@ const open = (id: string, tasks: Map<string, TaskEntry>, defects: Map<string, De
 export function validateClosureTransition(previous: RunState, next: RunState): VerificationViolation[] {
   const current = next.verification;
   const prior = previous.verification;
-  if (next.contractVersion !== 6 || !current || current.version !== 3 || !prior || prior.version === 1) return [];
+  if (next.contractVersion < 6 || !current || current.version !== 3 || !prior || prior.version === 1) return [];
   const errors: VerificationViolation[] = [];
   const add = (field: string, message: string, context: Record<string, unknown> = {}): void => {
     errors.push({ field, message });

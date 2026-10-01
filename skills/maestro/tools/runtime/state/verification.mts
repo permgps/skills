@@ -362,8 +362,8 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
   const record = state.verification!;
   if ((state.contractVersion === 4 && record.version !== 1)
     || (state.contractVersion === 5 && record.version !== 2)
-    || (state.contractVersion === 6 && record.version !== 3)) {
-    return [{ field: 'verification.version', message: 'contract 4 requires verification 1; contract 5 requires verification 2; contract 6 requires verification 3' }];
+    || (state.contractVersion >= 6 && record.version !== 3)) {
+    return [{ field: 'verification.version', message: 'contract 4 requires verification 1; contract 5 requires verification 2; contracts 6 and 7 require verification 3' }];
   }
   const add = (field: string, message: string): void => {
     errors.push({ field, message });
@@ -675,10 +675,31 @@ export function validateVerificationTransition(
       }
     }
   }
+  // Contract 7 is where a run is born, never where one is converted to: an
+  // older run keeps the directory name it was written under, and a converted
+  // state would have to invent a dated name for a folder nobody renamed.
+  if ((next.contractVersion >= 7 || previous.contractVersion >= 7)
+    && next.contractVersion !== previous.contractVersion) {
+    errors.push({ field: 'contractVersion', message: 'a run keeps its contract from 7 on; an older run continues under its own contract and keeps its directory name' });
+    log.debug('transition', 'contract version change refused', {
+      runId: next.runId, from: previous.contractVersion, to: next.contractVersion,
+    });
+  }
+  // The run directory's date and slug are read out of these three, so a write
+  // that moved one of them would move the folder's name under a run whose
+  // folder publication never renamed.
+  if (next.contractVersion >= 7 && previous.contractVersion >= 7) {
+    for (const field of ['runId', 'slug', 'startedAt'] as const) {
+      if (next[field] !== previous[field]) {
+        errors.push({ field, message: `${field} is fixed for the life of a contract-7 run — keep ${JSON.stringify(previous[field])}` });
+        log.debug('transition', 'run identity change refused', { field, from: previous[field], to: next[field] });
+      }
+    }
+  }
   if (prior.version !== 1) {
     // A contract-5 run may resume as contract 6; nothing moves the other way.
     const lawful = current.version === 2 ? prior.version === 2 && next.contractVersion === 5
-      : current.version === 3 && next.contractVersion === 6;
+      : current.version === 3 && (next.contractVersion === 6 || next.contractVersion === 7);
     if (!lawful || current.version === 1) {
       errors.push({ field: 'verification.version', message: 'published safeguards cannot be downgraded' });
     } else {

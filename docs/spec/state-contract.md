@@ -13,6 +13,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `contractVersion` | integer | preflight | dashboard |
 | `runId` | string | preflight | dashboard |
 | `slug` | string | preflight | dashboard |
+| `dir` | string, the run directory under `.maestro/`, required from contract 7 | preflight | dashboard |
 | `startedAt` | ISO 8601 string | preflight | dashboard |
 | `updatedAt` | ISO 8601 string | preflight | dashboard |
 | `heldBy` | optional `{ token, since }` | preflight | — |
@@ -27,14 +28,14 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason? }` | manifest | dashboard |
 | `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
-| `lifecycle` | `active` \| `closed` in contracts 4–6 | preflight | dashboard |
+| `lifecycle` | `active` \| `closed` in contracts 4–7 | preflight | dashboard |
 | `outcome` | `completed` \| `closed_with_exceptions` \| `stopped_incomplete`, only when closed | acceptance | dashboard |
 | `stopReason` | string, required for `stopped_incomplete` | acceptance | dashboard |
-| `verification` | versioned verification index, required in contracts 4–6 | preflight | dashboard |
+| `verification` | versioned verification index, required in contracts 4–7 | preflight | dashboard |
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
 | `tests` | `{ passed, failed }` | build | dashboard |
-| `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–6 | acceptance | dashboard |
+| `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–7 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
 
 **`language` is the second such dial, and it is here for the same reason.** The
@@ -357,6 +358,37 @@ preserved verbatim, names the carried executions and attempts in
 `defects` and `strategyReviews` empty. No resume fabricates readiness, a defect
 or a review the run never had.
 
+## Version 7 Extension
+
+Contract 7 keeps verification version 3 and every contract-6 rule, and adds
+`dir`: the name of the run directory under `.maestro/`. Every path a прогон
+writes is built from `dir`, never rebuilt from `slug`, because a name derived
+from `slug` alone answers wrongly for the whole life of the run.
+
+- **Grammar.** `<YYYY-MM-DD>-<slug>`, followed by `--wip` while the run is
+  active. The slug is the canonical slug of the state, and `--` can never occur
+  inside it, so the name parses one way.
+- **The date never moves.** It is the UTC day of `startedAt`, built by the same
+  function that names `<YYYY-MM-DD>-brief.md`, so the two dates in one
+  directory cannot disagree.
+- **`--wip` iff active.** `dir` ends in `--wip` exactly when `lifecycle` is
+  `active`. Any closure — `completed`, `closed_with_exceptions` or
+  `stopped_incomplete` — takes the suffix off; reopening a closed contract-7
+  run puts it back, with the date and the slug unchanged. The outcome is told
+  apart in the register ([`artifacts.md`](artifacts.md)), not in the name.
+- **Frozen identity.** Between two published contract-7 states `runId`, `slug`
+  and `startedAt` do not change, so neither part of `dir` can drift through a
+  later write.
+- **Relocation belongs to publication.** A phase changes `dir` together with
+  `lifecycle`; `--publish` moves the folder (see *Autonomous Runtime* below).
+
+A contract-6 or older state carries no `dir`, resolves its directory from
+`slug` and is never relocated or upgraded: it keeps its name, its contract, and
+its place outside the register. A contract-6 run continues as contract 6, and
+the legacy resume conversion still targets contracts 4–6. A `dir` on a state
+below contract 7 is refused, because the field would carry a meaning that
+contract does not have.
+
 ## Versioning
 
 - `contractVersion` starts at `1` and is stored in every state file.
@@ -369,6 +401,11 @@ or a review the run never had.
 - The contract is changed in `scripts/state/` before it is changed on either
   side. That is what makes the single integration point real rather than
   aspirational.
+
+**Version 7** requires a new field, `dir`, and gives the run directory a
+meaning it did not have: a dated name whose suffix tracks the lifecycle. The
+dashboard's `KNOWN_CONTRACT_VERSION` moves with it, and a contract-6 state
+renders as it did, titled by its slug alone.
 
 **Version 6** changes four value sets — the repair outcome gains
 `defect_verified` and `prerequisite_blocked` and loses `repaired`, decisions
@@ -432,7 +469,22 @@ The sole installed command is `node .maestro/sync.mts`; its relative
 exports are compatibility facades. The installed helper imports only its own
 modules and `node:*` built-ins. It resolves the run directory from the copied
 entrypoint and the project root from that directory's parent, irrespective of
-cwd or the target's package type. It publishes contracts 4, 5 and 6; each keeps its own verification version.
+cwd or the target's package type. It publishes contracts 4, 5, 6 and 7; each keeps its own verification version,
+and contract 7 shares verification 3 with contract 6. The contract version of a
+run does not change between two published states except through the legacy
+resume conversion.
+
+**Relocation and the register.** When a contract-7 `--publish` candidate names a
+`dir` other than the published one, publication moves `.maestro/<published>` to
+`.maestro/<candidate>` after the structural checks and before the evidence
+checks, which then run against the new location. The move is `git mv` when the
+folder holds tracked files and a plain rename otherwise. A target that already
+exists refuses the publish with nothing moved; any rejection after the move puts
+the folder back by the same method. `--validate` and `--project` never move
+anything. After every successful contract-7 publish, publication rewrites the
+run's row in `.maestro/README.md` from the published state; a register write that
+fails does not undo the publish, is reported in the result, and is repaired by
+the next publish.
 
 `--validate <candidate>` and `--project <candidate>` are read-only: no state,
 diagnostic, snapshot, viewer or opener writes. JSON actions emit one result on

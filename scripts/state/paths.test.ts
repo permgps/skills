@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 
 import {
+  forDir,
   forRun,
   forState,
+  parseRunDir,
+  runDirName,
+  toRunDir,
   toDate,
   toIndex,
   toSlug,
@@ -160,4 +164,50 @@ test('forState uses the slug the state carries', () => {
     gates: [],
   };
   assert.equal(forState(state).dir, path.join(ROOT, 'checkout-flow'));
+});
+
+test('a run directory is named by the UTC day the run started, never by the clock', () => {
+  assert.equal(toRunDir('2026-09-29T23:30:00Z', 'landing-page', true), '2026-09-29-landing-page--wip');
+  // 01:30 in Moscow is still the previous UTC day, as it is for the brief's date.
+  assert.equal(toRunDir('2026-09-29T22:30:00-03:00', 'landing-page', true), '2026-09-30-landing-page--wip');
+  assert.equal(toRunDir('2026-09-29T23:30:00Z', 'landing-page', true).slice(0, 10),
+    p.brief(new Date('2026-09-29T23:30:00Z')).split(path.sep).at(-1)!.slice(0, 10));
+});
+
+test('an active run directory ends in --wip and a closed one does not', () => {
+  assert.equal(toRunDir('2026-09-29T09:00:00Z', 'landing-page', true), '2026-09-29-landing-page--wip');
+  assert.equal(toRunDir('2026-09-29T09:00:00Z', 'landing-page', false), '2026-09-29-landing-page');
+});
+
+test('a run directory name parses into its date, slug and suffix, and nothing else parses', () => {
+  assert.deepEqual(parseRunDir('2026-09-29-landing-page--wip'), { date: '2026-09-29', slug: 'landing-page', wip: true });
+  assert.deepEqual(parseRunDir('2026-09-29-landing-page-2'), { date: '2026-09-29', slug: 'landing-page-2', wip: false });
+  for (const bad of ['landing-page', '2026-09-29-', '2026-09-29-Landing', '2026-09-29-a--b', '2026-09-29-a/b', '../2026-09-29-a']) {
+    assert.equal(parseRunDir(bad), null, bad);
+  }
+});
+
+test('a non-canonical slug cannot be turned into a run directory', () => {
+  assert.throws(() => toRunDir('2026-09-29T09:00:00Z', 'Landing Page', true), PathEscapeError);
+});
+
+test('a contract-7 state resolves its artifacts from dir, not from slug', () => {
+  const state = { contractVersion: 7, slug: 'checkout-flow', dir: '2026-09-29-checkout-flow--wip' } as RunState;
+  assert.equal(runDirName(state), '2026-09-29-checkout-flow--wip');
+  assert.equal(forState(state).dir, path.join(ROOT, '2026-09-29-checkout-flow--wip'));
+  assert.equal(forState(state).slug, 'checkout-flow');
+  assert.equal(forState(state).report(), path.join(ROOT, '2026-09-29-checkout-flow--wip', 'report.md'));
+  assert.equal(forDir('2026-09-29-checkout-flow').manifest(), path.join(ROOT, '2026-09-29-checkout-flow', 'manifest.md'));
+});
+
+test('a contract-6 state still resolves its directory from the slug', () => {
+  const state = { contractVersion: 6, slug: 'checkout-flow' } as RunState;
+  assert.equal(runDirName(state), 'checkout-flow');
+  assert.equal(forState(state).dir, path.join(ROOT, 'checkout-flow'));
+});
+
+test('a run directory that would leave the run root is refused', () => {
+  assert.throws(() => runDirName({ contractVersion: 7, slug: 'a', dir: '../a' } as RunState), PathEscapeError);
+  assert.throws(() => runDirName({ contractVersion: 7, slug: 'a' } as RunState), PathEscapeError);
+  assert.throws(() => forDir('not-a-dated-name'), PathEscapeError);
 });

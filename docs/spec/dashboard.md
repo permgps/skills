@@ -66,6 +66,17 @@ logic block and not inside the render, so that it can be called by a test. The
 defect this rule replaced shipped because the rule was written in a branch no
 test in the repository could reach.
 
+## The Title Names The Run
+
+The header's title is the slug and, for a contract-7 state, the day the run
+started, read out of `dir` — «Прогон: <slug> · <YYYY-MM-DD>». A state whose
+`dir` is absent or does not parse is titled by its slug alone, as every state
+before contract 7 was. The page reads the date and nothing else out of `dir`:
+it builds no artifact path, and whether the run is still in progress is said by
+the lifecycle the page already renders, not by the suffix. The page carries its
+own copy of the `dir` grammar because it imports nothing; the copy is compared
+with the runtime's by `npm run dashboard`.
+
 ## The Reader's Own Two Controls
 
 Two switches in the header, and everything true of one is true of the other:

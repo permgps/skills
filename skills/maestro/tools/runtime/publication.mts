@@ -28,8 +28,8 @@ export async function loadCandidate(file: string): Promise<unknown> {
 export async function candidateViolations(candidate: unknown, dir: string): Promise<StateViolation[]> {
   try {
     const errors = [...validateState(candidate), ...languageViolations(candidate)];
-    if (!isRecord(candidate) || ![4, 5, 6].includes(candidate['contractVersion'] as number)) {
-      errors.push({ field: 'contractVersion', message: 'publication requires contract version 4, 5 or 6' });
+    if (!isRecord(candidate) || ![4, 5, 6, 7].includes(candidate['contractVersion'] as number)) {
+      errors.push({ field: 'contractVersion', message: 'publication requires contract version 4, 5, 6 or 7' });
     }
     if (errors.length === 0) errors.push(...await validateEvidence(candidate as RunState, path.dirname(dir), dir));
     return errors;

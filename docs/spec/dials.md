@@ -129,8 +129,8 @@ of reason Scout's ТЗ draft keeps its own: writing it in English performs a
 translation nothing checks, and it does it exactly where the contract stopped
 being the прогон's own words.
 
-The slug stays Latin in both, for the same reason it was Latin before: it is a
-directory name.
+The slug stays Latin in both, for the same reason it was Latin before: it is
+part of a directory name, `<YYYY-MM-DD>-<slug>--wip`.
 
 `en` is not a second product. Nothing about the phases, the gates, the safety
 rules or the mode matrix reads differently in it; the same прогон is being

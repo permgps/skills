@@ -9,7 +9,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { CAPTURES, activeContract6State, fingerprint, planningOwnershipState, repairContract6State, sha256, v3Attempt, verifiedState } from './fixtures/verification.ts';
+import { CAPTURES, SOURCE_MANIFEST, activeContract6State, activeContract7State, fingerprint, planningOwnershipState, repairContract6State, sha256, v3Attempt, verifiedState } from './fixtures/verification.ts';
 import { validateStateTransition } from './closure.ts';
 import { deriveVerification, validateVerificationTransition } from './verification.ts';
 import { validateState, InvalidStateError } from './validate.ts';
@@ -482,4 +482,42 @@ test('a task leaves repair only when the prerequisite its blocked attempt named 
   assert.ok(validateStateTransition(prior, next).some(item => /repair of DF-1 waits on open prerequisite 02/.test(item.message)));
   next.tasks[1]!.status = 'review';
   assert.deepEqual(validateStateTransition(prior, next), []);
+});
+
+test('evidence of a contract-7 run is validated inside its dated directory, never the slug one', async () => {
+  const project = await mkdtemp(path.join(tmpdir(), 'maestro-dated-evidence-'));
+  try {
+    const state = activeContract7State();
+    const write = async (folder: string): Promise<void> => {
+      for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
+        await mkdir(path.dirname(path.join(project, '.maestro', folder, relative)), { recursive: true });
+        await writeFile(path.join(project, '.maestro', folder, relative), body);
+      }
+    };
+    await write(state.slug);
+    assert.ok((await validateEvidence(state, project)).length > 0);
+    await write('2026-09-29-synthetic-menu--wip');
+    assert.deepEqual(await validateEvidence(state, project), []);
+  } finally { await rm(project, { recursive: true, force: true }); }
+});
+
+test('task captures of a contract-7 run are sealed into its dated directory', async () => {
+  const project = await mkdtemp(path.join(tmpdir(), 'maestro-dated-import-'));
+  const taskRoot = await mkdtemp(path.join(tmpdir(), 'maestro-dated-captures-'));
+  try {
+    const state = activeContract7State();
+    await writeFile(path.join(taskRoot, 'pointer.txt'), CAPTURES['evidence/X-1/pointer.txt']!);
+    // The other declared captures are not on disk, so the run as a whole does not
+    // validate yet; what this holds is where the one imported capture landed.
+    const result = await importEvidence(state, project, taskRoot, { 'E-1': 'pointer.txt' });
+    assert.ok(!result.some(item => ['dir', 'slug', 'verification.evidence'].includes(item.field)));
+    assert.match(await readFile(path.join(project, '.maestro', '2026-09-29-synthetic-menu--wip',
+      'evidence/X-1/pointer.txt'), 'utf8'), /initial:hidden/);
+    const unsafe = { ...state, dir: '../escape' };
+    assert.ok((await importEvidence(unsafe, project, taskRoot, { 'E-1': 'pointer.txt' }))
+      .some(item => item.field === 'dir'));
+  } finally {
+    await rm(project, { recursive: true, force: true });
+    await rm(taskRoot, { recursive: true, force: true });
+  }
 });

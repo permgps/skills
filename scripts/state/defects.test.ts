@@ -9,7 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { validateStateTransition } from './closure.ts';
-import { defect, finding, repairContract6State, strategyReview, v3Attempt } from './fixtures/verification.ts';
+import { defect, finding, repairContract6State, repairContract7State, strategyReview, v3Attempt } from './fixtures/verification.ts';
 import { validateState } from './validate.ts';
 
 const messages = (state: unknown): string => validateState(state).map(item => `${item.field}: ${item.message}`).join('\n');
@@ -223,4 +223,34 @@ test('a contract-6 attempt names a defect of its own root and task, and repeatKi
   assert.match(messages(state), /attempt and defect must share the stable root/);
   record.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', minute(10), { repeatKind: 'same_action_failed' })];
   assert.match(messages(state), /repeatKind is first exactly when the attempt has no predecessor/);
+});
+
+test('a contract-7 run keeps every contract-6 closure rule', () => {
+  const state = repairContract7State();
+  state.tasks[0]!.status = 'done';
+  state.tasks[0]!.finishedAt = minute(5);
+  assert.match(messages(state), /task 01 is done with open defects DF-1/);
+});
+
+test('a contract-7 defect verified at a write is held to the current passing run, as in contract 6', () => {
+  const prior = repairContract7State();
+  const next = structuredClone(prior);
+  next.verification!.defects[0] = { ...next.verification!.defects[0]!, status: 'verified', verifiedExecutionIds: ['X-1'] };
+  assert.deepEqual(validateStateTransition(prior, next), []);
+  next.verification!.checks[0]!.currentFingerprint.build = 'integrated-build-2';
+  assert.ok(validateStateTransition(prior, next).some(item => /X-1 is not the current passing result/.test(item.message)));
+});
+
+test('a published contract-6 run cannot be republished as contract 7', () => {
+  const prior = repairContract6State();
+  const next = { ...structuredClone(prior), contractVersion: 7, dir: '2026-09-29-synthetic-menu--wip' };
+  assert.ok(validateStateTransition(prior, next).some(item => item.field === 'contractVersion'
+    && /keeps its contract from 7 on/.test(item.message)));
+});
+
+test('a contract-7 run cannot fall back to contract 6', () => {
+  const prior = repairContract7State();
+  const { dir: _dir, ...rest } = structuredClone(prior);
+  const next = { ...rest, contractVersion: 6 };
+  assert.ok(validateStateTransition(prior, next).some(item => item.field === 'contractVersion'));
 });

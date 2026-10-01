@@ -441,6 +441,16 @@ file, and this is the file most likely to grow one — it is the only artifact
 written for the user rather than for a later phase. Labels are resolved through
 `vocabulary.md` when the summary is spoken, not stored in the отчёт.
 
+**The round that closes the run publishes its closure before it writes its
+отчёт.** Closing takes `--wip` off the run directory
+([`state-contract.md`](state-contract.md), *Version 7 Extension*), and an отчёт
+written first would name files under a directory that is about to be renamed.
+When the outcome needs the user's authorization — `closed_with_exceptions` —
+the residual set is presented in the chat first, the closure is published on
+their answer, and only then is the отчёт written. Whatever the order, the отчёт
+cites run artifacts by paths relative to its own directory. A round that does
+not close the run writes its отчёт where the run already is.
+
 ### When G4 Disagrees
 
 The отчёт is written either way. It is the record of what disagreed, so
@@ -487,7 +497,7 @@ orchestrator may write. This section is where it gets a name.
 
 ### Decision Records
 
-`.maestro/<slug>/decisions.md`, append-only. One entry per decision that should
+`.maestro/<dir>/decisions.md`, append-only. One entry per decision that should
 outlive the прогон: what was decided, what it was decided instead of, and what
 made the difference.
 
@@ -680,7 +690,7 @@ are retries. **A second reading of the specification is never an amendment**; if
 the words were ambiguous, they were ambiguous before the build ran, and what
 changed is only who is inconvenienced by them.
 
-An amendment is written to `.maestro/<slug>/amendments.md`, naming the `R##` it
+An amendment is written to `.maestro/<dir>/amendments.md`, naming the `R##` it
 affects and the `D##` that demonstrated it, and it moves that requirement's
 status in the run state. It is not written into `spec.md`:
 [`artifacts.md`](artifacts.md) gives that file one writer, and a specification

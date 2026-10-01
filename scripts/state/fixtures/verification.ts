@@ -301,3 +301,22 @@ export function repairContract6State(): ReturnType<typeof contract6State> {
   state.verification!.repairLimits = { perFinding: 2, total: 20 };
   return state;
 }
+
+/**
+ * Contract 7 is contract 6 plus `dir`. The name is spelled out here rather than
+ * built by the paths module, so a test that holds the builder to the grammar
+ * is not also the source of the name it checks.
+ */
+export function asContract7<T extends RunState>(state: T): T {
+  const day = state.startedAt.slice(0, 10);
+  return { ...state, contractVersion: 7, dir: `${day}-${state.slug}${state.lifecycle === 'active' ? '--wip' : ''}` };
+}
+
+/** The closed contract-7 delivery: `2026-09-29-synthetic-menu`, no suffix. */
+export const contract7State = (): ReturnType<typeof contract6State> => asContract7(contract6State());
+
+/** The contract-7 run while it is still building: `2026-09-29-synthetic-menu--wip`. */
+export const activeContract7State = (): ReturnType<typeof contract6State> => asContract7(activeContract6State());
+
+/** The contract-7 run in repair, with the same open defect as its contract-6 twin. */
+export const repairContract7State = (): ReturnType<typeof contract6State> => asContract7(repairContract6State());
