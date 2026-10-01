@@ -90,10 +90,11 @@ async function move(project: string, runRoot: string, from: string, to: string, 
  * existing target before touching anything, so a refusal never leaves half a
  * move behind.
  */
-export async function relocateRunDir(project: string, runRoot: string, from: string, to: string): Promise<Relocation> {
+export async function relocateRunDir(project: string, runRoot: string, from: string, to: string,
+  runId: string): Promise<Relocation> {
   const source = path.join(runRoot, from);
   const target = path.join(runRoot, to);
-  log.debug('plan', 'relocation requested', { from, to });
+  log.debug('plan', 'relocation requested', { runId, from, to });
   try {
     if (!(await stat(source)).isDirectory()) throw new RelocationSourceMissingError(from, to);
   } catch (error) {
@@ -102,14 +103,15 @@ export async function relocateRunDir(project: string, runRoot: string, from: str
   }
   if (await exists(target)) throw new RelocationTargetExistsError(from, to);
   const method: RelocationMethod = await tracked(project, path.relative(project, source)) ? 'git' : 'rename';
-  log.debug('method', 'relocation method chosen', { from, to, method });
+  log.debug('method', 'relocation method chosen', { runId, from, to, method });
   await move(project, runRoot, from, to, method);
-  log.info('done', 'run directory relocated', { from, to, method });
+  log.info('done', 'run directory relocated', { runId, from, to, method });
   return { from, to, method };
 }
 
 /** Undo a relocation by the method that made it, after the publish it served was refused. */
-export async function restoreRunDir(project: string, runRoot: string, relocation: Relocation): Promise<void> {
+export async function restoreRunDir(project: string, runRoot: string, relocation: Relocation,
+  runId: string): Promise<void> {
   await move(project, runRoot, relocation.to, relocation.from, relocation.method);
-  log.info('restore', 'run directory moved back', { from: relocation.to, to: relocation.from, method: relocation.method });
+  log.info('restore', 'run directory moved back', { runId, from: relocation.to, to: relocation.from, method: relocation.method });
 }

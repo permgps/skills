@@ -162,7 +162,7 @@ export async function candidateMode(args: string[], dir: string,
     const from = runDirName(previous);
     const to = runDirName(state);
     if (from !== to) {
-      try { relocation = await relocateRunDir(path.dirname(dir), dir, from, to); }
+      try { relocation = await relocateRunDir(path.dirname(dir), dir, from, to, state.runId); }
       catch (error) {
         const reason = error instanceof Error ? error.message : String(error);
         log.error('relocation', 'run directory could not be relocated', { runId: state.runId, from, to, reason });
@@ -184,13 +184,14 @@ export async function candidateMode(args: string[], dir: string,
     }
   }
   if (errors.length && relocation) {
-    try { await restoreRunDir(path.dirname(dir), dir, relocation); }
-    catch (error) {
+    try {
+      await restoreRunDir(path.dirname(dir), dir, relocation, state.runId);
+      log.error('relocation', 'relocation rolled back after the candidate was refused', { runId: state.runId, ...relocation });
+    } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       log.error('relocation', 'run directory could not be moved back', { runId: state.runId, ...relocation, reason });
       errors.push({ field: 'dir', message: `.maestro/${relocation.to} could not be moved back to .maestro/${relocation.from} — rename it by hand before the next publish` });
     }
-    log.error('relocation', 'relocation rolled back after the candidate was refused', { runId: state.runId, ...relocation });
     relocation = null;
   }
   let register: 'written' | 'failed' | null = null;
