@@ -223,7 +223,12 @@ from one that was met.
   of the write that gets forgotten — the next стадия is opened and the previous
   one is never closed — and until it was written down the chain gave up on that
   pair rather than reporting it, because one of the two stamps it compares was
-  not there to compare.
+  not there to compare. A стадия still `pending` behind one that has started is
+  the same rule with a different sentence: it never opened, so it is reported
+  as *never opened* rather than *still open*, against its `status` rather than
+  its `finishedAt`, and repaired by marking it `skipped` with a `note` or by
+  stamping the interval it actually ran. Nothing closes or skips it
+  automatically — the write that opens the next стадия already owns that.
 
   **A стадия's status is a claim about its own clock**, and the same validator
   holds it to that claim: a `done` стадия carries both stamps, an `active` one

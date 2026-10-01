@@ -360,6 +360,25 @@ export function validateState(value: unknown): StateViolation[] {
       // was forgotten. Nothing downstream notices — the стадия keeps a running
       // clock on a phase that ended, and `scripts/metrics/` attributes the
       // interval to neither.
+      //
+      // A `pending` стадия in that position is a different record and gets a
+      // different sentence. «Still open» was false twice for it: nothing was
+      // open, and nothing needs closing — a `finishedAt` written onto it would
+      // only be refused by the rule above for a стадия that has not begun. The
+      // finding stays, because the record is still wrong, and it points at the
+      // status: a стадия stepped over is `skipped` with a note, and one that ran
+      // unrecorded gets its stamps. No writer closes or skips it on its own —
+      // the write that opens the next стадия already owns that, and a second
+      // mechanism would cost more than it buys.
+      if (before['status'] === 'pending' && !Number.isNaN(opened)) {
+        add(
+          `stages[${String(before['id'])}].status`,
+          `"${String(before['id'])}" never opened, and "${id}" has already started: ` +
+            'mark it skipped with a note saying why, or stamp the interval it ran',
+        );
+        continue;
+      }
+
       if (Number.isNaN(closed) && !Number.isNaN(opened)) {
         add(
           `stages[${String(before['id'])}].finishedAt`,

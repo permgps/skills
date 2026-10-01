@@ -547,6 +547,41 @@ test('a стадия left open behind one that has already started is reported',
   assert.match(violations[0]!.message, /"plan" has already started/);
 });
 
+test('a стадия the прогон walked past is reported as never opened, not as still open', () => {
+  // `briefing` stayed `pending` while `spec` started. Calling it «still open»
+  // was false twice: nothing was open, and nothing needs closing. The finding
+  // stays — the record is still wrong — and points at the status, because the
+  // repair is `skipped` with a note or the stamps it ran under.
+  const stages = chain();
+  stages[2] = { id: 'briefing', status: 'pending' };
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[briefing].status']);
+  assert.match(violations[0]!.message, /"briefing" never opened/);
+  assert.match(violations[0]!.message, /"spec" has already started/);
+  assert.match(violations[0]!.message, /skipped with a note/);
+  assert.doesNotMatch(violations[0]!.message, /still open/);
+});
+
+test('a never-opened стадия is reported across a skipped one just the same', () => {
+  const stages = chain();
+  stages[2] = { id: 'briefing', status: 'pending' };
+  stages[3] = { id: 'spec', status: 'skipped', note: 'the бриф was already a specification' };
+
+  const violations = validateState(withPatch({ stages, currentStage: 'review' }));
+  assert.deepEqual(fields(violations), ['stages[briefing].status']);
+  assert.match(violations[0]!.message, /"briefing" never opened, and "plan" has already started/);
+});
+
+test('a pending стадия with nothing started after it is not a finding', () => {
+  // The ordinary tail of a прогон in progress: the new wording must not fire
+  // on a стадия that simply has not been reached yet.
+  const stages = chain();
+  stages.push({ id: 'acceptance', status: 'pending' });
+
+  assert.deepEqual(validateState(withPatch({ stages, currentStage: 'review' })), []);
+});
+
 test('an open стадия is overtaken across a skipped one just the same', () => {
   const stages = chain();
   stages[2] = { id: 'briefing', status: 'active', startedAt: '2026-08-19T18:52:40Z' };

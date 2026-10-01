@@ -27,7 +27,14 @@ with an open defect. Reviews read one diff per task commit, never a range. The
 dashboard shows defects, the repair budget and readiness. Contract-5 runs remain
 readable and resume as contract 6 with inherited history.
 
-**Verification status:** `npm run check` passes 824 tests with zero failures
+**A стадия that never opened is not called «still open».** The chain rule used
+to report a `pending` стадия the прогон walked past as `"<id>" is still open`,
+which was false twice: nothing was open and nothing needed closing. It now says
+the стадия never opened, points at `stages[<id>].status` instead of its
+`finishedAt`, and names both repairs — `skipped` with a note, or the stamps it
+ran under. The finding is kept; no mechanism closes or skips a стадия on its own.
+
+**Verification status:** `npm run check` passes 827 tests with zero failures
 and zero skips on macOS with Node v26.8.1. No real run has exercised contract 6
 yet; see [the closure checkpoint](docs/parity-verification.md#contract-6-closure-checkpoint--2026-10-01).
 
