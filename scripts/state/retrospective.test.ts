@@ -115,3 +115,13 @@ test('accepted: one cause of the broad root verified while its parent stays in r
   closed.tasks[0]!.finishedAt = minute(30);
   assert.match(messages(closed), /task 01 is done with open defects DF-2/);
 });
+
+test('refused: a downstream task forecast as closable while its schema prerequisite is still open', () => {
+  const prior = retrospectiveState();
+  const next = structuredClone(prior);
+  next.verification!.repairAttempts = [v3Attempt('RA-1', 'F-11', 'DF-15', minute(20),
+    { taskId: '04', expectedProgress: 'task_closure' })];
+  assert.match(transition(prior, next), /task 04 is not closable while blocker 02 is repair; forecast the defect or scenario instead/);
+  next.verification!.repairAttempts = [v3Attempt('RA-1', 'F-11', 'DF-15', minute(20), { taskId: '04' })];
+  assert.deepEqual(validateStateTransition(prior, next), []);
+});

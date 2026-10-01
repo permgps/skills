@@ -27,7 +27,7 @@ with an open defect. Reviews read one diff per task commit, never a range. The
 dashboard shows defects, the repair budget and readiness. Contract-5 runs remain
 readable and resume as contract 6 with inherited history.
 
-**Verification status:** `npm run check` passes 823 tests with zero failures
+**Verification status:** `npm run check` passes 824 tests with zero failures
 and zero skips on macOS with Node v26.8.1. No real run has exercised contract 6
 yet; see [the closure checkpoint](docs/parity-verification.md#contract-6-closure-checkpoint--2026-10-01).
 

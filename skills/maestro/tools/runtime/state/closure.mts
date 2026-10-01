@@ -491,6 +491,13 @@ export function validateClosureTransition(previous: RunState, next: RunState): V
     for (const id of attempt.readyUpstreamTaskIds) {
       if (!FINISHED.includes(tasks.get(id)?.status ?? '')) add(at, `upstream task ${id} is not ready`, { attemptId: attempt.id, rule: 'upstream' });
     }
+    if (attempt.expectedProgress === 'task_closure') {
+      for (const blockerId of tasks.get(attempt.taskId)?.blockedBy ?? []) {
+        const status = tasks.get(blockerId)?.status ?? 'missing';
+        if (!FINISHED.includes(status)) add(at, `task ${attempt.taskId} is not closable while blocker ${blockerId} is ${status}; `
+          + 'forecast the defect or scenario instead', { attemptId: attempt.id, rule: 'forecast', blockerId });
+      }
+    }
     if (attempt.outcome === 'prerequisite_blocked') {
       for (const id of attempt.blockingPrerequisites) {
         if (!open(id, tasks, defects)) add(at, `prerequisite ${id} is already closed; it does not block`, { attemptId: attempt.id, rule: 'prerequisite' });

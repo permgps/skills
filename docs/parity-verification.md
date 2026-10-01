@@ -79,7 +79,7 @@ its `budget_exhausted` review. Contract-5 runs stay readable and resume as
 contract 6 with their carried history named as inherited.
 
 Exercised on **macOS with Node v26.8.1**. `npm run check` passed
-typechecking, all eleven validator runs and **823 tests**, with zero failures
+typechecking, all eleven validator runs and **824 tests**, with zero failures
 or skips. The new rule tests were confirmed to fail first:
 
 - the closure-rule tests failed with the closure rules disabled;
@@ -91,6 +91,7 @@ the failed one. The runtime refuses each recorded exit:
 - a broad run behind a failed bootstrap;
 - a ninth repair with no strategy review;
 - a downstream relaunch before its upstream;
+- a downstream task forecast as closable while its upstream is open;
 - an unauthorized limit raise;
 - a repair commit review would not see;
 - a misattributed execution.

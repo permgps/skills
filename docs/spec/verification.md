@@ -312,7 +312,9 @@ it never had.
    requires the defect verified and a `commit` listed in the task's `commits`.
    `prerequisite_blocked` names open tasks or defects in `blockingPrerequisites`.
    `expectedProgress: task_closure` is refused while the defect lists residual
-   parent criteria or blocking prerequisites. `readyUpstreamTaskIds` are in
+   parent criteria or blocking prerequisites, and, at the write that appends
+   the attempt, while any `blockedBy` task of its task is not `review` or
+   `done`. `readyUpstreamTaskIds` are in
    `review` or `done` at the write that appends the attempt.
 4. Measured by `at`, the attempts since the latest strategy review form a batch.
    When a batch holds two or more attempts and no task reached `done` since its
@@ -354,7 +356,10 @@ it never had.
    required parameter and the capture key carries route, locale, viewport and
    state; goldens come only from the reference origin. Rules 4–6 are procedure,
    held by review and the bundle's verification procedures; the validator holds
-   rules 1–3.
+   rules 1–3. It can check that an attempt's commit is among its task's
+   commits, but not that `commits` lists every commit an executor returned:
+   the state never holds the executor's return, so that comparison is the
+   orchestrator's before review dispatch.
 
 Valid: a readiness record shows `bootstrap: setup_failed` because the
 verification copy denied its own root; the coordinator allows the copy's root,
