@@ -37,6 +37,16 @@ const VALUE_SET_CONSTANTS: Record<string, string> = {
   'outcome': 'CLOSURE_OUTCOMES',
   'verification.executions[].result': 'CHECK_RESULTS',
   'verification.obligations[].result': 'VERIFICATION_RESULTS',
+  'verification.readiness[].probes[].kind': 'READINESS_PROBE_KINDS',
+  'verification.readiness[].probes[].result': 'READINESS_PROBE_RESULTS',
+  'verification.executions[].failureCause': 'FAILURE_CAUSES',
+  'verification.defects[].causeClass': 'DEFECT_CAUSES',
+  'verification.defects[].status': 'DEFECT_STATUSES',
+  'verification.repairAttempts[].outcome': 'REPAIR_OUTCOMES',
+  'verification.repairAttempts[].repeatKind': 'REPEAT_KINDS',
+  'verification.repairAttempts[].expectedProgress': 'EXPECTED_PROGRESS',
+  'verification.strategyReviews[].trigger': 'STRATEGY_TRIGGERS',
+  'verification.strategyReviews[].decision': 'STRATEGY_DECISIONS',
 };
 
 /** Stage ids belong to phases.md; the contract only mirrors them. */
@@ -267,16 +277,30 @@ export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise
     }
     if (statedVersion >= 5) {
       const verificationFile = path.join(specDir, 'verification.md');
-      const extension = findTable(parseTables(await readFile(verificationFile, 'utf8')), ['Entity', 'Exact fields (a trailing ? means optional)']);
-      const entities: Record<string, string> = {
-        'verification-2 record': 'VerificationRecordV2', 'sourceSnapshots[]': 'SourceSnapshot',
-        'sourceClauses[]': 'SourceClause', 'manifestAudits[]': 'ManifestAudit',
-        'scopeBaseline': 'ScopeBaseline', 'scopeMappings[]': 'ScopeMapping',
-        'journeys[]': 'VerificationJourney', 'negativeControls[]': 'NegativeControl',
-        'control run': 'ControlRun', 'extended repairAttempts[]': 'RepairAttemptV2',
-      };
-      for (const [entity, name] of Object.entries(entities)) {
-        const row = extension?.rows.find(item => clean(item['Entity']) === entity);
+      // One table per verification extension. Rows are pooled across them so a
+      // later extension is held to the same exact-field rule as the first.
+      const exactColumn = 'Exact fields (a trailing ? means optional)';
+      const extensionRows = parseTables(await readFile(verificationFile, 'utf8'))
+        .filter(table => table.columns.includes('Entity') && table.columns.includes(exactColumn))
+        .flatMap(table => table.rows);
+      // [entity, interface, occurrence]: two extensions each name a row
+      // 'extended repairAttempts[]', held to its own interface in table order.
+      const entities: Array<[string, string, number]> = [
+        ['verification-2 record', 'VerificationRecordV2', 0], ['sourceSnapshots[]', 'SourceSnapshot', 0],
+        ['sourceClauses[]', 'SourceClause', 0], ['manifestAudits[]', 'ManifestAudit', 0],
+        ['scopeBaseline', 'ScopeBaseline', 0], ['scopeMappings[]', 'ScopeMapping', 0],
+        ['journeys[]', 'VerificationJourney', 0], ['negativeControls[]', 'NegativeControl', 0],
+        ['control run', 'ControlRun', 0], ['extended repairAttempts[]', 'RepairAttemptV2', 0],
+      ];
+      if (statedVersion >= 6) entities.push(
+        ['verification-3 record', 'VerificationRecordV3', 0], ['readiness[]', 'ReadinessRecord', 0],
+        ['readiness probe', 'ReadinessProbe', 0], ['extended checks[]', 'VerificationCheckV3', 0],
+        ['extended executions[]', 'CheckExecutionV3', 0], ['extended decisions[]', 'VerificationDecisionV3', 0],
+        ['defects[]', 'Defect', 0], ['extended repairAttempts[]', 'RepairAttemptV3', 1],
+        ['strategyReviews[]', 'StrategyReview', 0], ['strategy answers', 'StrategyAnswers', 0],
+      );
+      for (const [entity, name, occurrence] of entities) {
+        const row = extensionRows.filter(item => clean(item['Entity']) === entity)[occurrence];
         const declared = String(row?.['Exact fields (a trailing ? means optional)'] ?? '').replace(/\([^)]*\)/g, '').split(',')
           .flatMap(part => /`([A-Za-z][A-Za-z0-9_]*)(?:\[\])?\??`/.exec(part)?.[1] ?? []);
         const implemented = parseInterfaceFields(source, name);
@@ -284,7 +308,7 @@ export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise
           add('extension-fields', verificationFile, row?.__line ?? 0, `${name} direct fields disagree with its exact extension declaration`);
         }
       }
-      log.info('extension-fields', 'completion record fields compared', { records: Object.keys(entities).length });
+      log.info('extension-fields', 'completion record fields compared', { records: entities.length });
 
     }
     log.info('version', 'the contract version and the page\'s copy compared', {

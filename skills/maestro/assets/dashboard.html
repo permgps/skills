@@ -357,7 +357,7 @@
 globalThis.MAESTRO_LOGIC = (function () {
   'use strict';
 
-  var KNOWN_CONTRACT_VERSION = 5;
+  var KNOWN_CONTRACT_VERSION = 6;
 
   // Mirrors docs/spec/phases.md. scripts/validate/dashboard-integrity.ts fails
   // the build when this set or any label below drifts from vocabulary.md.
@@ -1539,7 +1539,7 @@ globalThis.MAESTRO_LOGIC = (function () {
   }
 
   function completionResults(record, obligation, checks) {
-    if (record.version !== 2) return [];
+    if (record.version < 2) return [];
     var required = record.checks.filter(function (check) { return check.required && obligation.checkIds.indexOf(check.id) !== -1; });
     var superseded = record.negativeControls.map(function (item) { return item.supersedes; });
     var controls = record.negativeControls.filter(function (item) {
@@ -1572,7 +1572,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     var record = state && state.verification;
     var requirements = (state && state.requirements) || [];
     var currentIds = requirements.filter(function (item) { return item.status !== 'deferred' && item.status !== 'dropped'; }).map(function (item) { return item.id; });
-    var baseline = record && record.version === 2 && record.scopeBaseline;
+    var baseline = record && record.version >= 2 && record.scopeBaseline;
     var originalIds = baseline ? baseline.requirementIds : [];
     var originalPass = function (id) {
       if (!baseline || !summary || summary.legacy) return false;
@@ -1601,7 +1601,7 @@ globalThis.MAESTRO_LOGIC = (function () {
       addedIds: baseline ? requirements.filter(function (item) { return originalIds.indexOf(item.id) === -1; }).map(function (item) { return item.id; }) : [],
       deferredIds: requirements.filter(function (item) { return item.status === 'deferred'; }).map(function (item) { return item.id; }),
       droppedIds: requirements.filter(function (item) { return item.status === 'dropped'; }).map(function (item) { return item.id; }),
-      changedIds: record && record.version === 2 ? Array.from(new Set(record.scopeMappings.filter(function (item) { return item.targetRevision === record.targetRevision && (item.relation === 'changed' || item.relation === 'split'); }).map(function (item) { return item.originalRequirementId; }))) : [],
+      changedIds: record && record.version >= 2 ? Array.from(new Set(record.scopeMappings.filter(function (item) { return item.targetRevision === record.targetRevision && (item.relation === 'changed' || item.relation === 'split'); }).map(function (item) { return item.originalRequirementId; }))) : [],
       exceptionDecisionIds: record ? record.decisions.filter(function (item) { return item.kind === 'accepted_exception'; }).map(function (item) { return item.id; }) : [] };
   }
 
@@ -1616,7 +1616,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     var checks = {};
     record.checks.forEach(function (check) {
       var execution = effectiveExecution(check, record);
-      checks[check.id] = record.version === 2 && check.currentFingerprint.acceptanceInput !== record.acceptanceInputDigest ? 'stale' : !execution ? 'not_run'
+      checks[check.id] = record.version >= 2 && check.currentFingerprint.acceptanceInput !== record.acceptanceInputDigest ? 'stale' : !execution ? 'not_run'
         : sameFingerprint(execution.fingerprint, check.currentFingerprint) ? execution.result : 'stale';
     });
     var obligationResults = {};
@@ -1672,7 +1672,7 @@ globalThis.MAESTRO_LOGIC = (function () {
       && record.findings.filter(function (item) { return item.status === 'open'; })
         .every(function (item) { return round.findingIds.indexOf(item.id) !== -1; });
     var promised = record.promisedWork.some(function (item) { return item.status === 'open'; });
-    var safeguardsPending = record.version === 2 && (!record.scopeBaseline || !freshManifestAudit(record, (state.requirements || []).map(function (item) { return item.id; })));
+    var safeguardsPending = record.version >= 2 && (!record.scopeBaseline || !freshManifestAudit(record, (state.requirements || []).map(function (item) { return item.id; })));
     var g4 = failedIds.length ? 'failed'
       : Object.keys(requirementResults).length === 0 || incompleteIds.length || !roundCurrent || promised || safeguardsPending
         ? 'pending' : 'passed';

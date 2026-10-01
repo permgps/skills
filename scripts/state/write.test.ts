@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, readdir, rm, chmod } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, chmod, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -8,6 +8,7 @@ import { writeState, serializeState, StaleStateError } from './write.ts';
 import { InvalidStateError } from './validate.ts';
 import { STATE_FILE } from './paths.ts';
 import type { RunState } from './contract.ts';
+import { CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, repairContract6State } from './fixtures/verification.ts';
 
 function baseline(): RunState {
   return {
@@ -192,4 +193,28 @@ test('a file that cannot corroborate the claim is refused too', async () => {
 
     assert.deepEqual(await readdir(dir), []);
   });
+});
+
+test('a write that launches a task on a blocker still in repair is refused and the file keeps the plan', async () => {
+  const project = await mkdtemp(path.join(tmpdir(), 'state-launch-'));
+  try {
+    const dir = path.join(project, '.maestro');
+    for (const [relative, body] of Object.entries({ ...CAPTURES, ...CONTROL_CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
+      const filename = path.join(dir, 'synthetic-menu', relative);
+      await mkdir(path.dirname(filename), { recursive: true });
+      await writeFile(filename, body);
+    }
+    const prior = repairContract6State();
+    prior.tasks.push({ ...prior.tasks[0]!, id: '02', title: 'Account page', status: 'queued', blockedBy: ['01'], commits: [] });
+    await writeState(dir, prior);
+    const launched = structuredClone(prior);
+    launched.tasks[1]!.status = 'running';
+    await assert.rejects(writeState(dir, launched), (error: unknown) => error instanceof InvalidStateError
+      && error.violations.some(item => /task 02 cannot run while blocker 01 is repair/.test(item.message)));
+    assert.match(await readFile(path.join(dir, STATE_FILE), 'utf8'), /"status":\s*"queued"/);
+    launched.tasks[0]!.status = 'review';
+    await writeState(dir, launched);
+  } finally {
+    await rm(project, { recursive: true, force: true });
+  }
 });

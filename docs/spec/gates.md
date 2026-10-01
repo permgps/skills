@@ -7,8 +7,8 @@ that fails is not a warning: the phase is redone.
 |---|---|---|
 | G1 | briefing | Every требование has a status and no unexplained open entry; contract 5 also requires a fresh returned independent source audit and frozen initial agreement |
 | G2 | spec | Every live требование is dispositioned; independent intent and raw-reference passes find no unresolved mandatory coverage gap |
-| G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner and integration dependency; a task reader finds each task executable |
-| G4 | acceptance | Current, applicable evidence and independent discovery cover the current contract; failures and incomplete checks are reconciled under [`verification.md`](verification.md) |
+| G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner that transitively depends on each integration dependency; no two таски share a file unless one transitively blocks the other; a task reader finds each task executable |
+| G4 | acceptance | Current, applicable evidence and independent discovery cover the current contract; failures and incomplete checks are reconciled under [`verification.md`](verification.md); contract 6 also closes `completed` with no open defect, and stops after an exhausted budget only with a `budget_exhausted` strategy review |
 
 ## Evidence
 

@@ -77,10 +77,17 @@ observable obligation IDs and check IDs it serves, its implementation owner
 when implementation is required, the check execution owner, variants, and
 integration prerequisites. `interfaces.md` carries shared boundaries; the
 executor does not receive the unrelated full specification. A verification-only
-task can own an execution without claiming implementation files. G3 validates
-both requirement-to-obligation-to-task and obligation-to-check-to-owner paths,
-including dependency cycles and integrated-app prerequisites. Headless rendered
-criteria are valid task checks; a visible viewer takeover is not.
+task can own an execution without claiming implementation files. G3's
+mechanical half (`scripts/gates/check-g3.ts`) validates both
+requirement-to-obligation-to-task and obligation-to-check-to-owner paths, that
+every implementation owner is an integration dependency of the check, that the
+check's execution owner transitively depends on each integration dependency,
+that two таски sharing a path in `files` or `zone` are ordered by `blockedBy`,
+and that the task graph has no cycle or missing prerequisite. It does not read
+task files: whether a declared prerequisite, seam or completion artifact is
+consistent across them is the plan-consistency reader's verdict, recorded
+against G3. Headless rendered criteria are valid task checks; a visible viewer
+takeover is not.
 
 `reference.md` is a neutral projection of declared source identity, role,
 availability, and conditions. The independent G2 and G4 reference passes may

@@ -108,7 +108,7 @@ export async function validateEvidence(
     }
   }
 
-  if (record.version === 2) {
+  if (record.version !== 1) {
     const field = 'verification.manifestDigest';
     const file = await checkedFile(runDir, 'manifest.md', field, violations);
     if (file && createHash('sha256').update(await readFile(file)).digest('hex') !== record.manifestDigest) {

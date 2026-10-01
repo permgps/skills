@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { validateState, isValidState, type StateViolation } from './validate.ts';
-import { CONTRACT_VERSION, type RunState } from './contract.ts';
+import { CONTRACT_VERSION, type RunState, type VerificationRecordV3 } from './contract.ts';
+import { contract6State, sourceVerifiedState } from './fixtures/verification.ts';
+import { prepareLegacyResume } from './projection.ts';
 
 /** A state that passes every rule; each test bends exactly one thing. */
 function baseline(): RunState {
@@ -766,4 +768,40 @@ test('the canonical shipped state modules import only bundle-local modules and N
       }
     }
   }
+});
+
+test('a contract-5 state stays valid when the build knows contract 6', () => {
+  assert.deepEqual(validateState(sourceVerifiedState()), []);
+});
+
+test('a contract-6 state with verification 3 and a matching readiness record is valid', () => {
+  assert.deepEqual(validateState(contract6State()), []);
+});
+
+test('contract 6 refuses a verification-2 record, and contract 5 refuses verification 3', () => {
+  const six = { ...sourceVerifiedState(), contractVersion: 6 };
+  assert.ok(validateState(six).some(item => item.field === 'verification.version'));
+  const five = { ...contract6State(), contractVersion: 5 };
+  assert.ok(validateState(five).some(item => item.field === 'verification.version'));
+});
+
+test('resuming a contract-5 run as contract 6 carries every record verbatim and infers no readiness or defect', () => {
+  const old = sourceVerifiedState();
+  old.lifecycle = 'closed'; old.outcome = 'stopped_incomplete'; old.stopReason = 'Repair budget exhausted';
+  const prior = old.verification!;
+  const candidate: VerificationRecordV3 = {
+    ...structuredClone(prior), version: 3, readiness: [], defects: [], strategyReviews: [],
+    inheritedExecutionIds: prior.executions.map(item => item.id),
+    inheritedAttemptIds: prior.repairAttempts.map(item => item.id),
+  };
+  const resumed = prepareLegacyResume(old, candidate);
+  assert.equal(resumed.contractVersion, 6);
+  assert.equal(resumed.lifecycle, 'active');
+  assert.deepEqual(validateState(resumed), []);
+  const { version: _from, ...carried } = prior;
+  const { version: _to, readiness, defects, strategyReviews, inheritedExecutionIds: _e, inheritedAttemptIds: _a, ...kept } = resumed.verification as VerificationRecordV3;
+  assert.deepEqual(kept, carried);
+  assert.deepEqual([readiness, defects, strategyReviews], [[], [], []]);
+  assert.throws(() => prepareLegacyResume(old, { ...candidate, inheritedExecutionIds: [] }), /inherited/);
+  assert.throws(() => prepareLegacyResume(old, { ...candidate, readiness: contract6State().verification!.readiness }), /infers no readiness/);
 });

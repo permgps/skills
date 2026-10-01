@@ -21,13 +21,16 @@
  * against. The dashboard has no handling to add because it never read the field
  * under either name, but it does carry its own copy of this number, and
  * `scripts/validate/state-matches-spec.ts` holds the two together.
+ * Version 6 requires verification 3: readiness, defects closing apart from
+ * their task, strategy reviews and an authorized limit raise. It changes the
+ * repair outcome and decision value sets and defines a finished blocker.
  * Version 5 requires source audit, frozen scope and completion safeguards.
  * Version 4 changes completion semantics: lifecycle, outcome and a versioned
  * verification index are required for a new state. Earlier states remain
  * readable without inferred verification; validateState enforces the version
  * boundary rather than narrowing this reader-facing interface.
  */
-export const CONTRACT_VERSION = 5;
+export const CONTRACT_VERSION = 6;
 
 /** The stage ids from docs/spec/phases.md, in run order. */
 export type StageId =
@@ -474,7 +477,150 @@ export interface VerificationRecordV2 extends Omit<VerificationRecordV1, 'versio
   repairAttempts: RepairAttemptV2[];
 }
 
-export type VerificationRecord = VerificationRecordV1 | VerificationRecordV2;
+export type ReadinessProbeKind = 'source_identity' | 'secrets_excluded' | 'autoload' | 'bootstrap'
+  | 'storage_and_cwd' | 'database' | 'listener' | 'browser' | 'write_boundary';
+export const READINESS_PROBE_KINDS: readonly ReadinessProbeKind[] = ['source_identity', 'secrets_excluded', 'autoload', 'bootstrap', 'storage_and_cwd', 'database', 'listener', 'browser', 'write_boundary'];
+
+export type ReadinessProbeResult = 'passed' | 'setup_failed' | 'unavailable' | 'not_applicable';
+export const READINESS_PROBE_RESULTS: readonly ReadinessProbeResult[] = ['passed', 'setup_failed', 'unavailable', 'not_applicable'];
+
+export type FailureCause = 'product' | 'test' | 'setup' | 'unavailable_capability';
+export const FAILURE_CAUSES: readonly FailureCause[] = ['product', 'test', 'setup', 'unavailable_capability'];
+
+export type DefectCause = 'product' | 'test' | 'contract' | 'evidence' | 'environment';
+export const DEFECT_CAUSES: readonly DefectCause[] = ['product', 'test', 'contract', 'evidence', 'environment'];
+
+export type DefectStatus = 'open' | 'verified' | 'superseded';
+export const DEFECT_STATUSES: readonly DefectStatus[] = ['open', 'verified', 'superseded'];
+
+export type RepairOutcomeV3 = 'defect_verified' | 'still_failing' | 'unavailable' | 'prerequisite_blocked';
+export const REPAIR_OUTCOMES: readonly RepairOutcomeV3[] = ['defect_verified', 'still_failing', 'unavailable', 'prerequisite_blocked'];
+
+export type RepeatKind = 'first' | 'same_action_failed' | 'different_action_same_cause'
+  | 'new_cause_same_surface' | 'prerequisite_blocked' | 'coordination_correction';
+export const REPEAT_KINDS: readonly RepeatKind[] = ['first', 'same_action_failed', 'different_action_same_cause', 'new_cause_same_surface', 'prerequisite_blocked', 'coordination_correction'];
+
+export type ExpectedProgress = 'defect_verified' | 'scenario_verified' | 'task_closure';
+export const EXPECTED_PROGRESS: readonly ExpectedProgress[] = ['defect_verified', 'scenario_verified', 'task_closure'];
+
+export type StrategyTrigger = 'batch_without_closure' | 'same_cause_survived' | 'budget_exhausted' | 'limit_request';
+export const STRATEGY_TRIGGERS: readonly StrategyTrigger[] = ['batch_without_closure', 'same_cause_survived', 'budget_exhausted', 'limit_request'];
+
+export type StrategyDecision = 'change_strategy' | 'stop_incomplete' | 'request_limit';
+export const STRATEGY_DECISIONS: readonly StrategyDecision[] = ['change_strategy', 'stop_incomplete', 'request_limit'];
+
+/** One probe of the verification target, made by trying the capability. */
+export interface ReadinessProbe {
+  kind: ReadinessProbeKind;
+  result: ReadinessProbeResult;
+  evidenceIds: string[];
+  limitation?: string;
+}
+
+/**
+ * Whether the candidate can be evaluated at all, recorded before a broad run.
+ * A setup failure here is the coordinator's to correct; it never spends a
+ * repair attempt, and thousands of identical errors behind it are not a
+ * product inventory.
+ */
+export interface ReadinessRecord {
+  id: string;
+  targetFingerprint: EvidenceFingerprint;
+  executedAt: string;
+  probes: ReadinessProbe[];
+  supersedes?: string;
+}
+
+export interface VerificationCheckV3 extends VerificationCheck {
+  /** Probes this check's result depends on, besides `source_identity`. */
+  readinessProbes?: ReadinessProbeKind[];
+}
+
+export interface CheckExecutionV3 extends CheckExecution {
+  readinessId?: string;
+  failureCause?: FailureCause;
+}
+
+export interface VerificationDecisionV3 extends Omit<VerificationDecision, 'kind'> {
+  kind: VerificationDecision['kind'] | 'limit_increase';
+  strategyReviewId?: string;
+  previousLimits?: RepairLimits;
+  limits?: RepairLimits;
+  forecast?: string;
+}
+
+/** The causal unit a bounded repair can close; the parent task closes only through review. */
+export interface Defect {
+  id: string;
+  parentTaskId: string;
+  rootFindingId: string;
+  findingIds: string[];
+  causeClass: DefectCause;
+  counterexample: string;
+  repairCriteriaCheckIds: string[];
+  residualParentCriteria: string[];
+  status: DefectStatus;
+  verifiedExecutionIds: string[];
+  supersedes?: string;
+}
+
+export interface RepairAttemptV3 extends Omit<RepairAttemptV2, 'outcome'> {
+  outcome: RepairOutcomeV3;
+  defectId: string;
+  repeatKind: RepeatKind;
+  expectedProgress: ExpectedProgress;
+  readyUpstreamTaskIds: string[];
+  blockingPrerequisites: string[];
+  unlocksTaskIds: string[];
+  commit?: string;
+}
+
+/** The seven questions a repeated incomplete batch must answer before another attempt. */
+export interface StrategyAnswers {
+  contractConsistent: string;
+  dependenciesReady: string;
+  environmentEvaluable: string;
+  detectorDistinguishes: string;
+  rootCauseTargeted: string;
+  taskClosable: string;
+  nextChange: string;
+}
+
+export interface StrategyReview {
+  id: string;
+  at: string;
+  trigger: StrategyTrigger;
+  attemptIds: string[];
+  closedTaskIds: string[];
+  answers: StrategyAnswers;
+  decision: StrategyDecision;
+  nextApproach: string;
+  dispatchId: string;
+  returnId: string;
+}
+
+/**
+ * Contract 6. Records carried verbatim from verification 2 on resume are named
+ * in the two inherited lists, so the rules that demand a new field skip exactly
+ * them and history stays readable without invented readiness or defects.
+ */
+export interface VerificationRecordV3 extends Omit<VerificationRecordV2, 'version' | 'checks' | 'executions' | 'decisions' | 'repairAttempts'> {
+  version: 3;
+  checks: VerificationCheckV3[];
+  executions: CheckExecutionV3[];
+  decisions: VerificationDecisionV3[];
+  readiness: ReadinessRecord[];
+  defects: Defect[];
+  strategyReviews: StrategyReview[];
+  repairAttempts: Array<RepairAttemptV2 | RepairAttemptV3>;
+  inheritedExecutionIds: string[];
+  inheritedAttemptIds: string[];
+}
+
+/** Verification 2 and 3 both carry the source and completion safeguards. */
+export type SafeguardedRecord = VerificationRecordV2 | VerificationRecordV3;
+
+export type VerificationRecord = VerificationRecordV1 | VerificationRecordV2 | VerificationRecordV3;
 
 /** Which dial moved, and at which phase boundary it took effect. */
 export interface DialChange {

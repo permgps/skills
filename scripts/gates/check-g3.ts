@@ -87,7 +87,7 @@ export function checkG3(state: RunState): GateFinding[] {
 
   if (state.contractVersion >= 4 && state.verification) {
     const record = state.verification;
-    if (record.version === 2) {
+    if (record.version !== 1) {
       for (const violation of validateCompletionRecords(state, record)) findings.push({ requirementId: '',
         message: `${violation.field}: ${violation.message}` });
     }

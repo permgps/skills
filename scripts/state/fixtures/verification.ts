@@ -1,15 +1,19 @@
-// Shared synthetic version-4 state and immutable capture contents.
+// Shared synthetic version-4, version-5 and version-6 states and immutable capture contents.
 //
 // The strings are deliberately credential-free so repository tooling and the copied
 // runtime can exercise the same artifact hashes without production data.
 
 import { createHash } from 'node:crypto';
 
-import type { EvidenceFingerprint, RunState, VerificationRecordV1, VerificationRecordV2 } from '../contract.ts';
+import type {
+  Defect, EvidenceFingerprint, RepairAttemptV3, RunState, StrategyReview, VerificationFinding,
+  VerificationRecordV1, VerificationRecordV2, VerificationRecordV3,
+} from '../contract.ts';
 
 export const CAPTURES: Record<string, string> = {
   'evidence/REF-1/source.txt': 'Reference menu opens on pointer entry.\n',
   'evidence/X-1/pointer.txt': 'initial:hidden hover:visible panel:usable exit:hidden\n',
+  'evidence/RD-1/probes.txt': 'source_identity:passed secrets_excluded:passed browser:passed\n',
 };
 
 export const sha256 = (body: string): string => createHash('sha256').update(body).digest('hex');
@@ -218,5 +222,82 @@ export function deferredScopeState(): RunState & { verification?: VerificationRe
   record.acceptanceRounds[0]!.targetRevision = 2;
   record.acceptanceRounds[0]!.coverageReviewIds = record.coverageReviews.map(item => item.id);
   record.acceptanceRounds[0]!.requirementResults = Object.fromEntries(ids.slice(0, 18).map(id => [id, 'passed']));
+  return state;
+}
+
+/**
+ * A contract-6 delivery: the version-5 delivery measured against a readiness
+ * record that probed the same build and runtime.
+ */
+export function contract6State(base: ReturnType<typeof sourceVerifiedState> = sourceVerifiedState()): RunState & { verification?: VerificationRecordV3 } {
+  const state = base;
+  const v2 = state.verification!;
+  const probes = 'evidence/RD-1/probes.txt';
+  const record: VerificationRecordV3 = {
+    ...v2, version: 3,
+    checks: v2.checks.map(check => ({ ...check, readinessProbes: ['browser'] })),
+    executions: v2.executions.map(execution => ({ ...execution, readinessId: 'RD-1' })),
+    evidence: [...v2.evidence, { id: 'E-RD-1', path: probes, sha256: sha256(CAPTURES[probes]!),
+      mediaType: 'text/plain', capturedAt: '2026-09-29T09:14:00Z', origin: 'execution' }],
+    readiness: [{ id: 'RD-1', targetFingerprint: fingerprint(), executedAt: '2026-09-29T09:14:00Z',
+      probes: (['source_identity', 'secrets_excluded', 'browser'] as const)
+        .map(kind => ({ kind, result: 'passed' as const, evidenceIds: ['E-RD-1'] })) }],
+    defects: [], strategyReviews: [], inheritedExecutionIds: [], inheritedAttemptIds: [],
+  };
+  return { ...state, contractVersion: 6, verification: record };
+}
+
+/** The contract-6 run while it is still building: no acceptance round, G4 pending. */
+export function activeContract6State(base?: ReturnType<typeof sourceVerifiedState>): ReturnType<typeof contract6State> {
+  const state = contract6State(base);
+  state.lifecycle = 'active'; delete state.outcome; delete state.finishedAt;
+  state.currentStage = 'build';
+  state.stages = [{ id: 'build', status: 'active', startedAt: '2026-09-29T09:10:00Z' }];
+  state.gates[3]!.status = 'pending';
+  state.verification!.acceptanceRounds = [];
+  return state;
+}
+
+/** An open reviewer finding against the menu check; each one is its own stable root. */
+export function finding(id: string, extra: Partial<VerificationFinding> = {}): VerificationFinding {
+  return { id, requirementIds: ['R01'], obligationIds: ['O-1'], checkIds: ['C-1'], evidenceIds: ['E-1'],
+    origin: 'reviewer', description: `Reviewer finding ${id}`, status: 'open', ...extra };
+}
+
+export function defect(id: string, rootFindingId: string, extra: Partial<Defect> = {}): Defect {
+  return { id, parentTaskId: '01', rootFindingId, findingIds: [rootFindingId], causeClass: 'product',
+    counterexample: 'Hovering the trigger leaves the panel hidden', repairCriteriaCheckIds: ['C-1'],
+    residualParentCriteria: ['Keyboard focus returns to the trigger on exit'], status: 'open',
+    verifiedExecutionIds: [], ...extra };
+}
+
+export function v3Attempt(id: string, root: string, defectId: string, at: string, extra: Partial<RepairAttemptV3> = {}): RepairAttemptV3 {
+  return { id, findingId: root, taskId: '01', at, outcome: 'still_failing', rootFindingId: root,
+    hypothesis: 'The hover handler is never bound', diagnosis: 'No listener on the trigger element',
+    evidenceIds: ['E-1'], strategy: 'implementation_change', action: 'Bind the pointer handler',
+    followUpCheckIds: ['C-1'], defectId, repeatKind: 'first', expectedProgress: 'defect_verified',
+    readyUpstreamTaskIds: [], blockingPrerequisites: [], unlocksTaskIds: [], ...extra };
+}
+
+export function strategyReview(id: string, at: string, extra: Partial<StrategyReview> = {}): StrategyReview {
+  return { id, at, trigger: 'batch_without_closure', attemptIds: [], closedTaskIds: [],
+    answers: { contractConsistent: 'Yes', dependenciesReady: 'The schema task is still in repair',
+      environmentEvaluable: 'Yes, readiness RD-1 passed', detectorDistinguishes: 'Control NC-1 detects it',
+      rootCauseTargeted: 'No, one symptom per attempt', taskClosable: 'No residual criteria were scheduled',
+      nextChange: 'Close the upstream schema defect before any downstream repair' },
+    decision: 'change_strategy', nextApproach: 'Upstream first, then one scenario per task',
+    dispatchId: `strategy-dispatch-${id}`, returnId: `strategy-return-${id}`, ...extra };
+}
+
+/**
+ * A contract-6 run in repair: task 01 carries an open finding F-1 and its
+ * defect DF-1, with a passed negative control on the repair-criteria check.
+ */
+export function repairContract6State(): ReturnType<typeof contract6State> {
+  const state = activeContract6State(controlledState());
+  state.tasks[0] = { ...state.tasks[0]!, status: 'repair', repairs: 1, commits: ['abcdef0', 'fedcba1'] };
+  state.verification!.findings = [finding('F-1')];
+  state.verification!.defects = [defect('DF-1', 'F-1')];
+  state.verification!.repairLimits = { perFinding: 2, total: 20 };
   return state;
 }

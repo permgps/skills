@@ -6,8 +6,9 @@
 import { isDeepStrictEqual } from 'node:util';
 
 import { createLogger } from '../shared/log.mts';
-import { CONTRACT_VERSION, type Debt, type RunState, type TaskEntry, type VerificationRecord } from './contract.mts';
-import { deriveVerification, deriveScopeProgress, hasFreshManifestAudit, validateVerificationTransition, type ScopeProgress, type VerificationSummary } from './verification.mts';
+import { type Debt, type RunState, type TaskEntry, type VerificationRecord } from './contract.mts';
+import { validateStateTransition } from './closure.mts';
+import { deriveVerification, deriveScopeProgress, hasFreshManifestAudit, type ScopeProgress, type VerificationSummary } from './verification.mts';
 
 const log = createLogger('state');
 
@@ -90,7 +91,7 @@ export function projectState(state: RunState): StateProjection {
   const summary = deriveVerification(state);
   return {
     scopeProgress,
-    completionSafeguards: state.verification.version === 2 && !!state.verification.scopeBaseline && hasFreshManifestAudit(state.verification, state.requirements.map(item => item.id)) ? 'established' : 'not-established',
+    completionSafeguards: state.verification.version !== 1 && !!state.verification.scopeBaseline && hasFreshManifestAudit(state.verification, state.requirements.map(item => item.id)) ? 'established' : 'not-established',
     legacy: false,
     verificationEstablished: state.lifecycle === 'closed' && state.outcome === 'completed'
       && summary.g4 === 'passed',
@@ -117,7 +118,17 @@ export function prepareLegacyResume(
   candidate: VerificationRecord,
   reconstruction?: LegacyReconstruction,
 ): RunState {
-  if (state.contractVersion >= 5 || (state.contractVersion === 4 && candidate.version !== 2)) throw new Error('resume conversion accepts historical guarantees only');
+  const target = { 1: 4, 2: 5, 3: 6 }[candidate.version];
+  if (state.contractVersion >= 6 || (state.contractVersion === 5 && candidate.version !== 3)
+    || (state.contractVersion === 4 && candidate.version === 1)) throw new Error('resume conversion accepts historical guarantees only');
+  if (candidate.version === 3) {
+    const carried = state.verification;
+    if (!isDeepStrictEqual([...candidate.inheritedExecutionIds].sort(), (carried?.executions ?? []).map(item => item.id).sort())
+      || !isDeepStrictEqual([...candidate.inheritedAttemptIds].sort(), (carried?.repairAttempts ?? []).map(item => item.id).sort())
+      || candidate.readiness.length || candidate.defects.length || candidate.strategyReviews.length) {
+      throw new Error('v6 resume names carried history as inherited and infers no readiness, defect or strategy review');
+    }
+  }
   if (state.contractVersion < 4 && (candidate.executions.length > 0
     || candidate.acceptanceRounds.length > 0
     || candidate.coverageReviews.some(item => item.status === 'complete'))) {
@@ -131,7 +142,7 @@ export function prepareLegacyResume(
       throw new Error('v5 resume preserves historical executions/rounds and needs a fresh acceptance input identity');
     }
   }
-  if (candidate.version === 2 && (candidate.scopeBaseline || candidate.manifestAudits.some(item => item.result === 'passed')
+  if (state.contractVersion < 5 && candidate.version !== 1 && (candidate.scopeBaseline || candidate.manifestAudits.some(item => item.result === 'passed')
     || candidate.negativeControls.some(item => item.result === 'passed'))) {
     throw new Error('v5 resume needs fresh independent audit and agreement; no inferred safeguards');
   }
@@ -146,7 +157,8 @@ export function prepareLegacyResume(
     || state.tasks.some(task => !task.commits || !task.zone || !task.wave))) {
     throw new Error('legacy planning, debt, and additions must be reconstructed from run artifacts');
   }
-  const gates = state.gates.map(gate => gate.id === 'G4' || (candidate.version === 2 && gate.id === 'G1')
+  // A contract-5 run already earned its safeguards; only an older one re-earns G1.
+  const gates = state.contractVersion === 5 ? [...state.gates] : state.gates.map(gate => gate.id === 'G4' || (candidate.version !== 1 && gate.id === 'G1')
     ? { ...gate, status: 'pending' as const } : gate);
   if (!gates.some(gate => gate.id === 'G4')) gates.push({ id: 'G4', status: 'pending', findings: [] });
   log.info('resume', 'prepared legacy candidate without inferred passes', {
@@ -162,13 +174,13 @@ export function prepareLegacyResume(
     tasks: reconstruction?.tasks ?? state.tasks,
     debt: reconstruction?.debt ?? state.debt!,
     additions: reconstruction?.additions ?? state.additions!,
-    contractVersion: candidate.version === 1 ? 4 : CONTRACT_VERSION,
+    contractVersion: target,
     lifecycle: 'active',
     verification: candidate,
     gates,
     updatedAt: new Date().toISOString(),
   };
-  if (validateVerificationTransition(state, resumed).length > 0) {
+  if (validateStateTransition(state, resumed).length > 0) {
     throw new Error('resume must retain the published legacy graph; reconstruct missing metadata from actual artifacts');
   }
   return resumed;

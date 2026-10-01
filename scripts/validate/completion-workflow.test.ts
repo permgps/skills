@@ -182,7 +182,7 @@ test('recorded external runs preserve missing state, changed authority, and abse
     const result = await gradeRecordedWorkflow(output);
     assert.equal(result.status, 'failed');
     const reasons = (result.runs[0] as { reasons: string[] }).reasons.join('\n');
-    assert.match(reasons, /no readable verification-2 state/);
+    assert.match(reasons, /no readable verification-2 or verification-3 state/);
     assert.match(reasons, /host-observed model/);
     assert.match(reasons, /protected input changed: request.txt/);
     assert.equal(JSON.parse(await readFile(path.join(output, 'recorded-results.json'), 'utf8')).status, 'failed');

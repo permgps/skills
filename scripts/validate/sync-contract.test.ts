@@ -22,7 +22,7 @@ import net from 'node:net';
 import { mkdtemp, mkdir, writeFile, copyFile, readFile, rm, unlink, cp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, sha256, planningOwnershipState, correctedSourceAuditState, deferredScopeState, sourceVerifiedState, controlledState, verifiedState } from '../state/fixtures/verification.ts';
+import { CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, sha256, planningOwnershipState, correctedSourceAuditState, deferredScopeState, sourceVerifiedState, controlledState, verifiedState, contract6State, activeContract6State } from '../state/fixtures/verification.ts';
 import { prepareLegacyResume } from '../state/projection.ts';
 
 const SYNC = 'skills/maestro/tools/sync.mts';
@@ -904,6 +904,38 @@ test('version-5 copied runtime preserves source-audit and completion fixture out
         assert.equal(done.status === 0, expectedValid, done.out);
         if (expectedValid) assert.equal((jsonResult(done)['projection'] as { g4: string }).g4, expectedG4);
       }
+    } finally { await target.dispose(); }
+  });
+
+test('version-6 copied runtime refuses a broad run behind a failed bootstrap and publishes it after a superseding readiness record', async () => {
+    const target = await session(null);
+    try {
+      const corrected = 'bootstrap:passed\n';
+      for (const [relative, body] of Object.entries({ ...CAPTURES, 'evidence/RD-2/probes.txt': corrected, 'manifest.md': SOURCE_MANIFEST })) {
+        const filename = path.join(target.root, 'synthetic-menu', relative);
+        await mkdir(path.dirname(filename), { recursive: true }); await writeFile(filename, body);
+      }
+      const candidate = path.join(target.root, 'candidate.json');
+      const blocked = activeContract6State();
+      const record = blocked.verification!;
+      record.readiness[0]!.probes.push({ kind: 'bootstrap', result: 'setup_failed', evidenceIds: [],
+        limitation: 'the verification copy denies its own root' });
+      record.checks[0]!.readinessProbes = ['browser', 'bootstrap'];
+      await writeFile(candidate, JSON.stringify(blocked));
+      const refused = await target.run({}, ['--validate', candidate]);
+      assert.equal(refused.status, 1, refused.out);
+      assert.match(refused.out, /bootstrap failed setup/);
+      record.evidence.push({ id: 'E-RD-2', path: 'evidence/RD-2/probes.txt', sha256: sha256(corrected),
+        mediaType: 'text/plain', capturedAt: '2026-09-29T09:14:30Z', origin: 'execution' });
+      record.readiness.push({ ...record.readiness[0]!, id: 'RD-2', supersedes: 'RD-1',
+        probes: (['source_identity', 'secrets_excluded', 'browser', 'bootstrap'] as const)
+          .map(kind => ({ kind, result: 'passed' as const, evidenceIds: ['E-RD-2'] })) });
+      record.executions[0]!.readinessId = 'RD-2';
+      await writeFile(candidate, JSON.stringify(blocked));
+      const published = await target.run({}, ['--publish', candidate, '--no-open']);
+      assert.equal(published.status, 0, published.out);
+      await writeFile(candidate, JSON.stringify(contract6State()));
+      assert.equal((await target.run({}, ['--validate', candidate])).status, 0);
     } finally { await target.dispose(); }
   });
 

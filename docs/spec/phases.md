@@ -153,7 +153,11 @@ smallest plan is one таск rather than an exemption from the gate.
 The granularity table above names a wave width and never says what a wave is.
 
 **A wave is the set of таски that can run at the same time**: every id in their
-`blockedBy` has finished, and no two of them own the same file. Both halves are
+`blockedBy` has finished, and no two of them own the same file. **Finished means
+`review` or `done`.** A blocker in `queued`, `running`, `repair` or `failed` holds
+its dependents, because what they build on is not yet there or has been found
+wrong; launching on it produces downstream evidence the upstream repair will
+make stale. Both halves are
 required. The dependency graph alone would let two таски edit one module from
 opposite ends, and file ownership alone would start a таск before what it builds
 on exists.
@@ -253,8 +257,11 @@ reading it, and the run would have no record of which attempt built what.
 The build hands over a таск and takes back what an executor says it did. This
 phase is where somebody other than that executor looks.
 
-**A reviewer is given one таск's file, the diff of that таск's own commit, and
-`interfaces.md`.** It does not get `spec.md`, the манифест, the plan's
+**A reviewer is given one таск's file, the per-commit diffs of exactly that
+таск's own commits, and `interfaces.md`.** Under contract 6 a re-review after a
+repair answers two questions separately — is the defect verified against its
+repair criteria, and which parent criteria remain — and writes `done` only when
+none remain. It does not get `spec.md`, the манифест, the plan's
 reasoning, or any other таск. That is the rule [`gates.md`](gates.md) already
 states for everything between G2 and G4: the measurement is against the contract
 the executor was actually given, because a finding derived from words the
@@ -616,8 +623,30 @@ returned falsifying observation and grounded different strategy; unchanged
 wording or merely switching executor cannot qualify. Record predecessor/root,
 evidence, diagnosis dispatch/return, strategy, action and follow-up check IDs.
 Missing diagnosis keeps repair incomplete. Counts follow the stable root across
-renames, task splits and executors; per-root at most two and finite global budget
-never increases. See [verification.md](verification.md).
+renames, task and defect splits and executors; per-root at most two. Under
+contract 5 the finite global budget never increases; under contract 6 it rises
+only by a user-authorized `limit_increase` answering a `request_limit` strategy
+review with a closure forecast. See [verification.md](verification.md).
+
+### Defects, Closure Forecasts And Strategy Review
+
+Under contract 6 a repair targets a **defect**, not a whole таск. Before
+diagnosis, a broad finding is split into causal defects under its parent таск,
+keeping the root and its count. Each repair brief states the defect and its
+counterexample, the parent таск, the repair criteria as check IDs, the residual
+parent criteria, the foreign prerequisites, the expected progress and a closure
+forecast that never promises a таск closure while residual criteria or open
+prerequisites remain. Repairs run upstream first, ordered by how many таски
+they transitively unlock; a downstream defect waiting on an upstream gap is
+recorded `prerequisite_blocked` and routed to the upstream owner.
+
+A batch of attempts that closed no таск, or a cause that survived a materially
+similar repair, stops the next attempt until a fresh strategy reviewer answers
+seven questions — was the contract consistent, were dependencies ready, could
+the environment evaluate the result, did the detector distinguish the behavior,
+did the repair target the root cause, did the batch make a таск closable, and
+what changes besides the count — and the review decides `change_strategy`,
+`stop_incomplete` or `request_limit`. The review spends no repair attempt.
 
 ### Retry Or Amendment
 
@@ -646,8 +675,10 @@ to `review` status; `done` is written where it is always written, by the review
 phase, and only for a таск whose review has no blocking finding.
 
 The repair's commit is **appended** to `tasks[].commits`, so the re-review is
-given the same range rule as the first: everything that таск did, from the first
-commit's parent to the last, over that таск's own files. Overwriting the entry
+given the same rule as the first: the per-commit diffs of exactly that таск's
+commits, in order, plus the list of paths outside its zone those commits
+touched. A range from the first commit's parent to the last would carry every
+foreign commit that landed in between. Overwriting the entry
 would lose the commit the original review was written against, which is the one
 the re-review has to be measured against.
 

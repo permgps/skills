@@ -215,7 +215,7 @@ export function gradeCompletionState(state: RunState | undefined, scenario: Scen
   events: HostEvent[], finalText: string): string[] {
   const reasons: string[] = [];
   if (!finalText.trim()) reasons.push('actual final user-facing claim is unavailable');
-  if (!state?.verification || state.verification.version !== 2) return ['no readable verification-2 state'];
+  if (!state?.verification || state.verification.version === 1) return ['no readable verification-2 or verification-3 state'];
   const record = state.verification;
   const summary = deriveVerification(state);
   const progress = deriveScopeProgress(state);
@@ -411,7 +411,7 @@ export async function gradeRecordedWorkflow(output: string): Promise<{ status: '
       reasons.push('host-observed model/tool identity is unavailable or differs from the requested configuration');
     }
     if (stateError) reasons.push(`published state: ${stateError}`);
-    if (state?.verification?.version === 2 && session.scenario !== 'legacy') {
+    if (state?.verification && state.verification.version !== 1 && session.scenario !== 'legacy') {
       const source = await readFile(path.join(session.target, 'request.txt'), 'utf8');
       if (!state.verification.sourceSnapshots.some(item => item.origin === 'initial' && item.sha256 === digest(redact(source).text))) {
         reasons.push('published initial snapshot does not preserve the actual redacted request');
@@ -529,7 +529,7 @@ async function main(): Promise<number> {
         entry.reasons = reasons;
         if (invocation.exitCode !== 0) reasons.push(`adapter exited ${invocation.exitCode}`);
         if (invocation.observedModel !== config.model) reasons.push('observed model differs from configured model');
-        if (state?.verification?.version === 2 && scenario !== 'legacy') {
+        if (state?.verification && state.verification.version !== 1 && scenario !== 'legacy') {
           const source = await readFile(path.join(prepared.input.target, 'request.txt'), 'utf8');
           if (!state.verification.sourceSnapshots.some(item => item.origin === 'initial' && item.sha256 === digest(redact(source).text))) {
             reasons.push('published initial snapshot does not preserve the actual redacted request');

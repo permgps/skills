@@ -18,7 +18,7 @@ import { STATE_FILE } from './paths.mts';
 // back here for them.
 import { parseStateSource } from './read.mts';
 import { InvalidStateError, validateState } from './validate.mts';
-import { validateVerificationTransition } from './verification.mts';
+import { validateStateTransition } from './closure.mts';
 
 const log = createLogger('state');
 
@@ -160,7 +160,7 @@ export async function writeState(
     try {
       const previous = parseStateSource(await readFile(target, 'utf8')) as RunState;
       if (previous.contractVersion >= 4 && validateState(previous).length === 0) {
-        const transition = validateVerificationTransition(previous, state);
+        const transition = validateStateTransition(previous, state);
         if (transition.length > 0) throw new InvalidStateError(transition);
       }
     } catch (error) {

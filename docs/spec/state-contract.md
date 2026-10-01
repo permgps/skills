@@ -27,14 +27,14 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason? }` | manifest | dashboard |
 | `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
-| `lifecycle` | `active` \| `closed` in contracts 4–5 | preflight | dashboard |
+| `lifecycle` | `active` \| `closed` in contracts 4–6 | preflight | dashboard |
 | `outcome` | `completed` \| `closed_with_exceptions` \| `stopped_incomplete`, only when closed | acceptance | dashboard |
 | `stopReason` | string, required for `stopped_incomplete` | acceptance | dashboard |
-| `verification` | versioned verification index, required in contracts 4–5 | preflight | dashboard |
+| `verification` | versioned verification index, required in contracts 4–6 | preflight | dashboard |
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
 | `tests` | `{ passed, failed }` | build | dashboard |
-| `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–5 | acceptance | dashboard |
+| `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–6 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
 
 **`language` is the second such dial, and it is here for the same reason.** The
@@ -123,8 +123,10 @@ which is what makes a review of it possible at all. A таск that came back an
 repaired lands in a second one, and a field holding a single commit records the
 last and loses the first. The first is exactly what the original review was
 written against, so losing it loses what the re-review has to be measured by. The
-entries are in the order they landed, so a таск's own work is
-`git diff <first>^..<last>` over that таск's own files; see
+entries are in the order they landed, and a таск's own work is the ordered
+union of exactly these commits, read one commit at a time. A range from the
+first commit's parent to the last is not that union once later waves land in
+the tree: it carries every foreign commit between the two. See
 [`phases.md`](phases.md) for what a re-review reads, and why it is not the tree.
 
 **The whole `tasks[]` array is written when the таски are cut**, every entry
@@ -175,6 +177,16 @@ cannot.
 | `outcome` | `completed`, `closed_with_exceptions`, `stopped_incomplete` |
 | `verification.executions[].result` | `not_run`, `passed`, `failed`, `unavailable`, `stale` |
 | `verification.obligations[].result` | `passed`, `failed`, `incomplete` |
+| `verification.readiness[].probes[].kind` | `source_identity`, `secrets_excluded`, `autoload`, `bootstrap`, `storage_and_cwd`, `database`, `listener`, `browser`, `write_boundary` |
+| `verification.readiness[].probes[].result` | `passed`, `setup_failed`, `unavailable`, `not_applicable` |
+| `verification.executions[].failureCause` | `product`, `test`, `setup`, `unavailable_capability` |
+| `verification.defects[].causeClass` | `product`, `test`, `contract`, `evidence`, `environment` |
+| `verification.defects[].status` | `open`, `verified`, `superseded` |
+| `verification.repairAttempts[].outcome` | `defect_verified`, `still_failing`, `unavailable`, `prerequisite_blocked` |
+| `verification.repairAttempts[].repeatKind` | `first`, `same_action_failed`, `different_action_same_cause`, `new_cause_same_surface`, `prerequisite_blocked`, `coordination_correction` |
+| `verification.repairAttempts[].expectedProgress` | `defect_verified`, `scenario_verified`, `task_closure` |
+| `verification.strategyReviews[].trigger` | `batch_without_closure`, `same_cause_survived`, `budget_exhausted`, `limit_request` |
+| `verification.strategyReviews[].decision` | `change_strategy`, `stop_incomplete`, `request_limit` |
 
 **`pending` is a стадия's word and a гейт's, and never a таск's.** The three
 sets sit one under another above and the middle one is the odd column out, which
@@ -322,6 +334,24 @@ Versions 1–3 keep their historical fields. New safeguards remain unestablished
 until explicitly reconstructed from actual inputs and independent returns.
 No version conversion invents an original source, agreement or audit.
 
+## Version 6 Extension
+
+Contract 6 requires verification version 3: readiness records, failure causes,
+defects, extended repair attempts, strategy reviews and the `limit_increase`
+decision, specified with exact fields in
+[verification.md](verification.md#closure-extension-verification-3). It also
+gives `tasks[].blockedBy` one meaning: a blocker is finished when it is
+`review` or `done`, and a таск is never moved to `running` while a blocker is
+`queued`, `running`, `repair` or `failed`. A таск with an open defect is never
+`done`.
+
+A contract-5 run stays readable and strictly validated as contract 5. An
+explicit resume writes it as contract 6 with every verification-2 record
+preserved verbatim, names the carried executions and attempts in
+`inheritedExecutionIds` and `inheritedAttemptIds`, and starts `readiness`,
+`defects` and `strategyReviews` empty. No resume fabricates readiness, a defect
+or a review the run never had.
+
 ## Versioning
 
 - `contractVersion` starts at `1` and is stored in every state file.
@@ -334,6 +364,16 @@ No version conversion invents an original source, agreement or audit.
 - The contract is changed in `scripts/state/` before it is changed on either
   side. That is what makes the single integration point real rather than
   aspirational.
+
+**Version 6** changes four value sets — the repair outcome gains
+`defect_verified` and `prerequisite_blocked` and loses `repaired`, decisions
+gain `limit_increase`, and readiness, defect and strategy-review values arrive —
+and gives `blockedBy` a defined meaning. The dashboard's
+`KNOWN_CONTRACT_VERSION` moves with it, and a contract-5 state renders as it
+did, without the new regions.
+
+**Version 5** requires the source audit, frozen scope and completion
+safeguards of verification 2.
 
 **Version 4** changes the meaning of completion, so it requires `lifecycle`,
 `verification`, and (for closed states) `outcome` and `finishedAt`. The
@@ -387,7 +427,7 @@ The sole installed command is `node .maestro/sync.mts`; its relative
 exports are compatibility facades. The installed helper imports only its own
 modules and `node:*` built-ins. It resolves the run directory from the copied
 entrypoint and the project root from that directory's parent, irrespective of
-cwd or the target's package type. Contract 5 and verification 2 remain unchanged.
+cwd or the target's package type. It publishes contracts 4, 5 and 6; each keeps its own verification version.
 
 `--validate <candidate>` and `--project <candidate>` are read-only: no state,
 diagnostic, snapshot, viewer or opener writes. JSON actions emit one result on

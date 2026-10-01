@@ -9,7 +9,8 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { CAPTURES, fingerprint, planningOwnershipState, sha256, verifiedState } from './fixtures/verification.ts';
+import { CAPTURES, activeContract6State, fingerprint, planningOwnershipState, repairContract6State, sha256, v3Attempt, verifiedState } from './fixtures/verification.ts';
+import { validateStateTransition } from './closure.ts';
 import { deriveVerification, validateVerificationTransition } from './verification.ts';
 import { validateState, InvalidStateError } from './validate.ts';
 import { importEvidence, validateEvidence } from './evidence.ts';
@@ -437,4 +438,48 @@ test('V24: a non-UI obligation can pass through a fresh output check', () => {
 
 test('the fixture captures use stable real SHA-256 values', () => {
   assert.equal(copy().verification!.evidence[0]!.sha256, sha256(CAPTURES['evidence/REF-1/source.txt']!));
+});
+
+test('C10: an execution attributed to a check another task owns is refused; role executors keep their identities', () => {
+  const state = activeContract6State();
+  state.tasks.push({ ...state.tasks[0]!, id: '02', title: 'Footer', status: 'queued', commits: [] });
+  const execution = state.verification!.executions[0]!;
+  execution.executor = '02';
+  assert.ok(validateState(state).some(item => /execution by task 02 is attributed to check C-1, which task 01 owns/.test(item.message)));
+  execution.executor = '01';
+  assert.deepEqual(validateState(state), []);
+  execution.executor = 'acceptance-reader';
+  assert.deepEqual(validateState(state), []);
+});
+
+test('an attribution correction supersedes an execution once; a fork is refused', () => {
+  const state = activeContract6State();
+  const record = state.verification!;
+  const original = record.executions[0]!;
+  record.executions.push({ ...original, id: 'X-2', supersedes: 'X-1', evidenceIds: [], assertions: [], result: 'not_run' });
+  assert.deepEqual(validateState(state), []);
+  record.executions.push({ ...original, id: 'X-3', supersedes: 'X-1', evidenceIds: [], assertions: [], result: 'not_run' });
+  assert.ok(validateState(state).some(item => /X-1 has more than one successor/.test(item.message)));
+});
+
+test('C11: a repair commit missing from its task commits is refused, so review cannot miss it', () => {
+  const state = repairContract6State();
+  const record = state.verification!;
+  record.defects[0] = { ...record.defects[0]!, status: 'verified', verifiedExecutionIds: ['X-1'] };
+  record.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T10:00:00Z', { outcome: 'defect_verified', commit: '5bada55' })];
+  assert.ok(validateState(state).some(item => /repair commit 5bada55 is missing from task 01 commits/.test(item.message)));
+  state.tasks[0]!.commits!.push('5bada55');
+  assert.deepEqual(validateState(state), []);
+});
+
+test('a task leaves repair only when the prerequisite its blocked attempt named is closed', () => {
+  const prior = repairContract6State();
+  prior.tasks.push({ ...prior.tasks[0]!, id: '02', title: 'Schema', status: 'repair', commits: ['0a0a0a0'] });
+  prior.verification!.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T10:00:00Z',
+    { outcome: 'prerequisite_blocked', blockingPrerequisites: ['02'] })];
+  const next = structuredClone(prior);
+  next.tasks[0]!.status = 'running';
+  assert.ok(validateStateTransition(prior, next).some(item => /repair of DF-1 waits on open prerequisite 02/.test(item.message)));
+  next.tasks[1]!.status = 'review';
+  assert.deepEqual(validateStateTransition(prior, next), []);
 });

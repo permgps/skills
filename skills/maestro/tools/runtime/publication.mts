@@ -10,7 +10,8 @@ import { parseStateSource } from './state/read.mts';
 import { validateState, type StateViolation } from './state/validate.mts';
 import { validateEvidence } from './state/evidence.mts';
 import { projectState } from './state/projection.mts';
-import { deriveVerification, validateVerificationTransition } from './state/verification.mts';
+import { validateStateTransition } from './state/closure.mts';
+import { deriveVerification } from './state/verification.mts';
 import { atomicText, serializeState } from './state/write.mts';
 
 const log = createLogger('sync');
@@ -27,8 +28,8 @@ export async function loadCandidate(file: string): Promise<unknown> {
 export async function candidateViolations(candidate: unknown, dir: string): Promise<StateViolation[]> {
   try {
     const errors = [...validateState(candidate), ...languageViolations(candidate)];
-    if (!isRecord(candidate) || ![4, 5].includes(candidate['contractVersion'] as number)) {
-      errors.push({ field: 'contractVersion', message: 'publication requires contract version 4 or 5' });
+    if (!isRecord(candidate) || ![4, 5, 6].includes(candidate['contractVersion'] as number)) {
+      errors.push({ field: 'contractVersion', message: 'publication requires contract version 4, 5 or 6' });
     }
     if (errors.length === 0) errors.push(...await validateEvidence(candidate as RunState, path.dirname(dir), dir));
     return errors;
@@ -119,7 +120,7 @@ export async function candidateMode(args: string[], dir: string,
   if (isRecord(candidate) && isRecord(candidate['heldBy']) && candidate['heldBy']['token'] !== holder) {
     errors.push({ field: 'heldBy', message: 'holder token does not match candidate' });
   }
-  if (errors.length === 0 && previous) errors.push(...validateVerificationTransition(previous, state));
+  if (errors.length === 0 && previous) errors.push(...validateStateTransition(previous, state));
   if (errors.length === 0) {
     try {
       log.debug('publish', 'candidate checked; replacing state', { revision: state.updatedAt });

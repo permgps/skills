@@ -52,7 +52,7 @@ export function checkG1(state: RunState): GateFinding[] {
     });
   }
 
-  if (state.contractVersion === 5 && (!state.verification || state.verification.version !== 2
+  if (state.contractVersion >= 5 && (!state.verification || state.verification.version === 1
     || !hasFreshManifestAudit(state.verification, state.requirements.map(item => item.id)) || !state.verification.scopeBaseline)) {
     findings.push({ requirementId: '', message: 'G1 requires a fresh independent source audit and frozen original agreement' });
     log.warn('audit', 'source agreement is not established', { runId: state.runId });

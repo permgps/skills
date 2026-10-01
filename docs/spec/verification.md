@@ -1,7 +1,7 @@
 # Verification and Closure
 
-This document defines contract version 5's verification record and preserves
-contract 4's historical rules. The source
+This document defines contract version 6's verification record and preserves
+contract 4's and 5's historical rules. The source
 request is the user's declared scope; a reference is authoritative only for the
 behavior or appearance the user asked to preserve. The orchestrator is the sole
 writer of the state snapshot and imports task-owned captures after checking
@@ -36,7 +36,8 @@ product. A source scan helps discovery but cannot prove behavioral completeness.
 
 ## Record Shape and Ownership
 
-`VerificationRecord.version` is `2` for contract 5, and `1` for contract 4.
+`VerificationRecord.version` is `3` for contract 6, `2` for contract 5, and `1`
+for contract 4.
 Its `targetRevision` changes only
 with an authorized scope amendment; `acceptanceInputDigest` identifies the
 current manifest and additions snapshot. IDs are stable within the run. Existing task
@@ -82,10 +83,10 @@ execution is unavailable, name the missing capability and mark affected checks
 Contract 5 requires verification 2. Contract 4 requires verification 1 and keeps
 its old outcomes; contracts 1–3 retain their historical activity fields. No
 reader upgrades a historical record. New safeguards on an old run are
-`not-established`. Explicit resume constructs an active v5 candidate, recovers
+`not-established`. Explicit resume constructs an active candidate at the current contract, recovers
 actual redacted sources, dispatches fresh readers, and reruns affected checks.
 Missing original text cannot be invented: keep the baseline absent and explain
-the limitation. It cannot establish passing G1 or completed v5 closure.
+the limitation. It cannot establish passing G1 or completed closure under contract 5 or 6.
 
 All records below are embedded in the same atomic snapshot. Arrays are required,
 including empty arrays during preflight; `manifestDigest` is required; `scopeBaseline` is optional until
@@ -190,14 +191,23 @@ rows cannot supply a missing current mapping or enlarge that frozen agreement.
 | Missing startup prerequisite | unavailable checks / acceptance | continue independent checks; ask only for required nonsecret information; no code retry loop |
 | Repair still fails | attempt / repair | preserve root/budget; independent diagnosis with falsifying evidence; different grounded strategy before next dispatch |
 | Unchanged strategy or missing diagnosis | rejected/unavailable novelty / repair | no retry; obtain valid diagnosis or stop incomplete |
-| Budget exhausted | unresolved finding / repair | report both attempts and stable root; stop incomplete or exact authorized exception |
+| Readiness probe `setup_failed` (v3) | superseding readiness record / coordinator | correct the verification setup; no `RA-N`; no broad execution against that record |
+| Readiness probe `unavailable` (v3) | dependent executions `unavailable` with `unavailable_capability` / build or acceptance | continue checks that do not declare the probe; no code repair |
+| Bounded repair verifies its defect, parent criteria remain (v3) | defect `verified`; task stays `repair` | dispatch the next defect or review; the task closes only through review |
+| Batch closed no task, or the same cause survived (v3) | strategy review / repair | no further `RA-N` until a returned strategy review records a decision |
+| Budget exhausted | unresolved finding / repair | report attempts and stable roots; v3 records a `budget_exhausted` strategy review; stop incomplete, exact authorized exception, or a user-authorized `limit_increase` |
 | Current authorized target passes while original does not | two scope measurements / acceptance | may close current target; preserve original deficit and decisions |
 | Missing/zero original baseline | not-established / not-applicable progress | show unknown / no ratio; never fabricate 100% |
 
-A renamed finding, split task, new executor or strategy cannot reset per-root or
-global counts. Per-finding limit is at most two; total limit is finite and cannot
-increase during a run. Independent diagnosis consumes the prior hypothesis,
-action, result and evidence. Textual variation alone does not prove novelty.
+A renamed finding, split task, split defect, new executor or strategy cannot
+reset per-root or global counts. Per-finding limit is at most two and never
+rises; the total limit is finite. Under verification 2 it never changes. Under
+verification 3 it rises only through a `limit_increase` decision carrying the
+user's exact authorization, the `request_limit` strategy review it answers, the
+old and new limits and a closure forecast; a silent or coordinator-initiated
+raise, and any decrease, is rejected. Independent diagnosis consumes the prior
+hypothesis, action, result and evidence. Textual variation alone does not prove
+novelty.
 
 ### Scope Progress
 
@@ -227,6 +237,115 @@ Valid control: disabled save handler causes the unchanged persistence assertion
 to fail only in the disposable copy, then restored copy passes. Invalid: change
 the assertion to accommodate the broken copy, or call the expected control
 failure the main build's latest execution.
+
+## Closure Extension (Verification 3)
+
+Contract 6 requires verification 3. It keeps every verification-2 record and
+rule and adds four things a real run lacked: a readiness record that separates
+a broken verification setup from a product failure, defects that close
+separately from the task that owns them, strategy reviews that stop a repeated
+repair strategy, and evidence attribution checked before publication. Contract
+5 keeps verification 2 and its rules unchanged; no reader upgrades it.
+
+Identifiers follow the same monotonic rule: `RD-N` readiness records, `DF-N`
+defects and `SR-N` strategy reviews. A task is still the only unit that becomes
+`done`, and only through review; a defect is the unit a bounded repair can
+close.
+
+| Entity | Exact fields (a trailing ? means optional) | Owner / publication |
+|---|---|---|
+| verification-3 record | verification-2 fields plus `version`, `checks[]`, `executions[]`, `decisions[]`, `readiness[]`, `defects[]`, `strategyReviews[]`, `repairAttempts[]`, `inheritedExecutionIds[]`, `inheritedAttemptIds[]` | orchestrator; version 3 only under contract 6 |
+| `readiness[]` | `id`, `targetFingerprint`, `executedAt`, `probes[]`, `supersedes?` | build or acceptance, before a broad run; immutable; correction is a superseding record |
+| readiness probe | `kind` (`source_identity` / `secrets_excluded` / `autoload` / `bootstrap` / `storage_and_cwd` / `database` / `listener` / `browser` / `write_boundary`), `result` (`passed` / `setup_failed` / `unavailable` / `not_applicable`), `evidenceIds[]`, `limitation?` | probe by trying the capability; captures under `evidence/<RD-N>/` |
+| extended `checks[]` | inherited fields plus `readinessProbes?` | plan; the probes this check's result depends on, besides `source_identity` |
+| extended `executions[]` | inherited fields plus `readinessId?`, `failureCause?` (`product` / `test` / `setup` / `unavailable_capability`) | executor returns, orchestrator imports; required for every non-inherited execution |
+| extended `decisions[]` | inherited fields plus `kind` (adds `limit_increase`), `strategyReviewId?`, `previousLimits?`, `limits?`, `forecast?` | repair; a raise needs the user's exact words |
+| `defects[]` | `id`, `parentTaskId`, `rootFindingId`, `findingIds[]`, `causeClass` (`product` / `test` / `contract` / `evidence` / `environment`), `counterexample`, `repairCriteriaCheckIds[]`, `residualParentCriteria[]`, `status` (`open` / `verified` / `superseded`), `verifiedExecutionIds[]`, `supersedes?` | repair, before the attempt that targets it; only `status` and `verifiedExecutionIds` change, once |
+| extended `repairAttempts[]` | verification-2 attempt fields plus `outcome` (`defect_verified` / `still_failing` / `unavailable` / `prerequisite_blocked`), `defectId`, `repeatKind` (`first` / `same_action_failed` / `different_action_same_cause` / `new_cause_same_surface` / `prerequisite_blocked` / `coordination_correction`), `expectedProgress` (`defect_verified` / `scenario_verified` / `task_closure`), `readyUpstreamTaskIds[]`, `blockingPrerequisites[]`, `unlocksTaskIds[]`, `commit?` | repair; append after result |
+| `strategyReviews[]` | `id`, `at`, `trigger` (`batch_without_closure` / `same_cause_survived` / `budget_exhausted` / `limit_request`), `attemptIds[]`, `closedTaskIds[]`, `answers`, `decision` (`change_strategy` / `stop_incomplete` / `request_limit`), `nextApproach`, `dispatchId`, `returnId` | repair; a fresh strategy reviewer's actual return |
+| strategy answers | `contractConsistent`, `dependenciesReady`, `environmentEvaluable`, `detectorDistinguishes`, `rootCauseTargeted`, `taskClosable`, `nextChange` | one returned sentence each, never empty |
+
+`inheritedExecutionIds[]` and `inheritedAttemptIds[]` name the executions and
+repair attempts carried verbatim from verification 2 when a contract-5 run
+resumes as contract 6. They are empty for a run begun under contract 6, frozen
+once published, and must equal the prior record's IDs exactly at the resume
+write. The rules below that demand a new field skip exactly these records and
+nothing else, so history stays readable without inventing readiness or defects
+it never had.
+
+### Readiness
+
+1. A readiness record names the candidate it probed in `targetFingerprint`.
+   Probe kinds are unique within a record. `setup_failed` and `unavailable`
+   carry a limitation; `passed` carries evidence. A record is immutable; a
+   corrected setup is a new record that `supersedes` it, with at most one
+   successor.
+2. Every non-inherited execution names `readinessId`, an unsuperseded record
+   whose `targetFingerprint.build` and `targetFingerprint.runtime` equal the
+   execution fingerprint's. A runtime label copied from history therefore
+   cannot be published against a fresh candidate.
+3. The probes an execution depends on are `source_identity` plus its check's
+   `readinessProbes`. Any of them `setup_failed` rejects the execution: the
+   coordinator corrects the setup and probes again, and no repair attempt is
+   spent. Any of them `unavailable` forces the execution to `unavailable` with
+   `failureCause: unavailable_capability`. A required probe that is absent or
+   `not_applicable` rejects the execution. A check that declares no `database`
+   probe proceeds while the database is unavailable — independence is a
+   declaration the plan makes and review can contest.
+4. `failed` and `unavailable` executions carry `failureCause`; `passed` never
+   does. `failed` takes `product`, `test` or `setup`; `unavailable` takes
+   `unavailable_capability` or `setup`.
+
+### Defects, Attempts and Strategy Reviews
+
+1. A defect belongs to one parent task and one stable root finding. Its
+   `findingIds` resolve to that root. Splitting a broad defect appends
+   successors that `supersede` it under the same root, so the root's attempt
+   count is inherited and never reset. An `environment` defect never receives a
+   repair attempt: setup is corrected at readiness.
+2. A defect becomes `verified` only with passed executions of its repair-criteria
+   checks, current at the write that verifies it, and a passed negative control
+   for each of those checks. Verification never moves its parent task. A task
+   with an open defect cannot be `done`.
+3. Every non-inherited attempt names a defect of its root and of its own task.
+   `repeatKind` is `first` exactly when there is no predecessor. `defect_verified`
+   requires the defect verified and a `commit` listed in the task's `commits`.
+   `prerequisite_blocked` names open tasks or defects in `blockingPrerequisites`.
+   `expectedProgress: task_closure` is refused while the defect lists residual
+   parent criteria or blocking prerequisites. `readyUpstreamTaskIds` are in
+   `review` or `done` at the write that appends the attempt.
+4. Measured by `at`, the attempts since the latest strategy review form a batch.
+   When a batch holds two or more attempts and no task reached `done` since its
+   first attempt, or any of its attempts is a `same_action_failed` or
+   `different_action_same_cause` repeat, the next attempt requires a newer
+   strategy review. A review after `stop_incomplete` admits no later attempt.
+   Dispatch and return identities are required and never reused.
+5. When attempts reach the total limit, a `budget_exhausted` review follows
+   before a stopped closure. A raise follows a `request_limit` review and a
+   `limit_increase` decision whose previous limits equal the published ones;
+   the per-root limit never moves.
+
+### Attribution and Dispatch
+
+1. An execution whose `executor` names a task must name the check's
+   `executionTaskId`; role executors keep their role identities. A superseded
+   execution has at most one successor.
+2. An attempt's `commit` is one of its task's `commits`. Review input is the
+   ordered union of exactly those commits, never a range that can carry a
+   foreign commit.
+3. A task moves to `running` only when every `blockedBy` task is `review` or
+   `done`; a blocker in `queued`, `running`, `repair` or `failed` holds it. A
+   task leaves `repair` for `running` only when no prerequisite named by its
+   latest blocked attempt is still open.
+
+Valid: a readiness record shows `bootstrap: setup_failed` because the
+verification copy denied its own root; the coordinator allows the copy's root,
+appends `RD-2` that supersedes it, and the broad suite publishes against `RD-2`.
+Invalid: 2148 identical bootstrap errors published as a failed suite against
+`RD-1`. Valid: `DF-3` (authentication text translated after mount) is verified
+by its two checks and their controls while task 12 stays `repair` with three
+residual criteria. Invalid: a ninth attempt appended after eight that closed no
+task, with no strategy review between them.
 
 ## Evidence Identity and Currentness
 
@@ -318,7 +437,7 @@ acceptance” is not an exception decision. Repair attempts are counted by stabl
 failure identity, with a finite overall budget; renaming a finding does not
 reset it. Exhaustion leaves an unresolved result.
 
-Contract-4/5 `lifecycle` is `active` or `closed`. Active state has no `outcome` or
+Contract-4–6 `lifecycle` is `active` or `closed`. Active state has no `outcome` or
 `finishedAt`. Closed state has `finishedAt` as closure time and exactly one
 outcome: `completed` requires G4 passed and all promised work done;
 `closed_with_exceptions` requires an explicit bounded user decision covering
@@ -343,7 +462,7 @@ G4 fails. Closure never converts that failure into a pass.
 Contract versions 1–3 remain readable without rewriting or fabricating
 evidence. Their `finishedAt` is historical activity, not a version-4
 `completed` outcome. A resumed historical run explicitly constructs a new
-contract-5 candidate from current sources, fresh source audit/agreement and obligations, open findings, stale evidence,
+contract-6 candidate from current sources, fresh source audit/agreement and obligations, open findings, stale evidence,
 and promised work; fresh checks are required to complete it.
 
 The shipped TypeScript helper validates a complete candidate before atomically

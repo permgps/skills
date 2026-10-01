@@ -22,6 +22,7 @@ import {
   TASK_STATUSES,
   type RunState,
 } from './contract.mts';
+import { validateClosureRecord } from './closure.mts';
 import { validateVerificationRecord } from './verification.mts';
 
 const log = createLogger('state');
@@ -520,8 +521,11 @@ export function validateState(value: unknown): StateViolation[] {
     if (!isRecord(value['verification'])) {
       add('verification', 'contract 4 requires a verification object');
     } else if (Array.isArray(tasks) && Array.isArray(requirements) && Array.isArray(gates)) {
-      for (const violation of validateVerificationRecord(value as unknown as RunState)) {
-        add(violation.field, violation.message);
+      const record = validateVerificationRecord(value as unknown as RunState);
+      for (const violation of record) add(violation.field, violation.message);
+      // The closure graph is traversed only once the graph it hangs from is sound.
+      if (record.length === 0) {
+        for (const violation of validateClosureRecord(value as unknown as RunState)) add(violation.field, violation.message);
       }
     }
   }

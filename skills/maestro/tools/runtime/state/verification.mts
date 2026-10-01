@@ -9,10 +9,10 @@ import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 
 import { createLogger } from '../shared/log.mts';
-import { STAGE_IDS } from './contract.mts';
+import { REPAIR_OUTCOMES, STAGE_IDS } from './contract.mts';
 import type {
   CheckExecution, CheckResult, RunState, VerificationCheck,
-  VerificationObligation, VerificationRecord, VerificationRecordV2, VerificationResult, NegativeControl,
+  VerificationObligation, VerificationRecord, SafeguardedRecord, VerificationResult, NegativeControl,
 } from './contract.mts';
 
 const log = createLogger('state');
@@ -47,7 +47,7 @@ export function sameFingerprint(left: unknown, right: unknown): boolean {
       === (hashesB as Record<string, unknown>)[String(path)]);
 }
 
-function effectiveExecution(
+export function effectiveExecution(
   check: VerificationCheck,
   executions: CheckExecution[],
 ): CheckExecution | undefined {
@@ -59,7 +59,7 @@ function effectiveExecution(
 
 function checkResult(check: VerificationCheck, record: VerificationRecord): CheckResult {
   const execution = effectiveExecution(check, record.executions);
-  if (record.version === 2 && check.currentFingerprint.acceptanceInput !== record.acceptanceInputDigest) return 'stale';
+  if (record.version !== 1 && check.currentFingerprint.acceptanceInput !== record.acceptanceInputDigest) return 'stale';
   if (!execution) return 'not_run';
   if (!sameFingerprint(execution.fingerprint, check.currentFingerprint)) return 'stale';
   return execution.result;
@@ -74,9 +74,9 @@ function obligationResult(
     && finding.obligationIds.includes(obligation.id));
   const required = record.checks.filter(check => check.required
     && obligation.checkIds.includes(check.id));
-  const controls = record.version === 2 ? activeControls(record).filter(control => required.some(check => check.id === control.checkId)) : [];
-  const controlResults = record.version === 2 ? controls.map(control => controlResult(control, record)) : [];
-  const journeyResults = record.version === 2 ? record.journeys.filter(journey => journey.targetRevision === record.targetRevision && journey.obligationIds.includes(obligation.id)).map(journey => journeyResult(journey.id, record, checkResults)) : [];
+  const controls = record.version !== 1 ? activeControls(record).filter(control => required.some(check => check.id === control.checkId)) : [];
+  const controlResults = record.version !== 1 ? controls.map(control => controlResult(control, record)) : [];
+  const journeyResults = record.version !== 1 ? record.journeys.filter(journey => journey.targetRevision === record.targetRevision && journey.obligationIds.includes(obligation.id)).map(journey => journeyResult(journey.id, record, checkResults)) : [];
   if (contradicted || journeyResults.includes('failed') || required.some(check => checkResults[check.id] === 'failed')
     || controlResults.includes('failed')) return 'failed';
   if (controlResults.some(result => result !== 'passed') || journeyResults.some(result => result !== 'passed')) return 'incomplete';
@@ -145,7 +145,7 @@ export function deriveVerification(state: RunState): VerificationSummary {
     && record.findings.filter(finding => finding.status === 'open')
       .every(finding => latestRound.findingIds.includes(finding.id));
   const promised = record.promisedWork.some(item => item.status === 'open');
-  const safeguardsPending = record.version === 2 && (!record.scopeBaseline || !hasFreshManifestAudit(record, state.requirements.map(item => item.id)));
+  const safeguardsPending = record.version !== 1 && (!record.scopeBaseline || !hasFreshManifestAudit(record, state.requirements.map(item => item.id)));
   const g4 = failedIds.length > 0 ? 'failed'
     : Object.keys(requirementResults).length === 0 || incompleteIds.length > 0
       || !roundCurrent || promised || safeguardsPending ? 'pending' : 'passed';
@@ -172,7 +172,8 @@ function validateShape(value: unknown): VerificationViolation[] {
   const errors: VerificationViolation[] = [];
   const add = (field: string, message: string): void => { errors.push({ field, message }); };
   if (!recordValue(value)) return [{ field: 'verification', message: 'verification must be an object' }];
-  if (value['version'] !== 1 && value['version'] !== 2) add('verification.version', 'verification version must be 1 or 2');
+  if (![1, 2, 3].includes(value['version'] as number)) add('verification.version', 'verification version must be 1, 2 or 3');
+  const safeguarded = value['version'] === 2 || value['version'] === 3;
   if (!Number.isInteger(value['targetRevision']) || Number(value['targetRevision']) < 1) {
     add('verification.targetRevision', 'target revision must be a positive integer');
   }
@@ -193,7 +194,7 @@ function validateShape(value: unknown): VerificationViolation[] {
     promisedWork: { id: 'string', description: 'string', status: 'string' },
     repairAttempts: { id: 'string', findingId: 'string', taskId: 'string', at: 'string', outcome: 'string' },
   };
-  if (value['version'] === 2) {
+  if (safeguarded) {
     collections['sourceSnapshots'] = { id: 'string', origin: 'string', text: 'string', sha256: 'string', capturedAt: 'string', targetRevision: 'number' };
     collections['sourceClauses'] = { id: 'string', sourceId: 'string', start: 'number', end: 'number', quote: 'string', classification: 'string', requirementIds: 'array' };
     collections['manifestAudits'] = { id: 'string', sourceIds: 'array', manifestDigest: 'string', targetRevision: 'number', clauseIds: 'array', findings: 'array', result: 'string', auditedAt: 'string' };
@@ -286,7 +287,7 @@ function validateShape(value: unknown): VerificationViolation[] {
       }
     });
   });
-  if (value['version'] === 2) {
+  if (safeguarded) {
     const journeys = value['journeys'];
     if (Array.isArray(journeys)) journeys.forEach((journey, index) => {
       if (recordValue(journey) && Array.isArray(journey['steps'])) journey['steps'].forEach((step, position) => {
@@ -336,7 +337,7 @@ function validateShape(value: unknown): VerificationViolation[] {
   return errors;
 }
 
-function validateFingerprint(
+export function validateFingerprint(
   raw: unknown,
   at: string,
   add: (field: string, message: string) => void,
@@ -360,8 +361,9 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
   if (errors.length > 0) return errors;
   const record = state.verification!;
   if ((state.contractVersion === 4 && record.version !== 1)
-    || (state.contractVersion === 5 && record.version !== 2)) {
-    return [{ field: 'verification.version', message: 'contract 4 requires verification 1; contract 5 requires verification 2' }];
+    || (state.contractVersion === 5 && record.version !== 2)
+    || (state.contractVersion === 6 && record.version !== 3)) {
+    return [{ field: 'verification.version', message: 'contract 4 requires verification 1; contract 5 requires verification 2; contract 6 requires verification 3' }];
   }
   const add = (field: string, message: string): void => {
     errors.push({ field, message });
@@ -510,7 +512,8 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
         || item.targetRevision <= item.previousTargetRevision)) {
       add(at, 'scope amendment must advance the target revision');
     }
-    if (!['scope_amendment', 'accepted_exception'].includes(item.kind)) add(`${at}.kind`, 'unknown decision kind');
+    const kinds = record.version === 3 ? ['scope_amendment', 'accepted_exception', 'limit_increase'] : ['scope_amendment', 'accepted_exception'];
+    if (!kinds.includes(item.kind)) add(`${at}.kind`, 'unknown decision kind');
   });
   record.coverageReviews.forEach((item, index) => {
     const at = `verification.coverageReviews[${index}]`;
@@ -555,11 +558,16 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
     return current;
   };
   const repairCounts = new Map<string, number>();
+  const inheritedAttempts = new Set(record.version === 3 ? record.inheritedAttemptIds : []);
   record.repairAttempts.forEach((item, index) => {
     const at = `verification.repairAttempts[${index}]`;
     references(`${at}.findingId`, [item.findingId], findingIds);
     references(`${at}.taskId`, [item.taskId], taskIds);
-    if (!['repaired', 'still_failing', 'unavailable'].includes(item.outcome)) {
+    // Verification 3 replaced `repaired` with outcomes that tell a verified
+    // defect from a closed task; carried history keeps the word it was written with.
+    const outcomes: readonly string[] = record.version === 3 && !inheritedAttempts.has(item.id)
+      ? REPAIR_OUTCOMES : ['repaired', 'still_failing', 'unavailable'];
+    if (!outcomes.includes(item.outcome)) {
       add(`${at}.outcome`, 'unknown repair outcome');
     }
     const root = rootOf(item.findingId);
@@ -573,7 +581,7 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
       add('verification.repairAttempts', `repair budget exceeded for stable failure ${root}`);
     }
   }
-  if (record.version === 2) errors.push(...validateSourceRecords(state, record), ...validateCompletionRecords(state, record));
+  if (record.version !== 1) errors.push(...validateSourceRecords(state, record), ...validateCompletionRecords(state, record));
   if (errors.length > 0) return errors;
 
   const summary = deriveVerification(state);
@@ -667,9 +675,12 @@ export function validateVerificationTransition(
       }
     }
   }
-  if (prior.version === 2) {
-    if (current.version !== 2 || next.contractVersion !== 5) {
-      errors.push({ field: 'verification.version', message: 'published v5 safeguards cannot be downgraded' });
+  if (prior.version !== 1) {
+    // A contract-5 run may resume as contract 6; nothing moves the other way.
+    const lawful = current.version === 2 ? prior.version === 2 && next.contractVersion === 5
+      : current.version === 3 && next.contractVersion === 6;
+    if (!lawful || current.version === 1) {
+      errors.push({ field: 'verification.version', message: 'published safeguards cannot be downgraded' });
     } else {
       for (const name of ['sourceSnapshots', 'sourceClauses', 'manifestAudits', 'scopeMappings', 'journeys', 'negativeControls'] as const) {
         if (!isDeepStrictEqual(current[name].slice(0, prior[name].length), prior[name])) {
@@ -681,7 +692,10 @@ export function validateVerificationTransition(
           }
         }
       }
-      if (current.repairLimits.perFinding > prior.repairLimits.perFinding || current.repairLimits.total > prior.repairLimits.total) {
+      // Verification 3 limits move only through an authorized raise, checked
+      // with the rest of the closure records in closure.mts.
+      if (current.version === 2 && (current.repairLimits.perFinding > prior.repairLimits.perFinding
+        || current.repairLimits.total > prior.repairLimits.total)) {
         errors.push({ field: 'verification.repairLimits', message: 'stable repair budgets cannot increase' });
       }
       if (prior.scopeBaseline && !isDeepStrictEqual(prior.scopeBaseline, current.scopeBaseline)) {
@@ -699,7 +713,7 @@ export function validateVerificationTransition(
     errors.push({ field: 'verification.targetRevision',
       message: 'target revision change needs an explicit scope amendment' });
   }
-  if (prior.version === 2 && current.version === 2 && errors.length === 0
+  if (prior.version !== 1 && current.version !== 1 && errors.length === 0
     && (prior.manifestAudits.length !== current.manifestAudits.length || !prior.scopeBaseline && current.scopeBaseline)) {
     log.info('source-transition', 'audit or baseline appended', { runId: next.runId, audits: current.manifestAudits.length, baseline: !!current.scopeBaseline });
   }
@@ -709,7 +723,7 @@ export function validateVerificationTransition(
   return errors;
 }
 
-function validateInputHashes(
+export function validateInputHashes(
   fingerprint: { relevantPaths: string[]; inputHashes: Record<string, string> },
   at: string,
   add: (field: string, message: string) => void,
@@ -730,7 +744,7 @@ const sameIds = (left: string[], right: string[]): boolean =>
   new Set(left).size === left.length && left.length === right.length && left.every(id => right.includes(id));
 
 /** A returned independent pass binds the complete current source/manifest set. */
-export function hasFreshManifestAudit(record: VerificationRecordV2, requirementIds: string[] = []): boolean {
+export function hasFreshManifestAudit(record: SafeguardedRecord, requirementIds: string[] = []): boolean {
   const sources = record.sourceSnapshots;
   if (sources.length === 0) return false;
   const audit = record.manifestAudits.filter(audit => audit.targetRevision === record.targetRevision
@@ -747,7 +761,7 @@ export function hasFreshManifestAudit(record: VerificationRecordV2, requirementI
 }
 
 /** Source/audit integrity is mechanical; semantic discovery belongs to the reader. */
-function validateSourceRecords(state: RunState, record: VerificationRecordV2): VerificationViolation[] {
+function validateSourceRecords(state: RunState, record: SafeguardedRecord): VerificationViolation[] {
   const errors: VerificationViolation[] = [];
   const add = (field: string, message: string): void => {
     errors.push({ field, message });
@@ -855,12 +869,12 @@ export function checkOracleDigest(check: VerificationCheck): string {
   return digest(JSON.stringify([check.procedure, check.oracle, check.ignoreMask ?? []]));
 }
 
-function activeControls(record: VerificationRecordV2): NegativeControl[] {
+export function activeControls(record: SafeguardedRecord): NegativeControl[] {
   const superseded = new Set(record.negativeControls.flatMap(item => item.supersedes ? [item.supersedes] : []));
   return record.negativeControls.filter(item => !superseded.has(item.id) && item.targetRevision === record.targetRevision);
 }
 
-function controlResult(control: NegativeControl, record: VerificationRecordV2): VerificationResult {
+export function controlResult(control: NegativeControl, record: SafeguardedRecord): VerificationResult {
   const check = record.checks.find(item => item.id === control.checkId);
   if (!check || !sameFingerprint(control.mainFingerprint, check.currentFingerprint)
     || control.oracleDigest !== checkOracleDigest(check)) return 'incomplete';
@@ -869,7 +883,7 @@ function controlResult(control: NegativeControl, record: VerificationRecordV2): 
 }
 
 /** Controls and repair declarations prove structure, not causal diagnosis quality. */
-export function validateCompletionRecords(state: RunState, record: VerificationRecordV2): VerificationViolation[] {
+export function validateCompletionRecords(state: RunState, record: SafeguardedRecord): VerificationViolation[] {
   const errors: VerificationViolation[] = [];
   const add = (field: string, message: string): void => {
     errors.push({ field, message }); log.error('completion', message, { field });
@@ -994,7 +1008,7 @@ export function validateCompletionRecords(state: RunState, record: VerificationR
   return errors;
 }
 
-function journeyResult(id: string, record: VerificationRecordV2, results: Record<string, CheckResult>): VerificationResult {
+function journeyResult(id: string, record: SafeguardedRecord, results: Record<string, CheckResult>): VerificationResult {
   const journey = record.journeys.find(item => item.id === id)!;
   if (journey.checkIds.some(check => results[check] === 'failed')) return 'failed';
   if (!journey.checkIds.length || journey.checkIds.some(check => results[check] !== 'passed')) return 'incomplete';
@@ -1028,10 +1042,10 @@ export function deriveScopeProgress(state: RunState): ScopeProgress {
   const record = state.verification;
   const summary = state.contractVersion >= 4 && record ? deriveVerification(state) : undefined;
   const currentIds = state.requirements.filter(item => item.status !== 'deferred' && item.status !== 'dropped').map(item => item.id);
-  const baseline = record?.version === 2 ? record.scopeBaseline : undefined;
+  const baseline = record && record.version !== 1 ? record.scopeBaseline : undefined;
   const originalIds = baseline?.requirementIds ?? [];
   const originalPass = (id: string): boolean => {
-    if (!baseline || record?.version !== 2 || !summary) return false;
+    if (!baseline || !record || record.version === 1 || !summary) return false;
     const planning = state.requirements.find(item => item.id === id);
     if (!planning || planning.status === 'deferred' || planning.status === 'dropped') return false;
     if (record.findings.some(item => item.status === 'open' && item.requirementIds.includes(id))) return false;
@@ -1062,7 +1076,7 @@ export function deriveScopeProgress(state: RunState): ScopeProgress {
     addedIds: baseline ? state.requirements.filter(item => !originalIds.includes(item.id)).map(item => item.id) : [],
     deferredIds: state.requirements.filter(item => item.status === 'deferred').map(item => item.id),
     droppedIds: state.requirements.filter(item => item.status === 'dropped').map(item => item.id),
-    changedIds: record?.version === 2 ? [...new Set(record.scopeMappings.filter(item => item.targetRevision === record.targetRevision
+    changedIds: record && record.version !== 1 ? [...new Set(record.scopeMappings.filter(item => item.targetRevision === record.targetRevision
       && (item.relation === 'changed' || item.relation === 'split')).map(item => item.originalRequirementId))] : [],
     exceptionDecisionIds: record?.decisions.filter(item => item.kind === 'accepted_exception').map(item => item.id) ?? [],
   };
