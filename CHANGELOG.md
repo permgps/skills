@@ -14,6 +14,8 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+## v0.0.7-alpha — 2026-10-01
+
 **Contract 7: a run's directory says when it started and whether it landed
 (breaking).** A new run writes into `.maestro/<YYYY-MM-DD>-<slug>--wip/` and
 carries that name in the new required `dir` field. The date is the UTC day the
@@ -46,9 +48,10 @@ the стадия never opened, points at `stages[<id>].status` instead of its
 `finishedAt`, and names both repairs — `skipped` with a note, or the stamps it
 ran under. The finding is kept; no mechanism closes or skips a стадия on its own.
 
-**Verification status:** `npm run check` passes 827 tests with zero failures
+**Verification status:** `npm run check` passes 868 tests with zero failures
 and zero skips on macOS with Node v26.8.1. No real run has exercised contract 6
-yet; see [the closure checkpoint](docs/parity-verification.md#contract-6-closure-checkpoint--2026-10-01).
+or contract 7 yet; see [the run directory checkpoint](docs/parity-verification.md#contract-7-run-directory-checkpoint--2026-10-01)
+and [the closure checkpoint](docs/parity-verification.md#contract-6-closure-checkpoint--2026-10-01).
 
 ## v0.0.6-alpha — 2026-09-30
 
