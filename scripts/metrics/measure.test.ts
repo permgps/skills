@@ -189,3 +189,11 @@ test('main exits 0 on a readable state and 2 on an unreadable one', async () => 
     await rm(missing, { recursive: true, force: true });
   }
 });
+
+test('a measurement names the run by its directory when the state carries one', () => {
+  const state = { ...baseline(), contractVersion: 7, dir: '2026-08-19-landing-page--wip' };
+  const m = measure(state);
+  assert.equal(m.dir, '2026-08-19-landing-page--wip');
+  assert.match(render(m), /^прогон \S+ \(2026-08-19-landing-page--wip\)/);
+  assert.equal(measure(baseline()).dir, baseline().slug);
+});

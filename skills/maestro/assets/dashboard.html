@@ -360,6 +360,12 @@ globalThis.MAESTRO_LOGIC = (function () {
 
   var KNOWN_CONTRACT_VERSION = 7;
 
+  // The run directory grammar of contract 7, copied from
+  // skills/maestro/tools/runtime/state/paths.mts because this page imports
+  // nothing; scripts/validate/dashboard-integrity.ts fails the build when the
+  // two copies differ. The page reads the start date out of it and nothing else.
+  var RUN_DIR_PATTERN = /^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)(--wip)?$/;
+
   // Mirrors docs/spec/phases.md. scripts/validate/dashboard-integrity.ts fails
   // the build when this set or any label below drifts from vocabulary.md.
   var STAGE_ORDER = [
@@ -462,7 +468,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         G1: 'G1', G2: 'G2', G3: 'G3', G4: 'G4'
       },
       UI: {
-        title: function (slug) { return 'Прогон: ' + slug; },
+        title: function (slug, date) { return 'Прогон: ' + slug + (date ? ' · ' + date : ''); },
         polishChip: function (value) { return 'Доводка: ' + value; },
         registerChip: function (value) { return 'Объяснения: ' + value; },
         cannotRead: function (file) {
@@ -732,7 +738,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         G1: 'G1', G2: 'G2', G3: 'G3', G4: 'G4'
       },
       UI: {
-        title: function (slug) { return 'Run: ' + slug; },
+        title: function (slug, date) { return 'Run: ' + slug + (date ? ' · ' + date : ''); },
         polishChip: function (value) { return 'Polish: ' + value; },
         registerChip: function (value) { return 'Wording: ' + value; },
         cannotRead: function (file) {
@@ -2921,6 +2927,15 @@ globalThis.MAESTRO_LOGIC = (function () {
     return !!(state && (state.finishedAt || state.interruptedAt));
   }
 
+  /**
+   * The day a contract-7 run started, read out of its `dir`; null for an older
+   * state or a name that does not parse, which the title then leaves out.
+   */
+  function runDateOf(state) {
+    var match = state && typeof state.dir === 'string' ? RUN_DIR_PATTERN.exec(state.dir) : null;
+    return match ? match[1] : null;
+  }
+
   function isStateShape(value) {
     return !!value
       && typeof value === 'object'
@@ -2945,6 +2960,8 @@ globalThis.MAESTRO_LOGIC = (function () {
 
   return {
     KNOWN_CONTRACT_VERSION: KNOWN_CONTRACT_VERSION,
+    RUN_DIR_PATTERN: RUN_DIR_PATTERN,
+    runDateOf: runDateOf,
     STAGE_ORDER: STAGE_ORDER,
     // Every word the page shows is reached through this one root. The label
     // maps are deliberately not re-exported flat beside it: a second way in is
@@ -3337,7 +3354,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
 
   function render(state) {
     useLanguage(storedLanguage() || L.languageOf(state));
-    el('run-title').textContent = T.UI.title(state.slug);
+    el('run-title').textContent = T.UI.title(state.slug, L.runDateOf(state));
 
     var notices = [L.runNotice(state, lang), L.contractNotice(state.contractVersion, lang)]
       .filter(function (line) { return !!line; });

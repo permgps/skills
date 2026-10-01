@@ -16,6 +16,7 @@ import vm from 'node:vm';
 import { createLogger } from '../shared/log.ts';
 import { formatViolation, type Violation } from '../shared/violation.ts';
 import { cleanCell, parseTables, type Table } from './spec-integrity.ts';
+import { RUN_DIR_PATTERN } from '../state/paths.ts';
 
 export type { Violation };
 
@@ -390,6 +391,18 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     add('logic', 0, `the logic block does not evaluate on its own: ${reason}`);
     return violations;
   }
+
+  // --- the page's copy of the run directory grammar is the runtime's ---------
+  // Two renderings of one grammar are a defect even while they agree; this is
+  // what keeps the copy the page needs from becoming a second grammar.
+  const pagePattern = logic['RUN_DIR_PATTERN'];
+  const pageSource = pagePattern && typeof pagePattern === 'object' && 'source' in pagePattern
+    ? String((pagePattern as { source: unknown }).source) : null;
+  if (pageSource !== RUN_DIR_PATTERN.source) {
+    add('run-dir', 0, `the page's RUN_DIR_PATTERN ${pageSource === null ? 'is missing' : `is /${pageSource}/`}, `
+      + `but skills/maestro/tools/runtime/state/paths.mts holds /${RUN_DIR_PATTERN.source}/ — copy the runtime's pattern into the logic block`);
+  }
+  log.debug('run-dir', 'run directory grammar compared', { page: pageSource, runtime: RUN_DIR_PATTERN.source });
 
   const asMap = (name: string): Record<string, string> => {
     const value = logic[name];

@@ -14,6 +14,7 @@
 import { pathToFileURL } from 'node:url';
 
 import { createLogger } from '../shared/log.ts';
+import { runDirName } from '../state/paths.ts';
 import {
   GATE_IDS,
   REQUIREMENT_STATUSES,
@@ -61,6 +62,8 @@ export interface StageMeasure {
 export interface Measurement {
   runId: string;
   slug: string;
+  /** The run directory under `.maestro/` — `dir` from contract 7, the slug before. */
+  dir: string;
   mode: string;
   depth: string;
   polish: boolean;
@@ -135,9 +138,17 @@ export function measure(state: RunState): Measurement {
     };
   });
 
+  // A measurement reports rather than refuses: a state whose directory name
+  // cannot be resolved — a newer contract, a hand-edited dir — is named by its
+  // slug, and the warning says so instead of the measurement stopping.
+  let dir = state.slug;
+  try { dir = runDirName(state); }
+  catch { log.warn('run-dir', 'run directory unresolved; naming the run by its slug', { runId: state.runId, dir: state.dir }); }
+  log.debug('run-dir', 'run directory resolved for the measurement', { runId: state.runId, dir });
   return {
     runId: state.runId,
     slug: state.slug,
+    dir,
     mode: state.mode,
     depth: state.depth,
     polish: state.polish,
@@ -179,7 +190,7 @@ export function render(m: Measurement): string {
     lines.push(`  ${label.padEnd(22)}${value}`);
   };
 
-  lines.push(`прогон ${m.runId} (${m.slug})`);
+  lines.push(`прогон ${m.runId} (${m.dir})`);
   row('mode / depth', `${m.mode} / ${m.depth}${m.polish ? ' / polish' : ''}`);
   if (m.dialChanges > 0) row('dial changes', String(m.dialChanges));
   row('total', m.finished ? formatSpan(m.totalMs) : 'not finished');

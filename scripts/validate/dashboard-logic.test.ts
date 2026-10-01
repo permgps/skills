@@ -22,6 +22,7 @@ interface Logic {
   scopeProgressOf: (state: unknown) => unknown;
   textDigest: (value: string) => string;
   KNOWN_CONTRACT_VERSION: number;
+  runDateOf: (state: unknown) => string | null;
   STAGE_ORDER: string[];
   L10N: { ru: Words; en: Words } & Record<string, Words>;
   LANGUAGE_ORDER: string[];
@@ -1348,4 +1349,21 @@ test('C04: readiness reads the latest unsuperseded record and names the probes t
 test('C04: a contract-5 page has no defects, budget or readiness to render', () => {
   assert.equal(L.closureOf(controlledState()), null);
   assert.equal(L.closureOf(sourceVerifiedState()), null);
+});
+
+type Title = (slug: string, date: string | null) => string;
+const titleIn = (language: string): Title => L.words(language)['UI']!['title'] as unknown as Title;
+
+test('a contract-7 title names the slug and the day the run started', () => {
+  const state = { slug: 'landing-page', dir: '2026-09-29-landing-page--wip' };
+  assert.equal(L.runDateOf(state), '2026-09-29');
+  assert.equal(titleIn('ru')(state.slug, L.runDateOf(state)), 'Прогон: landing-page · 2026-09-29');
+  assert.equal(titleIn('en')(state.slug, L.runDateOf(state)), 'Run: landing-page · 2026-09-29');
+});
+
+test('a state without a parseable dir keeps the slug-only title', () => {
+  for (const state of [{ slug: 'landing-page' }, { slug: 'landing-page', dir: 'landing-page' }, null]) {
+    assert.equal(L.runDateOf(state), null);
+  }
+  assert.equal(titleIn('ru')('landing-page', L.runDateOf({ slug: 'landing-page' })), 'Прогон: landing-page');
 });

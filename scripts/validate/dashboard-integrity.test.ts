@@ -9,6 +9,7 @@ import {
   stripComments,
   type SpecSources,
 } from './dashboard-integrity.ts';
+import { RUN_DIR_PATTERN } from '../state/paths.ts';
 
 const VOCABULARY = `# Vocabulary
 
@@ -100,6 +101,7 @@ const SPEC: SpecSources = {
 
 /** What the page exports beside its words: the lists no language owns. */
 const LOGIC = {
+  RUN_DIR_PATTERN: RUN_DIR_PATTERN.toString(),
   STAGE_ORDER: "['preflight', 'build']",
   GATE_AFTER: "{ G1: 'preflight' }",
   EXPLAIN_ORDER: "['progress', 'gates']",
@@ -795,4 +797,10 @@ test('a specification with no Banned Synonyms table is reported', () => {
     'vocabulary.md': VOCABULARY.slice(0, VOCABULARY.indexOf('## Banned Synonyms')),
   };
   assert.match(messages(page(), spec), /no table with columns Banned and Use instead/);
+});
+
+test('a page whose run directory grammar drifted from the runtime grammar is refused', () => {
+  assert.match(messages(page({ logic: { RUN_DIR_PATTERN: String.raw`/^(\d{4}-\d{2}-\d{2})-(.+)$/` } })),
+    /RUN_DIR_PATTERN is .* but skills\/maestro\/tools\/runtime\/state\/paths\.mts holds/);
+  assert.match(messages(page({ logic: { RUN_DIR_PATTERN: 'null' } })), /RUN_DIR_PATTERN is missing/);
 });
