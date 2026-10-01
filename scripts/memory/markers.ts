@@ -10,6 +10,13 @@ import { readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { createLogger } from '../shared/log.ts';
+import {
+  findOwnedBlock, renderOwnedBlock, spliceOwnedBlock, type Block, type Markers,
+} from '../../skills/maestro/tools/runtime/shared/owned-block.mts';
+
+// The splice itself is shared with the run register; this module keeps the
+// memory file's name, its markers and its writer.
+export { MarkerError, type Block } from '../../skills/maestro/tools/runtime/shared/owned-block.mts';
 
 const log = createLogger('memory');
 
@@ -19,98 +26,22 @@ export const MEMORY_FILE = 'AGENTS.md';
 export const BEGIN_MARKER = '<!-- maestro:begin -->';
 export const END_MARKER = '<!-- maestro:end -->';
 
-/**
- * A marker is a line, not a substring.
- *
- * The alternative — matching anywhere on a line — would let a sentence *about*
- * the markers become one, and the file most likely to contain such a sentence
- * is the memory file itself.
- */
-const isMarker = (line: string, marker: string): boolean => line.trim() === marker;
-
-/** The owned region, with 1-based line numbers for the two marker lines. */
-export interface Block {
-  start: number;
-  end: number;
-  body: string;
-}
-
-/** The markers are malformed. Always a defect in the file, never a configuration. */
-export class MarkerError extends Error {
-  readonly lines: number[];
-
-  constructor(message: string, lines: number[]) {
-    super(lines.length === 0 ? message : `${message} (line${lines.length > 1 ? 's' : ''} ${lines.join(', ')})`);
-    this.name = 'MarkerError';
-    this.lines = lines;
-  }
-}
+const MARKERS: Markers = { begin: BEGIN_MARKER, end: END_MARKER };
 
 /**
- * Locate the owned region, or `null` when the file has none.
- *
- * Anything other than exactly zero or exactly one well-formed pair is an error.
- * Guessing which pair was meant is how a splice ends up deleting the text
- * between two of them.
+ * Locate the owned region, or `null` when the file has none. Zero or exactly one
+ * well-formed pair; anything else is a {@link MarkerError}.
  */
-export function findBlock(text: string): Block | null {
-  const lines = text.split('\n');
-  const begins: number[] = [];
-  const ends: number[] = [];
-
-  lines.forEach((line, index) => {
-    if (isMarker(line, BEGIN_MARKER)) begins.push(index + 1);
-    if (isMarker(line, END_MARKER)) ends.push(index + 1);
-  });
-
-  if (begins.length === 0 && ends.length === 0) return null;
-  if (begins.length > 1) throw new MarkerError('more than one begin marker', begins);
-  if (ends.length > 1) throw new MarkerError('more than one end marker', ends);
-  if (begins.length === 0) throw new MarkerError('end marker with no begin marker', ends);
-  if (ends.length === 0) throw new MarkerError('begin marker with no end marker', begins);
-
-  const start = begins[0] ?? 0;
-  const end = ends[0] ?? 0;
-  if (end < start) throw new MarkerError('end marker precedes begin marker', [start, end]);
-
-  return { start, end, body: lines.slice(start, end - 1).join('\n') };
-}
+export const findBlock = (text: string): Block | null => findOwnedBlock(text, MARKERS);
 
 /** The owned region as it is written: the two markers with the body between them. */
-export function renderBlock(body: string): string {
-  const trimmed = body.replace(/^\n+|\n+$/g, '');
-  return trimmed === ''
-    ? `${BEGIN_MARKER}\n${END_MARKER}`
-    : `${BEGIN_MARKER}\n${trimmed}\n${END_MARKER}`;
-}
+export const renderBlock = (body: string): string => renderOwnedBlock(body, MARKERS);
 
 /**
- * Replace the owned region, or append one when the file has none.
- *
- * Everything before the begin marker and after the end marker is returned
- * unchanged, with one deliberate exception: the result ends with exactly one
- * newline. That is the only byte this function decides on its own, and it is
- * decided at the end of the file, where nothing the user wrote lives.
+ * Replace the owned region, or append one when the file has none. Everything
+ * outside the markers is returned unchanged; the result ends in one newline.
  */
-export function spliceBlock(text: string, body: string): string {
-  if (body.includes(BEGIN_MARKER) || body.includes(END_MARKER)) {
-    throw new MarkerError('the body carries a marker of its own', []);
-  }
-
-  const block = renderBlock(body);
-  const found = findBlock(text);
-
-  if (found === null) {
-    const head = text.replace(/\n+$/, '');
-    return head === '' ? `${block}\n` : `${head}\n\n${block}\n`;
-  }
-
-  const lines = text.split('\n');
-  const before = lines.slice(0, found.start - 1);
-  const after = lines.slice(found.end);
-  const merged = [...before, ...block.split('\n'), ...after].join('\n');
-  return `${merged.replace(/\n+$/, '')}\n`;
-}
+export const spliceBlock = (text: string, body: string): string => spliceOwnedBlock(text, body, MARKERS);
 
 export interface WriteResult {
   path: string;
