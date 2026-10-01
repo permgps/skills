@@ -266,6 +266,13 @@ list **harder** to enforce, not easier.
 | median | middle value |
 | handoff, handoffs | passing a task to a fresh worker |
 
+**The slug and the run's directory are two names, not one.** Since contract 7
+the slug is only the short name; the folder the run writes into is the state's
+`dir` — the day the run started, then the slug, then `--wip` while it is in
+progress. A sentence for the user that points at that folder names it by its
+date and short name, says «still in progress» rather than `--wip`, and never
+spells either `slug` or `dir`.
+
 **The two lists are also matched differently, and that is not an oversight.**
 The Russian list is matched as a substring, because Russian inflects: «гейта»,
 «гейтом» and «гейты» all have to fail, and one entry catching all of them is why

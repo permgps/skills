@@ -16,7 +16,7 @@ An execution records the exact invocation, tool and host identity, runtime and
 fixture conditions, assertions, result, capture IDs, and the fingerprint of
 reference, build, data, runtime, acceptance input, and declared relevant files.
 The executor writes task-owned captures first. The orchestrator validates paths
-and hashes, imports them under `.maestro/<slug>/evidence/<execution-id>/`, then
+and hashes, imports them under `.maestro/<dir>/evidence/<execution-id>/`, then
 publishes one coherent candidate with `sync.mts --publish`. Never let a task
 write the shared state or report a check as passed solely from source inspection.
 

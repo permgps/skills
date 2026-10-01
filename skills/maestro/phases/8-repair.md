@@ -206,7 +206,7 @@ concrete remaining options; it never creates a pass or broad waiver.
 
 ### 4. If it is a user-authorized scope amendment — write it down
 
-Append to `.maestro/<slug>/amendments.md`:
+Append to `.maestro/<dir>/amendments.md`:
 
 - the `R##` it affects, quoted from the манифест,
 - the `D##` from `discovered-interfaces.md` that demonstrated it, or the failure
@@ -291,7 +291,7 @@ this.
 | Artifact | State |
 |---|---|
 | project code | changed by an executor, never by you; one commit per retried таск, **appended** to that таск's `commits` |
-| `.maestro/<slug>/amendments.md` | one appended entry per amendment, each naming its `R##` and what demonstrated it |
+| `.maestro/<dir>/amendments.md` | one appended entry per amendment, each naming its `R##` and what demonstrated it |
 | `.maestro/state.js` | the таск back at `running` then `review`; its repair commit appended to `commits`; a requirement status moved where an amendment moved it |
 
 ## Repair Door Inputs

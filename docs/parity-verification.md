@@ -65,6 +65,37 @@ viewer server after grading. The CLI run is saved locally because its
 `--ephemeral` mode cannot provide the child-thread evidence needed for this
 evaluation.
 
+## Contract 7 Run Directory Checkpoint — 2026-10-01
+
+Contract 7 keeps verification 3 and every contract-6 rule, and adds `dir`: a
+run lives in `.maestro/<YYYY-MM-DD>-<slug>--wip/` while it is active and loses
+the suffix when it closes. `--publish` moves the folder — `git mv` when it is
+tracked, a plain rename otherwise — refuses a target that already exists, and
+moves it back when the candidate is refused after the move. Every successful
+contract-7 publish rewrites the run's row in `.maestro/README.md`. Contract-6
+runs are never relocated, registered or upgraded.
+
+Exercised on **macOS with Node v26.8.1**. `npm run check` passed
+typechecking, all eleven validator runs and **868 tests**, with zero failures
+or skips. The new rule tests were confirmed to fail first:
+
+- the five `dir` validation tests failed with the run-directory check disabled;
+- the three contract-version transition tests failed against the previous
+  verification module.
+
+`scripts/validate/relocation.test.ts` drives the copied `sync.mts` in a real
+temporary project: a tracked close shows up in `git status` as a rename, an
+untracked one is renamed, a reopening moves the folder back, and a refused
+candidate leaves the folder and `state.js` where they were. The rollback test removes a
+captured file after the active publish and asserts the move was logged, so the
+refusal comes from the evidence check after the move rather than from the
+transition check before it; every relocation log line carries the `runId`.
+
+**Limits:** no real Maestro run has written a dated directory yet. The
+documentation fixtures under `docs/assets/` stay at contract 2 and show no date
+in the title. Which commit records the rename is left to the phase that
+commits; publication only stages it.
+
 ## Contract 6 Closure Checkpoint — 2026-10-01
 
 Contract 6 publishes verification 3. It adds readiness records, failure

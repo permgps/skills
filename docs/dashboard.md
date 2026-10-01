@@ -17,6 +17,11 @@ and a load that fails never replaces a state that worked. It never opens
 `manifest.md`, a task file, or any path in the repository — a view that reaches into artifacts becomes a second
 source of truth about a run, and the second one is silently wrong.
 
+The title names the run: «Прогон: <slug> · <YYYY-MM-DD>», the date being the day
+a contract-7 run started, read out of its `dir`. A run from before contract 7 is
+titled by its slug alone. Whether the run is still in progress is shown by the
+lifecycle on the page, not by the directory's `--wip` suffix.
+
 ## Verified Original And Current Scope
 
 The requirements block shows original and current scope once each, with explicit
@@ -202,6 +207,12 @@ See [the complete runtime layout](install.md#autonomous-runtime-layout).
 two states the screenshots were rendered from. They are fixtures, not the record
 of a real run — a real one belongs to the project it built and is never
 committed here.
+
+Both fixtures are contract-2 states, older than the verification record and
+the dated run directory. They carry no `dir`, because a state below contract 7
+that carries one is refused, so the captured title shows the slug alone rather
+than «Прогон: <slug> · <YYYY-MM-DD>». The screenshots therefore show neither
+the date in the title nor the blocks a contract-4+ state adds.
 
 To reproduce a capture:
 

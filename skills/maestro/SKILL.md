@@ -215,6 +215,15 @@ has concrete violations and a diagnostic `url`. Never announce success after a
 rejection. The helper mirrors a valid state into the page and recovers an owned
 server that died since the last update.
 
+**`.maestro/<dir>/` is the run's directory, and `<dir>` is the state's `dir`** —
+`<YYYY-MM-DD>-<slug>--wip` while the run is active, without `--wip` once it
+closes. Build every run path from `dir` as the state holds it now, never from
+the slug. You never rename the directory: a candidate that closes or reopens
+the run changes `dir` with `lifecycle`, and `--publish` moves the folder
+(`git mv` when it is tracked), reports it as `relocated`, and keeps the run's
+row in `.maestro/README.md`. A run written before contract 7 has no `dir` and
+keeps its slug directory.
+
 **The tool is what opens the page, and what remembers that it did** — the first
 call in a directory puts it in front of the user, later calls open nothing, and
 an address that moved is opened again because the tab the user holds is dead.

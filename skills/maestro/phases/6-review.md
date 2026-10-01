@@ -167,7 +167,7 @@ said is one gate, at the end, blind.
 
 | Artifact | State |
 |---|---|
-| `.maestro/<slug>/reviews/NN-<slug>.md` | one per таск, findings quoted as they came back |
+| `.maestro/<dir>/reviews/NN-<slug>.md` | one per таск, findings quoted as they came back |
 | `.maestro/state.js` | every таск `done`, or `repair` where a review blocked it; `currentStage` moved on |
 | project code | unchanged — this phase writes none of it |
 

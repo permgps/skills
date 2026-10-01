@@ -77,7 +77,7 @@ have decided what they are doing, and length is what makes it skipped.
 
 ### 3. Write the decision records
 
-`.maestro/<slug>/decisions.md`, appended, never rewritten. One entry per
+`.maestro/<dir>/decisions.md`, appended, never rewritten. One entry per
 decision that should outlive the прогон:
 
 - what was decided,
@@ -130,7 +130,7 @@ nothing worth keeping rather than failing at something.
 | Artifact | State |
 |---|---|
 | `AGENTS.md` | the owned block replaced or appended; everything outside it byte for byte as it was |
-| `.maestro/<slug>/decisions.md` | one appended entry per decision, each naming the `D##` or `R##` it came from |
+| `.maestro/<dir>/decisions.md` | one appended entry per decision, each naming the `D##` or `R##` it came from |
 | project code | unchanged — this phase writes none of it |
 
 ## Scope Progress Projection

@@ -50,12 +50,21 @@ the target, without replacing the populated run directory:
   runtime/
     state/*.mts
     shared/log.mts
-    publication.mts, legacy.mts, dashboard.mts, server.mts, opener.mts
+    shared/owned-block.mts
+    publication.mts, relocation.mts, register.mts, legacy.mts, dashboard.mts, server.mts, opener.mts
   dashboard.html
   state.js, validation.js
   serve.json, opened.json
-  <slug>/
+  README.md                        the run register, one row per contract-7 run
+  <YYYY-MM-DD>-<slug>--wip/        a run in progress; the suffix comes off when it closes
+  <YYYY-MM-DD>-<slug>/             a run that closed
+  <slug>/                          a run from before contract 7, under its old name
 ```
+
+A run's directory is named by the UTC day it started and, while it is active,
+carries `--wip`. `node .maestro/sync.mts --publish` takes the suffix off when
+the run closes — `git mv` when the folder is tracked — and rewrites the run's
+row in `.maestro/README.md`. Directories from earlier runs keep their names.
 
 The installed helper uses only Node built-ins and its relative modules. It works
 without a target `package.json`, with CommonJS or ESM, from a different cwd and

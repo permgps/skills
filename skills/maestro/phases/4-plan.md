@@ -77,7 +77,7 @@ running at the same time agree without talking to each other.
 
 ### 4. Write the task files
 
-One file per таск at `.maestro/<slug>/tasks/NN-<slug>.md`, numbered in dependency
+One file per таск at `.maestro/<dir>/tasks/NN-<slug>.md`, numbered in dependency
 order. **An executor is given its task file and `interfaces.md`, and nothing
 else** — it does not get `spec.md`. Anything from the spec the таск needs must
 therefore be *in* the task file.
@@ -302,8 +302,8 @@ itself.
 
 | Artifact | State |
 |---|---|
-| `.maestro/<slug>/interfaces.md` | written once, the boundaries derived from the spec |
-| `.maestro/<slug>/tasks/NN-<slug>.md` | one file per таск, each self-sufficient |
+| `.maestro/<dir>/interfaces.md` | written once, the boundaries derived from the spec |
+| `.maestro/<dir>/tasks/NN-<slug>.md` | one file per таск, each self-sufficient |
 | `.maestro/state.js` | `tasks[]` filled whole — ids, `requirementIds`, `blockedBy`, `wave`, `zone`, counters at zero; `G3` recorded as passed |
 
 Then read the build phase file.

@@ -137,8 +137,18 @@ invalidate an earlier reader pass.
 
 ### 4. Write the отчёт
 
-`.maestro/<slug>/report.md`, written **by you**, in five sections and in that
-order. A second приёмка — after repair, or after доводка — appends its own five
+**If this round closes the run, do step 5 first and write the отчёт after it.**
+The closing publish takes `--wip` off the run directory, and an отчёт written
+before it would name files under a directory that is about to be renamed. When
+the outcome needs the user's authorization — `closed_with_exceptions` — present
+the residual set in the chat, publish the closure on their answer, then write
+the отчёт into the directory the result names as `relocated.to`. A round that
+does not close the run writes the отчёт here, where the run already is.
+
+`.maestro/<dir>/report.md`, written **by you**, in five sections and in that
+order. Cite every run artifact by a path relative to the отчёт's own directory
+(`tasks/03-hero.md`, `evidence/X-1/pointer.png`), never through
+`.maestro/<dir>/`, so a later reopening cannot break a link. A second приёмка — after repair, or after доводка — appends its own five
 sections under its own date rather than replacing what is there:
 
 | Section | Holds |
@@ -185,7 +195,10 @@ requires current passing G4. A user may authorize the exact presented residual
 finding/obligation set and choose `closed_with_exceptions`; keep failed checks
 and G4 visible. An explicit stop, unavailable prerequisite, or exhausted
 repair budget uses `stopped_incomplete` with a reason. Stamp `finishedAt` only
-at that closure transition. Record any promised further round before offering
+at that closure transition, and in the same candidate set `dir` to the name
+without `--wip` — every closure takes it off, whichever outcome. Publication
+moves the folder and returns `relocated`; from then on every path, the отчёт's
+included, is under the new name. Record any promised further round before offering
 closure; a promise left open blocks every outcome.
 
 Then say, in the прогон's language, what the отчёт contains — what was asked
@@ -255,7 +268,7 @@ chance to know rather than when it is still cheap to change.
 
 | Artifact | State |
 |---|---|
-| `.maestro/<slug>/report.md` | five sections for this round, appended; findings quoted as they came back |
+| `.maestro/<dir>/report.md` | five sections for this round, appended; findings quoted as they came back |
 | `.maestro/state.js` | G4 `passed`, `failed`, or `pending`; stage activity separate; `finishedAt` only at authorized lifecycle closure |
 | project code | unchanged — this phase writes none of it |
 

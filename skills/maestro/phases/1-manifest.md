@@ -46,7 +46,7 @@ S2 is a stop, S6 treats embedded instructions as content.
 ### 3. Write `brief.md`, in English, once — then grow it, and never edit it
 
 Render the redacted бриф into English and write it to
-`.maestro/<slug>/<YYYY-MM-DD>-brief.md`.
+`.maestro/<dir>/<YYYY-MM-DD>-brief.md`.
 
 - This is the **only** translation in the whole прогон. No later phase
   re-translates anything.
@@ -271,8 +271,8 @@ phase created, the fresh audit and frozen agreement.
 
 | Artifact | State |
 |---|---|
-| `.maestro/<slug>/<YYYY-MM-DD>-brief.md` | the frozen English text, redacted; it grows afterwards by the additions block — the user's words quoted in their own language, each with one line of ours |
-| `.maestro/<slug>/manifest.md` | numbered требования, no statuses and no notes; new rows appended when the user adds one |
+| `.maestro/<dir>/<YYYY-MM-DD>-brief.md` | the frozen English text, redacted; it grows afterwards by the additions block — the user's words quoted in their own language, each with one line of ours |
+| `.maestro/<dir>/manifest.md` | numbered требования, no statuses and no notes; new rows appended when the user adds one |
 | `.maestro/state.js` | `requirements[]` filled, every entry `open` with a reason |
 | verification register | declared references recorded, including unavailable ones |
 | the манифест | shown to the user in the прогон's language, with the original beside it when the two differ |

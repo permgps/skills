@@ -14,6 +14,18 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**Contract 7: a run's directory says when it started and whether it landed
+(breaking).** A new run writes into `.maestro/<YYYY-MM-DD>-<slug>--wip/` and
+carries that name in the new required `dir` field. The date is the UTC day the
+run started; `--wip` stays exactly while the run is active. Closing a run
+takes the suffix off through `--publish`, which moves the folder with `git mv`
+when it is tracked and puts it back if the publish is refused; an explicit
+reopening puts the suffix back. Every successful contract-7 publish rewrites
+the run's row in the register `.maestro/README.md`, between owned markers. The
+dashboard title names the start date. Runs from before contract 7 keep their
+slug directories and their contract; anything that joins `.maestro` with
+`slug` must resolve the directory from `dir` instead.
+
 **Contract 6: close таски instead of repeating repairs (breaking).** Contract 6
 requires verification 3. It records readiness against a disposable source-only
 copy before broad runs, so a setup failure is corrected instead of filed as

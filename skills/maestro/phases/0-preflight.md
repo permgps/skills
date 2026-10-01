@@ -93,23 +93,34 @@ external network is needed after installation; loopback HTTP remains available.
 
 ### 2. Choose the slug
 
-The slug names the run's directory and appears in every artifact path.
+The slug names the run, and with the day the run starts it names the run's
+directory (step 3).
 
 - Use a short English name from what the user typed.
 - If the бриф is entirely in Russian, ask for a short English name in `semi`,
   `interview` and `manual`. In `full`, use `run-<YYYY-MM-DD>` and record the
   choice for the отчёт rather than inventing a translation of their words.
 - Lowercase, dash-separated, no other characters.
-- If `.maestro/<slug>/` already exists, this is a second прогон for the same
-  feature. Do not reuse it and do not delete it: add a numeric suffix. No run
+- If `.maestro/<YYYY-MM-DD>-<slug>/` or `.maestro/<YYYY-MM-DD>-<slug>--wip/`
+  already exists for today's date, this is a second прогон for the same feature
+  on the same day. Do not reuse it and do not delete it: add a numeric suffix to
+  the slug. A directory from another day, or an undated one from before
+  contract 7, does not collide. No run
   artifact under `.maestro/` is removed by a later прогон; step 4 may remove
   only the obsolete copied helper after verifying its replacement.
 
 ### 3. Create the run directory
 
 ```text
-.maestro/<slug>/
+.maestro/<YYYY-MM-DD>-<slug>--wip/
 ```
+
+The date is the UTC day of the `startedAt` you are about to write — the same
+day that dates `<YYYY-MM-DD>-brief.md`. This name is the state's `dir` (step 4),
+and from here on every phase builds its paths from `dir` and never from the
+slug. `--wip` stays while the run is active; publication takes it off when
+the run closes, and puts it back if the run is ever explicitly reopened. You
+never rename this directory yourself.
 
 Create the directory and an empty `manifest.md` (zero bytes) inside it. This
 provisional file has no requirements or agreement; the manifest phase replaces
@@ -159,13 +170,14 @@ run artifacts, `serve.json` and `opened.json`. Verify the copied runtime with
 publication. Only after it succeeds, remove the obsolete copied `.maestro/sync.py`
 file, if present; remove no other target file. The helper and runtime are one
 self-contained installation, without npm install, package.json or a build.
-Construct the complete contract-5 candidate in temporary JSON. It carries:
+Construct the complete contract-7 candidate in temporary JSON. It carries:
 
 | Field | Value at preflight |
 |---|---|
-| `contractVersion` | `5` for a new run; never auto-upgrade a historical state |
+| `contractVersion` | `7` for a new run; never auto-upgrade a historical state |
 | `runId` | stable for the whole прогон |
 | `slug` | from step 2 |
+| `dir` | from step 3: `<YYYY-MM-DD>-<slug>--wip`, the date being the UTC day of `startedAt` |
 | `startedAt` | now, ISO 8601, written once and never again |
 | `updatedAt` | now, and restamped at every write from here on |
 | `mode`, `depth`, `polish` | as resolved by the dials phase |
@@ -177,7 +189,7 @@ Construct the complete contract-5 candidate in temporary JSON. It carries:
 | `tasks`, `requirements` | empty |
 | `gates` | all four — `G1`, `G2`, `G3`, `G4` — `pending`, with no findings |
 | `lifecycle`, `outcome`, `finishedAt` | `active`, with no terminal outcome or closure timestamp |
-| `verification` | `version: 2`, `targetRevision: 1`, provisional acceptance input digest, `manifestDigest` as SHA-256 of empty draft, empty existing record arrays plus `sourceSnapshots`, `sourceClauses`, `manifestAudits`, `scopeMappings`, `journeys`, `negativeControls`; no invented `scopeBaseline`, `repairLimits: { perFinding: 2, total: 8 }` |
+| `verification` | `version: 3`, `targetRevision: 1`, provisional acceptance input digest, `manifestDigest` as SHA-256 of empty draft, empty existing record arrays plus `sourceSnapshots`, `sourceClauses`, `manifestAudits`, `scopeMappings`, `journeys`, `negativeControls`; no invented `scopeBaseline`, `repairLimits: { perFinding: 2, total: 8 }`, and the verification-3 lists `readiness`, `defects`, `strategyReviews`, `inheritedExecutionIds`, `inheritedAttemptIds`, all empty |
 | `debt` | three empty lists: `placeholders`, `assumptions`, `emptyEnv` |
 | `additions` | empty |
 | `tests` | `null` — no suite has run |
@@ -351,7 +363,8 @@ nothing yet to check against the user's words.
 
 | Artifact | State |
 |---|---|
-| `.maestro/<slug>/` | created with a zero-byte provisional `manifest.md`; no source agreement yet |
+| `.maestro/<dir>/` | `<YYYY-MM-DD>-<slug>--wip`, created with a zero-byte provisional `manifest.md`; no source agreement yet |
+| `.maestro/README.md` | the register, with this run's row in progress — written by the first publish, never by hand |
 | `.maestro/state.js` | written, `preflight` active |
 | `.maestro/dashboard.html` | copied, mirrored, and opened |
 | `.maestro/sync.mts`, `runtime/`, `index.html` | complete helper copied and index placed when available |
@@ -377,7 +390,9 @@ Entry inputs: historical state, preserved run artifacts, redacted original sourc
 when actually available, and the user's authorized current target.
 
 1. Read historical conformance using its original contract. Do not rewrite it.
-2. On explicit resume, prepare an active contract-5/verification-2 candidate.
+2. On explicit resume of a run written before contract 7, prepare an active
+   candidate under the contract the resume conversion targets (never 7): the
+   run keeps its undated slug directory, gets no `dir` and no register row.
    Reconstruct obligations, unresolved findings, planning, debt, and additions
    from actual artifacts; leave G1 and G4 pending. Preserve published v4 graph,
    execution and round history. A fresh acceptance input identity invalidates
@@ -396,3 +411,10 @@ passed audit to preserve a former completed label. Missing source/independent
 capability leaves relevant guarantees not established and G1/G4 pending.
 
 Next action: fresh source audit and agreement, then the ordinary phase sequence.
+
+**Reopening a closed contract-7 run** — a бриф the user directs into a run
+that already landed — is not a conversion. Publish an active candidate that
+keeps every published record, drops `outcome` and `finishedAt`, and sets `dir`
+back to `<YYYY-MM-DD>-<slug>--wip` with the date and slug unchanged. Publication
+moves the folder back and returns the register row to in progress; say in the
+chat that the run was reopened under its original date.

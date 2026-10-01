@@ -24,7 +24,7 @@ final return before importing results. The recipe is coordinator-only.
 
 ### 1. Read the манифест and the answers
 
-Read `.maestro/<slug>/manifest.md` and `.maestro/<slug>/answers.md`.
+Read `.maestro/<dir>/manifest.md` and `.maestro/<dir>/answers.md`.
 For preservation work, also read the neutral `reference.md` register and raw
 declared reference locations. Open
 [`../references/parity-migrations.md`](../references/parity-migrations.md) now.
@@ -160,7 +160,7 @@ that reached the run state and not the бриф.
 
 | Artifact | State |
 |---|---|
-| `.maestro/<slug>/spec.md` | written once, English, one entry per `in-spec` требование |
+| `.maestro/<dir>/spec.md` | written once, English, one entry per `in-spec` требование |
 | `.maestro/state.js` | no требование left `open`; `G2` recorded as passed |
 
 Then read the plan phase file.

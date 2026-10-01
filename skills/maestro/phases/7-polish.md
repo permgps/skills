@@ -23,7 +23,11 @@ final return before importing results. The recipe is coordinator-only.
 
 ### 1. Check that there is a standard to compare against
 
-Read `.maestro/<slug>/reference.md`. If the брифинг recorded no comparables,
+If the run is already closed, a round of доводка reopens it: publish an active
+candidate whose `dir` regains `--wip`, as preflight's *Reopening a closed
+contract-7 run* says, and read every path below under that name.
+
+Read `.maestro/<dir>/reference.md`. If the брифинг recorded no comparables,
 **доводка does not run.** Say so and stop: polishing against no reference means
 polishing against your own taste, and nothing in the прогон would ever show the
 user that is what happened.
@@ -110,7 +114,7 @@ gate of its own because it has no document of the user's to be measured against
 |---|---|
 | project code | changed by executors, one commit per доводка таск, each reviewed |
 | `.maestro/state.js` | the доводка таски in `tasks[]`, each ending at `done` through ревью |
-| `.maestro/<slug>/report.md` | one more приёмка round appended after the last доводка round |
+| `.maestro/<dir>/report.md` | one more приёмка round appended after the last доводка round |
 
 Mandatory source audit, integrated journeys, readiness, and selected controls
 remain acceptance work when this optional phase is disabled. A polishing change

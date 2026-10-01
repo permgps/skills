@@ -44,6 +44,12 @@ or worktrees narrows editing to one task. Installation and probes do not prove
 complete host support. See [Codex setup](docs/install.md#codex-cli-and-app) and
 [client-specific verification](docs/parity-verification.md#codex-compatibility-checkpoint--2026-09-30).
 
+Each run keeps its record in the target project under
+`.maestro/<YYYY-MM-DD>-<slug>--wip/`: the day it started, and `--wip` for as long
+as it is in progress. The suffix comes off when the run closes, and
+`.maestro/README.md` lists every run with how it ended. See
+[the runtime layout](docs/install.md#autonomous-runtime-layout).
+
 The first run in a project asks two things, and never asks them again. Both
 answers go to that project's `.maestro/config.json`, outside the bundle, where
 updating the skill cannot erase them.
@@ -153,7 +159,8 @@ cause that survived a similar repair, stops for a fresh **strategy review**, and
 only the user can raise the total repair limit. At G3 a **plan-consistency
 reader** sees every task file at once, and the gate refuses two таски that share
 a file without an order between them. Contract-5 runs stay readable and resume
-as contract 6 with their history marked as inherited.
+as contract 6 with their history marked as inherited. New runs publish contract
+7, which keeps all of this and adds the dated run directory described above.
 
 ## A live dashboard
 

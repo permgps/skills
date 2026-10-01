@@ -131,7 +131,7 @@ For each таск that returns done, in this order:
     captures. Verify the check/obligation IDs, invocation, assertions, reference
     and integrated-build identity, fixture/runtime/variant, relevant input
     hashes, capture paths and SHA-256. Copy captures into
-    `.maestro/<slug>/evidence/<execution-id>/` under orchestrator ownership,
+    `.maestro/<dir>/evidence/<execution-id>/` under orchestrator ownership,
     seal them, and add the execution/evidence records to the same state
     candidate. Publish through `sync.mts --publish` only after validation.
     Preserve an unavailable or failed result as such; missing capture or hash
@@ -271,8 +271,8 @@ not the бриф.
 | Artifact | State |
 |---|---|
 | project code | written by executors, one commit per finished таск |
-| `.maestro/<slug>/discovered-interfaces.md` | `D##` rows appended as each таск returned |
-| `.maestro/<slug>/tasks/NN-<slug>-handoff.md` | only for a таск that ran out of context; normally absent |
+| `.maestro/<dir>/discovered-interfaces.md` | `D##` rows appended as each таск returned |
+| `.maestro/<dir>/tasks/NN-<slug>-handoff.md` | only for a таск that ran out of context; normally absent |
 | `.maestro/state.js` | every таск `review`, or `repair` where a recorded divergence sent it back; `currentStage` moved on |
 
 Then read the review phase file.
