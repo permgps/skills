@@ -2,7 +2,7 @@
 
 Open this file when writing obligations, checks, executions, findings, or
 acceptance rounds. The exact fields and result rules are in the bundled
-contract-4 state shape described by `docs/spec/verification.md` in the source
+current contract's state shape described by `docs/spec/verification.md` in the source
 repository; an installed run uses the candidate schema enforced by `sync.mts`.
 
 Each live requirement has grounded obligations. Each obligation names its
@@ -19,6 +19,16 @@ The executor writes task-owned captures first. The orchestrator validates paths
 and hashes, imports them under `.maestro/<slug>/evidence/<execution-id>/`, then
 publishes one coherent candidate with `sync.mts --publish`. Never let a task
 write the shared state or report a check as passed solely from source inspection.
+
+Under contract 6 an execution also names the readiness record it ran against
+and, when it failed or was unavailable, its failure cause: `product`, `test`,
+`setup` or `unavailable_capability`. Readiness is recorded before any broad,
+browser or integrated run by the Readiness Protocol in
+[verification-procedures.md](verification-procedures.md), against a disposable
+source-only copy. A failed probe is the orchestrator's setup to correct with a
+superseding record; it spends no repair attempt and opens no finding. An
+unavailable probe leaves only the checks that declare it unavailable. Only the
+executor that a check names as its execution owner may return its execution.
 
 After a relevant input changes, retain the old execution as history and mark it
 stale for the current check. Reuse unaffected evidence only when its declared

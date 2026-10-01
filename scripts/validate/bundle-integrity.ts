@@ -166,20 +166,24 @@ export function checkProcedure(body: string): string[] {
   return requirements.filter(([, pattern]) => !pattern.test(body)).map(([name]) => name);
 }
 
-const COMPLETION_PROCEDURES = [
+export const COMPLETION_PROCEDURES = [
   ['prompts/manifest-reader.md', ''], ['prompts/repair-diagnostician.md', ''],
+  ['prompts/strategy-reviewer.md', ''],
   ['phases/1-manifest.md', '5a. Independently audit before agreement'],
   ['phases/3-spec.md', 'Integrated Outcomes And Readiness'],
   ['phases/4-plan.md', 'Journey And Control Ownership'],
   ['phases/5-build.md', 'Execute Journeys And Selected Controls'],
   ['phases/6-review.md', 'Verify Execution Handoffs'],
   ['phases/7-acceptance.md', 'Completion Reconciliation After Blind Discovery'],
+  ['phases/8-repair.md', '1a. Split the finding into defects'],
+  ['phases/8-repair.md', '2b. Strategy review'],
   ['phases/0-preflight.md', 'Explicit Historical Resume'],
+  ['references/verification-procedures.md', 'Readiness Protocol'],
   ['references/verification-procedures.md', 'Journey Protocol'],
   ['references/verification-procedures.md', 'Selective Negative-Control Protocol'],
 ] as const;
 
-function procedureSection(body: string, heading: string): string {
+export function procedureSection(body: string, heading: string): string {
   if (!heading) return body;
   const lines = body.split('\n');
   const index = lines.findIndex(line => line.replace(/^#+ /, '') === heading);

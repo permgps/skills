@@ -31,6 +31,8 @@ const VOCABULARY = `# Vocabulary
 | \`depth\` | \`normal\` | Обычная | Normal |
 | \`polish\` | \`false\` | Выключена | Off |
 | \`explain\` | \`plain\` | Простые | Plain |
+| \`verification.strategyReviews[].decision\` | \`stop_incomplete\` | Остановить | Stop |
+| \`verification.readiness[].probes[].result\` | \`passed\` | Пройдена | Passed |
 
 ## Screen Labels
 
@@ -118,6 +120,8 @@ const RU = {
   DEPTH: "{ normal: 'Обычная' }",
   POLISH: "{ 'false': 'Выключена' }",
   REGISTER: "{ plain: 'Простые' }",
+  STRATEGY_DECISION: "{ stop_incomplete: 'Остановить' }",
+  READINESS_RESULT: "{ passed: 'Пройдена' }",
   EXPLAIN: "{ progress: function () { return ['что это', 'что показывает']; } }",
   STAGE_EXPLAIN: "{ preflight: function () { return ['подготовка заводит прогон']; },"
     + " build: function () { return ['разработка пишет код']; } }",
@@ -136,6 +140,8 @@ const EN = {
   DEPTH: "{ normal: 'Normal' }",
   POLISH: "{ 'false': 'Off' }",
   REGISTER: "{ plain: 'Plain' }",
+  STRATEGY_DECISION: "{ stop_incomplete: 'Stop' }",
+  READINESS_RESULT: "{ passed: 'Passed' }",
   EXPLAIN: "{ progress: function () { return ['what it is', 'what it holds']; } }",
   STAGE_EXPLAIN: "{ preflight: function () { return ['setup opens the run']; },"
     + " build: function () { return ['development writes the code']; } }",

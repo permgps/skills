@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -8,6 +8,8 @@ import {
   bundleProfileFor,
   checkBundle,
   checkProcedure,
+  COMPLETION_PROCEDURES,
+  procedureSection,
   findRelativeLinks,
   parseFrontmatter,
   type Violation,
@@ -377,6 +379,16 @@ test('procedure scaffold rejects missing evidence/outcome instructions', () => {
   assert.deepEqual(checkProcedure(body), []);
   assert.deepEqual(checkProcedure(body.replace('Return fields: id, result', '')), ['output fields']);
   assert.deepEqual(checkProcedure(body.replace('Unavailable stays incomplete.', '')), ['missing-capability outcome']);
+});
+
+test('the shipped readiness protocol is a declared procedure and loses it without an Invalid example', async () => {
+  assert.ok(COMPLETION_PROCEDURES.some(([file, heading]) =>
+    file === 'references/verification-procedures.md' && heading === 'Readiness Protocol'));
+  const body = await readFile(new URL('../../skills/maestro/references/verification-procedures.md', import.meta.url), 'utf8');
+  const section = procedureSection(body, 'Readiness Protocol');
+  assert.match(section, /setup_failed/);
+  assert.deepEqual(checkProcedure(section), []);
+  assert.deepEqual(checkProcedure(section.replace('Invalid:', 'Counterexample')), ['invalid example']);
 });
 
 test('autonomous runtime imports reject external, missing, escaped and obsolete executable dependencies', async () => {

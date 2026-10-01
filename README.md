@@ -125,8 +125,10 @@ in front of a прогон it cannot touch. Two sessions once drove one прог
 neither had a way to notice.
 
 **A таск's commits are a list**, because a repaired таск lands twice. A review
-reads the union of that таск's own commits — `git diff <first>^..<last>` — and
-explicitly not the tree, which by then carries every wave that followed. The
+reads the ordered union of that таск's own commits, one diff per commit — never a
+range, which would carry every foreign commit between them — and explicitly not
+the tree, which by then carries every wave that followed. Paths those commits
+touched outside the таск's files are listed beside the diffs, not filtered away. The
 repair phase appends rather than replaces, so the commit the first review was
 written against stays findable.
 
@@ -140,6 +142,18 @@ report and dashboard distinguish frozen original scope from authorized current
 scope. Missing tools or independent returns remain incomplete. Historical v4
 outcomes stay readable under their original rules; see
 [verification and its limits](docs/parity-verification.md).
+
+Contract 6 makes the run close таски instead of repeating repairs. Before a
+broad, browser or integrated run, the orchestrator records **readiness** against
+a disposable source-only copy, so a broken setup is corrected rather than filed
+as product failures. A repair targets one **defect** under its parent таск, with
+repair criteria, residual criteria and a closure forecast; a verified defect
+does not close the таск by itself. A batch of repairs that closed nothing, or a
+cause that survived a similar repair, stops for a fresh **strategy review**, and
+only the user can raise the total repair limit. At G3 a **plan-consistency
+reader** sees every task file at once, and the gate refuses two таски that share
+a file without an order between them. Contract-5 runs stay readable and resume
+as contract 6 with their history marked as inherited.
 
 ## A live dashboard
 

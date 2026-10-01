@@ -337,6 +337,24 @@ it never had.
    `done`; a blocker in `queued`, `running`, `repair` or `failed` holds it. A
    task leaves `repair` for `running` only when no prerequisite named by its
    latest blocked attempt is still open.
+4. An executor returns each check result as one `maestro-execution-return/1`
+   block: invocation, actual exit code, tool and host identity, readiness ID,
+   fingerprint, assertions, captures with hashes, commit, and the failure cause
+   of a failed or unavailable result. It never assigns an execution ID; the
+   orchestrator does at import.
+5. A repaired task's review answers two questions separately: is the defect
+   verified against its repair criteria, and which parent criteria remain. The
+   task becomes `done` only when no open defect and no residual criterion
+   remains. Review input lists every path the task's commits touched outside
+   its owned files instead of filtering them away.
+6. A detector qualifies before its pass counts: a repair's follow-up check
+   fails on the counterexample and passes after restore; a test-framework
+   exception is never the expected domain failure; the default runner discovers
+   the file and the file holds the claimed suites; the harness forwards every
+   required parameter and the capture key carries route, locale, viewport and
+   state; goldens come only from the reference origin. Rules 4–6 are procedure,
+   held by review and the bundle's verification procedures; the validator holds
+   rules 1–3.
 
 Valid: a readiness record shows `bootstrap: setup_failed` because the
 verification copy denied its own root; the coordinator allows the copy's root,

@@ -16,8 +16,8 @@ on the source file's local path.
 | `npm run check` | Types, both specifications and bundles, state/dashboard/host/reader boundaries, and unit/integration tests | Required; copied Node runtime integration tests must execute without skips |
 | `npm run parity:browser` | Actual pointer input on an integrated local fixture through installed Chrome/Chromium and CDP | Required for UI parity acceptance; exits 1 on failed assertions and 2 when browser or loopback is unavailable |
 | `npm run parity:workflow` | Two isolated targets dispatched to the current Codex CLI configuration with hidden grading truth | Required for independent discovery; exits 2 when agent execution is unavailable |
-| `npm run completion:workflow` | Caller-supplied provider-neutral adapter; capability probe, eleven completion scenarios and three fresh omitted-limit runs | Required less-capable-model sample; exits 2 when unconfigured/unavailable |
-| `npm run completion:workflow:prepare` | Copies thirteen isolated targets and bounded input conversations | Preparation only; no execution credit |
+| `npm run completion:workflow` | Caller-supplied provider-neutral adapter; capability probe, thirteen completion scenarios and three fresh omitted-limit runs | Required less-capable-model sample; exits 2 when unconfigured/unavailable |
+| `npm run completion:workflow:prepare` | Copies fifteen isolated targets and bounded input conversations | Preparation only; no execution credit |
 | `npm run parity:workflow:prepare` | Copies the neutral fixture and skill into isolated targets | Preparation only; never counts as discovery |
 | `node scripts/validate/parity-workflow.ts --grade-existing <output-dir>` | Regrades the same isolated targets after saved CLI sessions continue past the unattended deadline | Continuation only; preserves the first result and writes `continued-results.json` |
 | `node scripts/validate/completion-workflow.ts --grade-recorded <output-dir>` | Grades saved external-host sessions against their prepared inputs and the same independent browser oracle | Actual sessions only; missing host observations remain explicit failures |
@@ -64,6 +64,47 @@ agents to pass `--no-open` to the viewer helper. It stops each target's
 viewer server after grading. The CLI run is saved locally because its
 `--ephemeral` mode cannot provide the child-thread evidence needed for this
 evaluation.
+
+## Contract 6 Closure Checkpoint — 2026-10-01
+
+Contract 6 publishes verification 3. It adds readiness records, failure
+causes, defects closed separately from their таски, defect-scoped repair
+attempts with closure forecasts, strategy reviews and user-authorized limit
+raises. It also checks executions against the check's execution owner. G3
+mechanically refuses two таски that share a path in `files` or `zone`
+without an order between them. It also refuses a check whose execution owner
+does not transitively depend on each integration prerequisite. G4 refuses
+`completed` with an open defect, and a stop after an exhausted budget without
+its `budget_exhausted` review. Contract-5 runs stay readable and resume as
+contract 6 with their carried history named as inherited.
+
+Exercised on **macOS with Node v26.8.1**. `npm run check` passed
+typechecking, all eleven validator runs and **823 tests**, with zero failures
+or skips. The new rule tests were confirmed to fail first:
+
+- the closure-rule tests failed with the closure rules disabled;
+- five of the six new G3/G4 tests failed against the previous gate scripts.
+
+`scripts/state/retrospective.test.ts` replays a synthetic run shaped like
+the failed one. The runtime refuses each recorded exit:
+
+- a broad run behind a failed bootstrap;
+- a ninth repair with no strategy review;
+- a downstream relaunch before its upstream;
+- an unauthorized limit raise;
+- a repair commit review would not see;
+- a misattributed execution.
+
+The same run's corrected path is accepted. No real run data is used.
+
+The live matrix gains two prepared scenarios, `setup-readiness` and
+`batch-without-closure`, graded through the same closure rules.
+
+**Limits:** no real Maestro run has exercised the contract-6 rules yet, and
+the two new live scenarios have been prepared and unit-tested but not executed
+against any agent host. The procedure rules for executor return format and
+detector qualification are held by prompts, review and the bundle's procedure
+scaffolding check, not by a validator. No release was published.
 
 ## Node Runtime Migration Checkpoint — 2026-09-30
 

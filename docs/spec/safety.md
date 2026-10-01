@@ -39,6 +39,20 @@ contradicts — and by then the бриф is the one document nobody is re-readin
   other path in the repository belongs to an executor.
 - **S4 asks even in the no-questions mode.** That mode buys the user freedom from
   questions about preference, never from questions about consequence.
+- **Verification runs inside a write boundary, which is how S2, S4 and S5 hold
+  while a build is exercised.** Before a broad, browser or integrated run, the
+  orchestrator records readiness against a disposable source-only verification
+  copy. The copy physically omits `.maestro/`, legacy trees, private settings
+  and caches, real credentials and symlinks that escape it, and carries
+  synthetic settings under the same variable names. That keeps S2 true of every
+  process the checks start. The copy and its synthetic settings are run
+  artifacts, not project code, so writing them is inside S5. A file-access
+  restriction allows the copy's root instead of denying the project root.
+  Read-only SQL does not make HTTP read-only: the app writes only to an owned
+  test database and storage inside the copy. Deleting rows the run did not
+  create, to hide a write, is S4's "delete data" and is asked about, never done.
+  The record's rules are under Readiness in [`verification.md`](verification.md);
+  the procedure is the Readiness Protocol in the bundle's verification procedures.
 - **S1's removal has two homes, and they are two because they answer two
   questions.** The words are the user's, so they are quoted where the user's own
   words are kept — the additions block of the бриф, which

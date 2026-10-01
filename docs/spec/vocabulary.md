@@ -108,6 +108,13 @@ half-supported.
 | `polish` | `false` | Выключена | Off |
 | `explain` | `plain` | Простые | Plain |
 | `explain` | `normal` | Обычные | Normal |
+| `verification.strategyReviews[].decision` | `change_strategy` | Сменить подход | Change approach |
+| `verification.strategyReviews[].decision` | `stop_incomplete` | Остановить | Stop |
+| `verification.strategyReviews[].decision` | `request_limit` | Запросить попытки | Ask for more attempts |
+| `verification.readiness[].probes[].result` | `passed` | Пройдена | Passed |
+| `verification.readiness[].probes[].result` | `setup_failed` | Ошибка настройки | Setup failed |
+| `verification.readiness[].probes[].result` | `unavailable` | Недоступна | Unavailable |
+| `verification.readiness[].probes[].result` | `not_applicable` | Не нужна | Not needed |
 
 `Готово` and `Готов` differ because one describes a stage and the other a таск,
 and Russian will not let one form serve both without reading as a mistake. They
@@ -157,6 +164,10 @@ term, and a term with two homes drifts.
 | Объяснения | Wording | Which register the прогон is speaking in — the label that keeps `Обычные` from being read as the depth's `Обычная` |
 | Вне контракта | Off-contract | Таски whose status is not one the contract defines — counted, shown as written, and worth nothing on the bar |
 | Гейты | Checks | The four checks of the прогон, each after its own stage |
+| Дефекты | Defects | Contract 6: a таск's verified and open defects, beside its status word. A verified defect closes no таск |
+| Попытки исправления | Repair attempts | Contract 6: repair attempts used out of the total limit, on the Таски card |
+| Решение по стратегии | Strategy decision | Contract 6: the latest strategy review's decision, beside the repair attempts |
+| Готовность к проверке | Readiness | Contract 6: whether the current candidate's latest readiness record passed, failed in setup, or lacks a capability, with the probe kinds that did not pass |
 | G1 | G1 | The gate after брифинг, shown as a row of Гейты |
 | G2 | G2 | The gate after спецификация |
 | G3 | G3 | The gate after план |

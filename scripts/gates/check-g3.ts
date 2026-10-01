@@ -4,7 +4,10 @@
 // Pass condition, from docs/spec/gates.md: every in-spec требование maps to at
 // least one таск, every таск traces back to at least one требование, and a
 // reader given exactly what an executor will be given finds each task file
-// buildable without asking a question.
+// buildable without asking a question. Two mechanical rules came from a run
+// whose repairs kept reopening each other: таски sharing a path in `files` or
+// `zone` are ordered by `blockedBy`, and a check's execution owner transitively
+// depends on every integration prerequisite of that check.
 //
 // Both directions of the map, because either alone is worth little. A cut can
 // cover every требование and still carry two таски invented along the way; it
@@ -28,8 +31,31 @@ export type { GateFinding };
 
 const log = createLogger('gate-g3');
 
+/**
+ * Every таск reachable through `blockedBy` from `id`, the таск itself excluded.
+ * A visited set rather than recursion, so a cycle — reported elsewhere — ends the walk.
+ */
+function upstreamOf(id: string, blockers: Map<string, string[]>): Set<string> {
+  const reached = new Set<string>();
+  const pending = [...(blockers.get(id) ?? [])];
+  while (pending.length > 0) {
+    const next = pending.pop()!;
+    if (next === id || reached.has(next)) continue;
+    reached.add(next);
+    pending.push(...(blockers.get(next) ?? []));
+  }
+  return reached;
+}
+
 export function checkG3(state: RunState): GateFinding[] {
   const findings: GateFinding[] = [];
+  const blockers = new Map(state.tasks.map(task => [task.id, task.blockedBy]));
+  const upstream = new Map<string, Set<string>>();
+  const ancestors = (id: string): Set<string> => {
+    let known = upstream.get(id);
+    if (!known) upstream.set(id, known = upstreamOf(id, blockers));
+    return known;
+  };
 
   const status = new Map<string, string>();
   for (const requirement of state.requirements) {
@@ -85,6 +111,35 @@ export function checkG3(state: RunState): GateFinding[] {
     }
   }
 
+  // --- two таски writing one path are ordered, or they collide --------------
+  // Waves keep wave-mates apart and say nothing about таски in different waves
+  // that never wait for each other: two such таски that share a route file both
+  // land, and the second one's review judges the first one's code.
+  const writers = new Map<string, string[]>();
+  for (const task of state.tasks) {
+    for (const path of new Set([...(task.files ?? []), ...(task.zone ?? [])])) {
+      writers.set(path, [...(writers.get(path) ?? []), task.id]);
+    }
+  }
+  let collisions = 0;
+  const reportedPairs = new Set<string>();
+  for (const [path, owners] of writers) {
+    for (let i = 0; i < owners.length; i += 1) {
+      for (let j = i + 1; j < owners.length; j += 1) {
+        const [a, b] = [owners[i]!, owners[j]!];
+        if (a === b || ancestors(a).has(b) || ancestors(b).has(a)) continue;
+        const pair = [a, b].sort().join('/');
+        if (reportedPairs.has(pair)) continue;
+        reportedPairs.add(pair);
+        collisions += 1;
+        findings.push({ requirementId: a,
+          message: `таски ${a} and ${b} both write ${path} and neither waits for the other — `
+            + `add one to the other's blockedBy, or move ${path} into one таск` });
+      }
+    }
+  }
+  log.debug('g3', 'file ownership checked', { paths: writers.size, collisions });
+
   if (state.contractVersion >= 4 && state.verification) {
     const record = state.verification;
     if (record.version !== 1) {
@@ -123,9 +178,10 @@ export function checkG3(state: RunState): GateFinding[] {
           if (!tasks.has(dependency)) findings.push({ requirementId: obligation.requirementIds[0] ?? '',
             message: `check ${check.id} has missing integration prerequisite ${dependency}` });
           else if (executionOwner && dependency !== executionOwner.id
-            && !executionOwner.blockedBy.includes(dependency)) findings.push({
+            && !ancestors(executionOwner.id).has(dependency)) findings.push({
             requirementId: obligation.requirementIds[0] ?? '',
-            message: `execution owner ${executionOwner.id} must depend on prerequisite ${dependency}` });
+            message: `execution owner ${executionOwner.id} of check ${check.id} does not transitively depend on `
+              + `integration prerequisite ${dependency} — add ${dependency} to the blockedBy chain of ${executionOwner.id}` });
         }
         if (check.method.includes('source') && /browser|pointer|keyboard|hover|visible/i.test(obligation.expectation)) {
           findings.push({ requirementId: obligation.requirementIds[0] ?? '',

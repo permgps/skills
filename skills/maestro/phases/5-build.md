@@ -47,6 +47,16 @@ Two rules bound what may fly together, and both still hold:
 The dependency graph alone lets two таски edit one module from opposite ends;
 file ownership alone starts a таск before what it builds on exists.
 
+**Finished means `review` or `done`.** A blocker in `queued`, `running`,
+`repair` or `failed` holds its dependents: what they would build on is not there
+yet or has been found wrong, and their evidence would go stale the moment the
+upstream repair lands. The run-state validator refuses the launch, so check
+before you write `running`, not after.
+
+When several таски are ready, launch first the one that unlocks the most
+transitively blocked таски. A run closes by closing таски, and a ready upstream
+таск that holds five others back is worth more than five independent leaves.
+
 **What changed here, and why it is worth a paragraph.** This step used to say
 «recompute the wave after each таск returns». Under that rule a таск had no wave
 number until the moment it started, so there was nothing for the dashboard to
@@ -271,11 +281,19 @@ Then read the review phase file.
 
 Entry: integrated reviewed prerequisites and complete verification-only brief.
 Open [verification-procedures.md](../references/verification-procedures.md).
+0. Before any broad suite, browser or integrated run, follow its Readiness
+   Protocol for this candidate: a source-only copy without `.maestro/`, legacy
+   trees, private settings or escaping symlinks, probes tried rather than read,
+   and an RD-N record. `setup_failed` is yours to correct with a superseding
+   record and spends no repair attempt; `unavailable` leaves dependent checks
+   unavailable. After mass identical errors from one prerequisite, preserve and
+   classify the run as `setup` and do not rerun it until readiness passes.
 1. Dispatch the task with its full relevant journey/control procedure and no
    unrelated specification. It returns captures/results; you do not execute
    project code yourself or author its observations.
 2. Import actual journey observations into ordinary executions. Require every
-   ordered assertion and current fingerprint. Missing result stays not_run.
+   ordered assertion, current fingerprint, readinessId, and failureCause on a
+   failed or unavailable result. Missing result stays not_run.
 3. Import control clean/mutated/restored returns separately. Compare unchanged
    oracle, isolated identity and main before/after identity; seal immutable
    captures under control-run IDs. Append superseding NC outcome, never a

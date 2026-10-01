@@ -27,9 +27,15 @@ final return before importing results. The recipe is coordinator-only.
 ### 1. Bring the build up
 
 The reader is given the project as it runs, not as it reads. Start it, or bring
-it to the closest thing a project of this kind has to running.
+it to the closest thing a project of this kind has to running. Record readiness
+for this candidate first, under the Readiness Protocol in
+[verification-procedures.md](../references/verification-procedures.md): a
+readiness record from the build phase is current only while its build and
+runtime identity equal this candidate's.
 
 If startup fails, classify before routing:
+0. A failed readiness probe is setup, not product: correct it, record a
+   superseding RD-N, and spend no repair attempt on it.
 1. Capture exact documented launch command, sanitized error evidence, current
    build fingerprint, affected R/check IDs and owning task.
 2. Assess prerequisites: missing external tool/service/value makes affected

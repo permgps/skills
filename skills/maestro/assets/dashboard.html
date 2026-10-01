@@ -315,6 +315,7 @@
       <div class="value"><span id="tasks-done">—</span><small id="tasks-total"></small></div>
       <div class="bar"><i id="tasks-fill" style="width:0%"></i><i id="tasks-flight" class="flight" style="width:0%"></i></div>
       <p class="sub" id="tasks-sub"></p>
+      <p class="sub" id="tasks-budget"></p>
     </div>
 
     <div class="card" data-region="debt">
@@ -423,6 +424,14 @@ globalThis.MAESTRO_LOGIC = (function () {
        * scripts/validate/dashboard-integrity.ts and dashboard-logic.test.ts.
        */
       REGISTER: { plain: 'Простые', normal: 'Обычные' },
+      STRATEGY_DECISION: {
+        change_strategy: 'Сменить подход', stop_incomplete: 'Остановить',
+        request_limit: 'Запросить попытки'
+      },
+      READINESS_RESULT: {
+        passed: 'Пройдена', setup_failed: 'Ошибка настройки',
+        unavailable: 'Недоступна', not_applicable: 'Не нужна'
+      },
       /** The words on screen that are the value of no field. */
       SCREEN: {
         dials: 'Тумблеры прогона',
@@ -446,6 +455,10 @@ globalThis.MAESTRO_LOGIC = (function () {
         register: 'Объяснения',
         offContract: 'Вне контракта',
         gates: 'Гейты',
+        defects: 'Дефекты',
+        repairBudget: 'Попытки исправления',
+        strategy: 'Решение по стратегии',
+        readiness: 'Готовность к проверке',
         G1: 'G1', G2: 'G2', G3: 'G3', G4: 'G4'
       },
       UI: {
@@ -610,6 +623,19 @@ globalThis.MAESTRO_LOGIC = (function () {
             'Добавлено: ' + value.addedIds.length + '; Отложено: ' + value.deferredIds.length + '; Удалено: ' + value.droppedIds.length
             + '; Изменено: ' + value.changedIds.length + '; Принятые исключения: ' + value.exceptionDecisionIds.length];
         },
+        taskDefects: function (count) {
+          return L10N.ru.SCREEN.defects + ': подтверждено ' + count.verified + ', открыто ' + count.open;
+        },
+        repairBudget: function (value) {
+          var line = L10N.ru.SCREEN.repairBudget + ': ' + value.used + '/' + value.total;
+          if (value.decision) line += ' · ' + L10N.ru.SCREEN.strategy + ': ' + L10N.ru.STRATEGY_DECISION[value.decision];
+          return line;
+        },
+        readinessRow: function (value) {
+          if (value.status === 'none') return L10N.ru.SCREEN.readiness + ': не записана.';
+          var line = L10N.ru.SCREEN.readiness + ': ' + L10N.ru.READINESS_RESULT[value.status];
+          return line + (value.kinds.length > 0 ? ' (' + value.kinds.join(', ') + ').' : '.');
+        },
         verificationRows: function (value) {
           return 'Результат требований — ошибки: ' + (value.failedIds.join(', ') || 'нет')
             + '; непроверено: ' + (value.incompleteIds.join(', ') || 'нет') + '.';
@@ -669,6 +695,14 @@ globalThis.MAESTRO_LOGIC = (function () {
       DEPTH: { strict: 'Strict', normal: 'Normal', deep: 'Deep' },
       POLISH: { 'true': 'On', 'false': 'Off' },
       REGISTER: { plain: 'Plain', normal: 'Normal' },
+      STRATEGY_DECISION: {
+        change_strategy: 'Change approach', stop_incomplete: 'Stop',
+        request_limit: 'Ask for more attempts'
+      },
+      READINESS_RESULT: {
+        passed: 'Passed', setup_failed: 'Setup failed',
+        unavailable: 'Unavailable', not_applicable: 'Not needed'
+      },
       SCREEN: {
         dials: 'Dials',
         progress: 'Project progress',
@@ -691,6 +725,10 @@ globalThis.MAESTRO_LOGIC = (function () {
         register: 'Wording',
         offContract: 'Off-contract',
         gates: 'Checks',
+        defects: 'Defects',
+        repairBudget: 'Repair attempts',
+        strategy: 'Strategy decision',
+        readiness: 'Readiness',
         G1: 'G1', G2: 'G2', G3: 'G3', G4: 'G4'
       },
       UI: {
@@ -837,6 +875,19 @@ globalThis.MAESTRO_LOGIC = (function () {
           return ['Original scope: ' + number(value.original), 'Current scope: ' + number(value.current),
             'Added: ' + value.addedIds.length + '; Deferred: ' + value.deferredIds.length + '; Dropped: ' + value.droppedIds.length
             + '; Changed: ' + value.changedIds.length + '; Accepted exceptions: ' + value.exceptionDecisionIds.length];
+        },
+        taskDefects: function (count) {
+          return L10N.en.SCREEN.defects + ': verified ' + count.verified + ', open ' + count.open;
+        },
+        repairBudget: function (value) {
+          var line = L10N.en.SCREEN.repairBudget + ': ' + value.used + '/' + value.total;
+          if (value.decision) line += ' · ' + L10N.en.SCREEN.strategy + ': ' + L10N.en.STRATEGY_DECISION[value.decision];
+          return line;
+        },
+        readinessRow: function (value) {
+          if (value.status === 'none') return L10N.en.SCREEN.readiness + ': not recorded.';
+          var line = L10N.en.SCREEN.readiness + ': ' + L10N.en.READINESS_RESULT[value.status];
+          return line + (value.kinds.length > 0 ? ' (' + value.kinds.join(', ') + ').' : '.');
         },
         verificationRows: function (value) {
           return 'Requirement results — failed: ' + (value.failedIds.join(', ') || 'none')
@@ -1603,6 +1654,54 @@ globalThis.MAESTRO_LOGIC = (function () {
       droppedIds: requirements.filter(function (item) { return item.status === 'dropped'; }).map(function (item) { return item.id; }),
       changedIds: record && record.version >= 2 ? Array.from(new Set(record.scopeMappings.filter(function (item) { return item.targetRevision === record.targetRevision && (item.relation === 'changed' || item.relation === 'split'); }).map(function (item) { return item.originalRequirementId; }))) : [],
       exceptionDecisionIds: record ? record.decisions.filter(function (item) { return item.kind === 'accepted_exception'; }).map(function (item) { return item.id; }) : [] };
+  }
+
+  /**
+   * Contract 6's closure view: defects per таск, the repair budget with the
+   * latest strategy decision, and the readiness of the current candidate.
+   * Null for any earlier contract, so those pages render as before. Defects
+   * never feed taskShare: a verified defect closes no таск.
+   */
+  function closureOf(state) {
+    var record = state && state.contractVersion >= 6 ? state.verification : null;
+    if (!record || record.version !== 3) return null;
+    var defects = {};
+    (record.defects || []).forEach(function (defect) {
+      if (defect.status !== 'open' && defect.status !== 'verified') return;
+      var slot = defects[defect.parentTaskId] || (defects[defect.parentTaskId] = { verified: 0, open: 0 });
+      slot[defect.status] += 1;
+    });
+    var latest = null;
+    (record.strategyReviews || []).forEach(function (review) {
+      if (!latest || String(review.at) >= String(latest.at)) latest = review;
+    });
+    var superseded = {};
+    (record.readiness || []).forEach(function (item) { if (item.supersedes) superseded[item.supersedes] = true; });
+    var current = null;
+    (record.readiness || []).forEach(function (item) {
+      if (superseded[item.id]) return;
+      if (!current || String(item.executedAt) >= String(current.executedAt)) current = item;
+    });
+    var readiness = { status: 'none', kinds: [] };
+    if (current) {
+      var probes = current.probes || [];
+      var pick = function (result) {
+        return probes.filter(function (probe) { return probe.result === result; })
+          .map(function (probe) { return probe.kind; });
+      };
+      var failed = pick('setup_failed');
+      var missing = pick('unavailable');
+      readiness = failed.length > 0 ? { status: 'setup_failed', kinds: failed }
+        : missing.length > 0 ? { status: 'unavailable', kinds: missing }
+        : { status: 'passed', kinds: [] };
+    }
+    var limits = record.repairLimits || {};
+    return {
+      defects: defects,
+      budget: { used: (record.repairAttempts || []).length, total: limits.total || 0,
+        decision: latest ? latest.decision : null },
+      readiness: readiness
+    };
   }
 
   function verificationOf(state) {
@@ -2895,6 +2994,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     testsOf: testsOf,
     contractNotice: contractNotice,
     verificationOf: verificationOf,
+    closureOf: closureOf,
     scopeProgressOf: function (state) { return scopeProgressOf(state, verificationOf(state)); },
     textDigest: textDigest,
     runNotice: runNotice,
@@ -3337,6 +3437,9 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     el('tasks-fill').style.width = Math.round(settled * 100) + '%';
     el('tasks-flight').style.width = Math.max(0, share - Math.round(settled * 100)) + '%';
     text('tasks-sub', T.UI.tasksSub(tasks, share));
+    var closure = null;
+    try { closure = L.closureOf(state); } catch (error) { closure = null; }
+    text('tasks-budget', closure ? T.UI.repairBudget(closure.budget) : '');
 
     // --- долг -----------------------------------------------------------
     var debt = L.debtCounts(state);
@@ -3400,6 +3503,8 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
 
   function renderBuild(state) {
     var host = clear(el('tasks'));
+    var closure = null;
+    try { closure = L.closureOf(state); } catch (error) { closure = null; }
     var chips = clear(el('build-chips'));
     var tasks = state.tasks || [];
 
@@ -3437,6 +3542,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
         // Colour says the таск is not ordinary work; the word says which kind.
         if (task.status === 'review' || task.status === 'repair' || task.status === 'failed') {
           put(fill, 'span', L.label(T.TASK_STATUS, task.status), 'phase');
+          if (closure && closure.defects[task.id]) put(fill, 'span', T.UI.taskDefects(closure.defects[task.id]), 'phase defects');
         } else if (L.TASK_ORDER.indexOf(task.status) === -1) {
           // A status the contract does not define is printed as it was written,
           // through the same reader that keeps a finding from becoming
@@ -3473,6 +3579,9 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       try { put(host, 'p', T.UI.verificationRows(L.verificationOf(state)), 'total'); }
       catch (error) { put(host, 'p', L.runNotice(state, lang), 'total'); }
     }
+    var closure = null;
+    try { closure = L.closureOf(state); } catch (error) { closure = null; }
+    if (closure) put(host, 'p', T.UI.readinessRow(closure.readiness), 'total');
   }
 
   function renderGates(state) {

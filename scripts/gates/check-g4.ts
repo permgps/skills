@@ -50,6 +50,26 @@ export function checkG4(state: RunState): GateFinding[] {
     if (state.lifecycle === 'closed'
       && state.verification.promisedWork.some(item => item.status === 'open')) findings.push({
       requirementId: '', message: 'open promised work blocks closure' });
+    const record = state.verification;
+    let openDefects = 0;
+    if (record.version === 3) {
+      const open = record.defects.filter(defect => defect.status === 'open');
+      openDefects = open.length;
+      if (state.lifecycle === 'closed' && state.outcome === 'completed') {
+        for (const defect of open) findings.push({
+          requirementId: state.tasks.find(task => task.id === defect.parentTaskId)?.requirementIds[0] ?? '',
+          message: `completed closure leaves defect ${defect.id} open — verify it against its criteria `
+            + 'checks and a negative control, or close the run as stopped_incomplete' });
+      }
+      const exhausted = record.repairAttempts.length >= record.repairLimits.total;
+      if (state.lifecycle === 'closed' && state.outcome === 'stopped_incomplete' && exhausted
+        && !record.strategyReviews.some(review => review.trigger === 'budget_exhausted')) {
+        findings.push({ requirementId: '',
+          message: `the run stopped after ${record.repairAttempts.length} of ${record.repairLimits.total} repair `
+            + 'attempts with no budget_exhausted strategy review — record the review before closing' });
+      }
+      log.debug('g4', 'closure rules checked', { openDefects, exhausted });
+    }
     log.info('g4', 'verification result checked', {
       g4: summary.g4, round: summary.currentRoundId ?? null,
       failed: summary.failedIds.length, incomplete: summary.incompleteIds.length,

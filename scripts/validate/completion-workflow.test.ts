@@ -33,7 +33,7 @@ test('adapter has no implicit executable/model and substitutions stay individual
 });
 
 test('focused fresh reruns preserve full-matrix defaults and require explicit bounded selection', () => {
-  assert.equal(selectedScenarios([]).length, 13);
+  assert.equal(selectedScenarios([]).length, 15);
   assert.deepEqual(selectedScenarios(['--scenario', 'source-limit', '--repeat', '3']), ['source-limit', 'source-limit', 'source-limit']);
   assert.throws(() => selectedScenarios(['--repeat', '3']), /requires --scenario/);
   assert.throws(() => selectedScenarios(['--scenario', 'unknown']), /known scenario/);
@@ -65,10 +65,10 @@ test('normalization redacts transcripts, drops unparseable/model messages, and r
 });
 
 test('hidden grading truth and scenario names stay outside target prompt/host instructions', async () => {
-  for (const scenario of ['source-limit', 'persistence', 'insensitive-detector', 'startup', 'repeated-repair', 'deferral', 'relaxed-target', 'unavailable', 'repaired', 'backend'] as const) {
+  for (const scenario of ['source-limit', 'persistence', 'insensitive-detector', 'startup', 'repeated-repair', 'deferral', 'relaxed-target', 'unavailable', 'repaired', 'backend', 'setup-readiness', 'batch-without-closure'] as const) {
     const prepared = await prepareCompletionTarget(scenario);
     try {
-      assert.doesNotMatch(prepared.input.prompt, /hidden|grader|suspected|insensitive|volatile|missing limit/i);
+      assert.doesNotMatch(prepared.input.prompt, /hidden|grader|suspected|insensitive|volatile|missing limit|readiness|bootstrap|strategy|batch/i);
       assert.match(prepared.input.prompt, /full strict.*polish disabled/);
       const host = await readFile(path.join(prepared.input.target, 'AGENTS.md'), 'utf8');
       assert.doesNotMatch(host, /limit|detector|restart|menu/i);
@@ -76,6 +76,13 @@ test('hidden grading truth and scenario names stay outside target prompt/host in
       assert.ok((await readFile(path.join(prepared.input.target, 'skills/maestro/prompts/manifest-reader.md'), 'utf8')).length > 0);
       if (scenario === 'persistence') assert.match(await readFile(path.join(prepared.input.target, 'src/index.html'), 'utf8'), /\|\| 'volatile-only'/);
       if (scenario === 'deferral' || scenario === 'relaxed-target') assert.equal(prepared.input.turns[0]!.after, 'G1');
+      if (scenario === 'setup-readiness') {
+        assert.match(await readFile(path.join(prepared.input.target, 'src/server.mjs'), 'utf8'), /generated\/routes\.mjs/);
+        await assert.rejects(readFile(path.join(prepared.input.target, 'src/generated/routes.mjs'), 'utf8'));
+      }
+      if (scenario === 'batch-without-closure') {
+        assert.match(await readFile(path.join(prepared.input.target, 'src/index.html'), 'utf8'), /entries\.length >= 2/);
+      }
     } finally { await rm(prepared.input.target, { recursive: true, force: true }); }
   }
 });

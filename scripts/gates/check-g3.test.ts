@@ -214,3 +214,43 @@ test('G3 failed while carrying findings is honest, not a violation', () => {
     { id: 'G3', status: 'failed', findings: ['T05 does not say what the score counts'] },
   ])), []);
 });
+
+test('C09: two таски writing one route file with no order between them collide', () => {
+  const state = stateWith([{ id: 'R01', status: 'in-spec' }], [
+    task('01', ['R01']),
+    { ...task('08', ['R01']), blockedBy: ['01'], files: ['src/routes/orders.ts', 'src/orders/list.ts'] },
+    { ...task('11', ['R01']), blockedBy: ['01'], zone: ['src/routes/orders.ts'] },
+  ]);
+  const findings = checkG3(state);
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]!.message, /таски 08 and 11 both write src\/routes\/orders\.ts and neither waits/);
+  assert.match(findings[0]!.message, /blockedBy/);
+});
+
+test('C09: the same overlap serialized through a third таск passes', () => {
+  assert.deepEqual(checkG3(stateWith([{ id: 'R01', status: 'in-spec' }], [
+    { ...task('08', ['R01']), files: ['src/routes/orders.ts'] },
+    { ...task('09', ['R01']), blockedBy: ['08'] },
+    { ...task('11', ['R01']), blockedBy: ['09'], files: ['src/routes/orders.ts'] },
+  ])), []);
+});
+
+test('C09: an execution owner reaching its prerequisite through a chain passes', () => {
+  const state = verifiedState();
+  state.tasks.push({ ...state.tasks[0]!, id: '02', title: 'Wire menu', blockedBy: ['01'], files: [] },
+    { ...state.tasks[0]!, id: '03', title: 'Verify menu', blockedBy: ['02'], files: [] });
+  state.verification!.obligations[0]!.implementationTaskIds = [];
+  state.verification!.checks[0]!.executionTaskId = '03';
+  state.verification!.checks[0]!.integrationDependencies = ['01'];
+  assert.deepEqual(checkG3(state), []);
+});
+
+test('C09: an execution owner that never waits for its prerequisite is reported', () => {
+  const state = verifiedState();
+  state.tasks.push({ ...state.tasks[0]!, id: '02', title: 'Verify menu', blockedBy: [], files: [] });
+  state.verification!.obligations[0]!.implementationTaskIds = [];
+  state.verification!.checks[0]!.executionTaskId = '02';
+  state.verification!.checks[0]!.integrationDependencies = ['01'];
+  assert.ok(checkG3(state).some(item =>
+    /execution owner 02 of check C-1 does not transitively depend on integration prerequisite 01/.test(item.message)));
+});

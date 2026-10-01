@@ -30,6 +30,13 @@ compatible checks. Missing historical baseline reads “not established”; an
 empty denominator reads “not applicable”. Russian/English labels use ordinary
 wording in both explanation registers.
 
+A contract-6 run adds three readings. A таск in review, repair or failed shows
+its verified and open defects beside its status word; a verified defect never
+moves the таски share. The Таски card shows repair attempts used out of the
+limit and the latest strategy-review decision. The requirements region shows
+the readiness of the current candidate: passed, setup failed, or unavailable,
+with the probe kinds that did not pass. Earlier contracts show none of them.
+
 Contract-5 G4 remains pending without a fresh source audit/agreement, required
 journey observations, or selected controls. A finished stage cannot override
 this result. Contract 4 retains its previous conformance result while the new

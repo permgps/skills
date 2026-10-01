@@ -14,6 +14,23 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**Contract 6: close таски instead of repeating repairs (breaking).** Contract 6
+requires verification 3. It records readiness against a disposable source-only
+copy before broad runs, so a setup failure is corrected instead of filed as
+product failures. It splits findings into defects that close separately from
+their таск, scopes each repair to one defect with a closure forecast, and stops
+a batch that closed nothing for a fresh strategy review. A larger repair limit
+needs the user's words. A plan-consistency reader joins G3. The gate refuses
+unordered таски that share a file, and an execution owner that does not
+transitively wait for its integration prerequisites. G4 refuses `completed`
+with an open defect. Reviews read one diff per task commit, never a range. The
+dashboard shows defects, the repair budget and readiness. Contract-5 runs remain
+readable and resume as contract 6 with inherited history.
+
+**Verification status:** `npm run check` passes 823 tests with zero failures
+and zero skips on macOS with Node v26.8.1. No real run has exercised contract 6
+yet; see [the closure checkpoint](docs/parity-verification.md#contract-6-closure-checkpoint--2026-10-01).
+
 ## v0.0.6-alpha — 2026-09-30
 
 **Autonomous Node runtime.** Replace the Python helper with `sync.mts` and a

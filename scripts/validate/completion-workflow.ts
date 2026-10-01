@@ -14,6 +14,7 @@ import { createLogger } from '../shared/log.ts';
 import { redact } from '../redact/redact.ts';
 import { readState } from '../state/read.ts';
 import { deriveScopeProgress, deriveVerification } from '../state/verification.ts';
+import { validateClosureRecord } from '../state/closure.ts';
 import type { RunState } from '../state/contract.ts';
 import { browserExecutable, runPersistenceControls } from './parity-browser.ts';
 import { collectDispatches, collectRolloutDispatches, gradeWorkflowTarget,
@@ -25,7 +26,8 @@ const fixtureRoot = path.join(import.meta.dirname, 'fixtures', 'completion-workf
 const bundleRoot = path.resolve(import.meta.dirname, '..', '..', 'skills', 'maestro');
 
 export const SCENARIOS = ['source-limit', 'persistence', 'insensitive-detector', 'startup',
-  'repeated-repair', 'deferral', 'relaxed-target', 'unavailable', 'repaired', 'legacy', 'backend'] as const;
+  'repeated-repair', 'deferral', 'relaxed-target', 'unavailable', 'repaired', 'legacy', 'backend',
+  'setup-readiness', 'batch-without-closure'] as const;
 export type Scenario = typeof SCENARIOS[number];
 
 /** Focused reruns retain the same truth/oracle; defaults still cover the full matrix. */
@@ -187,7 +189,23 @@ export async function prepareCompletionTarget(scenario: Scenario, target?: strin
   if (scenario === 'relaxed-target') turns.push({ after: 'G1', text: 'Изменяю допустимый максимум с 3 до 5 записей. Остальные условия сохраняются.' });
   if (scenario === 'backend') request = 'Предоставь команду node src/app.mjs, которая печатает сумму целых чисел из аргументов. Неверные аргументы отклоняются с ненулевым кодом.';
   if (scenario === 'unavailable') request += '\nПроверь настоящую интеграцию с сервисом из SERVICE_ENDPOINT; тестовая заглушка не заменяет её. Адрес и ключ сейчас недоступны.';
-  if (scenario === 'persistence' || scenario === 'repeated-repair') starter = starter.replace("|| 'clean'", "|| 'volatile-only'");
+  if (scenario === 'persistence' || scenario === 'repeated-repair' || scenario === 'batch-without-closure') {
+    starter = starter.replace("|| 'clean'", "|| 'volatile-only'");
+  }
+  // Two causes under one visible symptom: entries are not kept and the third is refused.
+  if (scenario === 'batch-without-closure') starter = starter.replace('entries.length >= 3', 'entries.length >= 2');
+  if (scenario === 'setup-readiness') {
+    // The server needs a generated module that only the documented bootstrap step writes,
+    // and a private settings file that a verification copy must not carry.
+    await mkdir(path.join(root, 'src', 'generated'), { recursive: true });
+    await writeFile(path.join(root, 'src', 'bootstrap.mjs'), "import { writeFileSync } from 'node:fs';\n"
+      + "writeFileSync(new URL('./generated/routes.mjs', import.meta.url), \"export const page = 'src/index.html';\\n\");\n");
+    await writeFile(path.join(root, 'src', 'server.mjs'), "import { createServer } from 'node:http';\n"
+      + "import { readFileSync } from 'node:fs';\nimport { page } from './generated/routes.mjs';\n"
+      + "createServer((request, response) => response.end(readFileSync(page))).listen(Number(process.env.PORT ?? 4173));\n");
+    await writeFile(path.join(root, '.env'), 'SERVICE_TOKEN=fixture-placeholder-value\n');
+    request += '\nПриложение запускается командами node src/bootstrap.mjs и затем node src/server.mjs.';
+  }
   if (scenario === 'source-limit') {
     await writeFile(path.join(root, '.maestro', 'draft-manifest.md'), await readFile(path.join(fixtureRoot, 'manifest-missing-limit.txt')));
   }
@@ -273,6 +291,17 @@ export function gradeCompletionState(state: RunState | undefined, scenario: Scen
     || progress.original.passed !== 0 || progress.current.passed < 1)) reasons.push('relaxed target lacks separate original measurement');
   if (scenario === 'unavailable' && (summary.g4 === 'passed' || state.outcome === 'completed'
     || !record.executions.some(item => item.result === 'unavailable'))) reasons.push('unavailable real integration was not left incomplete');
+  if (scenario === 'setup-readiness' || scenario === 'batch-without-closure') {
+    if (record.version !== 3) reasons.push('contract-6 closure records were not published');
+    else {
+      for (const violation of validateClosureRecord(state)) reasons.push(`closure rule broken: ${violation.field}: ${violation.message}`);
+      if (record.readiness.length === 0) reasons.push('no readiness record before the integrated run');
+      if (scenario === 'setup-readiness' && record.defects.some(item => item.causeClass === 'environment')) {
+        reasons.push('a setup failure was filed as a defect');
+      }
+      if (scenario === 'batch-without-closure' && record.defects.length < 2) reasons.push('the two causes were not split into defects');
+    }
+  }
   if (scenario === 'backend' && (!record.checks.length || record.checks.some(item => item.method === 'browser-interaction'))) reasons.push('backend verification was not proportional');
   if (scenario !== 'unavailable' && state.outcome !== 'completed') reasons.push('positive repaired target did not complete with evidence');
   return reasons;

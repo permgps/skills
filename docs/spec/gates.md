@@ -7,7 +7,7 @@ that fails is not a warning: the phase is redone.
 |---|---|---|
 | G1 | briefing | Every требование has a status and no unexplained open entry; contract 5 also requires a fresh returned independent source audit and frozen initial agreement |
 | G2 | spec | Every live требование is dispositioned; independent intent and raw-reference passes find no unresolved mandatory coverage gap |
-| G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner that transitively depends on each integration dependency; no two таски share a file unless one transitively blocks the other; a task reader finds each task executable |
+| G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner that transitively depends on each integration dependency; no two таски share a file unless one transitively blocks the other; a task reader finds each task executable, and a plan-consistency reader given every task file finds no coordination defect between them |
 | G4 | acceptance | Current, applicable evidence and independent discovery cover the current contract; failures and incomplete checks are reconciled under [`verification.md`](verification.md); contract 6 also closes `completed` with no open defect, and stops after an exhausted budget only with a `budget_exhausted` strategy review |
 
 ## Evidence
@@ -73,6 +73,7 @@ present in one and not the other is a finding that names both places.
 | Gate | Reader's brief | Given | Withheld |
 |---|---|---|---|
 | G1 source | `manifest-reader.md` | redacted source snapshots, candidate manifest | coordinator clause inventory, spec.md, answers.md, tasks, prior audit conclusions |
+| G3 consistency | `plan-consistency-reader.md` | every task file, `interfaces.md` | `spec.md`, `manifest.md` |
 | G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning |
 | G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts |
 | G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, neutral raw reference register and capture identity, the running build | `spec.md`, the plan, the task files, `reviews/`, prior dispositions, the бриф's original text |
@@ -100,6 +101,9 @@ and becomes a second opinion on work it has already seen.
 - A gate is never "passed with notes". Findings are either acted on, or recorded
   as an explicit deferral against a requirement id, which itself changes that
   requirement's status.
+- A G3 finding from the plan-consistency reader, or a mechanical collision, is a
+  coordination defect. It is fixed in the task files or `interfaces.md` before
+  any executor is dispatched and never reduces a requirement.
 
 ### G4 Cannot Send Its Phase Back
 
@@ -119,7 +123,10 @@ different answer.
 
 The two-failure budget above is what stops this from circling. A disagreement
 that survives two repairs stops the прогон, which names the требования and both
-attempts. A требование nobody can build is a fact about the требование, and it
+attempts. Under contract 6 the stop follows the repair budget and its strategy
+reviews: a disagreement becomes defects under the таски that carry its `R##`,
+a batch that closed no таск triggers a strategy review, and a stop after an
+exhausted budget carries the `budget_exhausted` review. A требование nobody can build is a fact about the требование, and it
 is reported rather than retried a third time.
 
 ## Completion Extension Routing
@@ -137,6 +144,13 @@ A coverage omission opens `coverage-omission` and adds check/task ownership,
 invalidating affected passes. Repair never passes G4 itself. All mode/depth
 combinations and polish off keep these rules. Exact records and transitions
 live in [verification.md](verification.md).
+
+Under contract 6, a failed readiness probe opens no repair door at all: it is
+setup, corrected by a superseding readiness record. An unavailable probe makes
+only the checks that declare it unavailable, and G4 `pending`. A product
+failure on a ready candidate opens its door as before, as a defect under the
+parent таск. Progress between rounds is reported as defects verified and таски
+closed, never as findings filed.
 
 ## Codex Gate Dispatch
 

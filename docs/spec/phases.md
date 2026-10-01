@@ -148,6 +148,24 @@ executor is handed is a таск. A plan with zero таски would make G3 vacu
 exactly when there is nothing else checking that the spec reached anyone, so the
 smallest plan is one таск rather than an exemption from the gate.
 
+**Each task file states its edges.** It names its Prerequisites, each with the
+таск that produces it and its row in the Seams table of `interfaces.md`. It
+names its Forbidden writes: always `.maestro/`, plus every zone another таск
+owns. It names its Completion artifacts, all inside the files it owns. The
+Seams table gives each seam its producer, consumers, integration owner and
+integration check.
+
+Every task-file reader sees one таск. A plan-consistency reader sees all of them
+with `interfaces.md` and without `spec.md` or the манифест. It reports what
+lives between таски: collisions, unowned artifacts or writers, completion
+artifacts outside allowed writes, prerequisites with no upstream producer, a
+producer and consumer that disagree on a route, method, DTO, migration or port,
+and stale formatter or project-rule instructions. A finding is a coordination
+defect, fixed in the task files before dispatch, and never a reduced
+requirement. Repair dispatches the same reader again when a defect crosses
+таски. Two таски sharing a file with neither blocking the other is refused
+mechanically at G3 as well, because a later wave does not order them by itself.
+
 ## Execution
 
 The granularity table above names a wave width and never says what a wave is.

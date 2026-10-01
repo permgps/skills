@@ -63,6 +63,8 @@ const VALUE_MAPS: Array<{ field: string; map: string }> = [
   { field: 'depth', map: 'DEPTH' },
   { field: 'polish', map: 'POLISH' },
   { field: 'explain', map: 'REGISTER' },
+  { field: 'verification.strategyReviews[].decision', map: 'STRATEGY_DECISION' },
+  { field: 'verification.readiness[].probes[].result', map: 'READINESS_RESULT' },
 ];
 
 /** The two registers, and the map each one's explanations live in. */

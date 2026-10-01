@@ -70,6 +70,10 @@ running at the same time agree without talking to each other.
   unattributable.
 - A boundary you are guessing at is a boundary the cut is wrong about. Re-cut so
   the guess is inside one таск.
+- It ends with a **Seams** table — seam, producer task, consumer tasks,
+  integration owner, integration check — one row per route, DTO, migration,
+  port or file that one таск produces and another consumes. A seam with no
+  row is a seam two executors will each guess at.
 
 ### 4. Write the task files
 
@@ -90,13 +94,18 @@ Each file carries:
 | Boundaries | which files this таск owns, and which signatures from `interfaces.md` it must meet |
 | Done means | what the executor checks before returning, in terms it can check |
 | Depends on | the таск ids that must finish first, or none; execution-only tasks may have no implementation files |
+| Prerequisites | each thing this таск consumes, named with the таск that produces it and its row in the Seams table of `interfaces.md` |
+| Forbidden writes | always `.maestro/`, plus every zone another таск owns |
+| Completion artifacts | what must exist when the таск is done; every one lies inside the files this таск owns |
 
 First map each live requirement to grounded obligations, then each obligation
 to implementation tasks when code is needed and to required executable checks
 with an execution owner. A verification-only task is legitimate: it has a
 requirement and check to execute, but invents no implementation ownership.
 Required integrated checks depend on the tasks that provide their application
-surface. Preserve `NN` task IDs, `blockedBy`, stable waves, and file zones.
+surface, transitively through `blockedBy`. Two таски that share a path in
+their files or zone are ordered, one blocking the other; G3 refuses an
+unordered pair. Preserve `NN` task IDs, `blockedBy`, stable waves, and file zones.
 Size tasks around observable surfaces and independent ownership, without a
 fixed line-count limit.
 
@@ -151,6 +160,19 @@ viewer takeover, a missing headless prerequisite, or work another task owns is
 a finding.** A required rendered criterion with an executable headless path is
 valid. The reader must also see each obligation/check ID and enough raw oracle
 provenance to know what result the task should test.
+
+Then hand **every** task file at once, with `interfaces.md`, to one more fresh
+subagent briefed by
+[`../prompts/plan-consistency-reader.md`](../prompts/plan-consistency-reader.md).
+It is not given `spec.md` or the манифест. It looks between tasks: collisions,
+unowned artifacts or writers, completion artifacts outside allowed writes,
+prerequisites no upstream task produces, producer/consumer disagreement on a
+route, method, DTO, migration or port, and stale formatter or project-rule
+instructions. Each `CD-N` it returns is a coordination defect, fixed in the
+task files or `interfaces.md` before dispatch; it never reduces a requirement.
+Log INFO with the verdict and the counts of tasks and findings, and WARN once
+per `CD-N`. The same reader is dispatched again when repair finds a defect
+that crosses tasks.
 
 Act on every finding by editing the task file, here, before any executor sees
 it. Then record them in the G3 entry of the run state — an empty list is a real
@@ -246,7 +268,8 @@ pass.
 
 ## Gates
 
-**G3 runs after this phase.** It has two halves, and the second one is step 5.
+**G3 runs after this phase.** It has two halves, and the second one is step 5:
+the task-file readers and the plan-consistency reader.
 
 The map between требования and таски holds in **both** directions:
 
@@ -254,6 +277,10 @@ The map between требования and таски holds in **both** directions
   for was dropped on the way from the spec to the cut;
 - every таск traces back to at least one требование — nothing was added that
   nobody asked for.
+
+The mechanical half also refuses two таски that share a path in their files or
+zone with neither blocking the other, and a check whose execution owner does
+not transitively depend on each of its integration prerequisites.
 
 One direction alone is worth little. A cut can cover every требование and still
 carry two таски invented along the way, and it can be entirely traceable while

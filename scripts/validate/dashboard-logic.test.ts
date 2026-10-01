@@ -10,7 +10,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { evaluateLogic, scriptBlock } from './dashboard-integrity.ts';
-import { correctedSourceAuditState, controlledState, sourceVerifiedState, deferredScopeState, sha256, verifiedState } from '../state/fixtures/verification.ts';
+import { correctedSourceAuditState, controlledState, repairContract6State, strategyReview, v3Attempt, sourceVerifiedState, deferredScopeState, sha256, verifiedState } from '../state/fixtures/verification.ts';
 import { projectState } from '../state/projection.ts';
 import { deriveVerification } from '../state/verification.ts';
 
@@ -39,6 +39,11 @@ interface Logic {
   countRequirements: (list: unknown) => Record<string, number>;
   contractNotice: (version: unknown, language?: string) => string | null;
   runNotice: (state: unknown, language?: string) => string | null;
+  closureOf: (state: unknown) => {
+    defects: Record<string, { verified: number; open: number }>;
+    budget: { used: number; total: number; decision: string | null };
+    readiness: { status: string; kinds: string[] };
+  } | null;
   verificationOf: (state: unknown) => {
     legacy: boolean; g4: string; outcome?: string; requirementResults: Record<string, string>;
     failedIds: string[]; incompleteIds: string[]; verificationEstablished: boolean;
@@ -1298,4 +1303,49 @@ test('standalone UTF-8 digest matches source/oracle hashes including Russian and
   for (const value of ['', 'abc', 'Не больше трёх 😀', JSON.stringify([['Save'], 'persist', []])]) {
     assert.equal(L.textDigest(value), sha256(value));
   }
+});
+
+const plain = (value: unknown): unknown => JSON.parse(JSON.stringify(value));
+const ui = (language: 'ru' | 'en') => L.L10N[language]!['UI'] as unknown as Record<string, (value: unknown) => string>;
+
+test('C04: a verified defect shows beside a таск that stays in repair, and moves no share', () => {
+  const state = repairContract6State();
+  const before = plain(L.taskShare(state.tasks));
+  state.verification!.defects[0]!.status = 'verified';
+  const closure = L.closureOf(state)!;
+  assert.deepEqual(plain(closure.defects), { '01': { verified: 1, open: 0 } });
+  assert.equal(L.label(L.L10N.ru['TASK_STATUS']!, state.tasks[0]!.status), 'На исправлении');
+  assert.equal(ui('ru')['taskDefects']!(closure.defects['01']), 'Дефекты: подтверждено 1, открыто 0');
+  assert.equal(ui('en')['taskDefects']!(closure.defects['01']), 'Defects: verified 1, open 0');
+  assert.deepEqual(plain(L.taskShare(state.tasks)), before);
+});
+
+test('C04: the Таски card reads attempts used of the limit and the latest strategy decision', () => {
+  const state = repairContract6State();
+  state.verification!.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:20:00Z')];
+  state.verification!.strategyReviews = [
+    strategyReview('SR-1', '2026-09-29T09:30:00Z'),
+    strategyReview('SR-2', '2026-09-29T09:40:00Z', { decision: 'request_limit' }),
+  ];
+  const closure = L.closureOf(state)!;
+  assert.deepEqual(plain(closure.budget), { used: 1, total: 20, decision: 'request_limit' });
+  assert.equal(ui('ru')['repairBudget']!(closure.budget), 'Попытки исправления: 1/20 · Решение по стратегии: Запросить попытки');
+  assert.equal(ui('en')['repairBudget']!(closure.budget), 'Repair attempts: 1/20 · Strategy decision: Ask for more attempts');
+});
+
+test('C04: readiness reads the latest unsuperseded record and names the probes that did not pass', () => {
+  const state = repairContract6State();
+  const first = state.verification!.readiness[0]!;
+  state.verification!.readiness = [first, { ...first, id: 'RD-2', supersedes: 'RD-1', executedAt: '2026-09-29T09:50:00Z',
+    probes: [{ kind: 'bootstrap', result: 'setup_failed', evidenceIds: [], limitation: 'autoloader missing' },
+      { kind: 'database', result: 'unavailable', evidenceIds: [], limitation: 'no server' }] }];
+  const closure = L.closureOf(state)!;
+  assert.deepEqual(plain(closure.readiness), { status: 'setup_failed', kinds: ['bootstrap'] });
+  assert.equal(ui('ru')['readinessRow']!(closure.readiness), 'Готовность к проверке: Ошибка настройки (bootstrap).');
+  assert.equal(ui('en')['readinessRow']!(plain(L.closureOf(repairContract6State())!.readiness)), 'Readiness: Passed.');
+});
+
+test('C04: a contract-5 page has no defects, budget or readiness to render', () => {
+  assert.equal(L.closureOf(controlledState()), null);
+  assert.equal(L.closureOf(sourceVerifiedState()), null);
 });

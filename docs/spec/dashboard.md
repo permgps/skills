@@ -425,6 +425,28 @@ observations and selected control results affect coverage; a production pass
 cannot mask omitted restart evidence or unavailable controls. Completed tasks or
 stage clocks remain activity measures and cannot replace verified scope.
 
+## Defects, Budget And Readiness
+
+A contract-6 page adds three readings, each derived once from the
+verification-3 record and rendered in one place:
+
+- **Дефекты / Defects** sits beside the status word of a таск in `review`,
+  `repair` or `failed`, as verified and open counts of that таск's unsuperseded
+  defects. A verified defect closes no таск: a таск with one verified defect and
+  residual criteria still reads «На исправлении», and defects never move the
+  таски share or the Таски card's accepted count.
+- **Попытки исправления / Repair attempts** sits on the Таски card as attempts
+  used out of the current total limit, followed by the latest strategy review's
+  decision when one exists.
+- **Готовность к проверке / Readiness** sits in the requirements region under
+  the verification results. It reads the latest unsuperseded readiness record:
+  `setup_failed` when any probe failed in setup, else `unavailable` when any
+  capability is missing, else passed, naming the probe kinds that did not pass.
+  No record reads "not recorded".
+
+A contract-5 or earlier page renders none of the three. The labels are the
+value and screen labels in [`vocabulary.md`](vocabulary.md), in both languages.
+
 ## Node Viewer Ownership
 
 The helper starts its own absolute copied `sync.mts --serve` entry with

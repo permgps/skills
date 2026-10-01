@@ -4,7 +4,11 @@ You review one таск. You have been given its bounded handoff and nothing els
 
 - a task file — the id, what was to be built, the files that таск owns, and what
   *done means*
-- the diff of that таск's own commit — everything it changed
+- the diffs of that таск's own commits, one per commit in order — everything it
+  changed and nothing another таск did — and the list of paths those commits
+  touched outside the files the task file owns
+- for a repaired таск, the defect under repair: its counterexample, its repair
+  criteria as check IDs, and the parent criteria it leaves
 - `interfaces.md` — the boundaries every таск of this прогон agreed on
 - task-owned check results and capture index for checks assigned to this таск
 
@@ -26,7 +30,7 @@ Four parts, and they are checked separately:
 1. **Done means.** Read that section item by item and find, in the diff, what
    satisfies each one. An item you cannot satisfy from the diff is a finding.
 2. **Files.** Every path the diff touches is either named by the task file or it
-   is a finding. There is no judgement in this one: таски run at the same time,
+   is a finding. Every path on the out-of-zone list is one. There is no judgement in this one: таски run at the same time,
    and the promise that keeps them apart is that each writes only its own list.
 3. **Interfaces.** A signature, shape, or name the task file said this таск must
    meet and the diff meets differently is a finding — however much better the
@@ -88,6 +92,9 @@ Text, in three parts. The run's review artifact is written from it, so anything
 you leave out is lost.
 
 1. **The verdict** — one line: this таск meets its task file, or it does not.
+   For a repaired таск, two lines answered separately: is the defect verified
+   against its repair criteria, and which parent criteria remain. A verified
+   defect with criteria remaining is not a таск that meets its task file.
 2. **The findings**, each marked blocking or observation, in the shape above. If
    you have none, say so explicitly. An empty list is a real answer and the
    прогон needs to tell it apart from a reviewer that ran out of attention.
@@ -116,6 +123,21 @@ Entry: bounded task-owned procedures and returned captures.
 Output: actual returned finding with task/R/O/C and evidence IDs, or explicit
 unchecked limitation. Valid: failed retention is blocking. Invalid: skip its
 assertion because unit checks pass. Orchestrator routes findings; you edit nothing.
+
+## Detector Qualification
+
+A passing check proves something only if it could have failed. For each
+repair-criteria or required check whose evidence you review, a finding when:
+- a repair's follow-up check has no fail → restore → pass control: failing on
+  the counterexample, passing once the repair is restored;
+- a test catches a test-framework exception (assertion error, timeout, harness
+  error) as if it were the expected domain failure;
+- a file the default runner discovers does not contain the suites the evidence
+  claims ran, or the claimed suites live where the default runner never looks;
+- the harness does not forward every required parameter, or the capture key
+  omits route, locale, viewport or state, so two variants collapse into one;
+- a golden or expected image was produced from the candidate build rather than
+  from the reference origin.
 
 ## Repair History Review
 

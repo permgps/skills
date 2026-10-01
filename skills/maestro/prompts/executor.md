@@ -61,8 +61,9 @@ assertions; browser/tool/host identity; reference revision and oracle capture;
 integrated build identity; fixture/data and runtime conditions; viewport,
 locale, and authentication variant where applicable; declared relevant paths
 with SHA-256 hashes; task-owned capture paths and hashes; and a limitation for
-anything unavailable. Include an execution ID and supersession link when
-replaying a check. Do not declare `passed` from module signatures, matching
+anything unavailable. Do not invent an execution ID: the orchestrator assigns
+it at import. When replaying a check, name the execution ID your brief gave you
+as the one this result supersedes. Do not declare `passed` from module signatures, matching
 metadata, a synthetic event, or a screenshot whose required interaction was
 never exercised.
 
@@ -82,7 +83,13 @@ anything you leave out is lost.
    run needs to be able to tell it apart from an executor that ran out of
    attention.
 5. **Check results and captures**, one record per owned check in the shape
-   above. State the explicit limitation for an unavailable check. Captures
+   above, each as one fenced block that begins with the line
+   `format: maestro-execution-return/1` and carries, in this order: checkId,
+   invocation, the actual exit code, tool and host identity, the readiness ID
+   from your brief, fingerprint, assertions with their results, captures as
+   path and SHA-256, the commit that holds the code it ran against, and for a
+   failed or unavailable result its failure cause. A block missing a field is
+   an incomplete return, never a partial pass. State the explicit limitation for an unavailable check. Captures
    remain in the task-owned location until the orchestrator verifies and imports
    them; you never write `.maestro/`.
 
@@ -139,3 +146,15 @@ strategy/action with follow-up check IDs. Execute that action only within your
 files; never reset budgets, rename away a root or change oracle to hide failure.
 Return actual repaired/still_failing/unavailable result and captures. Missing
 diagnosis/prerequisite is unavailable; review/acceptance decides pass later.
+
+## Defect-Scoped Repair
+
+Under contract 6 a repair brief names one defect: its counterexample, the
+parent таск, the repair criteria as check IDs, the residual parent criteria,
+any foreign prerequisites, and the expected progress. Make the counterexample
+fail before your change and pass after it, through those checks. Do not touch
+the residual criteria unless the brief schedules them; do not claim the таск is
+finished while any remain. If the defect cannot be repaired because an upstream
+таск or defect is still open, stop and return `prerequisite_blocked` naming it
+instead of working around it in your files. Return the commit that holds the
+repair.

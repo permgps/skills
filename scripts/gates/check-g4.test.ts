@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { checkG4, type GateFinding } from './check-g4.ts';
-import { verifiedState } from '../state/fixtures/verification.ts';
+import { contract6State, defect, finding, strategyReview, v3Attempt, verifiedState } from '../state/fixtures/verification.ts';
 import {
   CONTRACT_VERSION,
   type GateEntry,
@@ -116,4 +116,24 @@ test('one finding may name more than one требование', () => {
     { id: 'G4', status: 'failed', findings: ['R01 and R02 are both missing'] },
     [{ id: 'R01', status: 'in-spec' }, { id: 'R02', status: 'in-spec' }],
   )), []);
+});
+
+test('C09: a contract-6 run with an open defect cannot close as completed', () => {
+  const state = contract6State();
+  state.verification!.findings = [finding('F-1', { status: 'resolved' })];
+  state.verification!.defects = [defect('DF-1', 'F-1')];
+  assert.ok(checkG4(state).some(item => /completed closure leaves defect DF-1 open/.test(item.message)));
+  state.verification!.defects[0]!.status = 'superseded';
+  assert.ok(!checkG4(state).some(item => /leaves defect/.test(item.message)));
+});
+
+test('C09: a run stopped on an exhausted budget needs its budget_exhausted review', () => {
+  const state = contract6State();
+  state.outcome = 'stopped_incomplete';
+  state.verification!.repairLimits = { perFinding: 2, total: 1 };
+  state.verification!.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:20:00Z')];
+  assert.ok(checkG4(state).some(item => /no budget_exhausted strategy review/.test(item.message)));
+  state.verification!.strategyReviews = [strategyReview('SR-1', '2026-09-29T09:30:00Z',
+    { trigger: 'budget_exhausted', decision: 'stop_incomplete', attemptIds: ['RA-1'] })];
+  assert.ok(!checkG4(state).some(item => /budget_exhausted/.test(item.message)));
 });

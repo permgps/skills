@@ -272,10 +272,11 @@ phase back to redo work that was never judged.
 
 ## Completion Protocol Structure
 
-Contract-5 completion records are compared with the exact field declarations in
+Contract-6 completion records — verification 3, with readiness, defects and
+strategy reviews — are compared with the exact field declarations in
 `verification.md`; the bundled helper and dashboard must declare the same
 version. `npm run bundle` checks entry inputs, numbered actions, output fields,
-missing-capability outcomes, examples, and next actions for eleven owning
+missing-capability outcomes, examples, and next actions for fifteen owning
 procedures. Existing reader, repair-door, host, and viewer checks preserve their
 handoff boundaries. These structural checks cannot establish source-inventory
 completeness or whether a repair strategy is substantively new.

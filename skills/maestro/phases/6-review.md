@@ -35,21 +35,26 @@ G3.
 
 ### 2. Take each таск's diff
 
-**A таск's diff is the union of its own commits, over its own files:**
+**A таск's diff is the ordered union of its own commits — each one, and only
+those:**
 
 ```
-git diff <tasks[].commits[0]>^..<tasks[].commits[-1]> -- <the таск's zone>
+git show <commit> -- .        for every commit in tasks[].commits, in order
 ```
 
-For a таск that landed once those are the same commit, and this is the diff of
-that commit — the whole of what the таск did, which is why reviewing it against
-its task file is possible at all.
+Before dispatch, confirm that list against the commit IDs the executors actually
+returned for this таск. A commit in one and not the other is a build defect to
+report, not a list to reconcile by guessing.
 
-**For a таск that was repaired it is two, and the range is what makes the
-re-review honest.** The repair lands after the waves that followed the original,
-so the state those files were in when the first review was written no longer
-exists anywhere in the tree — only in that first commit. The range asks the one
-question this phase may ask: what did *this* таск do?
+**Not a range.** `commits[0]^..commits[-1]` carries every foreign commit that
+landed between the original and its repair, and a reviewer handed it judges
+other таски' code as this one's. Per-commit diffs ask the one question this phase
+may ask: what did *this* таск do?
+
+**Do not filter the diffs to the таск's zone.** List, beside the diffs, every
+path those commits touched outside the files the task file owns. A write outside
+the zone is exactly what the files check exists to catch, and a filter would hide
+it.
 
 **Do not review the tree.** By the time a repair lands, later waves are in it and
 always will be — waiting for a quiet tree would serialise the build, which is the
@@ -63,7 +68,9 @@ in the working tree and attributing it to a таск.
 
 ### 3. Hand every таск over, all at once
 
-Give each reviewer its task file, that таск's diff, and `interfaces.md`, briefed
+Give each reviewer its task file, that таск's per-commit diffs with the list of
+out-of-zone paths, and `interfaces.md` — for a repaired таск also the defect
+under repair with its repair criteria and the residual parent criteria — briefed
 by [`../prompts/reviewer.md`](../prompts/reviewer.md). **Nothing else** — not
 `spec.md`, not the манифест, not another таск's file or diff.
 
@@ -100,6 +107,13 @@ result or silently accepts a defect.
 |---|---|
 | no blocking finding | `done` |
 | one blocking finding or more | `repair` |
+
+**A repaired таск is answered twice, separately.** First: is the defect the
+repair targeted verified against its repair criteria? Second: which of the
+parent таск's criteria remain? The defect can be verified while criteria remain;
+then the defect is closed and the таск stays in `repair` for the next one. The
+таск becomes `done` only when no open defect and no residual criterion remain.
+Log INFO with the verdict and `{ defectVerified, residualCount }`.
 
 Write the state at the transition, never on a timer. **`done` is written here
 and nowhere else.** It means reviewed and accepted, and the build stopped one

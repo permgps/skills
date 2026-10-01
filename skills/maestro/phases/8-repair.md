@@ -60,6 +60,10 @@ final return before importing results. The recipe is coordinator-only.
   Distinguish reproducible syntax/import/config code defect from missing external
   tool/service/value. External absence records unavailable and avoids code retries.
 
+Under contract 6, also the таск's open defects, their attempts and strategy
+reviews, the latest readiness record, and the status of every таск its
+Prerequisites name.
+
 Not `spec.md`, not the манифест, not the other таски. You are deciding about one
 таск against the contract it was given, and the withholding that makes a review
 worth reading makes a retry worth running.
@@ -92,6 +96,33 @@ were ambiguous, they were ambiguous before anybody built anything; what changed
 is only who is inconvenienced by them. Re-reading your way out of a failure is
 the shortest route to a build that does something nobody asked for.
 
+### 1a. Split the finding into defects
+
+Entry: a blocking finding, failed check or G4 disagreement against one parent
+таск, with its stable root finding and the таск's criteria.
+1. Write one `DF-N` per causal defect before any attempt targets it: parent
+   таск, root finding, counterexample, cause class (`product`, `test`,
+   `contract`, `evidence`, `environment`), the check IDs that verify it
+   (repair criteria), and the parent criteria it leaves (residual).
+2. A broad defect split later becomes successors that `supersede` it under the
+   same root. Splitting keeps history and the root's attempt count; it never
+   resets a budget. ERROR on any write that would.
+3. An `environment` defect is not repaired: it is setup, corrected through a
+   superseding readiness record. A defect that crosses таски goes back to the
+   plan-consistency reader, briefed by
+   [plan-consistency-reader.md](../prompts/plan-consistency-reader.md) with every
+   task file and `interfaces.md`, before any executor.
+4. Order repairs: ready upstream first, then by the number of таски the repair
+   transitively unlocks. A downstream defect whose upstream prerequisite is
+   still open is recorded as an attempt with `outcome: prerequisite_blocked`,
+   naming the open таски or defects, and routed to the upstream owner. WARN it.
+Output: defects with repair criteria and residual criteria, and an order. A
+finding with no reproducible counterexample stays incomplete until one exists.
+Valid: one finding «orders page broken» becomes DF-3 (totals use the old DTO)
+and DF-4 (empty state never renders), each with its own check. Invalid: one
+defect «fix the orders page», or a split that names fresh roots to restart the
+count. Next action: brief the first ready repair.
+
 ### 2a. Diagnose before repeating a failed repair
 
 Entry: stable root and previous attempt, actual failure evidence and finite
@@ -118,12 +149,48 @@ verifies exports. Invalid: same edit renamed, executor switched without new
 hypothesis, root ID changed, or budget increased. INFO door/diagnosis/strategy/
 attempt; WARN exhaustion/unavailability; ERROR reset/routing; DEBUG safe IDs.
 
+### 2b. Strategy review
+
+Entry: the attempts since the latest strategy review, measured by `at`, the
+таски closed since the first of them, and the published repair limits.
+1. A review is due before the next attempt when the batch holds two or more
+   attempts and no таск reached `done` since its first, or when any attempt in
+   it repeated the same action or the same cause (`same_action_failed`,
+   `different_action_same_cause`). It is also due when attempts reach the
+   total limit (`budget_exhausted`) and before asking for more
+   (`limit_request`). The state validator refuses the next attempt without it.
+2. Dispatch a fresh subagent briefed by
+   [strategy-reviewer.md](../prompts/strategy-reviewer.md) with the defects,
+   attempts, readiness records, task statuses and limits — not the executors'
+   reasoning. Wait for its actual return; a review you write yourself is not one.
+3. Record `SR-N` with its seven answers, one sentence each, and the decision:
+   `change_strategy` (next attempt follows the new approach), `stop_incomplete`
+   (no later attempt) or `request_limit`. A limit request goes to the user in
+   their language with the closure forecast and what changes beyond the count;
+   only their exact words authorize a `limit_increase` decision, which raises
+   the total and never the per-root limit.
+Output: SR-N with trigger, attempts, closed таски, answers, decision, next
+approach, dispatch and return IDs. INFO the decision; WARN exhaustion.
+Valid: eight attempts closed no таск; the review finds the schema таск still in
+repair and decides to close it first. Invalid: a ninth attempt with no review,
+a review written by the coordinator, or «raise the limit» with no forecast.
+Next action: the attempt the decision allows, or closure as stopped_incomplete.
+
 ### 3. If it is a retry — hand it over again
 
 Give the executor its task file, `interfaces.md`, the failure exactly as it came
 back, and the handoff if there is one, briefed by
 [`../prompts/executor.md`](../prompts/executor.md). Set the таск to `running`
 and write the state at that transition.
+
+Under contract 6 the brief is about one defect. It states the defect and its
+counterexample, the parent таск, the repair criteria as check IDs, the residual
+parent criteria, foreign prerequisites, the expected progress, and a closure
+forecast. Expected progress is `defect_verified`, `scenario_verified` or
+`task_closure`, and `task_closure` is never promised while residual criteria
+or open prerequisites remain. Append the attempt with its `repeatKind`,
+`readyUpstreamTaskIds`, `blockingPrerequisites` and `unlocksTaskIds` only
+after the actual return. INFO the defect and its forecast.
 
 **A таск is retried at most twice.** On the third failure, stop: name the таск,
 both attempts, and what each produced. That is the number
@@ -191,6 +258,15 @@ failure is not repaired first and reported afterwards.
 and treat the difference as a finding about the таск. A report that describes
 work the commit does not contain is the failure mode the per-таск commit exists
 to make visible.
+
+**The failure is setup, not product.** A readiness probe failed, or one
+prerequisite produced the same error everywhere. Correct it and record a
+superseding readiness record; no defect, no attempt, no budget spent.
+
+**A downstream таск keeps failing on what its upstream owes it.** Record the
+attempt as `prerequisite_blocked` and repair the upstream defect first. The
+downstream таск stays in `repair` until that prerequisite is closed; the state
+validator refuses `running` before then.
 
 **Two таски failed on the same file.** That is one defect in the cut wearing two
 faces. Report it against the plan rather than repairing both — resolving it
