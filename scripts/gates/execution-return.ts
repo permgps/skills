@@ -95,6 +95,9 @@ const SUB_LABEL = /^\s{2,}([A-Za-z][A-Za-z0-9]*):\s*(.*)$/;
 const ITEM = /^\s*-\s+(.*)$/;
 const CAPTURE = /^(.*?)\s+sha256\s+(\S+)\s*$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
+// An exit code as a process returns it; `Number()` alone would read "abc" as
+// non-zero and accept a red run that never reported one.
+const EXIT_CODE = /^-?\d+$/;
 const NOT_APPLICABLE = /^not applicable\s*[—–-]+\s*(.*)$/i;
 
 function toAssertion(text: string): ReturnAssertion {
@@ -242,7 +245,10 @@ function redFindings(block: ExecutionReturnBlock, result: string): Finding[] {
       + 'assertion it failed on and its captured output with a SHA-256' });
   }
 
-  if (run.exitCode !== null && run.exitCode !== '' && Number(run.exitCode) === 0) {
+  if (run.exitCode !== null && run.exitCode !== '' && !EXIT_CODE.test(run.exitCode)) {
+    findings.push({ rule: 'red-invalid', message:
+      `the "red:" run's exit code is "${run.exitCode}" — write the actual exit code the failing run returned, a whole number` });
+  } else if (run.exitCode !== null && run.exitCode !== '' && Number(run.exitCode) === 0) {
     findings.push({ rule: 'red-invalid', message:
       'the "red:" run exited 0 — a red run is one the check failed; run it against the stub or the base until it fails on its assertion' });
   }

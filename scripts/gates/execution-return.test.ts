@@ -80,6 +80,15 @@ test('a red run that exited 0 is refused', () => {
   assert.deepEqual(rules(block({ red })), ['red-invalid']);
 });
 
+test('a red run whose exit code is not a whole number is refused', () => {
+  for (const exitCode of ['abc', '1.5', 'failed', '0x1']) {
+    const red = RED_RUN.map(line => line.replace('exitCode: 1', `exitCode: ${exitCode}`));
+    const violations = check(block({ red }));
+    assert.deepEqual(violations.map(violation => violation.check), ['red-invalid'], exitCode);
+    assert.match(violations[0]!.message, /actual exit code/, exitCode);
+  }
+});
+
 test('a red run that failed on no assertion of the block is refused', () => {
   const red = RED_RUN.map(line => line.replace(
     'failedAssertion: total includes the delivery fee', 'failedAssertion: Cannot find module ../src/cart'));
