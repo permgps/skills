@@ -74,7 +74,13 @@ const ACCEPTANCE = `# Acceptance Reader
 Does the build do each требование?
 `;
 
-type Overrides = { spec?: string; independent?: string; acceptance?: string };
+type Overrides = {
+  spec?: string;
+  independent?: string;
+  acceptance?: string;
+  /** Further briefs by file name, for a row the baseline table does not carry. */
+  briefs?: Record<string, string>;
+};
 
 async function violationsFor(overrides: Overrides = {}): Promise<Violation[]> {
   const root = await mkdtemp(path.join(tmpdir(), 'gate-readers-'));
@@ -94,6 +100,9 @@ async function violationsFor(overrides: Overrides = {}): Promise<Violation[]> {
       overrides.acceptance ?? ACCEPTANCE,
       'utf8',
     );
+    for (const [name, body] of Object.entries(overrides.briefs ?? {})) {
+      await writeFile(path.join(promptsDir, name), body, 'utf8');
+    }
     return await checkGateReaders({ specDir, bundleDir: path.join(root, 'bundle') });
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -242,4 +251,58 @@ test('a reader row that does not withhold prior memory is reported, even with it
 
 test('the withheld name is the file the memory read actually writes, so the two cannot drift apart', () => {
   assert.equal(PRIOR_MEMORY_INPUT, PRIOR_FILE);
+});
+
+// --- the task-file reader is held like every other reader ----------------------
+
+const TASK_ROW = '| G3 task | `task-reader.md` | the task file, `interfaces.md` | `spec.md`, `manifest.md`, the other task files, `prior.md` |\n';
+
+const TASK_READER = `# Task-File Reader
+
+## What You Are Given
+
+| Input | What it is |
+|---|---|
+| the task file | what to build, its Depends on and its done means |
+| \`interfaces.md\` | the shared boundaries |
+
+## What You Are Not Given
+
+| Input | What it is |
+|---|---|
+| \`spec.md\` | the specification |
+| \`manifest.md\` | the numbered requirement list |
+| the other task files | every other таск |
+| \`prior.md\` | what earlier runs decided |
+
+## Your Question
+
+Could you build this without asking a question?
+`;
+
+const withTaskRow = (row = TASK_ROW): string => `${SPEC}${row}`;
+
+test('a task reader that agrees with its G3 task row produces no violations', async () => {
+  assert.deepEqual(await violationsFor({ spec: withTaskRow(), briefs: { 'task-reader.md': TASK_READER } }), []);
+});
+
+test('a task reader handed the other task files is reported, on both sides of the row', async () => {
+  const violations = await violationsFor({
+    spec: withTaskRow(),
+    briefs: { 'task-reader.md': TASK_READER
+      .replace('| the other task files | every other таск |\n', '')
+      .replace('| `interfaces.md` | the shared boundaries |\n',
+        '| `interfaces.md` | the shared boundaries |\n| the other task files | every other таск |\n') },
+  });
+  assert.deepEqual(checks(violations).sort(), ['inputs', 'withheld']);
+  assert.ok(violations.every(v => v.message.includes('the other task files')), JSON.stringify(violations));
+});
+
+test('a G3 task row that does not withhold prior memory is reported', async () => {
+  const violations = await violationsFor({
+    spec: withTaskRow(TASK_ROW.replace(', `prior.md` |', ' |')),
+    briefs: { 'task-reader.md': TASK_READER.replace('| `prior.md` | what earlier runs decided |\n', '') },
+  });
+  assert.deepEqual(checks(violations), ['memory']);
+  assert.match(violations[0]!.message, /gate G3 task does not withhold prior\.md/);
 });

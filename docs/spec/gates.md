@@ -75,8 +75,9 @@ brief, that the quotation wins over any line the прогон wrote beside it.
 
 ### What Each Independent Reader Is Given
 
-Source audit precedes agreement and is a G1 prerequisite; G2 and G4 also use
-independent subagents. Each of those
+Source audit precedes agreement and is a G1 prerequisite; G2, G3 and G4 also
+use independent subagents — G3 two of them, a task-file reader per таск and one
+plan-consistency reader. Each of those
 readers is handed a fixed list of things. The same list otherwise lives in five
 places: this table, the phase table, the phase file, the reader's own brief, and
 `SKILL.md`. The last of those is the one that drifts, because it is the one
@@ -89,6 +90,7 @@ present in one and not the other is a finding that names both places.
 | Gate | Reader's brief | Given | Withheld |
 |---|---|---|---|
 | G1 source | `manifest-reader.md` | redacted source snapshots, candidate manifest | coordinator clause inventory, spec.md, answers.md, tasks, prior audit conclusions, `prior.md` |
+| G3 task | `task-reader.md` | the task file, `interfaces.md` | `spec.md`, `manifest.md`, the other task files, `prior.md` |
 | G3 consistency | `plan-consistency-reader.md` | every task file, `interfaces.md` | `spec.md`, `manifest.md`, `prior.md` |
 | G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning, `prior.md` |
 | G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts, `prior.md` |

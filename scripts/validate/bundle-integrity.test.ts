@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   BRIEFING_ANCHORS,
+  CUT_ANCHORS,
   bundleProfileFor,
   carriesLeafRule,
   checkBundle,
@@ -674,4 +675,55 @@ test('the shipped return template without its red run is exactly one red-missing
   lines.splice(start, end - start);
   const violations = checkExecutionReturns(parseExecutionReturns(lines.join('\n')), 'prompts/executor.md');
   assert.deepEqual(violations.map(v => v.check), ['red-missing']);
+});
+
+// --- the plan cuts for width and for something to show ------------------------
+
+test('every cut anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(CUT_ANCHORS.length > 0, 'CUT_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of CUT_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'cut'), []);
+  });
+});
+
+test('the plan phase losing its prefactor precondition is the one finding, named on the plan phase', async () => {
+  await withShippedCopy(async copy => {
+    const plan = path.join(copy, 'phases', '4-plan.md');
+    const body = await readFile(plan, 'utf8');
+    const dropped = body.replace(/Cut it only when an\s+existing check already covers/, 'Cut it whenever it helps; it covers');
+    assert.notEqual(dropped, body);
+    await writeFile(plan, dropped, 'utf8');
+
+    const violations = await checkBundle(copy);
+    assert.equal(violations.length, 1, JSON.stringify(violations));
+    assert.equal(violations[0]?.check, 'cut');
+    assert.equal(violations[0]?.file, path.join('phases', '4-plan.md'));
+    assert.match(violations[0]?.message ?? '', /never seen failing/);
+  });
+});
+
+test('the task reader losing the stub finding is reported on the task reader', async () => {
+  await withShippedCopy(async copy => {
+    const reader = path.join(copy, 'prompts', 'task-reader.md');
+    const body = await readFile(reader, 'utf8');
+    await writeFile(reader, body.replace('A *done means* only a stub can meet', 'A done-means item'), 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'cut');
+    assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'task-reader.md')]);
+  });
+});
+
+test('the build phase losing the hand-over of blockers\' D## rows is reported on the build phase', async () => {
+  await withShippedCopy(async copy => {
+    const build = path.join(copy, 'phases', '5-build.md');
+    const body = await readFile(build, 'utf8');
+    const dropped = body.replace(/is also handed the `D##` rows its blockers\s+recorded/, 'is handed nothing more');
+    assert.notEqual(dropped, body);
+    await writeFile(build, dropped, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'cut');
+    assert.deepEqual(violations.map(v => v.file), [path.join('phases', '5-build.md')]);
+  });
 });

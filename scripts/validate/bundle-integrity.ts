@@ -315,6 +315,54 @@ export const TESTING_ANCHORS: readonly Anchor[] = [
     why: 'the import step refuses a skip reported as a pass' },
 ];
 
+/**
+ * The literal text that carries «the plan cuts for width and for something to
+ * show».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. The plan phase states
+ * four preferences and where a declined one is named; the build phase hands a
+ * dependent таск its blockers' `D##` rows, and the executor brief says those
+ * rows are facts rather than contract; the task reader reports a *done means*
+ * only a stub can meet; the consistency reader checks a command against the
+ * Project conventions section. A file that loses its line keeps the others
+ * intact and the rule broken. Whether a declined preference's reason is true,
+ * whether a prefactor really preserves behaviour, and whether a dependent used
+ * the rows it was handed are the readers' and the review's judgement, so no
+ * anchor stands for them.
+ */
+export const CUT_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/4-plan.md', literal: 'Each is a preference the plan may decline with a stated reason',
+    why: 'a preference the plan states as a hard rule fights the width it was meant to buy' },
+  { file: 'phases/4-plan.md', literal: 'A thin path end to end',
+    why: 'a таск whose done means is something that visibly works is checked against the real thing' },
+  { file: 'phases/4-plan.md', literal: 'Prefactor to unlock width (existing code only)',
+    why: 'a shared file otherwise serialises таски or merges them into one oversized таск' },
+  { file: 'phases/4-plan.md', literal: 'Cut it only when an existing check already covers',
+    why: 'a preservation check the prefactor wrote for itself passes on the old code at once, '
+      + 'and a check never seen failing proves nothing' },
+  { file: 'phases/4-plan.md', literal: 'Expand, migrate, contract',
+    why: 'a many-file change cut as one таск hands off over and over' },
+  { file: 'phases/4-plan.md', literal: 'It opens with **Project conventions**',
+    why: 'without it every executor rediscovers the test command, and two rediscover it differently' },
+  { file: 'phases/4-plan.md', literal: 'a task file is buildable without the `D##` rows',
+    why: 'the rows a dependent is handed do not exist when its task file is read' },
+  { file: 'phases/4-plan.md', literal: 'A declined preference is named, never silent',
+    why: 'a preference declined without a reason is indistinguishable from one forgotten' },
+  { file: 'phases/5-build.md', literal: 'is also handed the `D##` rows its blockers recorded',
+    why: 'the D## rows are written for the dependent таск and otherwise reach no one' },
+  { file: 'phases/5-build.md', literal: 'D## — from таск NN — <fact>',
+    why: 'a dependent is handed its blockers\' rows by the таск each row names' },
+  { file: 'prompts/executor.md', literal: 'Those rows are facts, not contract',
+    why: 'an executor that adapts to a row silently hides the divergence that would route it' },
+  { file: 'prompts/executor.md', literal: 'Project conventions section of `interfaces.md`',
+    why: 'the executor runs the commands the plan wrote once rather than rediscovering them' },
+  { file: 'prompts/task-reader.md', literal: 'A *done means* only a stub can meet',
+    why: 'a done means that needs a таск it does not depend on can be met only against a stand-in' },
+  { file: 'prompts/plan-consistency-reader.md',
+    literal: 'The Project conventions section of `interfaces.md` is what a command is checked against',
+    why: 'a stale instruction needs one place to be stale against' },
+];
+
 /** Every anchor in `anchors` the documents fail to carry, as violations under `check`. */
 function missingAnchors(
   byFile: ReadonlyMap<string, string>,
@@ -530,6 +578,12 @@ export async function checkBundle(
     const body = await readFile(path.join(bundleDir, procedures), 'utf8').catch(() => '');
     testing.set(procedures, body);
     for (const v of missingAnchors(testing, TESTING_ANCHORS, 'testing')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- the plan cuts for width and for something to show ---------------------
+  // Only a bundle with a plan phase cuts таски; Scout has none.
+  if (byFile.has('phases/4-plan.md')) {
+    for (const v of missingAnchors(byFile, CUT_ANCHORS, 'cut')) add(v.check, v.file, v.line, v.message);
   }
 
   if (skill.includes('<!-- maestro:delegation:native-explicit -->') || skill.includes('<!-- maestro:runtime:node -->')) {

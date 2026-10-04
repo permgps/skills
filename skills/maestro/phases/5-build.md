@@ -97,7 +97,14 @@ phase spends the answer.
 
 Give the executor its task file and `interfaces.md`, briefed by
 [`../prompts/executor.md`](../prompts/executor.md). **Nothing else** — not
-`spec.md`, not the манифест, not the other task files.
+`spec.md`, not the манифест, not the other task files — with one named
+addition: a таск with blockers is also handed the `D##` rows its blockers
+recorded, taken from `discovered-interfaces.md` by the таск each row names,
+for the таски in its own `blockedBy` and no further back. Those rows were
+written for exactly this reader, and without this hand-over they reach no one. They are
+facts, not contract: `interfaces.md` still wins, an executor that finds a row
+disagreeing with it builds to `interfaces.md` and says so, and the review still
+judges the таск against its task file and `interfaces.md` alone.
 
 Name the absolute owned workspace as operational metadata, including when the
 wave has one task and no worktree. Require the executor to verify it before any
@@ -126,7 +133,8 @@ For each таск that returns done, in this order:
    one per fact another таск would otherwise learn again. An interface that came
    back different from `interfaces.md` is such a fact, and the difference is
    recorded rather than reconciled: `interfaces.md` has one writer and it is not
-   this phase.
+   this phase. Each row names the таск it came from — `D## — from таск NN —
+   <fact>` — because step 4 hands a dependent its blockers' rows by that name.
 1a. **Import execution evidence.** Read each check-level result and its task-owned
     captures. Verify the check/obligation IDs, invocation, assertions, reference
     and integrated-build identity, fixture/runtime/variant, relevant input

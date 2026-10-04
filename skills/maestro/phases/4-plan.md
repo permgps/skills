@@ -51,6 +51,45 @@ Three rules decide the cut, and they outrank the table:
    reaches at least one таск. That is G3, and it is what stops the cut from
    drifting into work nobody asked for.
 
+Four preferences shape the cut inside those rules. Each is a preference the
+plan may decline with a stated reason, never a hard rule; step 8 says where the
+reason goes.
+
+- **A thin path end to end.** When zones allow, a таск owns a narrow path
+  through every layer it touches, and its *done means* is something that
+  visibly works through its Test surface. Strict vertical slicing fights
+  parallel width, so a cut that rests on the Seams table instead — each side
+  built to the contract `interfaces.md` states — is legitimate. What is never
+  legitimate is a *done means* item that needs the output of a таск this one
+  does not depend on: its executor could meet it only against a stand-in, and
+  nothing would visibly work when it returns. The task reader reports it.
+- **Prefactor to unlock width (existing code only).** Rule 2 either serialises
+  таски that share a file or merges them into one oversized таск. A
+  behaviour-preserving wave-1 таск may instead split the shared file so the
+  later таски own disjoint zones. It owns the shared file and the files it
+  splits into, and every таск it unblocks lists it in `blockedBy`. Its
+  требования are those of the таски it unblocks, so rule 3 holds without a
+  требование of its own. It adds no behaviour, which is why the limits in
+  `3-spec.md` still hold: it is not a new capability. Cut it only when an
+  existing check already covers the shared file's behaviour. Its *done means*
+  names that check, passing before and after unchanged, and its return records
+  `red: not applicable — existing check <path>`. With no such check, decline
+  it — «no existing check covers `<file>`» — and serialise. A check the
+  prefactor wrote for itself would pass on the old code at once, and a check
+  never seen failing proves nothing. In a new project there is nothing to
+  split: `interfaces.md` gives each таск its own files from the start.
+- **Expand, migrate, contract.** A change that touches many files — a rename, a
+  signature — is cut into three таски in that order, rather than into one таск
+  that hands off over and over. *Expand* adds the new form beside the old and
+  owns the defining file. Each *migrate* таск owns a disjoint set of callers and
+  waits for *expand*; migrate таски may share a wave. *Contract* removes the
+  old form, owns the defining file again, and waits for every *migrate* таск,
+  so the one path *expand* and *contract* share is ordered through the chain.
+  All three trace to the требование the change serves. This is rare for the
+  people Maestro is built for, and it gets this one paragraph.
+- **Project conventions written once.** Step 3 opens `interfaces.md` with them,
+  so no executor rediscovers the test command on its own.
+
 A tiny project produces **one** таск carrying every relevant spec criterion in
 its own file — one, not none. The executor is not given `spec.md` separately.
 Somebody is handed the work either way, and the unit one executor is handed is a
@@ -70,8 +109,27 @@ running at the same time agree without talking to each other.
   unattributable.
 - A boundary you are guessing at is a boundary the cut is wrong about. Re-cut so
   the guess is inside one таск.
-- Before the Seams, it carries a **Terms** table, one row per domain word that
-  more than one task file uses, or that the user said:
+- It opens with **Project conventions**, a table of exactly five rows:
+
+  | Convention | Value |
+  |---|---|
+  | Test command | |
+  | Typecheck command | |
+  | Lint command | |
+  | Where tests live | |
+  | Prior art | |
+
+  *Prior art* names one existing test file an executor can copy the shape of.
+  Take the values from the repository as it is — its manifests, scripts and CI
+  configuration, and the documented start and test commands preflight's
+  readiness entry already read. A row with nothing to name says `none — <why>`;
+  in a new project, prior art reads `none yet — таск NN writes the first`.
+  Task files cite this section and never restate a command: a task file whose
+  command disagrees with it is the plan-consistency reader's stale
+  instruction. Without it, every executor rediscovers the same commands, and
+  two of them rediscover them differently.
+- After the conventions, it carries a **Terms** table, one row per domain word
+  that more than one task file uses, or that the user said:
 
   | Term | Meaning | Words to avoid | User's wording |
   |---|---|---|---|
@@ -169,6 +227,11 @@ Hand every task file to its own subagent, briefed by
 `interfaces.md`. **Nothing else** — not `spec.md`, not the манифест, not the
 other task files. It is given exactly what its executor will be given, and asked
 one question: could you build this without asking a question?
+
+A dependent таск's executor will also be handed the `D##` rows its blockers
+record, and those do not exist yet. So a task file is buildable without the
+`D##` rows: they save an executor a rediscovery, they never fill a gap the task
+file left.
 
 They are independent of each other, so they go out at once and the wave is as
 wide as the host allows.
@@ -275,6 +338,13 @@ the share it measures is zero out of zero.
 | `manual` | the plan is discussed and the прогон waits for approval |
 
 `manual` and `interview` differ in exactly two places, and this is the second.
+
+**A declined preference is named, never silent.** Every preference from step 2
+that the cut declined goes into what the user is shown or asked to approve, one
+line each, with its reason — «prefactor declined: no existing check covers
+`src/store.ts`». Log INFO `plan` `preference declined` with
+`{ preference, reason, tasks }` for each. Nothing checks the reason; it is for
+the user, and for whoever reads this plan after the прогон.
 
 **Depth has already been spent, and the cut does not spend it again.** `strict`,
 `normal` and `deep` decided how far beneath the бриф `spec.md` reaches; by the

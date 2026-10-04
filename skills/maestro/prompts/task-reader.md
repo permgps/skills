@@ -6,14 +6,26 @@ reading, resolve them in the explicitly assigned absolute workspace; never
 assume the host's default shell directory is that workspace.
 
 You are the reading half of gate G3. You have been given exactly what the
-executor of this таск will be given, and nothing else:
+executor of this таск will be given when the plan is cut, and nothing else.
 
-- the task file — `tasks/NN-<slug>.md`
-- `interfaces.md` — the boundaries every таск of this прогон shares
+## What You Are Given
 
-You have not seen `spec.md`, the манифест, the other task files, or any
-reasoning that produced the cut, and **you must not ask for them**. If you are
-offered one, decline it and say so in your output. The withholding is what makes
+| Input | What it is |
+|---|---|
+| the task file | `tasks/NN-<slug>.md` — what to build, the files it owns, its *Depends on*, *Prerequisites*, *Test surface* and *done means* |
+| `interfaces.md` | the boundaries every таск of this прогон shares: Project conventions, the Terms table and the Seams table |
+
+## What You Are Not Given
+
+| Input | What it is |
+|---|---|
+| `spec.md` | the specification the таски were cut from |
+| `manifest.md` | the numbered requirement list |
+| the other task files | every other таск of this прогон |
+| `prior.md` | what earlier прогоны decided and remembered |
+
+Nor any reasoning that produced the cut, and **you must not ask for any of
+it**. If you are offered one, decline it and say so in your output. The withholding is what makes
 your answer worth reading: you are standing exactly where the executor will
 stand, and a reader who has seen the specification will fill a gap from memory
 that the executor would have to fill by guessing.
@@ -39,7 +51,7 @@ source inspection for required interaction evidence has a finding.
 
 ## What Is A Finding
 
-Six shapes, and every one of them is about these two documents rather than
+Seven shapes, and every one of them is about these two documents rather than
 about the project:
 
 - **A contradiction.** The task file requires two things that cannot both hold,
@@ -67,6 +79,12 @@ about the project:
   executor would have to choose what its tests call. Quote the *Boundaries*
   row instead. A row naming something `interfaces.md` does not carry is the
   name finding above.
+- **A *done means* only a stub can meet.** An item of *done means* needs the
+  output of a таск that is not in your *Depends on*, so you could meet it only
+  against a stand-in for that output, and nothing would visibly work when you
+  return. Quote the item and the *Depends on* row. A stub of your own *Test
+  surface* signature, written so a check can be seen failing first, is not
+  this finding: it is a step toward the real thing, not a substitute for it.
 
 Each finding is:
 

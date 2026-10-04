@@ -254,3 +254,24 @@ test('C09: an execution owner that never waits for its prerequisite is reported'
   assert.ok(checkG3(state).some(item =>
     /execution owner 02 of check C-1 does not transitively depend on integration prerequisite 01/.test(item.message)));
 });
+
+// A task reader's finding reaches this script only as a recorded string; the
+// script never reads a task file. So the regression is that a G3 recorded as
+// passed while carrying the stub finding is refused like any other, and a G3
+// recorded as failed with it is the honest record.
+const STUB_FINDING = 'T02 done means "the list renders the saved rows" — only a stub can meet it: '
+  + 'T01, which saves the rows, is not in Depends on';
+
+test('G3 passed while carrying a done means only a stub can meet is reported', () => {
+  const findings = checkG3(stateWith(OK, [task('01', ['R01']), task('02', ['R01'])], [
+    { id: 'G3', status: 'passed', findings: [STUB_FINDING] },
+  ]));
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]?.message ?? '', /passed while carrying 1 finding/);
+});
+
+test('G3 failed while carrying a done means only a stub can meet is honest, not a violation', () => {
+  assert.deepEqual(checkG3(stateWith(OK, [task('01', ['R01']), task('02', ['R01'])], [
+    { id: 'G3', status: 'failed', findings: [STUB_FINDING] },
+  ])), []);
+});

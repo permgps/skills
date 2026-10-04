@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Holds each gate reader's declared inputs to the specification.
 //
-// Two gates — G2 and G4 — are decided in part by a subagent, and what that
+// Every gate — G1 through G4 — is decided in part by a subagent, and what that
 // subagent is handed is a rule the repository states in five places: the gate
 // table of `gates.md`, the phase table of `phases.md`, the phase file, the
 // reader's own brief in `prompts/`, and `SKILL.md`. Four of them are prose read
