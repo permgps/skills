@@ -14,6 +14,39 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **The git guard reads commands the way the shell and git do.** An apostrophe
+  in a here-document commit message (`Don't`) no longer hides the command after
+  it, a `$(…)` whose quote never closes is refused as `unreadable`, and an
+  abbreviated long option such as `--har` or `--forc` counts as the option git
+  takes it for.
+- **State text can no longer run as code in the dashboard.** A snapshot or
+  validation end marker spelled inside a state string stopped the next rewrite
+  early and left the old tail in the page as script. The markers now own whole
+  lines, and `*/` is escaped inside the literal.
+- **The secret gate is linear and catches more.** The assignment rule no longer
+  slows quadratically on long words, and backtick- or punctuation-wrapped
+  values, quoted values with spaces, URL credentials containing `@` or `/`,
+  JWTs, PGP and unterminated private keys, Slack app tokens and webhooks, and
+  npm tokens are redacted. Key names match by segment, so `AUTHOR` is no longer
+  taken for a key, and a provider token behind `Authorization:` is named by its
+  provider. The sweep skips build directories only at its root.
+- **A symlinked memory file stays a symlink.** Writing the block through
+  `CLAUDE.md -> AGENTS.md` replaced the link with a regular file; the write now
+  lands on the file the link points at, one file under two names counts once,
+  and a link to nothing is refused.
+- **The viewer answers only its own loopback name**, so a page rebound to
+  127.0.0.1 cannot read `.maestro/`, and every response carries `nosniff`.
+- **The run state refuses what used to contradict itself.** Stamps are strict
+  ISO 8601 moments from contract 4 on and are ordered as moments, so a later
+  failure in another zone no longer hides behind an earlier pass; duplicate ids
+  in stages, tasks, requirements and gates are refused; a task that first
+  appears already running waits on its blockers.
+- **The bundle keeps its own promises.** Every phase file ends at its hand-off,
+  so no step sits where a reader that obeys it never looks; review has the
+  promised no-version-control branch; the executor carries S4; a stop that asks
+  nothing writes `interruptedAt`; and the executor's `commit:` names the HEAD it
+  worked on, since only the orchestrator commits. `bundle-integrity` holds each.
+
 - **A refused write no longer blanks the dashboard.** When `sync.mts` rejected a
   candidate, the page hid every region until the next accepted write, leaving
   only the header and the error. The last accepted прогон now stays on screen
