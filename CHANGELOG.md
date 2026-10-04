@@ -14,6 +14,22 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+## v0.0.8-alpha — 2026-10-04
+
+Eleven changes from a second outside reading of the skill, each re-derived from
+our own specification and written in our own words. None of them adds a stop,
+and most live in phase files and prompts rather than in `SKILL.md`.
+`CONTRACT_VERSION` stays `7`, so a contract-7 прогон already in progress is read
+unchanged; the new `signals` and `oneWay` lists are optional.
+
+**Upgrade notes.** Three changes are visible without reading the specification:
+- the skill starts only when the user invokes it — `disable-model-invocation`
+  on Claude Code, `agents/openai.yaml` on Codex;
+- the memory block goes into the file the host loads at session start, which is
+  no longer always `AGENTS.md`;
+- the git guard is optional, offered in `docs/install.md`, and never installed
+  by a прогон.
+
 **An optional guard against destructive git.** `tools/guard-git.mts` is a
 Claude Code `PreToolUse` hook that refuses:
 - `git push`, forced or not;
@@ -211,7 +227,18 @@ own context. Before this, an executor could read its таск as a new бриф 
 a nested прогон. Five briefs already had a "rules that still hold" section and
 gained a third rule there; the other six gained the section. `npm run bundle`
 fails a brief that does not carry the sentence. `SKILL.md` is unchanged, so
-nothing resident grew. 873 tests pass.
+nothing resident grew.
+
+**A `</script>` in the state no longer blanks the dashboard.** The state is
+inlined into `dashboard.html` inside a script element, and a commitment text
+containing `</script>` closed that element early, so the page never received
+its state. Both the state snapshot and the validation snapshot now write `<`
+as `<` before `script`, `/script` and `!--`, which is the same character
+inside a string literal. `scripts/state/dashboard-snapshot.test.ts` holds it.
+
+**Verification status:** `npm run check` passes 1141 tests with zero failures
+and zero skips on macOS with Node v26.8.1. No real прогон has run under any of the
+rules in this release; each is held by validators, gate scripts and tests.
 
 ## v0.0.7-alpha — 2026-10-01
 
