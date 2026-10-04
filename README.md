@@ -72,7 +72,7 @@ what to build; everything after it proves the right thing was built.
 
 | # | Stage | Produces |
 |---|---|---|
-| 0 | Preflight | resolved dials, run state, dashboard |
+| 0 | Preflight | resolved dials, run state, dashboard, `prior.md` |
 | 1 | Manifest | `brief.md`, `manifest.md` |
 | 2 | Briefing | `answers.md`, `reference.md` |
 | 3 | Specification | `spec.md` |
@@ -84,7 +84,9 @@ what to build; everything after it proves the right thing was built.
 Three more phases run outside that sequence: **repair**, which a task reaches by
 coming back not done, failing review, carrying a final disagreement, or exposing
 an omitted obligation; **polish**, if requested, for optional refinement; and
-**memory**, which writes down what should outlive the run. Required reference
+**memory**, which writes down what should outlive the run into the instruction file
+your agent host loads (`CLAUDE.md`, `AGENTS.md` or `GEMINI.md`); the next run's
+preflight reads it back, with every earlier run's decisions. Required reference
 fidelity is checked in acceptance even when polish is off.
 
 ## Four gates

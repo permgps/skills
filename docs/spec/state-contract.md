@@ -492,6 +492,26 @@ stdout: exit 0 for valid/current/legacy/published, 1 for invalid/rejected state,
 2 for unreadable input or JSON parsing failure. Legacy projection preserves
 historical gates with verification explicitly not established.
 
+**Memory.** The helper has two actions outside the state, and neither touches
+`state.js`, the viewer or the opener. Each emits one JSON line under the same
+exit codes.
+
+- `--memory-read --run-dir <dir>` writes `.maestro/<dir>/prior.md` from the
+  maestro block of every known memory file and the `decisions.md` of each
+  register row except `<dir>`. It reports `action: "written"`, `blockFiles`,
+  `runs` and `notRead`. An existing `prior.md` is kept, with `action: "kept"`.
+  Malformed markers are reported under `notRead` and still exit 0. A missing,
+  malformed or absent run directory exits 2.
+- `--memory-write --host <claude-code|codex|gemini-cli>` reads the block body
+  from stdin and splices it into the memory file [`hosts.md`](hosts.md)
+  resolves for that host. It reports `path`, `file`, `bytes`,
+  `action` (`created`, `appended` or `replaced`), `loadedByHost` and `reason`.
+  - Exit 1: the block is in two files (`files`), the markers are malformed
+    (`file`, `lines`), or the body carries a marker.
+  - Exit 2: the host is missing or unknown, or the body is empty or not piped.
+  - Canonical module: `tools/runtime/memory.mts`. `scripts/memory/markers.ts`
+    is its facade.
+
 Strict `--publish <candidate> [--expect <revision>] [--holder <token>]`
 requires a matching expected revision whenever state exists, checks both prior
 and candidate holders, refuses unreadable or invalid history, and validates

@@ -8,6 +8,7 @@ project that was built, not with Maestro.
 ├── <YYYY-MM-DD>-<feature-slug>--wip/   (the suffix comes off when the run closes)
 │   ├── <YYYY-MM-DD>-brief.md
 │   ├── manifest.md
+│   ├── prior.md
 │   ├── answers.md
 │   ├── reference.md
 │   ├── spec.md
@@ -62,17 +63,18 @@ actually built.
 |---|---|---|---|
 | `brief.md` | manifest | manifest, G2, acceptance (the manifest plus the additions) | append-only |
 | `manifest.md` | manifest | briefing, spec, plan, acceptance, G1, G2, G3, G4 | append-only |
+| `prior.md` | preflight | briefing, spec, memory | no |
 | `answers.md` | briefing | spec | append-only |
 | `reference.md` | briefing | G2 reference reader, acceptance reference reader, polish | append-only |
 | `spec.md` | spec | plan, build, review | yes, by amendment only |
-| `interfaces.md` | plan | build, review | no |
+| `interfaces.md` | plan | build, review, G3, memory | no |
 | `discovered-interfaces.md` | build | build, memory | append-only |
 | `tasks/NN-<slug>.md` | plan | build, review, G3 | no |
 | `tasks/NN-<slug>-handoff.md` | build | build, review | no |
 | `reviews/NN-<slug>.md` | review | repair, acceptance | append-only |
 | `report.md` | acceptance | the user | append-only |
 | `evidence/<execution-id>/...` | acceptance | verification validator, acceptance | no |
-| `decisions.md` | memory | the user, a later прогон | append-only |
+| `decisions.md` | memory | the user, a later прогон's preflight | append-only |
 | `amendments.md` | repair | build, review, acceptance | append-only |
 | `config.json` | preflight | preflight | yes |
 | `README.md` | preflight | the user, a later прогон | yes, its owned rows rewritten by publication |
@@ -93,7 +95,8 @@ measuring against it would be judging an executor by words it never saw.
 Each task file contains the relevant user-contract and reference excerpts, the
 observable obligation IDs and check IDs it serves, its implementation owner
 when implementation is required, the check execution owner, variants, and
-integration prerequisites. `interfaces.md` carries shared boundaries; the
+integration prerequisites. `interfaces.md` carries shared boundaries, a Terms
+table naming each domain word once, and the Seams table; the
 executor does not receive the unrelated full specification. A verification-only
 task can own an execution without claiming implementation files. G3's
 mechanical half (`scripts/gates/check-g3.ts`) validates both
@@ -181,12 +184,20 @@ where its artifact is:
   paragraph just above.
 
 The project memory file is **not in that table**, and its absence is deliberate.
-It is `AGENTS.md` in the target project's root — not a run artifact, not under
-`.maestro/`, and not written once per прогон but added to across many. Its
+It is the instruction file the agent host loads at session start, in the target
+project's root: `CLAUDE.md`, `AGENTS.md` or `GEMINI.md`, resolved per host by
+[`hosts.md`](hosts.md) and never a second one beside the first. It is not a run
+artifact, not under `.maestro/`, and not written once per прогон but added to
+across many. Its
 single writer is named where the write permission is granted rather than here:
 `safety.md` (`S5`) limits the orchestrator to run artifacts, the project memory
 file, and version control, and [`phases.md`](phases.md) says what goes in it and
 which region of it the прогон owns.
+
+`prior.md` is how a прогон reads what earlier ones left. Preflight writes it
+once through the helper, from the memory block and the `decisions.md` of every
+earlier run in the register. Briefing and the specification consult it, and
+every blind reader withholds it.
 
 Requirement **statuses are not in `manifest.md`.** The manifest holds requirement
 text and nothing else, growing by rows; the statuses live in the run state, whose

@@ -14,6 +14,19 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**The next прогон reads what the last one remembered.** Phase 9 wrote the memory
+block and `decisions.md`, and nothing ever read either. Preflight now runs
+`sync.mts --memory-read` and writes `prior.md`: the block plus every earlier run's
+decisions from the register. Briefing and the specification consult it, and a
+choice that goes against an earlier decision says `contradicts <date> decision,
+because …`. Every blind reader withholds `prior.md`, held by `npm run readers`.
+The memory file is no longer always `AGENTS.md`. It is the file the host loads at
+session start, recorded per host in `docs/spec/hosts.md`. The block goes into the
+file the project already has and never into a second one. Phase 9 writes through
+`sync.mts --memory-write`. A decision is recorded only when it is hard to reverse,
+surprising without context, and had a real alternative. `interfaces.md` gains a
+Terms table that the task reader holds task files to.
+
 **Every субагент is a leaf.** Each of the eleven briefs in `prompts/` now tells
 its субагент to invoke no skill and dispatch no agent, and to do the work in its
 own context. Before this, an executor could read its таск as a new бриф and start

@@ -8,16 +8,16 @@ right thing was built.
 
 | Id | Name | Stage | Reads | Produces |
 |---|---|---|---|---|
-| preflight | Preflight | yes | user arguments, repository state | resolved dials, run state created, dashboard raised |
+| preflight | Preflight | yes | user arguments, repository state, the memory file, the register and earlier runs' `decisions.md` | resolved dials, run state created, dashboard raised, `prior.md` |
 | manifest | Manifest | yes | бриф from the user, redacted source snapshots and independent audit return | `brief.md` — written once, then grown by its additions block — and `manifest.md` |
-| briefing | Briefing | yes | `manifest.md`, declared references | `answers.md`, neutral `reference.md` |
-| spec | Specification | yes | `manifest.md`, `answers.md`, raw reference | `spec.md`, obligation and source coverage map |
+| briefing | Briefing | yes | `manifest.md`, declared references, `prior.md` | `answers.md`, neutral `reference.md` |
+| spec | Specification | yes | `manifest.md`, `answers.md`, raw reference, `prior.md` | `spec.md`, obligation and source coverage map |
 | plan | Plan | yes | `spec.md`, obligations and checks | `tasks/`, `interfaces.md`, ownership map |
 | build | Build | yes | task files, relevant raw reference, `interfaces.md` | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
 | review | Review | yes | task files, obligations, evidence, `interfaces.md`, project code | `reviews/`, findings and check limits |
 | acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md` |
 | polish | Доводка | no | `reference.md`, project code after required parity | optional polished build, `tasks/` of its own |
-| memory | Memory | no | `discovered-interfaces.md`, `spec.md`, project code, run state | the memory block in `AGENTS.md`, `decisions.md` |
+| memory | Memory | no | `discovered-interfaces.md`, `spec.md`, the Terms table of `interfaces.md`, `prior.md`, project code, run state | the memory block in the host's memory file, `decisions.md` |
 | repair | Repair | no | whatever one of its six doors provides | retried таск, `amendments.md` |
 
 `polish` runs only when the finish dial asked for it, inside the acceptance
@@ -154,6 +154,15 @@ names its Forbidden writes: always `.maestro/`, plus every zone another таск
 owns. It names its Completion artifacts, all inside the files it owns. The
 Seams table gives each seam its producer, consumers, integration owner and
 integration check.
+
+**Each domain word is named once.** Before the Seams, `interfaces.md` carries
+a Terms table. Its columns are term, meaning, words to avoid, and the user's
+wording quoted from the original-language source clause. Terms that an earlier
+прогон's memory block carries are taken over unless the манифест changed their
+meaning. The task-file reader counts a word to avoid, or a listed term used
+with another meaning, as an undefined term. The table exists because a task
+file once said «a running score» without saying what it counts, and the README
+built from it described a tally the page does not keep.
 
 Every task-file reader sees one таск. A plan-consistency reader sees all of them
 with `interfaces.md` and without `spec.md` or the манифест. It reports what
@@ -491,9 +500,24 @@ what is written is what the project now is rather than what a таск ran into.
 
 ### Where It Writes
 
-The project memory file is **`AGENTS.md` in the target project's root**, and the
+The project memory file is the instruction file the agent host loads at session
+start, in the target project's root. Which file that is differs by host:
+[`hosts.md`](hosts.md) records it per host, from each host's documentation. The
 прогон owns only the region between `<!-- maestro:begin -->` and
 `<!-- maestro:end -->`.
+
+The block goes into, in order:
+
+1. the file that already carries it;
+2. otherwise, the first existing file the host loads that may be written;
+3. otherwise, any other existing memory file from that table;
+4. only when the project has none, the file the host reads, created.
+
+A project never gains a second memory file because a different host wrote to
+it. When rule 3 picks a file the host does not load, the прогон tells the user.
+The block in two files is a stop. The helper does the splice:
+`node .maestro/sync.mts --memory-write --host <id>`, with the body on stdin. A
+paragraph re-derived in prose each run is how a user's text gets overwritten.
 
 Everything outside those two markers belongs to the user. It is not edited, not
 reformatted, not reordered, and not summarised — not even when it says something
@@ -504,7 +528,7 @@ be theirs afterwards.
 
 If the file does not exist, it is created containing the block and nothing else.
 If it exists without the markers, the block is appended and the existing content
-is left exactly as it was.
+is left exactly as it was. A rewrite keeps the file's permissions.
 
 `safety.md` (`S5`) already names this file as one of the three paths the
 orchestrator may write. This section is where it gets a name.
@@ -514,6 +538,17 @@ orchestrator may write. This section is where it gets a name.
 `.maestro/<dir>/decisions.md`, append-only. One entry per decision that should
 outlive the прогон: what was decided, what it was decided instead of, and what
 made the difference.
+
+**An entry goes in only when all three hold:**
+
+1. the decision is hard to reverse;
+2. a reader without the прогон's context would be surprised by it;
+3. there was a real alternative.
+
+A cheap decision is simply redone by the next session, and an obvious one is
+simply made again. Recording either only lengthens the file for the reader who
+asks why. The threshold is a judgement, so no validator holds it. The phase
+file states it where the judgement is made.
 
 **A decision record carries no identifier of its own.** It names the `D##` or
 `R##` it came from and the date it was written. The identifier schemes in
@@ -525,6 +560,33 @@ The two writes are for two readers. The memory block is read by whoever opens
 the project next — a person or an agent — and is short for that reason.
 `decisions.md` is read by somebody asking why, and is as long as the reasoning
 was.
+
+### Who Reads It
+
+Preflight reads what earlier прогоны left, once, after its first publish:
+`node .maestro/sync.mts --memory-read --run-dir <dir>` writes
+`.maestro/<dir>/prior.md`. That file holds the maestro block from every known
+memory file and the `decisions.md` of every earlier run listed in the register,
+excluding the current run. Runs from before contract 7 have no register row and
+are not read. A second call keeps the first `prior.md`. A memory file with
+malformed markers is listed as not read and does not stop the run.
+
+Two phases use it, at the moment they decide:
+
+- **Briefing**, for a fork the прогон settles itself.
+- **The specification**, for an entry that settles what an earlier прогон
+  settled.
+
+Following an earlier decision is cited. Going against it is written
+`contradicts <date> decision, because …` and is never a silent override.
+`prior.md` is S6 content: it may prompt a question or ground a self-briefed
+answer, and it never adds or removes a требование. The memory phase starts its
+new block from the one `prior.md` carried, and carries the durable rows of the
+plan's Terms table forward, so the next plan names things the same way.
+
+Every blind reader withholds `prior.md` (see [`gates.md`](gates.md)). A reader
+holding earlier decisions would confirm the past instead of checking this
+run's words.
 
 ### What Qualifies
 
