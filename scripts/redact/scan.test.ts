@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 import { scanDirectory, scanText, looksBinary } from './scan.ts';
 
@@ -118,6 +120,50 @@ test('ignored directories are not walked', async () => {
     const summary = await scanDirectory(root);
     assert.deepEqual(summary.violations, []);
     assert.equal(summary.filesScanned, 1);
+  });
+});
+
+test('an ignored name at the sweep root is skipped, whichever name it is', async () => {
+  await withTree({
+    'brief.md': '# clean\n',
+    'build/env.txt': 'DB_PASSWORD=s3cr3t-value\n',
+    'dist/env.txt': 'DB_PASSWORD=s3cr3t-value\n',
+  }, async root => {
+    const summary = await scanDirectory(root);
+    assert.deepEqual(summary.violations, []);
+    assert.equal(summary.filesScanned, 1);
+  });
+});
+
+test('an ignored name below the sweep root is still walked', async () => {
+  // Reported by review: the ignore list matched a name at any depth, so a
+  // credential in an evidence folder called `build` was a clean sweep.
+  const nested = path.join('run', 'evidence', 'EX-1', 'build', 'env.txt');
+  await withTree({
+    'brief.md': '# clean\n',
+    [nested]: 'DB_PASSWORD=s3cr3t-value\n',
+    [path.join('run', 'node_modules', 'notes.md')]: 'API_TOKEN=aaaaaaaaaaaaaaaa\n',
+  }, async root => {
+    const summary = await scanDirectory(root);
+    assert.deepEqual(summary.violations.map(v => v.file), [
+      path.join('run', 'evidence', 'EX-1', 'build', 'env.txt'),
+      path.join('run', 'node_modules', 'notes.md'),
+    ]);
+    assert.equal(summary.filesScanned, 3);
+  });
+});
+
+test('the sweep exits 1 when the only credential sits under a nested ignored name', async () => {
+  await withTree({
+    [path.join('run', 'evidence', 'EX-1', 'build', 'env.txt')]: 'DB_PASSWORD=s3cr3t-value\n',
+  }, async root => {
+    const script = fileURLToPath(new URL('./scan.ts', import.meta.url));
+    const run = spawnSync(process.execPath, [script, root], { encoding: 'utf8' });
+
+    assert.equal(run.status, 1, run.stdout);
+    assert.match(run.stdout, /DB_PASSWORD/);
+    assert.equal(run.stdout.includes('s3cr3t-value'), false);
+    assert.equal(run.stderr.includes('s3cr3t-value'), false);
   });
 });
 

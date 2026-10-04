@@ -232,3 +232,169 @@ test('a secret on the last line without a trailing newline is removed', () => {
   assert.equal(result.text, 'notes\nDB_PASSWORD=[REDACTED:DB_PASSWORD]');
   assert.deepEqual(result.names, ['DB_PASSWORD']);
 });
+
+// --- regression: the assignment rule must stay linear -------------------------
+
+/** Wall-clock time of one redaction, in milliseconds. */
+function timeRedaction(input: string): number {
+  const started = performance.now();
+  redact(input);
+  return performance.now() - started;
+}
+
+test('a long run of identifier characters is redacted in linear time', () => {
+  // Reported by review: with no left anchor the assignment rule restarted the
+  // key at every offset, and 40 000 letters took two seconds.
+  const elapsed = timeRedaction('a'.repeat(200_000));
+  assert.ok(elapsed < 200, `took ${Math.round(elapsed)} ms`);
+});
+
+test('a long base64url line is redacted in linear time', () => {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  let line = '';
+  let seed = 7;
+  for (let i = 0; i < 200_000; i += 1) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    line += alphabet[seed % alphabet.length];
+  }
+
+  const elapsed = timeRedaction(line);
+  assert.ok(elapsed < 200, `took ${Math.round(elapsed)} ms`);
+});
+
+// --- regression: values the old rules cut short or never saw ------------------
+
+/** Redacted under `name`, and no trace of `secret` anywhere in the output. */
+function assertRemoved(input: string, secret: string, name: string): void {
+  const result = redact(input);
+  assertGone(result, secret);
+  assert.ok(result.names.includes(name), `expected ${name}, got [${result.names.join(', ')}]`);
+}
+
+test('a password wrapped in backticks or parentheses is removed without its wrapper leaking it', () => {
+  assertRemoved('Set `DB_PASSWORD=hunter22` in env', 'hunter22', 'DB_PASSWORD');
+  assertRemoved('(DB_PASSWORD=hunter22)', 'hunter22', 'DB_PASSWORD');
+});
+
+test('a password made of punctuation is removed whole, whatever its characters', () => {
+  assertRemoved('DB_PASSWORD=hunter2!', 'hunter2', 'DB_PASSWORD');
+  assertRemoved('DB_PASSWORD=Tr0ub4dor&3#x', 'Tr0ub4dor', 'DB_PASSWORD');
+  assertRemoved('DB_PASSWORD=Tr0ub4dor&3#x', '&3#x', 'DB_PASSWORD');
+  assertRemoved('{"password": "S3cr3t!pass"}', 'S3cr3t', 'PASSWORD');
+  assertRemoved('{"password": "S3cr3t!pass"}', '!pass', 'PASSWORD');
+});
+
+test('a quoted password keeps its spaces inside the redaction', () => {
+  const result = redact('PASSWORD="correct horse battery staple"');
+  for (const word of ['correct', 'horse', 'battery', 'staple']) assertGone(result, word);
+  assert.deepEqual(result.names, ['PASSWORD']);
+});
+
+test('a semicolon inside an unquoted password does not split it', () => {
+  // The old value class stopped at `;`, so the tail after it reached the file.
+  assertRemoved('DB_PASSWORD=abcdef;ghij', 'ghij', 'DB_PASSWORD');
+  assertRemoved('DB_PASSWORD=abc;defghij', 'defghij', 'DB_PASSWORD');
+});
+
+test('a connection string password containing @ or / is removed whole', () => {
+  assert.deepEqual(redact('postgres://admin:p@ss@db.example/x'), {
+    text: 'postgres://admin:[REDACTED:POSTGRES_PASSWORD]@db.example/x',
+    names: ['POSTGRES_PASSWORD'],
+  });
+  assert.deepEqual(redact('postgres://admin:pa/ss123@db.example/x'), {
+    text: 'postgres://admin:[REDACTED:POSTGRES_PASSWORD]@db.example/x',
+    names: ['POSTGRES_PASSWORD'],
+  });
+});
+
+test('a connection string with a password and no user loses the password', () => {
+  assert.deepEqual(redact('redis://:s3cretpass@cache:6379'), {
+    text: 'redis://:[REDACTED:REDIS_PASSWORD]@cache:6379',
+    names: ['REDIS_PASSWORD'],
+  });
+});
+
+test('a bare JWT is removed', () => {
+  const jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
+  assertRemoved(`the session token was ${jwt} yesterday`, jwt, 'JWT');
+  assertRemoved(`the session token was ${jwt} yesterday`, 'dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U', 'JWT');
+});
+
+test('a PGP private key block is removed whole, body and all', () => {
+  const body = 'lQOYBF0A1B2C3D4E5F6G7H8I9J0KLMNOPQRSTUVWXYZabcdef';
+  const input = `-----BEGIN PGP PRIVATE KEY BLOCK-----\n\n${body}\n=AbCd\n-----END PGP PRIVATE KEY BLOCK-----\n`;
+  assertRemoved(input, body, 'PRIVATE_KEY');
+});
+
+test('a private key with no END fence still loses its body', () => {
+  const body = 'MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQ';
+  assertRemoved(`-----BEGIN RSA PRIVATE KEY-----\n${body}\n${body}\n`, body, 'PRIVATE_KEY');
+});
+
+// Built from parts, like the tokens above: a whole token-shaped literal in the
+// source is refused by the remote's secret scanning, fake or not.
+test('a Slack app token and a Slack webhook URL are removed', () => {
+  const app = ['xapp', '1', 'A0123456789', '1234567890123', 'abcdef0123456789'.repeat(4)].join('-');
+  assertRemoved(`token: ${app}`, app, 'SLACK_TOKEN');
+  assertRemoved(`token: ${app}`, 'abcdef0123456789abcdef', 'SLACK_TOKEN');
+
+  const hook = ['https://hooks.slack.com/services', 'T00000000', 'B00000000', 'X'.repeat(24)].join('/');
+  assertRemoved(`post to ${hook} when done`, 'XXXXXXXXXXXXXXXXXXXXXXXX', 'SLACK_WEBHOOK_URL');
+});
+
+test('an npm token is removed', () => {
+  const token = `npm_${'a1B2c3D4e5'.repeat(3)}abcdef`;
+  assert.equal(token.length, 40);
+  assertRemoved(`//registry.npmjs.org/:_authToken=${token}`, token, 'NPM_TOKEN');
+  assertRemoved(`use ${token} to publish`, token, 'NPM_TOKEN');
+});
+
+// --- regression: no new false positives, because S2 stops the run -------------
+
+test('a key that only contains a credential word inside a longer word is not a credential', () => {
+  // The strong-key test was a substring test, so AUTHOR matched AUTH and
+  // MONKEY matched KEY — and in the sweep a false positive is a stop.
+  for (const input of ['AUTHOR=JohnSmith1', 'MONKEY_NAME=bananas123']) {
+    assert.deepEqual(redact(input), { text: input, names: [] });
+  }
+});
+
+test('an ordinary URL and ordinary prose are left byte-identical', () => {
+  for (const input of [
+    'https://example.com/path?x=1',
+    'a = b + c',
+    'ratio: 3',
+    'open http://localhost:3000/@vite/client in the browser',
+  ]) {
+    assert.deepEqual(redact(input), { text: input, names: [] });
+  }
+});
+
+test('code that fetches a credential is not itself a credential', () => {
+  for (const input of [
+    'password = getpass()',
+    'PASSWORD = os.environ["PASSWORD"]',
+    'token := getToken()',
+    "if (token === '') return;",
+    'const handler = token => token.trim();',
+  ]) {
+    assert.deepEqual(redact(input), { text: input, names: [] });
+  }
+});
+
+// --- regression: a provider token is named after its provider -----------------
+
+test('a GitHub token sent as an Authorization token is named GITHUB_TOKEN', () => {
+  const token = `ghp_${'A1b2C3d4E5f6'.repeat(3)}`;
+  assert.equal(token.length, 40);
+  const result = redact(`Authorization: token ${token}`);
+  assertGone(result, token);
+  assert.deepEqual(result.names, ['GITHUB_TOKEN']);
+});
+
+test('an Anthropic key sent as a bearer token is named ANTHROPIC_API_KEY', () => {
+  const key = 'sk-ant-api03-AAAABBBBCCCCDDDDEEEEFFFF';
+  const result = redact(`Authorization: Bearer ${key}`);
+  assertGone(result, key);
+  assert.deepEqual(result.names, ['ANTHROPIC_API_KEY']);
+});

@@ -20,7 +20,13 @@ export type { Violation };
 
 const log = createLogger('redact-scan');
 
-/** Never worth reading, and never the user's own text. */
+/**
+ * Never worth reading, and never the user's own text — at the sweep root only.
+ *
+ * Below the root these are ordinary names a прогон writes under: an evidence
+ * folder called `build` holds whatever the build printed, credentials included.
+ * Matching the name at any depth made such a folder a clean sweep.
+ */
 export const DEFAULT_IGNORED = ['.git', 'node_modules', '.venv', 'dist', 'build'];
 
 /** How much of a file is inspected before deciding it is not text. */
@@ -37,6 +43,7 @@ export function looksBinary(buffer: Buffer): boolean {
 }
 
 export interface ScanOptions {
+  /** Entry names skipped directly under the root; deeper entries are always read. */
   ignored?: string[];
 }
 
@@ -99,7 +106,7 @@ export async function scanDirectory(root: string, options: ScanOptions = {}): Pr
     for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
       const child = relative === '' ? entry.name : path.join(relative, entry.name);
 
-      if (ignored.has(entry.name)) {
+      if (relative === '' && ignored.has(entry.name)) {
         filesSkipped += 1;
         log.debug('scan', 'skipped', { file: child, reason: 'ignored name' });
         continue;
