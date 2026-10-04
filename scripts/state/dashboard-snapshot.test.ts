@@ -74,3 +74,39 @@ test('a state carrying every field the page newly reads round-trips into the sna
     assert.deepEqual(evaluate(inlineScript(page, 'snapshot'))['MAESTRO_SNAPSHOT'], state);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+// The block is found by its markers, so a marker spelled inside a state string
+// must not be taken for the real one on the next rewrite. Two rewrites are the
+// repro: the first stores the text, the second is where a lazy match stops early.
+const SNAPSHOT_BREAKOUT = '/* maestro:snapshot:end */globalThis.PWNED=1//';
+const VALIDATION_BREAKOUT = '/* maestro:validation:end */globalThis.PWNED=2//';
+
+test('a snapshot end marker inside state text survives the next rewrite as text, never as code', async () => {
+  const dir = await scratch();
+  try {
+    const first = { runId: 'r1', stages: [{ id: 'build', note: SNAPSHOT_BREAKOUT }] };
+    const second = { runId: 'r1', stages: [{ id: 'build', note: 'second' }] };
+    await mirror(dir, JSON.stringify(first));
+    await mirror(dir, JSON.stringify(second));
+    const page = await readFile(path.join(dir, 'dashboard.html'), 'utf8');
+    const sandbox = evaluate(inlineScript(page, 'snapshot'));
+    assert.equal(sandbox['PWNED'], undefined, 'state text ran as code');
+    assert.deepEqual(sandbox['MAESTRO_SNAPSHOT'], second);
+    assert.equal(page.match(/maestro:snapshot:end/g)?.length, 1, 'a stale tail of the old snapshot stayed in the page');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('a validation end marker inside a refusal message survives the next rewrite as text, never as code', async () => {
+  const dir = await scratch();
+  try {
+    const first = validationEnvelope('invalid', { runId: 'r1' }, [{ field: 'heldBy', message: VALIDATION_BREAKOUT }]);
+    const second = validationEnvelope('invalid', { runId: 'r1' }, [{ field: 'heldBy', message: 'second' }]);
+    await mirrorValidation(dir, first);
+    await mirrorValidation(dir, second);
+    const page = await readFile(path.join(dir, 'dashboard.html'), 'utf8');
+    const sandbox = evaluate(inlineScript(page, 'validation-snapshot'));
+    assert.equal(sandbox['PWNED'], undefined, 'a refusal message ran as code');
+    assert.deepEqual(sandbox['MAESTRO_VALIDATION_SNAPSHOT'], second);
+    assert.equal(page.match(/maestro:validation:end/g)?.length, 1, 'a stale tail of the old envelope stayed in the page');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
