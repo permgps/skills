@@ -131,9 +131,9 @@ rather than as skipped.
 
 - **A design you would have chosen differently.** The build was allowed to
   satisfy a требование in a way you would not have. If it does it, it does it.
-- **Something the build does that no требование asked for.** Extra is a question
-  for somewhere else. You are checking that the numbered list was done, not that
-  nothing else was.
+- **Something the build does that no требование asked for.** Extra is the
+  per-таск review's question, which records it as `unrequested`. You are
+  checking that the numbered list was done, not that nothing else was.
 - **A ranking.** Do not sort your findings by importance or call any of them
   minor. Sorting is how the small ones get dropped.
 - **A rewrite.** Do not restate a требование more clearly, do not propose what it

@@ -16,7 +16,7 @@ and nobody is asked about it.
 | Run | Read | The question it answers |
 |---|---|---|
 | during Разработка | `discovered-interfaces.md`, the таск that returned, the run state | what did this таск run into that the next person will too |
-| after приёмка | `spec.md`, the project code, `discovered-interfaces.md`, the Terms table of `interfaces.md`, `prior.md`, the run state | what is this project now, where are its seams, and what does it call things |
+| after приёмка | `spec.md`, the project code, `discovered-interfaces.md`, the Terms table of `interfaces.md`, the seam-level items of `reviews/standards.md`, `prior.md`, the run state | what is this project now, where are its seams, and what does it call things |
 
 You do not read `brief.md`, `manifest.md` or `report.md` here. Those say what was
 asked and what was delivered; this phase records what was **learned**, and the
@@ -39,6 +39,12 @@ noise:
 - **Anything true only for this прогон** — which таск ran in which wave, what a
   review found and got fixed, how long a stage took. The отчёт and the run state
   hold that already.
+
+A seam-level item of the standards pass passes through the same test. It is a
+fact about how the project is put together across таски — two seams that pass
+the same clump of values, one rule implemented twice — not something a review
+found and got fixed, and it enters only when the next session would otherwise
+rediscover it.
 
 **Writing nothing is a valid outcome.** A run that learned nothing worth keeping
 is not a failed run, and a memory file padded to look thorough is worse than an

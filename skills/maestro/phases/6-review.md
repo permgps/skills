@@ -56,6 +56,17 @@ path those commits touched outside the files the task file owns. A write outside
 the zone is exactly what the files check exists to catch, and a filter would hide
 it.
 
+**Then look for debug output a repair left behind.** In each таск's per-commit
+diffs, a line added with `[maestro-debug:` that no later commit of the same таск
+removes is a blocking finding of your own, before any reviewer is dispatched.
+Write it into that таск's review file and import it into `verification.findings`
+with origin `validator`. It names the tag id and the path, never the line: the
+line is debug output, and debug output is where a value that should not travel
+tends to sit. A tag whose id is not a `DF-N` counts the same — any
+`[maestro-debug:` left behind is debug output left behind — and a removal in
+another таск's commit does not clear it. Log WARN `review` `debug tag left` with
+`{ taskId, commit, path, tagId }`.
+
 **Do not review the tree.** By the time a repair lands, later waves are in it and
 always will be — waiting for a quiet tree would serialise the build, which is the
 one thing the wave order exists to avoid. A finding about what another таск put
@@ -95,6 +106,7 @@ observation. A reviewer's keyboard does not reach `.maestro/`, and a review
 rewritten in your words is a review whose original nobody can check.
 
 An observation is recorded and stops nothing; the отчёт reads these files later.
+An `unrequested` observation is written with its tag, as it came back.
 Import every substantiated finding into `verification.findings` with a stable ID,
 origin, affected requirement/obligation/check IDs, and evidence links. Route an
 upstream omitted obligation to coverage repair and an integration-evidence gap
@@ -108,6 +120,24 @@ result or silently accepts a defect.
 | no blocking finding | `done` |
 | one blocking finding or more | `repair` |
 
+A blocking finding of your own counts the same as a reviewer's: a debug tag left
+behind, or an `unrequested` observation sent to repair.
+
+**Under `strict`, you dispose of each `unrequested` observation.** Ask whether
+the behaviour is something a требование cannot work without — the `strict` row,
+«only what the requirement cannot work without». If it is not, you may send it
+to repair. Append a blocking finding of your own to the review file that quotes
+the reviewer's observation verbatim and the `strict` row; import it with origin
+`coordinator`. The observation itself is never rewritten. In repair, the
+counterexample is the unrequested behaviour and the repair criterion is a check
+that it is gone. Log INFO `review` `unrequested sent to repair` with
+`{ taskId, findingId }`. An observation you keep under `strict` gets one line in
+the review file naming the требование it serves. Under `normal` and `deep`, an
+`unrequested` observation stays an observation and goes to the отчёт.
+
+This disposition is yours, not the review's. It uses what you hold, and no
+reviewer is told the depth.
+
 **A repaired таск is answered twice, separately.** First: is the defect the
 repair targeted verified against its repair criteria? Second: which of the
 parent таск's criteria remain? The defect can be verified while criteria remain;
@@ -118,6 +148,39 @@ Log INFO with the verdict and `{ defectVerified, residualCount }`.
 Write the state at the transition, never on a timer. **`done` is written here
 and nowhere else.** It means reviewed and accepted, and the build stopped one
 step short of it on purpose.
+
+### 6. One standards pass
+
+Executors worked apart, and a per-таск review sees one таск at a time, so
+duplication and data clumps across таски are invisible to both. **One fresh
+reader looks at the whole прогон, once.**
+
+It runs the first time this phase ends with every таск `done` and
+`.maestro/<dir>/reviews/standards.md` does not exist yet. That file is the
+record: a review round after a repair, or a session that resumes the прогон,
+finds it and does not run the pass again. A прогон that never reaches
+all-`done` has no standards pass. It is never looped on — its observations are
+not repaired and the pass is not repeated after they are read.
+
+Give the reader, briefed by
+[`../prompts/standards-reader.md`](../prompts/standards-reader.md):
+
+- every таск's per-commit diffs, labelled with the таск id, in the order they
+  landed — the same `git show` per commit as step 2;
+- the project's documented standards: the host's memory file with the region
+  between `<!-- maestro:begin -->` and `<!-- maestro:end -->` cut out,
+  `CONTRIBUTING*`, and any document the memory file or the README names as the
+  project's conventions. Lint and format configuration is not a document; the
+  lint command already enforces it. With none found, say «none documented».
+
+**Nothing else** — not `spec.md`, not the манифест, not the task files, not
+`interfaces.md`, not the review files.
+
+Write `reviews/standards.md` from its text, quoted as it came back. Its output is
+observations only, so it moves no таск and writes no state; none of it enters
+`verification.findings`. The отчёт carries its observations, and the memory
+phase reads its seam-level items. Log INFO `review` `standards pass` with
+`{ commits, observations, seamItems }`.
 
 ## When It Does Not Go That Way
 
@@ -148,10 +211,12 @@ phase and the previous one agree about.
 
 ## The Dials Here
 
-**No mode changes this phase, and no depth does either.** A review measures one
-таск against the task file its executor was handed. That file was written under
-whatever mode and depth the прогон is running, and the measurement against it is
-the same in every one of them.
+**No mode changes this phase. Depth changes one disposition, never the
+measurement.** A review measures one таск against the task file its executor was
+handed. That file was written under whatever mode and depth the прогон is
+running, and the measurement against it is the same in every one of them. What
+`strict` changes is what you do afterwards with an `unrequested` observation
+(step 5): you may send it to repair. No reviewer is told the depth.
 
 ## Gates
 
@@ -168,6 +233,7 @@ said is one gate, at the end, blind.
 | Artifact | State |
 |---|---|
 | `.maestro/<dir>/reviews/NN-<slug>.md` | one per таск, findings quoted as they came back |
+| `.maestro/<dir>/reviews/standards.md` | once per прогон, the standards pass's observations quoted as they came back |
 | `.maestro/state.js` | every таск `done`, or `repair` where a review blocked it; `currentStage` moved on |
 | project code | unchanged — this phase writes none of it |
 

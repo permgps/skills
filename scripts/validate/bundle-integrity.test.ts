@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   BRIEFING_ANCHORS,
   CUT_ANCHORS,
+  REVIEW_ANCHORS,
   bundleProfileFor,
   carriesLeafRule,
   checkBundle,
@@ -725,5 +726,59 @@ test('the build phase losing the hand-over of blockers\' D## rows is reported on
     await writeFile(build, dropped, 'utf8');
     const violations = (await checkBundle(copy)).filter(v => v.check === 'cut');
     assert.deepEqual(violations.map(v => v.file), [path.join('phases', '5-build.md')]);
+  });
+});
+
+// --- review sees what nobody asked for ----------------------------------------
+
+test('every review anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(REVIEW_ANCHORS.length > 0, 'REVIEW_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of REVIEW_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'review'), []);
+  });
+});
+
+test('the review phase losing its debug-tag condition is the one finding, named on the review phase', async () => {
+  await withShippedCopy(async copy => {
+    const review = path.join(copy, 'phases', '6-review.md');
+    const body = await readFile(review, 'utf8');
+    const dropped = body.replace(/that no later commit of the same таск\s+removes is a blocking finding of your own/,
+      'is worth a mention');
+    assert.notEqual(dropped, body);
+    await writeFile(review, dropped, 'utf8');
+
+    const violations = await checkBundle(copy);
+    assert.equal(violations.length, 1, JSON.stringify(violations));
+    assert.equal(violations[0]?.check, 'review');
+    assert.equal(violations[0]?.file, path.join('phases', '6-review.md'));
+    assert.match(violations[0]?.message ?? '', /debug output/);
+  });
+});
+
+test('the reviewer losing its fifth part is reported on the reviewer brief', async () => {
+  await withShippedCopy(async copy => {
+    const reviewer = path.join(copy, 'prompts', 'reviewer.md');
+    const body = await readFile(reviewer, 'utf8');
+    const dropped = body.replace(/tagged `unrequested`, and never\s+blocking/, 'blocking when it matters');
+    assert.notEqual(dropped, body);
+    await writeFile(reviewer, dropped, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'review');
+    assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'reviewer.md')]);
+  });
+});
+
+test('the standards reader calling a smell a violation is reported on its brief', async () => {
+  await withShippedCopy(async copy => {
+    const reader = path.join(copy, 'prompts', 'standards-reader.md');
+    const body = await readFile(reader, 'utf8');
+    const dropped = body.replaceAll('never a violation', 'a violation');
+    assert.notEqual(dropped, body);
+    await writeFile(reader, dropped, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'review');
+    assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'standards-reader.md')]);
   });
 });

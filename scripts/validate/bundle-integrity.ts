@@ -363,6 +363,57 @@ export const CUT_ANCHORS: readonly Anchor[] = [
     why: 'a stale instruction needs one place to be stale against' },
 ];
 
+/**
+ * The literal text that carries «review sees what nobody asked for».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. The reviewer tags
+ * behaviour nobody asked for as an `unrequested` observation and is never told
+ * the depth; the review phase disposes of it under `strict`, looks for debug
+ * output a repair left behind, and runs one standards pass per прогон; the
+ * executor tags and removes its diagnostics; the standards reader labels a smell
+ * a judgement; the отчёт and the memory phase each read their share of the
+ * standards pass. Whether a reviewer recognises unrequested behaviour, whether a
+ * promotion under `strict` was right, and whether a smell judgement is fair are
+ * the readers' and the orchestrator's judgement, so no anchor stands for them.
+ * The debug-tag condition itself is also held executably, by
+ * `scripts/gates/debug-tags.ts`.
+ */
+export const REVIEW_ANCHORS: readonly Anchor[] = [
+  { file: 'prompts/reviewer.md', literal: 'tagged `unrequested`, and never blocking',
+    why: 'a reviewer that blocks on extra behaviour is weighing a depth it was never told' },
+  { file: 'prompts/reviewer.md', literal: '`unrequested` is a tag on an observation, not a third kind',
+    why: 'a third kind of finding is the middle grade the two kinds exist to refuse' },
+  { file: 'prompts/reviewer.md', literal: 'marked `observation · unrequested`',
+    why: 'the отчёт and the strict disposition find these observations by their tag' },
+  { file: 'phases/6-review.md',
+    literal: 'that no later commit of the same таск removes is a blocking finding of your own',
+    why: 'debug output a repair left behind otherwise ships in the build' },
+  { file: 'phases/6-review.md', literal: 'It names the tag id and the path, never the line',
+    why: 'a tagged line is debug output, and a value that must not travel sits in it' },
+  { file: 'phases/6-review.md', literal: 'Under `strict`, you dispose of each `unrequested` observation',
+    why: 'nothing else checks the strict promise after the spec' },
+  { file: 'phases/6-review.md', literal: 'Depth changes one disposition, never the measurement',
+    why: 'a review whose measurement moved with the depth would judge a таск by words it never had' },
+  { file: 'phases/6-review.md', literal: 'One standards pass',
+    why: 'duplication across таски is invisible to every per-таск review' },
+  { file: 'phases/6-review.md', literal: 'finds it and does not run the pass again',
+    why: 'a standards axis does not converge, so a repeated pass loops' },
+  { file: 'phases/7-acceptance.md', literal: 'the standards pass\'s observations from `reviews/standards.md`',
+    why: 'observations nobody carries into the отчёт are never read' },
+  { file: 'phases/9-memory.md', literal: 'the seam-level items of `reviews/standards.md`',
+    why: 'a seam-level smell is a fact about the project the next session would rediscover' },
+  { file: 'prompts/executor.md', literal: 'carries `[maestro-debug:<DF-id>]` on the same line',
+    why: 'an untagged diagnostic cannot be told from code the таск meant to ship' },
+  { file: 'prompts/executor.md', literal: 'Remove every tagged line before you return',
+    why: 'a tag is a promise to remove the line, and the review phase checks it' },
+  { file: 'prompts/acceptance-reader.md', literal: 'Extra is the per-таск review\'s question',
+    why: 'a question pointed «somewhere else» is a question nobody owns' },
+  { file: 'prompts/standards-reader.md', literal: 'never a violation',
+    why: 'a smell called a violation turns a judgement into a blocking finding' },
+  { file: 'prompts/standards-reader.md', literal: '`scope: seam`',
+    why: 'the memory phase reads only the seam-level items' },
+];
+
 /** Every anchor in `anchors` the documents fail to carry, as violations under `check`. */
 function missingAnchors(
   byFile: ReadonlyMap<string, string>,
@@ -584,6 +635,12 @@ export async function checkBundle(
   // Only a bundle with a plan phase cuts таски; Scout has none.
   if (byFile.has('phases/4-plan.md')) {
     for (const v of missingAnchors(byFile, CUT_ANCHORS, 'cut')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- review sees what nobody asked for --------------------------------------
+  // Only a bundle with a review phase reviews таски; Scout has none.
+  if (byFile.has('phases/6-review.md')) {
+    for (const v of missingAnchors(byFile, REVIEW_ANCHORS, 'review')) add(v.check, v.file, v.line, v.message);
   }
 
   if (skill.includes('<!-- maestro:delegation:native-explicit -->') || skill.includes('<!-- maestro:runtime:node -->')) {

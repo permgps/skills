@@ -205,6 +205,7 @@ strategy/action with follow-up check IDs. Execute that action only within your
 files; never reset budgets, rename away a root or change oracle to hide failure.
 Return actual repaired/still_failing/unavailable result and captures. Missing
 diagnosis/prerequisite is unavailable; review/acceptance decides pass later.
+Temporary diagnostics are tagged and removed exactly as in Defect-Scoped Repair.
 
 ## Defect-Scoped Repair
 
@@ -218,3 +219,9 @@ finished while any remain. If the defect cannot be repaired because an upstream
 таск or defect is still open, stop and return `prerequisite_blocked` naming it
 instead of working around it in your files. Return the commit that holds the
 repair.
+
+Any temporary diagnostic output you add — a print, a log line, a probe — carries
+`[maestro-debug:<DF-id>]` on the same line, in its string or in a trailing
+comment, with the defect id from your brief. Remove every tagged line before you
+return. A tagged line left in your commit is a blocking finding from a
+mechanical check, and it sends the таск back to repair.

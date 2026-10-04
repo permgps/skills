@@ -306,3 +306,59 @@ test('a G3 task row that does not withhold prior memory is reported', async () =
   assert.deepEqual(checks(violations), ['memory']);
   assert.match(violations[0]!.message, /gate G3 task does not withhold prior\.md/);
 });
+
+// --- the standards reader gates nothing, and is held like every reader ---------
+
+const STANDARDS_ROW = '| standards (no gate) | `standards-reader.md` | every таск\'s per-commit diffs, the project\'s documented standards | `spec.md`, `manifest.md`, the task files, `interfaces.md`, `reviews/`, `prior.md` |\n';
+
+const STANDARDS_READER = `# Standards Reader
+
+## What You Are Given
+
+| Input | What it is |
+|---|---|
+| every таск's per-commit diffs | each commit of every таск, labelled |
+| the project's documented standards | the project's own documents |
+
+## What You Are Not Given
+
+| Input | What it is |
+|---|---|
+| \`spec.md\` | the specification |
+| \`manifest.md\` | the numbered requirement list |
+| the task files | what each executor was told |
+| \`interfaces.md\` | the shared boundaries |
+| \`reviews/\` | what each reviewer found |
+| \`prior.md\` | what earlier runs decided |
+
+## Your Question
+
+What would the project's own standards notice across таски?
+`;
+
+test('a standards reader that agrees with its row produces no violations', async () => {
+  assert.deepEqual(await violationsFor({
+    spec: `${SPEC}${STANDARDS_ROW}`, briefs: { 'standards-reader.md': STANDARDS_READER } }), []);
+});
+
+test('a standards reader handed the task files is reported, on both sides of the row', async () => {
+  const violations = await violationsFor({
+    spec: `${SPEC}${STANDARDS_ROW}`,
+    briefs: { 'standards-reader.md': STANDARDS_READER
+      .replace('| the task files | what each executor was told |\n', '')
+      .replace('| the project\'s documented standards | the project\'s own documents |\n',
+        '| the project\'s documented standards | the project\'s own documents |\n'
+        + '| the task files | what each executor was told |\n') },
+  });
+  assert.deepEqual(checks(violations).sort(), ['inputs', 'withheld']);
+  assert.ok(violations.every(v => v.message.includes('the task files')), JSON.stringify(violations));
+});
+
+test('a standards row that does not withhold prior memory is reported', async () => {
+  const violations = await violationsFor({
+    spec: `${SPEC}${STANDARDS_ROW.replace(', `prior.md` |', ' |')}`,
+    briefs: { 'standards-reader.md': STANDARDS_READER.replace('| `prior.md` | what earlier runs decided |\n', '') },
+  });
+  assert.deepEqual(checks(violations), ['memory']);
+  assert.match(violations[0]!.message, /standards \(no gate\) does not withhold prior\.md/);
+});

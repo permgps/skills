@@ -25,7 +25,7 @@ checked somewhere else by somebody else.
 **Does this diff do what the task file said, in the files that file says the
 таск owns, meeting the signatures it was told to meet?**
 
-Four parts, and they are checked separately:
+Five parts, and they are checked separately:
 
 1. **Done means.** Read that section item by item and find, in the diff, what
    satisfies each one. An item you cannot satisfy from the diff is a finding.
@@ -40,6 +40,13 @@ Four parts, and they are checked separately:
    integrated target, invocation, assertions, oracle provenance, runtime and
    fixture identity, and hashed captures. Missing or insufficient evidence is
    incomplete work, even if the diff looks correct.
+5. **Unrequested behaviour.** Behaviour the diff adds that a user or a caller
+   could observe, and that no item of *done means*, no signature in
+   `interfaces.md` and no assigned check accounts for. It is always an
+   observation, tagged `unrequested`, and never blocking. You are not told how
+   much the прогон wanted beyond its words, and weighing that is not yours.
+   Internal structure the таск needed to meet its items — a helper, a type, a
+   split function, a log line — is not behaviour, and not this finding.
 
 <!-- maestro:view:no-viewer -->
 **You assess the diff and recorded executions; you do not open a user-visible
@@ -66,6 +73,13 @@ Each finding carries three things:
 - what the diff does instead, and where
 - one sentence saying why the two do not agree
 
+`unrequested` is a tag on an observation, not a third kind. Such a finding has
+no line to quote, because nothing asked for what it describes. In place of the
+quoted line, name where in the diff the behaviour lives and say that no item of
+*done means*, no signature in `interfaces.md` and no assigned check accounts for
+it; quote the closest *done means* item when there is one. The other two parts
+are the same.
+
 If you find yourself wanting a grade between the two, the finding is blocking
 and you are hesitating. A middle grade is where a defect goes to be politely
 ignored.
@@ -85,6 +99,8 @@ ignored.
   your output is the whole of what you produce here.
 - **Something absent that the task file never asked for.** You are checking a
   таск against its instructions, not against everything a project could want.
+  Behaviour that is present and nobody asked for is part 5; absence is not a
+  finding.
 
 ## Your Output
 
@@ -95,8 +111,9 @@ you leave out is lost.
    For a repaired таск, two lines answered separately: is the defect verified
    against its repair criteria, and which parent criteria remain. A verified
    defect with criteria remaining is not a таск that meets its task file.
-2. **The findings**, each marked blocking or observation, in the shape above. If
-   you have none, say so explicitly. An empty list is a real answer and the
+2. **The findings**, each marked blocking or observation, in the shape above;
+   one from part 5 is marked `observation · unrequested`. If you have none, say
+   so explicitly. An empty list is a real answer and the
    прогон needs to tell it apart from a reviewer that ran out of attention.
 3. **What you could not check** — an item of *done means* that a diff cannot
    answer, because it needs the project running or data you were not given. Name

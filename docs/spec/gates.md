@@ -87,6 +87,10 @@ So the list gets a machine-readable form. `scripts/validate/gate-readers.ts`
 holds every reader's brief to the `Given` and `Withheld` columns below, name for name: a name
 present in one and not the other is a finding that names both places.
 
+One more reader is held here and gates nothing: the standards reader, dispatched
+once after review over the whole прогон. Its output is observations only, and
+its blindness is held the same way as the gate readers'.
+
 | Gate | Reader's brief | Given | Withheld |
 |---|---|---|---|
 | G1 source | `manifest-reader.md` | redacted source snapshots, candidate manifest | coordinator clause inventory, spec.md, answers.md, tasks, prior audit conclusions, `prior.md` |
@@ -95,6 +99,7 @@ present in one and not the other is a finding that names both places.
 | G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning, `prior.md` |
 | G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts, `prior.md` |
 | G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, neutral raw reference register and capture identity, the running build | `spec.md`, the plan, the task files, `reviews/`, prior dispositions, the бриф's original text, `prior.md` |
+| standards (no gate) | `standards-reader.md` | every таск's per-commit diffs, the project's documented standards | `spec.md`, `manifest.md`, the task files, `interfaces.md`, `reviews/`, `prior.md` |
 
 The reference reader's first discovery pass is not bounded by the generated
 inventory. The orchestrator then reconciles its findings with all other

@@ -186,7 +186,9 @@ and write the state at that transition.
 Under contract 6 the brief is about one defect. It states the defect and its
 counterexample, the parent таск, the repair criteria as check IDs, the residual
 parent criteria, foreign prerequisites, the expected progress, and a closure
-forecast. Expected progress is `defect_verified`, `scenario_verified` or
+forecast. The defect's `DF-N` is the id the executor tags any temporary
+diagnostic output with, `[maestro-debug:DF-N]`; the review phase treats a tag
+left in a commit as a blocking finding. Expected progress is `defect_verified`, `scenario_verified` or
 `task_closure`, and `task_closure` is never promised while residual criteria
 or open prerequisites remain. Append the attempt with its `repeatKind`,
 `readyUpstreamTaskIds`, `blockingPrerequisites` and `unlocksTaskIds` only
