@@ -207,6 +207,14 @@ Return actual repaired/still_failing/unavailable result and captures. Missing
 diagnosis/prerequisite is unavailable; review/acceptance decides pass later.
 Temporary diagnostics are tagged and removed exactly as in Defect-Scoped Repair.
 
+When the brief's probe runs first, run it before any change. Tag its output
+`[maestro-debug:<DF-id>]` and capture what it showed as evidence. If the result
+does not match the brief's hypothesis, stop before the change and return
+`still_failing` with the capture: a repair made on a falsified hypothesis ships
+a change nobody can explain. Change one variable at a time. For a performance
+defect, measure the baseline before any change and capture it. The return
+template does not change.
+
 ## Defect-Scoped Repair
 
 Under contract 6 a repair brief names one defect: its counterexample, the

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   BRIEFING_ANCHORS,
   CUT_ANCHORS,
+  DIAGNOSIS_ANCHORS,
   REVIEW_ANCHORS,
   bundleProfileFor,
   carriesLeafRule,
@@ -780,5 +781,47 @@ test('the standards reader calling a smell a violation is reported on its brief'
     await writeFile(reader, dropped, 'utf8');
     const violations = (await checkBundle(copy)).filter(v => v.check === 'review');
     assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'standards-reader.md')]);
+  });
+});
+
+// --- repair diagnoses by competing hypotheses ----------------------------------
+
+test('every diagnosis anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(DIAGNOSIS_ANCHORS.length > 0, 'DIAGNOSIS_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of DIAGNOSIS_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'diagnosis'), []);
+  });
+});
+
+test('the diagnostician losing its ranked hypotheses is the one finding, named on its brief', async () => {
+  await withShippedCopy(async copy => {
+    const brief = path.join(copy, 'prompts', 'repair-diagnostician.md');
+    const body = await readFile(brief, 'utf8');
+    const dropped = body.replace(/List three to five ranked hypotheses for the failure, most likely\s+first/,
+      'Propose one grounded next approach');
+    assert.notEqual(dropped, body);
+    await writeFile(brief, dropped, 'utf8');
+
+    const violations = await checkBundle(copy);
+    assert.equal(violations.length, 1, JSON.stringify(violations));
+    assert.equal(violations[0]?.check, 'diagnosis');
+    assert.equal(violations[0]?.file, path.join('prompts', 'repair-diagnostician.md'));
+    assert.match(violations[0]?.message ?? '', /one cause the diagnostician thought of first/);
+  });
+});
+
+test('the отчёт losing the noCorrectSeam observations is reported on the acceptance phase', async () => {
+  await withShippedCopy(async copy => {
+    const acceptance = path.join(copy, 'phases', '7-acceptance.md');
+    const body = await readFile(acceptance, 'utf8');
+    const dropped = body.replace(/; then each `noCorrectSeam:` line[^|]*never the hypotheses/, '');
+    assert.notEqual(dropped, body);
+    await writeFile(acceptance, dropped, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'diagnosis');
+    assert.deepEqual(violations.map(v => v.file), [path.join('phases', '7-acceptance.md'), path.join('phases', '7-acceptance.md')]);
   });
 });

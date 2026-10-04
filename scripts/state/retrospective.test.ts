@@ -125,3 +125,37 @@ test('refused: a downstream task forecast as closable while its schema prerequis
   next.verification!.repairAttempts = [v3Attempt('RA-1', 'F-11', 'DF-15', minute(20), { taskId: '04' })];
   assert.deepEqual(validateStateTransition(prior, next), []);
 });
+
+/** The schema defect repaired once without closing, then repeated on a diagnosis. */
+function schemaRepeat(diagnosis: { hypothesis: string; diagnosis: string }): ReturnType<typeof retrospectiveState> {
+  const state = retrospectiveState();
+  correctedReadiness(state);
+  state.verification!.repairAttempts = [
+    v3Attempt('RA-1', 'F-10', 'DF-14', minute(20), { taskId: '02' }),
+    v3Attempt('RA-2', 'F-10', 'DF-14', minute(30), { taskId: '02', predecessorId: 'RA-1',
+      repeatKind: 'new_cause_same_surface', diagnosisDispatchId: 'diagnosis-1', diagnosisReturnId: 'diagnosis-return-1',
+      novelty: 'accepted', ...diagnosis }),
+  ];
+  return state;
+}
+
+test('refused: a repeated repair whose diagnosis names a single hypothesis is sent back', () => {
+  const state = schemaRepeat({ hypothesis: 'The DTO still carries the old total field',
+    diagnosis: 'H1: The DTO still carries the old total field — falsified by: the renamed field in the generated DTO' });
+  assert.match(messages(state), /repairAttempts\[RA-2\]: a repeat repair's diagnosis names 1 hypothesis; send it back to the diagnostician for three to five ranked hypotheses/);
+});
+
+test('accepted: the same repair diagnosed by three ranked hypotheses, a probe and a minimised reproduction', () => {
+  const state = schemaRepeat({
+    hypothesis: 'The DTO still carries the old total field',
+    diagnosis: [
+      'H1: The DTO still carries the old total field — falsified by: the renamed field in the generated DTO',
+      'H2: The migration renamed the column but not the view — falsified by: the view selecting the new column',
+      'H3: The serializer maps the field by its old name — falsified by: a serialized order carrying the new name',
+      'Probe: read the generated DTO for the total field — result: the old name, which leaves H1 standing',
+      'Reproduction: generate the DTOs from the current schema and read one order',
+      'noCorrectSeam: the DTOs are generated at build time, and no test seam sits between the schema and the generator',
+    ].join('\n'),
+  });
+  assert.deepEqual(validateState(state), []);
+});

@@ -416,6 +416,59 @@ export const REVIEW_ANCHORS: readonly Anchor[] = [
     why: 'the memory phase reads only the seam-level items' },
 ];
 
+/**
+ * The literal text that carries «repair diagnoses by competing hypotheses».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. The diagnostician ranks
+ * three to five hypotheses, each with what falsifies it, runs the cheapest probe
+ * first, minimises the reproduction, changes one variable, and names a seam or
+ * `noCorrectSeam:`; the repair phase sends a diagnosis that breaks this back
+ * once; the executor runs a probe that needs a change before any change; the
+ * отчёт and the memory phase each carry the `noCorrectSeam:` lines, and never
+ * the hypotheses. Whether a probe is the cheapest, a reproduction minimal, one
+ * variable changed or a baseline measured, and whether a `noCorrectSeam` reason
+ * is true, are the diagnostician's and the executor's judgement, so no anchor
+ * stands for them. The diagnosis text's shape is also held executably, by the
+ * closure rules in `tools/runtime/state/closure.mts`.
+ */
+export const DIAGNOSIS_ANCHORS: readonly Anchor[] = [
+  { file: 'prompts/repair-diagnostician.md', literal: 'List three to five ranked hypotheses for the failure, most likely first',
+    why: 'a repeat built on the one cause the diagnostician thought of first is the guess this brief exists to stop' },
+  { file: 'prompts/repair-diagnostician.md', literal: 'Each names the observation that would falsify it',
+    why: 'a hypothesis nothing could falsify cannot be told apart from the others' },
+  { file: 'prompts/repair-diagnostician.md', literal: 'Name the cheapest probe that tells them apart, and run it first',
+    why: 'a repair chosen before the probe acts on the ranking instead of the evidence' },
+  { file: 'prompts/repair-diagnostician.md', literal: 'Minimise the reproduction until every element in it is needed',
+    why: 'an element the failure does not need hides which change fixed it' },
+  { file: 'prompts/repair-diagnostician.md', literal: 'The next action changes one variable',
+    why: 'two changes at once leave the passing one unattributed' },
+  { file: 'prompts/repair-diagnostician.md', literal: 'write `noCorrectSeam:` and why',
+    why: 'a missing seam left unsaid becomes an invented seam or a silent gap' },
+  { file: 'prompts/repair-diagnostician.md', literal: 'Hypotheses go into `diagnosis` and to the next executor, never to the user',
+    why: 'unconfirmed causes read to the user as things wrong with their project' },
+  { file: 'phases/8-repair.md', literal: 'A diagnosis that breaks the brief\'s text is sent back once',
+    why: 'a single-hypothesis diagnosis acted on spends the root\'s last attempt on a guess' },
+  { file: 'phases/8-repair.md', literal: 'A send-back spends no repair attempt',
+    why: 'charging the budget for the diagnostician\'s form would punish the repair for it' },
+  { file: 'phases/8-repair.md', literal: 'Hypotheses never reach the user',
+    why: 'the orchestrator is the one who talks to the user, so the rule has to be in its phase' },
+  { file: 'prompts/executor.md', literal: 'When the brief\'s probe runs first, run it before any change',
+    why: 'a repair made on a falsified hypothesis ships a change nobody can explain' },
+  { file: 'prompts/executor.md', literal: 'Change one variable at a time',
+    why: 'the executor is where the variables are actually changed' },
+  { file: 'prompts/executor.md', literal: 'measure the baseline before any change',
+    why: 'a performance repair with no baseline cannot be told from noise' },
+  { file: 'phases/7-acceptance.md',
+    literal: 'each `noCorrectSeam:` line of a repeated repair\'s diagnosis, as a defect repaired without a regression check',
+    why: 'a repair with no regression check is something the user builds on without knowing' },
+  { file: 'phases/7-acceptance.md', literal: 'the reason as written — never the hypotheses',
+    why: 'the отчёт is the user\'s, and hypotheses stay with the прогон' },
+  { file: 'phases/9-memory.md', literal: 'the `noCorrectSeam:` lines of repeated repairs\' diagnoses',
+    why: 'a missing seam is a fact the next session would rediscover when it tests the same thing' },
+  { file: 'phases/9-memory.md', literal: 'A `noCorrectSeam:` line passes the same test',
+    why: 'without the entry test a limitation of this прогон fills the memory file' },
+];
+
 /** Every anchor in `anchors` the documents fail to carry, as violations under `check`. */
 function missingAnchors(
   byFile: ReadonlyMap<string, string>,
@@ -643,6 +696,12 @@ export async function checkBundle(
   // Only a bundle with a review phase reviews таски; Scout has none.
   if (byFile.has('phases/6-review.md')) {
     for (const v of missingAnchors(byFile, REVIEW_ANCHORS, 'review')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- repair diagnoses by competing hypotheses -------------------------------
+  // Only a bundle with a repair phase diagnoses a repeat; Scout has none.
+  if (byFile.has('phases/8-repair.md')) {
+    for (const v of missingAnchors(byFile, DIAGNOSIS_ANCHORS, 'diagnosis')) add(v.check, v.file, v.line, v.message);
   }
 
   if (skill.includes('<!-- maestro:delegation:native-explicit -->') || skill.includes('<!-- maestro:runtime:node -->')) {

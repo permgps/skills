@@ -9,7 +9,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { validateStateTransition } from './closure.ts';
-import { defect, finding, repairContract6State, repairContract7State, strategyReview, v3Attempt } from './fixtures/verification.ts';
+import { defect, finding, rankedDiagnosis, repairContract6State, repairContract7State, strategyReview, v3Attempt } from './fixtures/verification.ts';
 import { validateState } from './validate.ts';
 
 const messages = (state: unknown): string => validateState(state).map(item => `${item.field}: ${item.message}`).join('\n');
@@ -115,7 +115,7 @@ test('C06: a cause that survived a materially similar repair stops the next atte
   state.verification!.repairAttempts = [
     v3Attempt('RA-1', 'F-1', 'DF-1', minute(10)),
     v3Attempt('RA-2', 'F-1', 'DF-1', minute(20), { predecessorId: 'RA-1', repeatKind: 'different_action_same_cause',
-      diagnosisDispatchId: 'diagnosis-1', diagnosisReturnId: 'diagnosis-return-1', novelty: 'accepted' }),
+      diagnosisDispatchId: 'diagnosis-1', diagnosisReturnId: 'diagnosis-return-1', novelty: 'accepted', ...rankedDiagnosis() }),
     v3Attempt('RA-3', 'F-2', 'DF-2', minute(30)),
   ];
   assert.match(messages(state), /a cause survived a similar repair; a returned strategy review must precede/);
@@ -204,7 +204,7 @@ test('splitting a defect or renaming its root never resets the per-root count', 
   const record = state.verification!;
   record.findings.push(finding('F-1b', { supersedes: 'F-1' }));
   record.defects = [defect('DF-1', 'F-1', { status: 'superseded' }), defect('DF-2', 'F-1', { supersedes: 'DF-1', findingIds: ['F-1b'] })];
-  const diagnosed = { diagnosisDispatchId: 'diagnosis-1', diagnosisReturnId: 'return-1', novelty: 'accepted' as const };
+  const diagnosed = { diagnosisDispatchId: 'diagnosis-1', diagnosisReturnId: 'return-1', novelty: 'accepted' as const, ...rankedDiagnosis() };
   record.repairAttempts = [
     v3Attempt('RA-1', 'F-1', 'DF-2', minute(10), { findingId: 'F-1b' }),
     v3Attempt('RA-2', 'F-1', 'DF-2', minute(20), { findingId: 'F-1b', predecessorId: 'RA-1', repeatKind: 'new_cause_same_surface', ...diagnosed }),

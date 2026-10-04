@@ -16,7 +16,7 @@ and nobody is asked about it.
 | Run | Read | The question it answers |
 |---|---|---|
 | during Разработка | `discovered-interfaces.md`, the таск that returned, the run state | what did this таск run into that the next person will too |
-| after приёмка | `spec.md`, the project code, `discovered-interfaces.md`, the Terms table of `interfaces.md`, the seam-level items of `reviews/standards.md`, `prior.md`, the run state | what is this project now, where are its seams, and what does it call things |
+| after приёмка | `spec.md`, the project code, `discovered-interfaces.md`, the Terms table of `interfaces.md`, the seam-level items of `reviews/standards.md`, the `noCorrectSeam:` lines of repeated repairs' diagnoses in the run state, `prior.md`, the run state | what is this project now, where are its seams, and what does it call things |
 
 You do not read `brief.md`, `manifest.md` or `report.md` here. Those say what was
 asked and what was delivered; this phase records what was **learned**, and the
@@ -45,6 +45,12 @@ fact about how the project is put together across таски — two seams that 
 the same clump of values, one rule implemented twice — not something a review
 found and got fixed, and it enters only when the next session would otherwise
 rediscover it.
+
+A `noCorrectSeam:` line passes the same test. A place where the project offers
+no seam for a regression check is a fact about how it is built, and the next
+session meets it again the moment it tries to test the same thing. It is not
+what a review found and got fixed, and it is written without the hypotheses
+that surround it in the diagnosis.
 
 **Writing nothing is a valid outcome.** A run that learned nothing worth keeping
 is not a failed run, and a memory file padded to look thorough is worse than an

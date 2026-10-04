@@ -279,6 +279,30 @@ export function v3Attempt(id: string, root: string, defectId: string, at: string
     readyUpstreamTaskIds: [], blockingPrerequisites: [], unlocksTaskIds: [], ...extra };
 }
 
+/**
+ * A repeated repair's diagnosis as the diagnostician returns it: three ranked
+ * causes of the hover defect, each with what falsifies it, the probe that told
+ * them apart, the minimised reproduction, and where the regression check sits
+ * — or why no correct seam exists. `hypothesis` is the cause the probe left
+ * standing, written exactly as its line writes it.
+ */
+export function rankedDiagnosis(extra: { seam?: 'seam' | 'noCorrectSeam' } = {}): { hypothesis: string; diagnosis: string } {
+  const seam = extra.seam === 'noCorrectSeam'
+    ? 'noCorrectSeam: the hover reaches the panel only through the browser\'s pointer events, and no unit seam exposes them'
+    : 'Seam: the menu component\'s pointer test';
+  return {
+    hypothesis: 'The hover handler is never bound',
+    diagnosis: [
+      'H1: The hover handler is never bound — falsified by: a pointer listener on the trigger after mount',
+      'H2: The panel opens but a stale class hides it — falsified by: the panel\'s computed display changing on hover',
+      'H3: The trigger is replaced after mount — falsified by: the same trigger element before and after mount',
+      'Probe: list the trigger\'s listeners after mount — result: none bound, which leaves H1 standing',
+      'Reproduction: mount the menu alone and hover the trigger once',
+      seam,
+    ].join('\n'),
+  };
+}
+
 export function strategyReview(id: string, at: string, extra: Partial<StrategyReview> = {}): StrategyReview {
   return { id, at, trigger: 'batch_without_closure', attemptIds: [], closedTaskIds: [],
     answers: { contractConsistent: 'Yes', dependenciesReady: 'The schema task is still in repair',

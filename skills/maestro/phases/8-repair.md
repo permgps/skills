@@ -133,21 +133,36 @@ remaining budgets. This protocol runs before every repeated repair dispatch.
    both attempts; do not dispatch. New task/name/executor is not a reset.
 3. Dispatch [repair-diagnostician.md](../prompts/repair-diagnostician.md) in a
    fresh bounded context with the prior hypothesis/action/result, evidence,
-   task/interface/check excerpts, root/predecessor and remaining budgets.
+   task/interface/check excerpts, root/predecessor and remaining budgets. It is
+   briefed for three to five ranked hypotheses, the probe that tells them
+   apart, a minimised reproduction and a seam; the brief says how.
 4. Wait for actual return. Accepted novelty needs falsifying evidence and a
    substantively different diagnosis/action. Different text alone is rejected.
    Missing context/return/evidence is unavailable; keep incomplete, no retry.
-5. Use accepted diagnosis in next executor brief. Append actual attempt RA-N
-   only after return: id, findingId, taskId, at, outcome, rootFindingId,
+   **A diagnosis that breaks the brief's text is sent back once**: fewer than
+   three hypotheses or more than five, a hypothesis without `falsified by:`, a
+   missing `Probe:`, `Reproduction:` or seam line, or a `hypothesis` that is
+   none of its `H` causes. Dispatch a fresh diagnostician with the same inputs
+   and the list of what was missing. A second return that still breaks it is
+   unavailable: keep incomplete, no retry. A send-back spends no repair
+   attempt. WARN `repair` `diagnosis sent back` with
+   `{ rootFindingId, hypotheses, missing }`, where `missing` names labels,
+   never text. The run state refuses an attempt carrying such a diagnosis.
+5. Use accepted diagnosis in next executor brief: its `hypothesis`, its
+   reproduction, and its `Probe:` line when the probe runs first there.
+   Hypotheses never reach the user — not in a status line, a question or the
+   отчёт; only a `noCorrectSeam:` line travels, as a limitation. Append
+   actual attempt RA-N only after return: id, findingId, taskId, at, outcome, rootFindingId,
    predecessorId, hypothesis, diagnosis, evidenceIds, strategy, action,
    followUpCheckIds, diagnosisDispatchId, diagnosisReturnId and novelty accepted.
    First attempt has no predecessor; repeats require actual diagnosis receipts.
 6. Fresh fingerprints and check executions return through review and affected
    acceptance, including shared-input variants; repair cannot accept itself.
 Valid: minimal reproduction falsifies prior interface hypothesis; next action
-verifies exports. Invalid: same edit renamed, executor switched without new
-hypothesis, root ID changed, or budget increased. INFO door/diagnosis/strategy/
-attempt; WARN exhaustion/unavailability; ERROR reset/routing; DEBUG safe IDs.
+verifies exports. Invalid: a single hypothesis, same edit renamed, executor
+switched without new hypothesis, root ID changed, or budget increased.
+INFO door/diagnosis/strategy/attempt; WARN exhaustion/unavailability/send-back;
+ERROR reset/routing; DEBUG safe IDs.
 
 ### 2b. Strategy review
 

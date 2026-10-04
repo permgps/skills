@@ -156,7 +156,7 @@ sections under its own date rather than replacing what is there:
 | What was asked | every `R##`, its status, and where it landed |
 | Disagreements | the G4 findings, each quoted against its требование |
 | Assumptions | `debt` as the прогон recorded it — every placeholder standing in for a fact nobody supplied, every decision taken on the user's behalf, every unfilled variable by name — plus any wording whose translation was uncertain |
-| Observations | the non-blocking findings carried out of `reviews/`, each `unrequested` one with its tag; then, under their own sub-heading, the standards pass's observations from `reviews/standards.md` — or one line saying the pass did not run |
+| Observations | the non-blocking findings carried out of `reviews/`, each `unrequested` one with its tag; then, under their own sub-heading, the standards pass's observations from `reviews/standards.md` — or one line saying the pass did not run; then each `noCorrectSeam:` line of a repeated repair's diagnosis, as a defect repaired without a regression check, with its таск and the reason as written — never the hypotheses |
 | What is left | deferred and dropped требования, each with the reason recorded against it |
 
 Build the acceptance table and closure summary from the same derived

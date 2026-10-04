@@ -7,6 +7,17 @@
 // it ran thousands of tests behind a bootstrap its own isolation broke, repaired
 // five causes under one root, scheduled eight bounded repairs that closed no
 // task, and asked for a bigger limit instead of a different method.
+//
+// A repeated repair's diagnosis is read here too. The diagnostician used to
+// propose "one grounded next approach", and nothing asked it what else could
+// explain the failure, so a repeat could rest on the one cause it thought of
+// first. Its `diagnosis` text now names three to five ranked hypotheses, each
+// with what falsifies it, the probe, the reproduction and a seam or
+// `noCorrectSeam:` — inside the existing string, so the contract does not
+// move. Only that shape is held. Whether the probe is the cheapest, the
+// reproduction minimal, one variable changed, a baseline measured, or a
+// `noCorrectSeam` reason true is the diagnostician's and the executor's
+// judgement, and no rule here can see it.
 
 import { isDeepStrictEqual } from 'node:util';
 
@@ -39,6 +50,91 @@ const ANSWER_FIELDS = ['contractConsistent', 'dependenciesReady', 'environmentEv
 
 export const isV3Attempt = (attempt: RepairAttemptV2 | RepairAttemptV3): attempt is RepairAttemptV3 =>
   'defectId' in attempt;
+
+/** How many ranked hypotheses a repeated repair's diagnosis names. */
+export const DIAGNOSIS_HYPOTHESES = { min: 3, max: 5 } as const;
+
+/** A repeated repair's `diagnosis` text, read by its labels. */
+export interface DiagnosisReading {
+  hypotheses: { rank: number; cause: string; falsifiedBy: string }[];
+  probe?: string;
+  reproduction?: string;
+  seam?: string;
+  noCorrectSeam?: string;
+  /** What the text lacks, each sentence saying what to send back for. */
+  problems: string[];
+}
+
+const HYPOTHESIS_LINE = /^H(\d+)\s*:\s*(.*)$/;
+const FALSIFIED_BY = /falsified by\s*:/i;
+const LABELLED = {
+  probe: /^Probe\s*:\s*(.*)$/, reproduction: /^Reproduction\s*:\s*(.*)$/,
+  seam: /^Seam\s*:\s*(.*)$/, noCorrectSeam: /^noCorrectSeam\s*:\s*(.*)$/,
+} as const;
+
+/**
+ * Reads the labelled lines of a diagnosis: `H<n>:` hypotheses with their
+ * `falsified by:`, and one each of `Probe:`, `Reproduction:` and `Seam:` or
+ * `noCorrectSeam:`. Any other line is free prose and is ignored. A label with
+ * nothing after it counts as absent. Only the shape is read here; the attempt's
+ * own `hypothesis` is matched by the caller, which holds the attempt.
+ */
+export function readDiagnosis(text: string): DiagnosisReading {
+  const reading: DiagnosisReading = { hypotheses: [], problems: [] };
+  const found: Record<keyof typeof LABELLED, string[]> = { probe: [], reproduction: [], seam: [], noCorrectSeam: [] };
+  const problem = (message: string): void => { reading.problems.push(message); };
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    const hypothesis = HYPOTHESIS_LINE.exec(line);
+    if (hypothesis) {
+      const body = hypothesis[2]!;
+      const split = FALSIFIED_BY.exec(body);
+      const cause = (split ? body.slice(0, split.index) : body).trim().replace(/[\s—–\-|;,]+$/, '').trim();
+      const falsifiedBy = split ? body.slice(split.index + split[0].length).trim() : '';
+      reading.hypotheses.push({ rank: Number(hypothesis[1]), cause, falsifiedBy });
+      continue;
+    }
+    for (const [label, pattern] of Object.entries(LABELLED) as [keyof typeof LABELLED, RegExp][]) {
+      const value = pattern.exec(line)?.[1]?.trim();
+      if (value) found[label].push(value);
+    }
+  }
+
+  const count = reading.hypotheses.length;
+  if (count < DIAGNOSIS_HYPOTHESES.min || count > DIAGNOSIS_HYPOTHESES.max) {
+    problem(`a repeat repair's diagnosis names ${count} ${count === 1 ? 'hypothesis' : 'hypotheses'}; send it back to the diagnostician for three to five ranked hypotheses, each with the observation that falsifies it`);
+  }
+  const ranks = reading.hypotheses.map(item => item.rank);
+  if (ranks.some((rank, index) => rank !== index + 1)) {
+    problem(`a repeat repair's hypotheses are numbered ${ranks.map(rank => `H${rank}`).join(', ')}; rank them H1 to H${count} in order, most likely first`);
+  }
+  const seen = new Map<string, number>();
+  for (const item of reading.hypotheses) {
+    if (!item.cause) problem(`hypothesis H${item.rank} names no cause; send it back for the cause each line ranks`);
+    if (!item.falsifiedBy) problem(`hypothesis H${item.rank} names no observation that falsifies it; send it back for a "falsified by:" on every hypothesis`);
+    const key = item.cause.toLowerCase();
+    const earlier = seen.get(key);
+    if (item.cause && earlier !== undefined) problem(`hypotheses H${earlier} and H${item.rank} name the same cause; send it back for distinct causes`);
+    else seen.set(key, item.rank);
+  }
+  const single = (label: 'probe' | 'reproduction', missing: string): string | undefined => {
+    const values = found[label];
+    if (values.length === 0) problem(`a repeat repair's diagnosis names no ${label}; send it back for ${missing}`);
+    else if (values.length > 1) problem(`a repeat repair's diagnosis names ${values.length} ${label} lines; send it back for exactly one`);
+    return values.length === 1 ? values[0] : undefined;
+  };
+  const probe = single('probe', 'the cheapest probe that tells the hypotheses apart');
+  if (probe !== undefined) reading.probe = probe;
+  const reproduction = single('reproduction', 'the reproduction, minimised until every element in it is needed');
+  if (reproduction !== undefined) reading.reproduction = reproduction;
+  const [seam, noCorrectSeam] = [found.seam, found.noCorrectSeam];
+  if (seam.length + noCorrectSeam.length === 0) problem('a repeat repair\'s diagnosis names no seam; send it back for where the regression check sits, or noCorrectSeam: with why none exists');
+  else if (seam.length > 0 && noCorrectSeam.length > 0) problem('a repeat repair\'s diagnosis names both a Seam: and a noCorrectSeam:; send it back for one of the two');
+  else if (seam.length + noCorrectSeam.length > 1) problem(`a repeat repair's diagnosis names ${seam.length + noCorrectSeam.length} seam lines; send it back for exactly one`);
+  else if (seam[0] !== undefined) reading.seam = seam[0];
+  else if (noCorrectSeam[0] !== undefined) reading.noCorrectSeam = noCorrectSeam[0];
+  return reading;
+}
 
 /** Shape of the verification-3 additions, checked before any typed traversal. */
 function validateClosureShape(value: Record<string, unknown>): VerificationViolation[] {
@@ -323,6 +419,17 @@ export function validateClosureRecord(state: RunState): VerificationViolation[] 
     if (!EXPECTED_PROGRESS.includes(attempt.expectedProgress)) fail('progress', 'unknown expected progress');
     if ((attempt.repeatKind === 'first') !== (attempt.predecessorId === undefined)) {
       fail('repeat', 'repeatKind is first exactly when the attempt has no predecessor');
+    }
+    if (attempt.predecessorId !== undefined) {
+      const reading = readDiagnosis(attempt.diagnosis);
+      log.debug('diagnosis', 'diagnosis read', { attemptId: attempt.id, hypotheses: reading.hypotheses.length,
+        probe: reading.probe !== undefined, reproduction: reading.reproduction !== undefined,
+        seam: reading.seam !== undefined ? 'seam' : reading.noCorrectSeam !== undefined ? 'noCorrectSeam' : 'missing',
+        problems: reading.problems.length });
+      for (const problem of reading.problems) fail('diagnosis', problem);
+      if (!reading.hypotheses.some(item => item.cause === attempt.hypothesis.trim())) {
+        fail('diagnosis', 'the attempt\'s hypothesis is not one of its diagnosis\'s H causes; name as hypothesis the cause the probe left standing, exactly as its H line writes it');
+      }
     }
     if (attempt.outcome === 'defect_verified' && !attempt.commit) fail('commit', 'a verified repair names the commit that made it');
     if (attempt.commit && !tasks.get(attempt.taskId)?.commits?.includes(attempt.commit)) {
