@@ -154,6 +154,83 @@ test('restore is allowed only when it touches the index and not the working tree
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });
 
+test('an abbreviated long option is read as the option git would take it for', async () => {
+  const cwd = await emptyDir();
+  try {
+    assertBlocked([
+      ['git reset --har', 'reset-hard'],
+      ['git reset --h HEAD~1', 'reset-hard'],
+      ['git clean --forc', 'clean-force'],
+      ['git clean -d --fo', 'clean-force'],
+      ['git branch --delete --forc x', 'branch-force-delete'],
+      ['git branch --del -f x', 'branch-force-delete'],
+      ['git branch --d --f x', 'branch-force-delete'],
+      ['git switch --discard main', 'discarding-switch'],
+      ['git switch --di main', 'discarding-switch'],
+      ['git switch --forc main', 'discarding-switch'],
+      ['git checkout --forc main', 'discarding-checkout'],
+      ['git checkout --patc', 'discarding-checkout'],
+      ['git checkout --our a.ts', 'discarding-checkout'],
+      ['git checkout --thei a.ts', 'discarding-checkout'],
+      ['git checkout --pathspec-fr=list.txt', 'discarding-checkout'],
+      ['git restore --st --wor a.ts', 'discarding-restore'],
+      // `--s` is `--source` or `--staged` to git, so it is not read as the one that makes a restore safe.
+      ['git restore --s a.ts', 'discarding-restore'],
+    ], cwd);
+    assertAllowed([
+      'git reset --soft HEAD~1',
+      'git reset --so HEAD~1',
+      'git clean -n',
+      'git clean --dry',
+      'git branch --list',
+      'git branch --del x',
+      'git log --format=%H',
+      'git switch --detach HEAD~1',
+      'git switch --force-create x',
+      'git restore --stag a.ts',
+      'git checkout --track origin/x',
+    ], cwd);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test('a here-document inside a substitution does not hide the command after it, whatever its quoting', async () => {
+  const cwd = await emptyDir();
+  try {
+    assertBlocked([
+      ["git commit -m \"$(cat <<'EOF'\nDon't break\nEOF\n)\" && git push", 'push'],
+      ['git commit -m "$(cat <<"EOF"\nDon\'t break\nEOF\n)" && git push', 'push'],
+      ['git commit -m "$(cat <<-EOF\n\tDon\'t break\n\tEOF\n)" && git push', 'push'],
+      ['git commit -m "$(cat <<EOF\nDon\'t break\nEOF\n)" && git push', 'push'],
+      ["git commit -m $(cat <<'EOF'\nDon't break\nEOF\n) && git push", 'push'],
+      // bash ends the body at a delimiter the closing parenthesis follows on the same line.
+      ['git commit -m "$(cat <<EOF\nDon\'t break\nEOF)" && git push', 'push'],
+      ['x="$(cat <<EOF\nhi\nEOF)" && git push', 'push'],
+    ], cwd);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test('a commit message written through a here-document with an apostrophe is allowed, because it is how every commit is made', async () => {
+  const cwd = await emptyDir();
+  try {
+    assertAllowed([
+      "git commit -m \"$(cat <<'EOF'\nfix: don't blank the dashboard\n\nCo-Authored-By: Someone <a@b.c>\nEOF\n)\"",
+      "git add -A && git commit -m \"$(cat <<'EOF'\nIt's done; git push comes later\nEOF\n)\" && git status",
+      'git commit -m "$(cat <<EOF\nDon\'t break\nEOF\n)"',
+    ], cwd);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test('a substitution whose quote never closes is denied as unreadable, never under a git rule', async () => {
+  const cwd = await emptyDir();
+  try {
+    const unreadable = { blocked: true, rule: 'unreadable', subcommand: null };
+    assert.deepEqual(classify("echo \"$(echo 'oops)\"", cwd), unreadable);
+    assert.deepEqual(classify('echo $(echo "oops) && git status', cwd), unreadable);
+    assert.deepEqual(classify("git status && echo $(printf 'x) ; git push", cwd), unreadable);
+    assert.deepEqual(classify("bash -c 'echo $(echo \"x)'", cwd), unreadable);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
 test('a blocked command is found behind separators, assignments, wrappers and global options', async () => {
   const cwd = await emptyDir();
   try {
@@ -443,6 +520,17 @@ test('no word of a blocked command reaches stdout or stderr, even at DEBUG', () 
   assert.match(run.err, /DEBUG/);
   assert.ok(!run.out.includes('SECRET') && !run.err.includes('SECRET'));
   assert.ok(!run.out.includes('https://') && !run.err.includes('https://'));
+});
+
+test('an unreadable substitution is denied with its own reason and logged without any word of the command', () => {
+  const run = hook(bash("echo $(printf 'SECRET) ; git push https://u:SECRET@h/r"), { MAESTRO_GUARD_DEBUG: '1' });
+  assert.equal(run.status, 0);
+  const output = denial(run.out);
+  assert.equal(output.permissionDecision, 'deny');
+  assert.equal(output.permissionDecisionReason, denyReason('unreadable'));
+  assert.match(run.err, /INFO \[guard-git\.classify\] unreadable substitution \{"quote":"single"\}/);
+  assert.match(run.err, /INFO \[guard-git\.decision\] blocked \{"rule":"unreadable","subcommand":null\}/);
+  assert.ok(!run.out.includes('SECRET') && !run.err.includes('SECRET'));
 });
 
 test('an installed copy runs with no package.json, no PATH, and through a symlink', async () => {

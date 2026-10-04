@@ -41,12 +41,14 @@ export const GUARD_RULES = {
   'discarding-checkout': 'git checkout over paths overwrites uncommitted changes',
   'discarding-switch': 'git switch --discard-changes overwrites uncommitted changes',
   'discarding-restore': 'git restore of the working tree overwrites uncommitted changes',
+  'unreadable': 'a command substitution whose quote never closes cannot be read, so what it hides is not cleared',
 } as const;
 export type GuardRule = keyof typeof GUARD_RULES;
 
+/** `subcommand` is null when the line could not be read far enough to find one. */
 export type Verdict =
   | { blocked: false; segments: number }
-  | { blocked: true; rule: GuardRule; subcommand: string };
+  | { blocked: true; rule: GuardRule; subcommand: string | null };
 
 /** What the agent is told. It names the rule and never the command. */
 export function denyReason(rule: GuardRule): string {
@@ -66,15 +68,124 @@ interface Segment { words: string[] }
 const SEPARATORS = new Set([';', '&', '|', '(', ')', '\n']);
 const WORD_END = new Set([' ', '\t', ...SEPARATORS, '<', '>']);
 
-/** The index just past the `)` that closes a `$(` or `<(` opened before `start`. */
+type Quote = 'single' | 'double';
+
+/**
+ * A quote inside a substitution that never closes. Outside a substitution an
+ * unclosed quote only swallows the rest of the line as one word, and the
+ * command before it is still read; inside one it decides where the
+ * substitution ends, so any guess could hide the commands after it.
+ */
+class UnreadableCommandError extends Error {
+  readonly quote: Quote;
+  constructor(quote: Quote) {
+    super(`a ${quote} quote inside a command substitution never closes`);
+    this.name = 'UnreadableCommandError';
+    this.quote = quote;
+  }
+}
+
+interface Heredoc { delimiter: string; tabs: boolean }
+
+/**
+ * The delimiter word after `<<` or `<<-`, quotes removed, read literally the
+ * way a shell does: no substitution inside it runs. `unclosed` names a quote
+ * in it that never closes.
+ */
+function heredocDelimiter(text: string, start: number): { delimiter: string; end: number; unclosed: Quote | null } {
+  let i = start;
+  while (text[i] === ' ' || text[i] === '\t') i += 1;
+  let delimiter = '';
+  while (i < text.length && !WORD_END.has(text[i]!)) {
+    const ch = text[i]!;
+    if (ch === "'" || ch === '"') {
+      const end = text.indexOf(ch, i + 1);
+      if (end < 0) return { delimiter: delimiter + text.slice(i + 1), end: text.length, unclosed: ch === "'" ? 'single' : 'double' };
+      delimiter += text.slice(i + 1, end);
+      i = end + 1;
+      continue;
+    }
+    if (ch === '\\') { delimiter += text[i + 1] ?? ''; i += 2; continue; }
+    delimiter += ch;
+    i += 1;
+  }
+  return { delimiter, end: i, unclosed: null };
+}
+
+/**
+ * The index past the bodies of the pending here-documents, which start at
+ * `start`, the line after their operators. Inside a substitution bash also
+ * ends a body at a delimiter line the closing `)` follows directly; the index
+ * of that `)` is returned so the caller closes the substitution there. Ending
+ * a body too late would hide every command after it, so the early reading wins.
+ */
+function skipHeredocBodies(text: string, start: number, heredocs: readonly Heredoc[], inSubstitution: boolean): number {
+  let i = start;
+  for (const { delimiter, tabs } of heredocs) {
+    while (i < text.length) {
+      const eol = text.indexOf('\n', i);
+      const line = text.slice(i, eol < 0 ? text.length : eol);
+      const bare = tabs ? line.replace(/^\t+/, '') : line;
+      if (inSubstitution && bare.startsWith(`${delimiter})`)) return i + (line.length - bare.length) + delimiter.length;
+      i = eol < 0 ? text.length : eol + 1;
+      if (bare === delimiter) break;
+    }
+  }
+  return i;
+}
+
+/** Whether `index` starts a word, so a `#` there opens a comment. */
+function atWordStart(text: string, index: number, first: number): boolean {
+  return index === first || WORD_END.has(text[index - 1]!);
+}
+
+/**
+ * The index just past the `)` that closes a `$(` or `<(` opened before `start`.
+ *
+ * Here-document bodies and comments are skipped, because both are text a
+ * quote in them does not open: `Don't` in a commit message written through
+ * `cat <<'EOF'` would otherwise start a quoted run that swallows the rest of
+ * the line, `&& git push` included.
+ *
+ * @throws UnreadableCommandError when a quote inside never closes.
+ */
 function closingParen(text: string, start: number): number {
   let depth = 1;
   let i = start;
+  const heredocs: Heredoc[] = [];
   while (i < text.length) {
     const ch = text[i]!;
     if (ch === '\\') { i += 2; continue; }
-    if (ch === "'") { const end = text.indexOf("'", i + 1); i = end < 0 ? text.length : end + 1; continue; }
-    if (ch === '"') { i = closingDouble(text, i + 1); continue; }
+    if (ch === "'") {
+      const end = text.indexOf("'", i + 1);
+      if (end < 0) throw new UnreadableCommandError('single');
+      i = end + 1;
+      continue;
+    }
+    if (ch === '"') {
+      const end = closingDouble(text, i + 1);
+      if (end < 0) throw new UnreadableCommandError('double');
+      i = end;
+      continue;
+    }
+    if (ch === '#' && atWordStart(text, i, start)) {
+      const eol = text.indexOf('\n', i);
+      i = eol < 0 ? text.length : eol;
+      continue;
+    }
+    if (text.startsWith('<<', i) && !text.startsWith('<<<', i)) {
+      const tabs = text[i + 2] === '-';
+      const read = heredocDelimiter(text, i + (tabs ? 3 : 2));
+      if (read.unclosed !== null) throw new UnreadableCommandError(read.unclosed);
+      heredocs.push({ delimiter: read.delimiter, tabs });
+      i = read.end;
+      continue;
+    }
+    if (ch === '\n' && heredocs.length) {
+      i = skipHeredocBodies(text, i + 1, heredocs, true);
+      heredocs.length = 0;
+      continue;
+    }
     if (ch === '(') depth += 1;
     if (ch === ')') { depth -= 1; if (depth === 0) return i + 1; }
     i += 1;
@@ -82,7 +193,7 @@ function closingParen(text: string, start: number): number {
   return text.length;
 }
 
-/** The index just past the `"` that closes a double-quoted run starting at `start`. */
+/** The index just past the `"` that closes a double-quoted run starting at `start`, or -1 when none does. */
 function closingDouble(text: string, start: number): number {
   let i = start;
   while (i < text.length) {
@@ -92,7 +203,7 @@ function closingDouble(text: string, start: number): number {
     if (ch === '$' && text[i + 1] === '(') { i = closingParen(text, i + 2); continue; }
     i += 1;
   }
-  return text.length;
+  return -1;
 }
 
 /** The index just past the backtick that closes one opened before `start`. */
@@ -123,7 +234,7 @@ function body(text: string, start: number, end: number, closer: string): string 
 function splitCommands(text: string, depth: number, out: Segment[]): void {
   let words: string[] = [];
   let word: string | null = null;
-  const heredocs: { delimiter: string; tabs: boolean }[] = [];
+  const heredocs: Heredoc[] = [];
   let i = 0;
 
   const endWord = (): void => { if (word !== null) words.push(word); word = null; };
@@ -133,25 +244,14 @@ function splitCommands(text: string, depth: number, out: Segment[]): void {
     log.debug('classify', 'nested command read', { depth: depth + 1, via });
     splitCommands(inner, depth + 1, out);
   };
-  const skipHeredocBodies = (): void => {
-    for (const { delimiter, tabs } of heredocs) {
-      while (i < text.length) {
-        const eol = text.indexOf('\n', i);
-        const line = text.slice(i, eol < 0 ? text.length : eol);
-        i = eol < 0 ? text.length : eol + 1;
-        if ((tabs ? line.replace(/^\t+/, '') : line) === delimiter) break;
-      }
-    }
-    heredocs.length = 0;
-  };
-  /** One redirection target or here-document delimiter, quotes removed. */
+  /** One redirection target, quotes removed. */
   const readTarget = (): string => {
     while (text[i] === ' ' || text[i] === '\t') i += 1;
     let target = '';
     while (i < text.length && !WORD_END.has(text[i]!)) {
       const ch = text[i]!;
       if (ch === "'") { const end = text.indexOf("'", i + 1); const stop = end < 0 ? text.length : end; target += text.slice(i + 1, stop); i = stop + 1; continue; }
-      if (ch === '"') { const end = closingDouble(text, i + 1); target += body(text, i + 1, end, '"'); i = end; continue; }
+      if (ch === '"') { const close = closingDouble(text, i + 1); const end = close < 0 ? text.length : close; target += body(text, i + 1, end, '"'); i = end; continue; }
       if (ch === '\\') { target += text[i + 1] ?? ''; i += 2; continue; }
       if (ch === '$' && text[i + 1] === '(') { const end = closingParen(text, i + 2); nested(body(text, i + 2, end, ')'), 'substitution'); i = end; continue; }
       target += ch;
@@ -238,8 +338,9 @@ function splitCommands(text: string, depth: number, out: Segment[]): void {
       if (text.startsWith('<<<', i)) { i += 3; readTarget(); continue; }
       if (text.startsWith('<<', i)) {
         const tabs = text[i + 2] === '-';
-        i += tabs ? 3 : 2;
-        heredocs.push({ delimiter: readTarget(), tabs });
+        const read = heredocDelimiter(text, i + (tabs ? 3 : 2));
+        heredocs.push({ delimiter: read.delimiter, tabs });
+        i = read.end;
         continue;
       }
       i += 1;
@@ -251,7 +352,7 @@ function splitCommands(text: string, depth: number, out: Segment[]): void {
     if (SEPARATORS.has(ch)) {
       endCommand();
       i += 1;
-      if (ch === '\n' && heredocs.length) skipHeredocBodies();
+      if (ch === '\n' && heredocs.length) { i = skipHeredocBodies(text, i, heredocs, false); heredocs.length = 0; }
       continue;
     }
     word = (word ?? '') + ch;
@@ -348,10 +449,39 @@ function isCluster(word: string): boolean {
   return /^-[A-Za-z]{2,}$/.test(word);
 }
 
+/**
+ * Whether `word` spells the long option `name`, whole or abbreviated, with any
+ * `=value` ignored. Git's option parser takes any prefix that is unique among
+ * the subcommand's options, so `--har` is `--hard` and `--del` is `--delete`.
+ *
+ * `shortest` is the shortest spelling read as `name`. For an option that makes
+ * a command destructive it stays at `--` and one letter: a prefix git finds
+ * ambiguous is refused by git itself, so reading it as the dangerous option
+ * costs a command that would not have run, while a longer floor would let
+ * through a prefix that happens to be unique (`--h` is `--hard` to
+ * `git reset`). No other option of the subcommands read here is spelled by a
+ * prefix of a dangerous one, so an exact match elsewhere cannot be misread.
+ */
+function isLongOption(word: string, name: string, shortest = 3): boolean {
+  if (!word.startsWith('--')) return false;
+  const stem = word.split('=', 1)[0]!;
+  return stem.length >= shortest && name.startsWith(stem);
+}
+
+/** Whether the options carry any of the long forms, whole or abbreviated. */
+function hasLong(options: readonly string[], ...long: string[]): boolean {
+  return options.some((w) => long.some((name) => isLongOption(w, name)));
+}
+
 /** Whether the options (the words before `--`) carry a short letter, alone or clustered, or a long form. */
 function hasOption(options: readonly string[], letter: string, ...long: string[]): boolean {
-  return options.some((w) => w === `-${letter}` || (isCluster(w) && w.includes(letter)) || long.includes(w));
+  return options.some((w) => w === `-${letter}` || (isCluster(w) && w.includes(letter))) || hasLong(options, ...long);
 }
+
+// `--staged` is the one long option here that makes a command safe, so its
+// floor runs the other way: `--s` is also `--source` to `git restore`, and only
+// a prefix git cannot read as anything else clears the restore.
+const STAGED_SHORTEST = '--st'.length;
 
 function optionsOf(args: readonly string[]): string[] {
   const end = args.indexOf('--');
@@ -370,7 +500,7 @@ function discardingCheckout(args: readonly string[], dir: string): boolean {
   if (separator >= 0 && separator < args.length - 1) return true;
   const options = optionsOf(args);
   if (hasOption(options, 'f', '--force') || hasOption(options, 'p', '--patch')) return true;
-  if (options.some((w) => w === '--ours' || w === '--theirs' || w.startsWith('--pathspec-from-file'))) return true;
+  if (hasLong(options, '--ours', '--theirs', '--pathspec-from-file')) return true;
   for (let index = 0; index < options.length; index += 1) {
     const word = options[index]!;
     if (CHECKOUT_VALUES.has(word)) { index += 1; continue; }
@@ -387,7 +517,7 @@ function ruleFor(subcommand: string, args: readonly string[], dir: string): Guar
     case 'push':
       return 'push';
     case 'reset':
-      return options.includes('--hard') ? 'reset-hard' : null;
+      return hasLong(options, '--hard') ? 'reset-hard' : null;
     case 'clean':
       return hasOption(options, 'f', '--force') ? 'clean-force' : null;
     case 'branch': {
@@ -400,7 +530,7 @@ function ruleFor(subcommand: string, args: readonly string[], dir: string): Guar
     case 'switch':
       return hasOption(options, 'f', '--force', '--discard-changes') ? 'discarding-switch' : null;
     case 'restore': {
-      const staged = hasOption(options, 'S', '--staged');
+      const staged = hasOption(options, 'S') || options.some((w) => isLongOption(w, '--staged', STAGED_SHORTEST));
       const worktree = hasOption(options, 'W', '--worktree');
       return staged && !worktree ? null : 'discarding-restore';
     }
@@ -414,9 +544,17 @@ function ruleFor(subcommand: string, args: readonly string[], dir: string): Guar
  * moves it for the simple commands after, and `git -C` moves it for one.
  */
 export function classify(command: string, cwd: string): Verdict {
-  const segments: Segment[] = [];
-  splitCommands(command, 0, segments);
-  return decide(segments, cwd, 0, { count: 0 });
+  try {
+    const segments: Segment[] = [];
+    splitCommands(command, 0, segments);
+    return decide(segments, cwd, 0, { count: 0 });
+  } catch (error) {
+    if (!(error instanceof UnreadableCommandError)) throw error;
+    // Denied rather than guessed at: where the substitution ends is exactly
+    // what decides whether a later `git push` is read or hidden.
+    log.info('classify', 'unreadable substitution', { quote: error.quote });
+    return { blocked: true, rule: 'unreadable', subcommand: null };
+  }
 }
 
 function decide(segments: readonly Segment[], start: string, depth: number, read: { count: number }): Verdict {

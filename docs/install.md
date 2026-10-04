@@ -258,10 +258,11 @@ whatever the agent believes you agreed to.
 | `discarding-checkout` | `git checkout` that overwrites files: `--`, `.`, `-f`, `-p`, `--ours` / `--theirs`, a pathspec, or a word that names an existing file or directory |
 | `discarding-switch` | `git switch --discard-changes` or `-f` |
 | `discarding-restore` | `git restore`, unless it names `--staged` and not `--worktree` |
+| `unreadable` | a `$(…)` whose quote never closes, so the command after it cannot be read |
 
 It finds these behind `&&`, pipes, `env`, `sudo`, `xargs`, `timeout`,
-`bash -c`, `eval` and `$(…)`. A plain `git checkout main` still switches
-branches. Everything it does not refuse goes on to your usual permission prompt:
+`bash -c`, `eval` and `$(…)`, and reads a long option as git does, so
+`--har` is `--hard`. A plain `git checkout main` still switches branches. Everything it does not refuse goes on to your usual permission prompt:
 the guard never answers `allow`.
 
 **Nothing installs it for you, and a прогон never will.** Wiring a hook means
