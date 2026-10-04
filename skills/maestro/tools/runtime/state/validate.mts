@@ -7,6 +7,7 @@
 
 import { createLogger } from '../shared/log.mts';
 import {
+  AWAITING_KINDS,
   CONTRACT_VERSION,
   CLOSURE_OUTCOMES,
   DEPTHS,
@@ -265,20 +266,32 @@ export function validateState(value: unknown): StateViolation[] {
   // its ordinary silence rule. A run that is finished waits for nobody, so a
   // closed state carrying the field is a write that forgot to clear it — and the
   // page would tell the user their reply is awaited by a run that has ended.
+  // A question is not an interruption either: the page reads `interruptedAt`
+  // first, so a state carrying both would show a stopped run to a user whose
+  // reply is the only thing missing.
   const awaiting = value['awaiting'];
   if (awaiting !== undefined) {
     if (!isRecord(awaiting)) {
-      add('awaiting', 'awaiting must be an object — { since }');
+      log.debug('validate', 'awaiting rejected', { field: 'awaiting', found: typeof awaiting });
+      add('awaiting', "awaiting must be an object — { kind: 'answer', since }");
     } else {
+      if (typeof awaiting['kind'] !== 'string' || !AWAITING_KINDS.includes(awaiting['kind'] as typeof AWAITING_KINDS[number])) {
+        log.debug('validate', 'awaiting rejected', { field: 'awaiting.kind', found: awaiting['kind'] ?? null });
+      }
+      requireOneOf('awaiting.kind', awaiting['kind'], AWAITING_KINDS);
       requireString('awaiting.since', awaiting['since']);
       const since = awaiting['since'];
       if (typeof since === 'string' && since !== '' && Number.isNaN(Date.parse(since))) {
+        log.debug('validate', 'awaiting rejected', { field: 'awaiting.since', found: since });
         add('awaiting.since', `awaiting.since is not a moment: ${JSON.stringify(since)}`);
       }
     }
     if (value['lifecycle'] === 'closed' || typeof value['finishedAt'] === 'string') {
       log.debug('validate', 'awaiting on a finished run', { lifecycle: value['lifecycle'], finishedAt: value['finishedAt'] });
       add('awaiting', 'a closed прогон waits for nobody — remove awaiting in the write that closes the run');
+    } else if (typeof value['interruptedAt'] === 'string') {
+      log.debug('validate', 'awaiting on an interrupted run', { field: 'awaiting', found: value['interruptedAt'] });
+      add('awaiting', 'a question is not an interruption — a stop on a question writes awaiting and leaves interruptedAt out');
     }
   }
 
@@ -554,6 +567,9 @@ export function validateState(value: unknown): StateViolation[] {
       requireString(`${at}.id`, entry['id']);
       requireOneOf(`${at}.status`, entry['status'], REQUIREMENT_STATUSES);
       optionalString(`${at}.reason`, entry['reason']);
+      if (entry['title'] !== undefined && (typeof entry['title'] !== 'string' || entry['title'].trim() === '')) {
+        log.debug('validate', 'requirement title rejected', { field: `${at}.title`, found: typeof entry['title'] });
+      }
       optionalString(`${at}.title`, entry['title']);
       if (typeof entry['title'] === 'string' && entry['title'].trim() === '') {
         add(`${at}.title`, `${at}.title is empty — write one English line or leave the field out`);

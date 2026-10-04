@@ -1027,17 +1027,29 @@ test('a requirement title is one line of text, and an empty or non-string one is
 });
 
 test('an awaiting reply carries a moment a reader can parse', () => {
-  assert.deepEqual(validateState(withPatch({ awaiting: { since: '2026-08-19T09:12:00Z' } })), []);
-  assert.deepEqual(fields(validateState(withPatch({ awaiting: { since: 'after lunch' } }))), ['awaiting.since']);
-  assert.deepEqual(fields(validateState(withPatch({ awaiting: {} }))), ['awaiting.since']);
+  assert.deepEqual(validateState(withPatch({ awaiting: { kind: 'answer', since: '2026-08-19T09:12:00Z' } })), []);
+  assert.deepEqual(fields(validateState(withPatch({ awaiting: { kind: 'answer', since: 'after lunch' } }))), ['awaiting.since']);
+  assert.deepEqual(fields(validateState(withPatch({ awaiting: { kind: 'answer' } }))), ['awaiting.since']);
   assert.deepEqual(fields(validateState(withPatch({ awaiting: 'yes' }))), ['awaiting']);
 });
 
 test('a closed прогон waits for nobody, so awaiting on it is reported', () => {
-  const closed = { ...contract7State(), awaiting: { since: '2026-09-29T09:19:00Z' } };
+  const closed = { ...contract7State(), awaiting: { kind: 'answer', since: '2026-09-29T09:19:00Z' } };
   const violations = validateState(closed);
   assert.deepEqual(fields(violations), ['awaiting']);
   assert.match(violations[0]?.message ?? '', /waits for nobody/);
-  const finished = withPatch({ finishedAt: '2026-08-19T09:20:00Z', awaiting: { since: '2026-08-19T09:12:00Z' } });
+  const finished = withPatch({ finishedAt: '2026-08-19T09:20:00Z', awaiting: { kind: 'answer', since: '2026-08-19T09:12:00Z' } });
   assert.ok(fields(validateState(finished)).includes('awaiting'));
+});
+
+test('an awaiting reply names what it waits for, and only an answer is a thing a прогон waits for', () => {
+  assert.deepEqual(fields(validateState(withPatch({ awaiting: { since: '2026-08-19T09:12:00Z' } }))), ['awaiting.kind']);
+  assert.deepEqual(fields(validateState(withPatch({ awaiting: { kind: 'deploy', since: '2026-08-19T09:12:00Z' } }))), ['awaiting.kind']);
+});
+
+test('a question is not an interruption, so a state carrying both is reported', () => {
+  const both = withPatch({ interruptedAt: '2026-08-19T09:20:00Z', awaiting: { kind: 'answer', since: '2026-08-19T09:12:00Z' } });
+  const violations = validateState(both);
+  assert.deepEqual(fields(violations), ['awaiting']);
+  assert.match(violations[0]?.message ?? '', /interrupt/);
 });

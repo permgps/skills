@@ -215,6 +215,10 @@ term, and a term with two homes drifts.
 | Ждёт тасков | Waits for | The таски one таск is blocked by |
 | На критическом пути | On the critical path | The marker on a таск that sits on the chain the estimate is measured along |
 | Ждёт вашего ответа | Waiting for your reply | The notice that replaces the silence line while the прогон is stopped on a question |
+| Сейчас от вас ничего не ждут | Nothing is waiting on you right now | The one muted line of an empty Ваш ход |
+| Вид не распознан | Kind not recognised | The group of one-way changes whose kind the contract does not define, kept as written |
+| Показать ещё | Show more | The press that opens a folded group, with the number of lines behind it |
+| Свернуть | Fold | The press that folds an opened group again |
 | G1 | G1 | The gate after брифинг, shown as a row of Гейты |
 | G2 | G2 | The gate after спецификация |
 | G3 | G3 | The gate after план |
@@ -273,6 +277,8 @@ explained, not in brackets, not once.
 | парсинг | чтение файла |
 | медиана | серединное значение |
 | хендофф | передача таска свежему субагенту |
+| хэш, хеш | короткий номер сохранения в истории проекта |
+| токен | метка |
 
 The `Shorthand` column holds the words themselves, comma-separated where a
 family shares one replacement. It is read by a checker, so a word added here
@@ -312,6 +318,8 @@ list **harder** to enforce, not easier.
 | parse, parsing | reading a file |
 | median | middle value |
 | handoff, handoffs | passing a task to a fresh worker |
+| hash, hashes | the short number of a saved step |
+| token, tokens | mark |
 
 **The slug and the run's directory are two names, not one.** Since contract 7
 the slug is only the short name; the folder the run writes into is the state's

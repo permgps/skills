@@ -58,7 +58,7 @@ export function legacyReports(state: unknown): string[] {
       const line = match[4] === undefined ? value : (value as unknown[])[Number(match[4])];
       messages.push('      ' + JSON.stringify(String(line).slice(0, 100)));
     }
-    messages.push("      The panel prints these three fields word for word, so they carry the dial's language: gates[].findings, tasks[].title, stages[].note. Every other file the прогон writes stays English.");
+    messages.push("      These three fields are the прогон's own sentences on the panel, so they carry the dial's language: gates[].findings, tasks[].title, stages[].note. Every other field stays English, even where the panel quotes it as written.");
   }
   return messages;
 }

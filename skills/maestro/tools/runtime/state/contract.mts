@@ -102,8 +102,16 @@ export interface Holder {
   since: string;
 }
 
-/** The прогон ended its turn on a question at `since`. */
+/**
+ * The прогон ended its turn on a question at `since`. `kind` names what it
+ * waits for; an answer is the only thing a прогон waits for today, and naming
+ * it keeps a second kind from arriving as an unvalidated shape.
+ */
+export const AWAITING_KINDS = ['answer'] as const;
+export type AwaitingKind = typeof AWAITING_KINDS[number];
+
 export interface Awaiting {
+  kind: AwaitingKind;
   since: string;
 }
 

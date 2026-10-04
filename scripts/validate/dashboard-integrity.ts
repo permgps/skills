@@ -16,6 +16,7 @@ import vm from 'node:vm';
 import { createLogger } from '../shared/log.ts';
 import { formatViolation, type Violation } from '../shared/violation.ts';
 import { cleanCell, parseTables, type Table } from './spec-integrity.ts';
+import { ONE_WAY_KINDS } from '../state/contract.ts';
 import { RUN_DIR_PATTERN } from '../state/paths.ts';
 
 export type { Violation };
@@ -310,7 +311,7 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
   // its own two files, loaded by script tag on every poll.
   let links = 0;
   lines.forEach((text, index) => {
-    const hits = text.match(/\.(?:href|src)\s*=(?!=)|setAttribute\(\s*['"](?:href|src)['"]|innerHTML/g) ?? [];
+    const hits = text.match(/\.(?:href|src|srcdoc)\s*=(?!=)|setAttribute\(\s*['"](?:href|src)['"]|innerHTML|outerHTML|insertAdjacentHTML|document\.write|window\.open/g) ?? [];
     for (const hit of hits) {
       if (hit.startsWith('.src') && /=\s*(?:STATE_FILE|VALIDATION_FILE)\b/.test(text)) continue;
       links += 1;
@@ -321,6 +322,23 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     }
   });
   log.debug('links', 'run-time addresses checked', { links });
+
+  // --- every node the view makes focusable can be found again ----------------
+  //
+  // The view rebuilds every region on each poll, so a focused row or toggle is
+  // destroyed under a keyboard reader every two seconds. A node made focusable
+  // is therefore given a key the redraw re-finds it by, within the few lines
+  // that create it; one without a key loses focus to <body> on the next poll.
+  let focusable = 0;
+  lines.forEach((text, index) => {
+    if (!/setAttribute\(\s*['"]tabindex['"]|put\([^)]*['"]button['"]/.test(text)) return;
+    focusable += 1;
+    if (lines.slice(index, index + 6).some(next => /\bfocusKey\(/.test(next))) return;
+    add('focus', index + 1,
+      'a node made focusable without a focus key — the next poll rebuilds it and drops the '
+      + 'keyboard reader to <body>; call focusKey(node, key) where it is created');
+  });
+  log.debug('focus', 'focusable nodes checked', { focusable });
 
   // --- every region has somewhere to render ---------------------------------
   for (const region of REQUIRED_REGIONS) {
@@ -430,6 +448,16 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
       + `but skills/maestro/tools/runtime/state/paths.mts holds /${RUN_DIR_PATTERN.source}/ — copy the runtime's pattern into the logic block`);
   }
   log.debug('run-dir', 'run directory grammar compared', { page: pageSource, runtime: RUN_DIR_PATTERN.source });
+
+  // --- the page's one-way kinds are the contract's -------------------------
+  // The page groups one-way lines by kind and keeps an unknown kind apart; a
+  // kind the contract gained and the page did not would be shown as unknown.
+  const pageKinds = Array.isArray(logic['ONE_WAY_ORDER']) ? (logic['ONE_WAY_ORDER'] as unknown[]).map(String) : null;
+  if (pageKinds === null || pageKinds.join(',') !== ONE_WAY_KINDS.join(',')) {
+    add('one-way', 0, `the page's ONE_WAY_ORDER ${pageKinds === null ? 'is missing' : `is [${pageKinds.join(', ')}]`}, `
+      + `but skills/maestro/tools/runtime/state/contract.mts holds [${ONE_WAY_KINDS.join(', ')}] — copy the contract's kinds into the logic block`);
+  }
+  log.debug('one-way', 'one-way kinds compared', { page: pageKinds, contract: ONE_WAY_KINDS });
 
   const asMap = (name: string): Record<string, string> => {
     const value = logic[name];
@@ -696,7 +724,10 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
         add('labels', 0, `vocabulary.md defines no ${label} entries for "${field}"`);
         continue;
       }
-      compare('labels', `${field} (${language})`, owned, branchMap(language, map));
+      const held = branchMap(language, map);
+      const missing = [...owned.keys()].filter(key => !(key in held));
+      log.debug('labels', 'value map compared', { check: 'labels', map: `${map} (${language})`, missing });
+      compare('labels', `${field} (${language})`, owned, held);
     }
   }
   log.info('labels', 'labels compared with the vocabulary',

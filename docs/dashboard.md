@@ -141,7 +141,7 @@ context, each with its reason, and «Сверх запрошенного», what
 that nobody asked for.
 
 An opened row stays open across the poll that redraws the page every two
-seconds.
+seconds, and keyboard focus stays on the row or toggle that had it.
 
 ## Your move
 
@@ -346,11 +346,11 @@ already been quiet for eleven, and alarming in one that writes at every таск
 that silence is accounted for, and the page already says so.
 
 **A run stopped on your question is waiting, not stalled.** Before every stop
-the orchestrator writes `awaiting`, and while it is set the silence line becomes
-«Ждёт вашего ответа в чате с 21:27» — calm, and never raised however long the
+on a question, once the run has a state, the orchestrator writes `awaiting`, and while it is set the silence line becomes
+«Ждёт вашего ответа в чате с 2026-08-19 21:27» — calm, and never raised however long the
 wait. A state written before the field existed falls back to the ordinary rule.
 
-The raised line also names the run's claim — «Метка прогона: k7f2 с 21:27» —
+The raised line also names the run's claim — «Метка прогона: k7f2 с 2026-08-19 21:27» —
 the same token a second chat quotes when it finds the run already claimed. The
 page says nothing about whether that holder is alive; it cannot know.
 
@@ -418,6 +418,14 @@ one the plain reader never reaches. That is why the median line says «сере�
 names neither the check nor its status: `normal` is *allowed* the trade's words,
 never owed them, and a sentence that has to differ by register belongs in a
 called function instead.
+
+**What the page builds at run time is held too.** No address, markup or window
+may be built from a state value — `href`, `src`, `srcdoc`, `innerHTML`,
+`outerHTML`, `insertAdjacentHTML`, `document.write`, `window.open` — apart from
+the page's own two files. The page's one-way kinds must equal the contract's,
+so a kind the contract gains is not shown as unrecognised. And every node the
+view makes focusable must be given a focus key where it is created, because the
+redraw every two seconds would otherwise drop a keyboard reader to the top.
 
 Its DOM-free logic is exercised separately by `scripts/validate/dashboard-logic.test.ts`,
 which evaluates the page's own `<script id="logic">` block in a VM rather than

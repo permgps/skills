@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   checkDashboard,
+  checkDashboardFile,
   customProperties,
   scriptBlock,
   sliceObjectLiteral,
@@ -108,6 +109,7 @@ const SPEC: SpecSources = {
 /** What the page exports beside its words: the lists no language owns. */
 const LOGIC = {
   RUN_DIR_PATTERN: RUN_DIR_PATTERN.toString(),
+  ONE_WAY_ORDER: "['deleted', 'renamed', 'migration', 'dependency-major']",
   STAGE_ORDER: "['preflight', 'build']",
   GATE_AFTER: "{ G1: 'preflight' }",
   EXPLAIN_ORDER: "['progress', 'gates']",
@@ -178,6 +180,7 @@ const RENDER = `<script>
   function renderStages(state) {
     var info = put(row, 'button', 'i', 'info');
     info.setAttribute('data-explains', 'stage:' + stage.id);
+    focusKey(info, 'stage:' + stage.id);
   }
 </script>`;
 
@@ -839,4 +842,32 @@ test('a link built from the state is reported, and the page\'s own two files are
 test('a one-way kind the vocabulary labels and the English page forgot is reported', () => {
   const found = messages(page({ en: { ONE_WAY_KIND: '{}' } }));
   assert.match(found, /oneWay\[\]\.kind \(en\) "deleted" has a label in the specification and none in the page/);
+});
+
+test('markup and windows built at run time are reported like links', () => {
+  for (const line of ['row.outerHTML = finding;', 'row.insertAdjacentHTML("beforeend", finding);',
+    'document.write(finding);', 'window.open(detail.files[0]);', 'frame.srcdoc = finding;']) {
+    const found = checkDashboard(page({ body: `<script>\n  ${line}\n</script>` }), SPEC).filter(v => v.check === 'links');
+    assert.equal(found.length, 1, line);
+  }
+});
+
+test('a page whose one-way kinds drifted from the contract is reported', () => {
+  assert.match(messages(page({ logic: { ONE_WAY_ORDER: "['deleted', 'renamed']" } })),
+    /ONE_WAY_ORDER .* but skills\/maestro\/tools\/runtime\/state\/contract\.mts holds/);
+  assert.match(messages(page({ logic: { ONE_WAY_ORDER: 'null' } })), /ONE_WAY_ORDER is missing/);
+});
+
+test('a node the view makes focusable without a focus key is reported, because the next poll would drop focus from it', () => {
+  const bare = page({ body: "<script>\n  row.setAttribute('tabindex', '0');\n</script>" });
+  assert.match(messages(bare), /focusable without a focus key/);
+  const button = page({ body: "<script>\n  var toggle = put(host, 'button', label, 'findings-toggle');\n</script>" });
+  assert.match(messages(button), /focusable without a focus key/);
+  const keyed = page({ body: "<script>\n  row.setAttribute('tabindex', '0');\n  focusKey(row, key);\n</script>" });
+  assert.equal(checkDashboard(keyed, SPEC).filter(v => v.check === 'focus').length, 0);
+});
+
+test('the shipped page passes against the shipped specification', async () => {
+  const found = await checkDashboardFile('skills/maestro/assets/dashboard.html', 'docs/spec');
+  assert.deepEqual(found, []);
 });

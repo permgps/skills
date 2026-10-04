@@ -232,7 +232,9 @@
   #build-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
   /* A row that opens says so on hover and on focus, and nowhere louder. */
   .opens { cursor: pointer; border-radius: 4px; }
-  .opens:hover, .opens:focus-visible { background: var(--ghost); outline: none; }
+  .opens:hover { background: var(--ghost); }
+  /* The track is --ghost too, so focus cannot be a background alone. */
+  .opens:focus-visible { background: var(--ghost); outline: 2px solid var(--info); outline-offset: 1px; }
   /* The critical path is a mark at the row's edge, in the tone the page uses
      for work in flight: it says where the time goes, not that anything failed. */
   .task.critical .id { color: var(--warn); font-weight: 600; }
@@ -744,9 +746,12 @@ globalThis.MAESTRO_LOGIC = (function () {
             + '. Прогон стоит на вопросе и продолжится, когда вы ответите.';
         },
         stopReasonLine: function (reason) { return L10N.ru.SCREEN.stopReason + ': ' + reason; },
-        holderLine: function (token, moment) {
-          return L10N.ru.SCREEN.holder + ': ' + token + ' с ' + moment + '.';
+        holderLine: function (token, moment, plain) {
+          return plain
+            ? 'Прогон заняла сессия чата с меткой ' + token + ' — в ' + moment + '.'
+            : L10N.ru.SCREEN.holder + ': ' + token + ' с ' + moment + '.';
         },
+        handoffNote: ' — это не дефект',
         handoverEmpty: 'Сейчас от вас ничего не ждут.',
         oneWayUnknown: 'Вид не распознан',
         foldMore: function (count) { return 'Показать ещё ' + count; },
@@ -1073,12 +1078,15 @@ globalThis.MAESTRO_LOGIC = (function () {
             + '. The run is stopped on a question and carries on once you answer.';
         },
         stopReasonLine: function (reason) { return L10N.en.SCREEN.stopReason + ': ' + reason; },
-        holderLine: function (token, moment) {
-          return L10N.en.SCREEN.holder + ': ' + token + ' since ' + moment + '.';
+        holderLine: function (token, moment, plain) {
+          return plain
+            ? 'A chat session marked ' + token + ' took this run at ' + moment + '.'
+            : L10N.en.SCREEN.holder + ': ' + token + ' since ' + moment + '.';
         },
+        handoffNote: ' — not a defect',
         handoverEmpty: 'Nothing is waiting on you right now.',
         oneWayUnknown: 'Kind not recognised',
-        foldMore: function (count) { return 'Show ' + count + ' more'; },
+        foldMore: function (count) { return 'Show more: ' + count; },
         foldLess: 'Fold',
         detail: function (name, value) { return name + ': ' + value; },
         taskTests: function (tests) { return tests.passed + ' passed, ' + tests.failed + ' failed'; },
@@ -2030,10 +2038,13 @@ globalThis.MAESTRO_LOGIC = (function () {
    *
    * The page never composes a reason of its own. A state that carries the
    * field as something other than a string is shown as written, through the
-   * same reader that keeps a finding from becoming `[object Object]`.
+   * same reader that keeps a finding from becoming `[object Object]`. A run
+   * still in motion shows none: the reason sits beside the closure notice, and
+   * without one it would read as a run that stopped when it did not.
    */
   function stopReasonOf(state) {
     if (!state || state.stopReason === undefined || state.stopReason === null) return null;
+    if (!isStopped(state) && state.lifecycle !== 'closed') return null;
     var line = lineOf(state.stopReason).trim();
     return line === '' ? null : line;
   }
@@ -2116,6 +2127,17 @@ globalThis.MAESTRO_LOGIC = (function () {
 
   /** How many lines of one group are shown before the rest is folded. */
   var FOLD_AFTER = 5;
+
+  /**
+   * Which lines of a group are shown, and how many wait behind the press.
+   * Decided here rather than in the view so the rule a test reads is the rule
+   * the page draws by.
+   */
+  function foldOf(lines, open) {
+    var folds = lines.length > FOLD_AFTER;
+    var shown = open || !folds ? lines.slice() : lines.slice(0, FOLD_AFTER);
+    return { shown: shown, hidden: lines.length - shown.length, folds: folds };
+  }
 
   /**
    * What the state holds for one таск, and nothing it does not.
@@ -2312,7 +2334,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     if (detail.commits) lines.push(said.UI.detail(name.commits, detail.commits.join(', ')));
     if (detail.retries !== undefined) lines.push(said.UI.detail(name.retries, detail.retries));
     if (detail.repairs !== undefined) lines.push(said.UI.detail(name.repairs, detail.repairs));
-    if (detail.handoffs !== undefined) lines.push(said.UI.detail(name.handoffs, detail.handoffs));
+    if (detail.handoffs !== undefined) lines.push(said.UI.detail(name.handoffs, detail.handoffs) + said.UI.handoffNote);
     if (detail.tests) lines.push(said.UI.detail(name.tests, said.UI.taskTests(detail.tests)));
     if (detail.defects) lines.push(said.UI.taskDefects(detail.defects));
     return lines;
@@ -2423,7 +2445,7 @@ globalThis.MAESTRO_LOGIC = (function () {
       // same token. The calm notice has nothing wrong to explain.
       var holder = holderOf(state);
       var line = say.silenceAlarming(say.gap(quiet), say.gap(record), plain);
-      if (holder) line += ' ' + say.holderLine(holder.token, formatMoment(holder.since));
+      if (holder) line += ' ' + say.holderLine(holder.token, formatMoment(holder.since), plain);
       return { alarming: true, line: line };
     }
     return { alarming: false, line: say.silenceCalm(say.gap(quiet), plain) };
@@ -3482,7 +3504,7 @@ globalThis.MAESTRO_LOGIC = (function () {
   /** The regions the page must be able to explain, in the order they appear. */
   var EXPLAIN_ORDER = [
     'dials', 'progress', 'coverage', 'stage', 'elapsed', 'estimate', 'tasks', 'debt',
-    'tests', 'requirements', 'stages', 'build', 'requirement-list', 'gates', 'handover'
+    'tests', 'requirements', 'handover', 'stages', 'build', 'requirement-list', 'gates'
   ];
 
   function explain(key, state, now, marks, register, language) {
@@ -3644,6 +3666,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     ONE_WAY_ORDER: ONE_WAY_ORDER,
     handoverOf: handoverOf,
     FOLD_AFTER: FOLD_AFTER,
+    foldOf: foldOf,
     taskDetailOf: taskDetailOf,
     requirementDetailOf: requirementDetailOf,
     contextClausesOf: contextClausesOf,
@@ -3944,7 +3967,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     lastGood = state;
     marks = L.collectMarks(state);
     clearProblem();
-    render(state);
+    keepingFocus(function () { render(state); });
     if (state.contractVersion < 4 && state.finishedAt && pollTimer !== null) {
       clearInterval(pollTimer);
       pollTimer = null;
@@ -3976,6 +3999,31 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     if (className) node.className = className;
     parent.appendChild(node);
     return node;
+  }
+
+  /**
+   * Give a node the view rebuilds a key the next redraw re-finds it by. Every
+   * region is cleared and drawn again on each poll, so without one a keyboard
+   * reader on a row or a toggle would be dropped to <body> every two seconds.
+   */
+  function focusKey(node, key) {
+    node.setAttribute('data-focus', key);
+    return node;
+  }
+
+  /** Redraw, then hand focus back to the node that held it, found by its key. */
+  function keepingFocus(redraw) {
+    var held = document.activeElement;
+    var key = held && held.getAttribute ? held.getAttribute('data-focus') : null;
+    redraw();
+    if (!key || document.activeElement === held) return;
+    var nodes = document.querySelectorAll('[data-focus]');
+    for (var i = 0; i < nodes.length; i += 1) {
+      if (nodes[i].getAttribute('data-focus') === key) {
+        nodes[i].focus({ preventScroll: true });
+        return;
+      }
+    }
   }
 
   function clear(node) {
@@ -4139,6 +4187,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
         var info = put(name, 'button', 'i', 'info');
         info.type = 'button';
         info.setAttribute('data-explains', key);
+        focusKey(info, key);
         info.setAttribute('aria-label', T.UI.stageAria(L.label(T.STAGE_LABEL, stage.id)));
         info.addEventListener('click', function (event) {
           event.stopPropagation();
@@ -4250,12 +4299,13 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     var open = !!openRows[key];
     row.setAttribute('role', 'button');
     row.setAttribute('tabindex', '0');
+    focusKey(row, key);
     row.setAttribute('aria-expanded', open ? 'true' : 'false');
     row.setAttribute('aria-label', aria);
     row.classList.add('opens');
     var flip = function () {
       openRows = L.toggled(openRows, key);
-      redraw();
+      keepingFocus(redraw);
     };
     row.addEventListener('click', flip);
     row.addEventListener('keydown', function (event) {
@@ -4274,15 +4324,17 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     put(host, nested ? 'h4' : 'h3', T.UI.groupToggle(heading, lines.length), 'group-name');
     var open = !!openRows['group:' + key];
     var list = put(host, 'ul', null, 'group');
-    (open ? lines : lines.slice(0, L.FOLD_AFTER)).forEach(function (line) { put(list, 'li', line); });
-    if (lines.length <= L.FOLD_AFTER) return;
+    var fold = L.foldOf(lines, open);
+    fold.shown.forEach(function (line) { put(list, 'li', line); });
+    if (!fold.folds) return;
     var toggle = put(host, 'button',
-      open ? T.UI.foldLess : T.UI.foldMore(lines.length - L.FOLD_AFTER), 'findings-toggle');
+      open ? T.UI.foldLess : T.UI.foldMore(fold.hidden), 'findings-toggle');
     toggle.type = 'button';
+    focusKey(toggle, 'fold:' + key);
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     toggle.addEventListener('click', function () {
       openRows = L.toggled(openRows, 'group:' + key);
-      redraw();
+      keepingFocus(redraw);
     });
   }
 
@@ -4295,10 +4347,11 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     var open = !!openRows['group:' + key];
     var toggle = put(host, 'button', T.UI.groupToggle(heading, lines.length), 'findings-toggle');
     toggle.type = 'button';
+    focusKey(toggle, 'fold:' + key);
     toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
     toggle.addEventListener('click', function () {
       openRows = L.toggled(openRows, 'group:' + key);
-      redraw();
+      keepingFocus(redraw);
     });
     if (!open) return;
     var list = put(host, 'ul', null, 'findings findings-quiet');
@@ -4433,10 +4486,11 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       // read one finding.
       var toggle = put(host, 'button', L.findingsLine(view.count, register, lang), 'findings-toggle');
       toggle.type = 'button';
+      focusKey(toggle, 'findings:' + gate.id);
       toggle.setAttribute('aria-expanded', openFindings[gate.id] ? 'true' : 'false');
       toggle.addEventListener('click', function () {
         openFindings[gate.id] = !openFindings[gate.id];
-        renderGates(state);
+        keepingFocus(function () { renderGates(state); });
       });
       if (openFindings[gate.id]) drawList();
     });
@@ -4545,6 +4599,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
         if (!heading && !region.getAttribute('data-region-label')) return;
         var button = put(heading || region, 'button', 'i', 'info');
         button.type = 'button';
+        focusKey(button, 'region:' + key);
         // Named at paint time rather than here: the heading is empty until a
         // language is in force, and the name has to follow a reader who
         // switches languages with the popover already mounted.

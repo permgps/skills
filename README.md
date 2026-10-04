@@ -286,13 +286,15 @@ a dial, and nothing in the specification hard-codes Russian except the vocabular
 itself.
 
 **Three fields of the state carry the прогон's language, and the boundary is
-visibility.** `gates[].findings`, `tasks[].title` and `stages[].note` are printed
-on the dashboard word for word, and the page has no vocabulary to translate a
-composed line against — so those three follow the dial while every other field
-stays English. `debt` reaches the page as three counts, `additions` is not drawn
-there at all, and a требование's `reason` is read out of the отчёт, which is why
-none of them moves. A quotation keeps the language it was said in, so an English
-отчёт carries Russian findings inside it. `node .maestro/sync.mts` holds the
+who is speaking.** `gates[].findings`, `tasks[].title` and `stages[].note` are the
+прогон's own sentences to you, printed on the dashboard word for word, and the
+page has no vocabulary to translate a composed line against — so those three
+follow the dial while every other field stays English. The page also shows
+`debt` and `oneWay` lines, `additions`, `stopReason`, a требование's `title` and
+the verification record's text as written; those are record lines the отчёт and
+the gates read too, so the page quotes them in English rather than translating.
+A quotation keeps the language it was said in, so an English отчёт carries
+Russian findings inside it. `node .maestro/sync.mts` holds the
 rule for `ru`, naming and quoting each offending line after it has printed the
 address — a дашборд nobody can reach helps nobody. It deliberately does not hold
 `en`: a Russian line carries Cyrillic and an English one does not, while an

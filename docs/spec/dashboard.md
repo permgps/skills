@@ -43,11 +43,11 @@ like to look at it.
 | `debt` | Долг | Заглушки, допущения and переменные as one number and three | `debt` |
 | `tests` | Тесты | The last full suite | `tests`, or the last таск's own |
 | `requirements` | Требования (счёт) | Planning status and separately derived verification results | `requirements[]`, `verification` |
+| `handover` | Ваш ход | What only the user can settle: empty variables by name, placeholders, open promised work, one-way changes by kind, assumptions | `debt`, `verification.promisedWork`, `oneWay` |
 | `stages` | Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
 | `build` | Ход разработки | The таски grouped by волна, each with its status, phase and clock | `tasks[]` |
-| `requirement-list` | Требования (список) | The манифест one требование at a time, with technical result | `requirements[]`, `verification` |
+| `requirement-list` | Требования (список) | The манифест one требование at a time, with technical result; a row opens to its chain, and folded below are the words heard but not taken and what was delivered beyond the ask | `requirements[]`, `verification`, `tasks[]`, `additions` |
 | `gates` | Gates | G1–G4 with status, derived G4 evidence, and findings | `gates[]`, `verification`, `lifecycle`, `outcome` |
-| `handover` | Ваш ход | What only the user can settle: empty variables by name, placeholders, open promised work, one-way changes by kind, assumptions | `debt`, `verification.promisedWork`, `oneWay` |
 
 The `Key` column is the region's name in the page: it is the `data-region`
 attribute in the markup and the entry in `EXPLAIN_ORDER` in the logic block.
@@ -231,7 +231,8 @@ and the run notice already names it.
 
 **A прогон stopped on a question is waiting, not quiet.** While an active state
 carries `awaiting`, the silence line is replaced by «Ждёт вашего ответа в чате с
-21:27», and it is never raised, however long the wait: the reader owes the next
+2026-08-19 21:27» — the date beside the time, as every moment on the page is
+printed — and it is never raised, however long the wait: the reader owes the next
 move, not the run. Without the field the page cannot tell the two apart, which
 is why a stop writes it before it asks. A finished or interrupted run, or an
 `awaiting` whose `since` does not parse, falls back to the ordinary rule above.
@@ -478,7 +479,8 @@ nothing more than it did — the page never composes a reason of its own.
 
 `heldBy` is shown in exactly one place: inside the **raised** silence notice, as
 the claim's token and the moment it was written — «Метка прогона: k7f2 с
-21:27». It is the same token the chat names when a second chat finds the run
+2026-08-19 21:27»; the plain register says it in words, «Прогон заняла сессия
+чата с меткой k7f2», without the label. It is the same token the chat names when a second chat finds the run
 claimed, so the reader can match the two. The calm notice never shows it, and
 neither does a finished or interrupted прогон: nothing has gone wrong there,
 and a token on a calm screen invites a question nobody needs to ask.
@@ -488,7 +490,9 @@ neither can the orchestrator — the contract records the claim, not a lease.
 
 ## Your Move
 
-The `handover` region gathers what only the user can settle, in this order:
+The `handover` region sits directly under the cards, above the stages and the
+lists: a requirement list can run to dozens of rows, and what only the user can
+settle must not wait at the bottom of it. It gathers, in this order:
 empty environment variables (**names only** — S2), placeholders, open promised
 work, one-way changes grouped by kind, then assumptions. A group longer than five
 lines is folded and opens on a press. An empty region says so in one muted line.
@@ -516,6 +520,11 @@ the count is the length of the marked chain, never a second figure beside it.
 
 An opened row is remembered by таск id and survives every poll, the way a folded
 findings list is: a detail that snapped shut every two seconds could not be read.
+The same holds for a требование row, by its id, and for every folded group of
+Ваш ход and below the requirement list, by the group's name. Focus is kept the
+same way: each row and toggle carries a key, and after a redraw the page hands
+focus back to the node with the key that held it, so a keyboard reader is not
+dropped to the top of the page every two seconds.
 
 ## A Требование Opens
 

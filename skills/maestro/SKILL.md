@@ -353,10 +353,10 @@ words they can answer. `S3` still holds.
 ## Asking A Question
 
 **A question that stops the прогон carries its answers.** Everything the прогон
-has done stands still behind one reply — the two dials questions on a project's
-first прогон, the манифест, the брифинг block, and the spec and plan gates in
-`manual`. A sentence into an empty box is not a question to someone who has
-never done this before: they cannot tell what an answer looks like.
+has done stands still behind one reply — the dials questions on a first прогон,
+the манифест, the брифинг block, the spec and plan gates in `manual`, an S4
+action, a spent repair limit. A sentence into an empty box is not a question to
+someone new to this: they cannot tell what an answer looks like.
 
 **Offer the answers, in the прогон's language.** If your host can put choices in
 front of the user, use it — that is the shortest path from a stopped прогон to a moving one. If it
@@ -378,9 +378,9 @@ Five things every stop owes the reader:
   say.
 - **One option marked as the прогон's choice, with its reason in one clause.**
   How briefing records the reply is in `phases/2-briefing.md`.
-- **A write before the words.** The state published just before the question
-  carries `awaiting: { since }` set to that moment; the first write after the
-  reply leaves it out, and the write that closes the прогон never carries it.
+- **A write before the words, once this прогон has a state.** The last write
+  before the question carries `awaiting: { kind: 'answer', since: <now> }`; the
+  first write after the reply drops it, and the closing write never carries it.
 
 **`R##` never travels alone.** In anything the user reads, an id carries a short
 gist of its требование: «R03 — оплата картой», never a bare «R03».
@@ -528,13 +528,13 @@ word the user must read has no English twin in `vocabulary.md`, that is a gap in
 the vocabulary and it is filled there.
 
 **The exception is three fields of `state.js`, and it is the panel that makes
-it one.** `gates[].findings`, `tasks[].title` and `stages[].note` are printed on
-the дашборд word for word — the page has a vocabulary for its labels and nothing
-at all for a free line, so what you wrote is what the user reads. Those three
-carry the dial's language. Every other field stays English, and the boundary is
-visibility rather than shape: `debt` reaches the page as three counts,
-`additions` is not rendered there at all, and a требование's `reason` is read
-out of the отчёт rather than off the screen.
+it one.** `gates[].findings`, `tasks[].title` and `stages[].note` are the
+прогон's own sentences to the user, printed on the дашборд word for word, so
+those three carry the dial's language. Every other field stays English, even
+where the page shows it as written: `debt` and `oneWay` lines, `additions`,
+`stopReason`, a требование's `title` and the verification record's text are
+record lines the отчёт and the gates read too, and the page quotes them in
+English rather than translating — one line, one language, every reader.
 
 **The бриф is translated into English exactly once**, in the Manifest phase, and
 only when it was not written in English already. When the dial's language and

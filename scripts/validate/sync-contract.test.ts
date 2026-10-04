@@ -494,9 +494,10 @@ test('a таск title and a стадия note are held to the same rule as a fi
     assert.match(done.out, /stages\[0\]\.note has no Russian in it/);
   });
 
-test('the fields the panel never prints as text are left alone', async () => {
-    // `debt` reaches the page as three counts and `additions` is not rendered
-    // there at all, so English in them is the rule rather than a breach of it.
+test('the record lines the panel quotes in English are left alone', async () => {
+    // `debt` lines, `additions` and a требование's `reason` are record lines
+    // the отчёт and the gates read too; the page quotes the first two as written
+    // rather than translating, so English in them is the rule, not a breach.
     const done = await sync({
       ...STATE,
       language: 'ru',

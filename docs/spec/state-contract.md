@@ -39,7 +39,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `tests` | `{ passed, failed }` | build | dashboard |
 | `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–7 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
-| `awaiting` | optional `{ since }`, set while the прогон waits for the user's reply | preflight | dashboard |
+| `awaiting` | optional `{ kind: 'answer', since }`, set by every stop on a question from the манифест on | manifest | dashboard |
 
 **`language` is the second such dial, and it is here for the same reason.** The
 dashboard has to paint its labels and its explanations in one of two languages,
@@ -82,11 +82,14 @@ the отчёт, and `signals` by the metrics tool and by no screen.
 silence notice; it now says `dashboard` because that is now true, not to keep the
 column's shape.
 
-**`awaiting` says the прогон ended its turn on a question.** `since` is the
-moment that turn ended, `Date.parse`-able like every other stamp. It is written
-in the same write that precedes the stop and is absent on the next write after
-the user replies; a closed прогон never carries it, because a finished run waits
-for nobody. It exists so the page can tell a run waiting for its reader from a
+**`awaiting` says the прогон ended its turn on a question.** `kind` is
+`answer`, the only thing a прогон waits for, and any other value is rejected;
+`since` is the moment that turn ended, `Date.parse`-able like every other
+stamp. It is written in the same write that precedes the stop and is absent on
+the next write after the user replies; a closed прогон never carries it, because a finished run waits
+for nobody, and neither does an interrupted one: a question is not an
+interruption, so a state carrying both `awaiting` and `interruptedAt` is
+rejected. It exists so the page can tell a run waiting for its reader from a
 run nobody is driving — the two are equally silent. It is **optional**, and
 absent means the page applies its ordinary silence rule, exactly as for every
 state written before the field existed. `contractVersion` does not move for it.
@@ -337,15 +340,19 @@ from one that was met.
   is a broken dashboard, so the file is written to a temporary name and moved
   into place.
 - `interruptedAt` is set when a phase fails or the run stops, and cleared when a
-  resumed run passes its next phase boundary. It is what lets the dashboard show
+  resumed run passes its next phase boundary. A stop on a question is not one:
+  it writes `awaiting` instead. It is what lets the dashboard show
   an interrupted прогон as interrupted rather than as frozen.
 - **Three fields are written in the прогон's language; every other one is
   English.** `gates[].findings`, `tasks[].title` and `stages[].note` are the
-  only free text the page prints word for word — it has labels for everything
-  else and no vocabulary at all for a line somebody composed — so these are read
-  by the user and carry `language`. The boundary is what the page renders, not
-  what the field holds: `debt` reaches it as three counts, `additions` is not
-  rendered there, and `requirements[].reason` is read out of the отчёт instead.
+  прогон's own sentences to the user — the page has labels for everything else
+  and no vocabulary at all for a line somebody composed — so these carry
+  `language`. The boundary is who is speaking, not whether the page shows the
+  line: `debt` and `oneWay` lines, `additions`, `stopReason`,
+  `requirements[].title` and the verification record's text are record lines
+  the отчёт and the gates read too, and the page quotes them in English as
+  written rather than translating. `requirements[].reason` is read out of the
+  отчёт.
   The rule and its reasoning live in
   [`../../skills/maestro/SKILL.md`](../../skills/maestro/SKILL.md) under
   *Language*, because it is the orchestrator that has to obey it.

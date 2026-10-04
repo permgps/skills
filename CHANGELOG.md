@@ -31,14 +31,24 @@ before.
   words heard but not taken, and what was delivered beyond the ask, are folded
   below the list.
 - **A stopped run prints its `stopReason`**; the raised silence notice names the
-  run's claim token.
-- **`awaiting { since }`**, new and optional: written before every stop on a
-  question, it turns the silence line into a calm «waiting for your reply». The
-  validator refuses it on a closed run.
+  run's claim token, in words in the plain register.
+- **`awaiting { kind: 'answer', since }`**, new and optional: written before
+  every stop on a question once the run has a state — the манифест, the брифинг,
+  the manual gates, an S4 action, a spent repair limit — it turns the silence
+  line into a calm «waiting for your reply». The validator refuses any other
+  `kind`, and refuses the field on a closed or interrupted run.
 - **`requirements[].title`**, new and optional: one English line from the
   manifest phase, shown under the quote.
-- `dashboard-integrity` holds six new value maps to the vocabulary and refuses
-  links or markup built at run time.
+- Keyboard focus survives the two-second redraw: every row and toggle carries a
+  key, and the page hands focus back to it. A focused row is outlined, not only
+  tinted.
+- The language rule now names what the page quotes as written — `debt` and
+  `oneWay` lines, `additions`, `stopReason`, a требование's `title`, the
+  verification record's text — and keeps them English: they are record lines
+  the отчёт and the gates read too.
+- `dashboard-integrity` holds six new value maps to the vocabulary, refuses
+  links, markup or windows built at run time, holds the page's one-way kinds to
+  the contract, and refuses a focusable node the redraw could not find again.
 
 ## v0.0.8-alpha — 2026-10-04
 

@@ -102,6 +102,7 @@ interface Logic {
   holderOf: (state: unknown) => { token: string; since: string } | null;
   ONE_WAY_ORDER: string[];
   FOLD_AFTER: number;
+  foldOf: (lines: string[], open: boolean) => { shown: string[]; hidden: number; folds: boolean };
   handoverOf: (state: unknown) => {
     emptyEnv: string[]; placeholders: string[]; promised: string[];
     oneWay: Record<string, string[]>; unknownOneWay: string[]; assumptions: string[];
@@ -1395,12 +1396,45 @@ test('a state without a parseable dir keeps the slug-only title', () => {
 // --- what the state already holds, now on the page ---------------------------
 
 test('a stopped run\'s reason is read as written, and a record is shown rather than [object Object]', () => {
-  assert.equal(L.stopReasonOf(bare({ stopReason: 'The schema task never closed' })), 'The schema task never closed');
-  assert.equal(L.stopReasonOf(bare({ stopReason: { why: 'budget' } })), '{"why":"budget"}');
-  assert.equal(L.stopReasonOf(bare()), null);
-  assert.equal(L.stopReasonOf(bare({ stopReason: '   ' })), null);
+  const stopped = (extra: Record<string, unknown>) => bare({ finishedAt: '2026-08-19T10:40:00.000Z', ...extra });
+  assert.equal(L.stopReasonOf(stopped({ stopReason: 'The schema task never closed' })), 'The schema task never closed');
+  assert.equal(L.stopReasonOf(stopped({ stopReason: { why: 'budget' } })), '{"why":"budget"}');
+  assert.equal(L.stopReasonOf(stopped({})), null);
+  assert.equal(L.stopReasonOf(stopped({ stopReason: '   ' })), null);
   assert.equal(ui('ru')['stopReasonLine']!('бюджет исчерпан'), 'Причина остановки: бюджет исчерпан');
   assert.equal(ui('en')['stopReasonLine']!('budget spent'), 'Why it stopped: budget spent');
+});
+
+test('a reason on a run still in motion is not shown, because no closure notice stands beside it', () => {
+  assert.equal(L.stopReasonOf(bare({ stopReason: 'The schema task never closed' })), null);
+  assert.equal(L.stopReasonOf(bare({ stopReason: 'budget', interruptedAt: '2026-08-19T10:40:00.000Z' })), 'budget');
+  assert.equal(L.stopReasonOf(bare({ stopReason: 'budget', lifecycle: 'closed' })), 'budget');
+});
+
+test('a group folds past five lines, and an opened one shows them all', () => {
+  const six = ['a', 'b', 'c', 'd', 'e', 'f'];
+  assert.deepEqual(plain(L.foldOf(six, false)), { shown: ['a', 'b', 'c', 'd', 'e'], hidden: 1, folds: true });
+  assert.deepEqual(plain(L.foldOf(six, true)), { shown: six, hidden: 0, folds: true });
+  assert.deepEqual(plain(L.foldOf(six.slice(0, 5), false)), { shown: six.slice(0, 5), hidden: 0, folds: false });
+});
+
+test('a finished or interrupted run never names its holder, however long it has been quiet', () => {
+  for (const extra of [{ finishedAt: '2026-08-19T10:40:00.000Z' }, { interruptedAt: '2026-08-19T10:40:00.000Z' }]) {
+    const state = run({ heldBy: { token: 'k7f2', since: '2026-08-19T10:00:00.000Z' }, ...extra });
+    const notice = L.silenceNotice(state, AT('2026-08-20T11:15:00.000Z'), L.collectMarks(state));
+    assert.ok(!notice || !/k7f2/.test(notice.line));
+  }
+});
+
+test('the plain register names the holder in words, without the label', () => {
+  const state = run({ heldBy: { token: 'k7f2', since: '2026-08-19T10:00:00.000Z' } });
+  const marks = L.collectMarks(state);
+  const ru = L.silenceNotice(state, AT('2026-08-19T11:15:00.000Z'), marks, 'plain', 'ru')!.line;
+  assert.match(ru, /сессия чата с меткой k7f2/);
+  assert.doesNotMatch(ru, /Метка прогона:/);
+  const en = L.silenceNotice(state, AT('2026-08-19T11:15:00.000Z'), marks, 'plain', 'en')!.line;
+  assert.match(en, /chat session marked k7f2/);
+  assert.doesNotMatch(en, /Run claim:/);
 });
 
 test('a malformed claim names no holder', () => {
@@ -1419,7 +1453,7 @@ test('the claim is named in the raised silence notice and never in the calm one'
   assert.ok(raised);
   assert.equal(raised.alarming, true);
   assert.match(raised.line, /Метка прогона: k7f2 с 2026-08-19 \d\d:\d\d\.$/);
-  const english = L.silenceNotice(state, AT('2026-08-19T11:15:00.000Z'), marks, 'plain', 'en');
+  const english = L.silenceNotice(state, AT('2026-08-19T11:15:00.000Z'), marks, 'normal', 'en');
   assert.match(english!.line, /Run claim: k7f2 since 2026-08-19 \d\d:\d\d\.$/);
   const calm = L.silenceNotice(state, AT('2026-08-19T10:35:00.000Z'), marks);
   assert.equal(calm!.alarming, false);
@@ -1498,8 +1532,9 @@ test('an opened таск shows what the state holds and leaves out what it does 
   assert.ok(waiting.includes('На критическом пути'));
   assert.ok(waiting.includes('Ждёт тасков: 01'));
   const done = L.describeTask(state, '01', 'en');
+  assert.ok(done.includes('Passed to a fresh subagent: 2 — not a defect'));
+  assert.ok(L.describeTask(state, '01', 'ru').includes('Передачи свежему субагенту: 2 — это не дефект'));
   assert.ok(done.includes('Saved in history: abcdef0, 1234567'));
-  assert.ok(done.includes('Passed to a fresh subagent: 2'));
   assert.ok(done.includes('Tests: 4 passed, 0 failed'));
   assert.ok(!done.some(line => line.includes('[object Object]')));
 });
@@ -1600,7 +1635,7 @@ test('an opened row is remembered by key, and toggling never edits the set it wa
 });
 
 test('a прогон stopped on a question is waiting, and the wait is never raised however long it lasts', () => {
-  const state = run({ awaiting: { since: '2026-08-19T10:30:00.000Z' } });
+  const state = run({ awaiting: { kind: 'answer', since: '2026-08-19T10:30:00.000Z' } });
   const marks = L.collectMarks(state);
   const notice = L.silenceNotice(state, AT('2026-08-19T14:00:00.000Z'), marks);
   assert.ok(notice);
@@ -1614,15 +1649,15 @@ test('without awaiting, or with one no reader can parse, the ordinary silence ru
   const plainRun = run();
   const raised = L.silenceNotice(plainRun, AT('2026-08-19T11:15:00.000Z'), L.collectMarks(plainRun));
   assert.equal(raised!.alarming, true);
-  const broken = run({ awaiting: { since: 'after lunch' } });
+  const broken = run({ awaiting: { kind: 'answer', since: 'after lunch' } });
   assert.equal(L.awaitingOf(broken), null);
   assert.equal(L.silenceNotice(broken, AT('2026-08-19T11:15:00.000Z'), L.collectMarks(broken))!.alarming, true);
 });
 
 test('a finished or closed run never shows the wait', () => {
-  assert.equal(L.awaitingOf(run({ awaiting: { since: '2026-08-19T10:30:00.000Z' }, finishedAt: '2026-08-19T10:40:00.000Z' })), null);
-  assert.equal(L.awaitingOf(run({ awaiting: { since: '2026-08-19T10:30:00.000Z' }, lifecycle: 'closed' })), null);
-  assert.equal(L.awaitingOf(run({ awaiting: { since: '2026-08-19T10:30:00.000Z' }, interruptedAt: '2026-08-19T10:40:00.000Z' })), null);
+  assert.equal(L.awaitingOf(run({ awaiting: { kind: 'answer', since: '2026-08-19T10:30:00.000Z' }, finishedAt: '2026-08-19T10:40:00.000Z' })), null);
+  assert.equal(L.awaitingOf(run({ awaiting: { kind: 'answer', since: '2026-08-19T10:30:00.000Z' }, lifecycle: 'closed' })), null);
+  assert.equal(L.awaitingOf(run({ awaiting: { kind: 'answer', since: '2026-08-19T10:30:00.000Z' }, interruptedAt: '2026-08-19T10:40:00.000Z' })), null);
 });
 
 test('the title never replaces the user\'s quoted words', () => {

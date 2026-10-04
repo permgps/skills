@@ -61,7 +61,7 @@ test('a state carrying every field the page newly reads round-trips into the sna
   try {
     const state = {
       runId: 'r1', slug: 'landing-page', contractVersion: 7, lifecycle: 'active',
-      awaiting: { since: '2026-10-04T10:00:00Z' },
+      awaiting: { kind: 'answer', since: '2026-10-04T10:00:00Z' },
       heldBy: { token: 'k7f2', since: '2026-10-04T09:00:00Z' },
       stopReason: 'not yet',
       requirements: [{ id: 'R01', status: 'in-spec', title: 'Hero names the product' }],
