@@ -133,6 +133,85 @@ test('a wrapped question and a wrapped option read back as one value each', () =
   assert.deepEqual(checkAnswers(parseAnswers(markdown)), []);
 });
 
+test('a recommendation whose reason wraps onto the next line leaves the option text whole', () => {
+  const markdown = [
+    '### R03 — способ оплаты',
+    'Asked: Как гость платит за заказ?',
+    'Options:',
+    '1. Оплата картой на сайте (recommended — деньги приходят до',
+    '   отправки заказа)',
+    '2. Оплата при получении',
+    'Answer: как советуешь',
+    'Chosen: Оплата картой на сайте',
+    '',
+  ].join('\n');
+  const [parsed] = parseAnswers(markdown);
+  assert.deepEqual(parsed?.options, [
+    { text: 'Оплата картой на сайте', recommended: true },
+    { text: 'Оплата при получении', recommended: false },
+  ]);
+  assert.deepEqual(checkAnswers(parseAnswers(markdown)), []);
+});
+
+test('an option that ends in a full stop matches its Chosen line copied verbatim', () => {
+  const markdown = [
+    '### R03 — способ оплаты',
+    'Asked: Как гость платит за заказ?',
+    'Options:',
+    '1. Оплата картой на сайте. (recommended — деньги приходят до отправки)',
+    '2. Оплата при получении.',
+    'Answer: второе',
+    'Chosen: Оплата при получении.',
+    '',
+  ].join('\n');
+  assert.deepEqual(findingsFor(markdown), []);
+});
+
+test('an option that ends in a semicolon or a comma matches its Chosen line either way', () => {
+  for (const mark of [';', ',']) {
+    const markdown = [
+      '### R03 — способ оплаты',
+      'Asked: Как гость платит за заказ?',
+      'Options:',
+      `1. Оплата картой на сайте${mark} (recommended — деньги приходят до отправки)`,
+      `2. Оплата при получении${mark}`,
+      'Answer: как советуешь',
+      'Chosen: Оплата картой на сайте',
+      '',
+    ].join('\n');
+    assert.deepEqual(findingsFor(markdown), [], `trailing "${mark}"`);
+  }
+});
+
+test('a recommendation reason wrapped over three lines still marks one option and leaves its text whole', () => {
+  const markdown = [
+    '### R03 — способ оплаты',
+    'Asked: Как гость платит за заказ?',
+    'Options:',
+    '1. Оплата при получении',
+    '2. Оплата картой на сайте (recommended — деньги',
+    '   приходят до отправки заказа, и курьер не',
+    '   возит с собой сдачу)',
+    'Answer: как советуешь',
+    'Chosen: Оплата картой на сайте',
+    '',
+  ].join('\n');
+  const [parsed] = parseAnswers(markdown);
+  assert.deepEqual(parsed?.options, [
+    { text: 'Оплата при получении', recommended: false },
+    { text: 'Оплата картой на сайте', recommended: true },
+  ]);
+  assert.deepEqual(checkAnswers(parseAnswers(markdown)), []);
+});
+
+test('an answers.md saved with CRLF line endings reads the same as one with LF', () => {
+  const lf = entry();
+  const crlf = lf.split('\n').join('\r\n');
+  assert.deepEqual(parseAnswers(crlf).map(({ line, ...rest }) => rest), parseAnswers(lf).map(({ line, ...rest }) => rest));
+  assert.deepEqual(findingsFor(crlf), []);
+  assert.equal(findingsFor(entry({ chosen: null }).split('\n').join('\r\n')).length, 1);
+});
+
 test('every entry in a file is checked, not just the first', () => {
   const markdown = [
     entry({ heading: 'R01 — оплата', chosen: null }),

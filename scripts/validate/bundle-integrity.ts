@@ -205,6 +205,9 @@ export function carriesLeafRule(body: string): boolean {
   return body.replace(/\s+/g, ' ').includes(LEAF_RULE);
 }
 
+/** One literal a bundle file must carry, and what breaks without it. */
+export interface Anchor { file: string; literal: string; why: string }
+
 /**
  * The literal text that carries the memory read path through the bundle.
  *
@@ -216,9 +219,6 @@ export function carriesLeafRule(body: string): boolean {
  * were deleted. Whether a decision clears the threshold for `decisions.md` is
  * a judgement, so no anchor stands for it; `phases/9-memory.md` says so.
  */
-/** One literal a bundle file must carry, and what breaks without it. */
-export interface Anchor { file: string; literal: string; why: string }
-
 export const MEMORY_ANCHORS: readonly Anchor[] = [
   { file: 'phases/0-preflight.md', literal: 'sync.mts --memory-read',
     why: 'preflight is where the memory and earlier decisions are read; without it nothing ever reads them' },

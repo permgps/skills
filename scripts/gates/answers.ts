@@ -94,6 +94,10 @@ export function parseAnswers(markdown: string): AnswerEntry[] {
   const entries: AnswerEntry[] = [];
   let entry: AnswerEntry | null = null;
   let field: Field | 'options' | null = null;
+  // Each option's lines as written. A continuation is joined to the raw text,
+  // not to the parsed one: once `(recommended` has been cut off, the rest of a
+  // wrapped reason would otherwise land in the option text itself.
+  let rawOptions: string[] = [];
 
   const close = (): void => {
     if (entry) {
@@ -129,7 +133,10 @@ export function parseAnswers(markdown: string): AnswerEntry[] {
       if (!match) continue;
       field = name;
       const value = text.slice(match[0].length);
-      if (name === 'options') current.options = [];
+      if (name === 'options') {
+        current.options = [];
+        rawOptions = [];
+      }
       else current[name] = collapse(value);
       return;
     }
@@ -138,11 +145,13 @@ export function parseAnswers(markdown: string): AnswerEntry[] {
     if (field === 'options') {
       const item = OPTION_ITEM.exec(text);
       const options = current.options!;
-      if (item) options.push(toOption(item[1]!));
-      else if (options.length > 0) {
-        const last = options[options.length - 1]!;
-        const joined = toOption(`${last.text} ${text}`);
-        options[options.length - 1] = { text: joined.text, recommended: last.recommended || joined.recommended };
+      if (item) {
+        rawOptions.push(item[1]!);
+        options.push(toOption(item[1]!));
+      } else if (options.length > 0) {
+        const last = rawOptions.length - 1;
+        rawOptions[last] = `${rawOptions[last]} ${text}`;
+        options[last] = toOption(rawOptions[last]!);
       }
       return;
     }
@@ -164,7 +173,11 @@ export function chosenText(chosen: string): string {
   return toOption(withoutCitation).text.replace(/[.;,]$/, '').trim();
 }
 
-const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+// Trailing punctuation is dropped on both sides. `chosenText` already drops it
+// from `Chosen:`, where it is left behind by a cut citation, so an option that
+// ends in a full stop would otherwise never match its own text copied verbatim.
+const comparable = (text: string): string => text.replace(/[.;,]$/, '').trim().toLowerCase();
+const same = (a: string, b: string): boolean => comparable(a) === comparable(b);
 
 function entryFindings(entry: AnswerEntry): Array<{ rule: string; message: string }> {
   const findings: Array<{ rule: string; message: string }> = [];
@@ -207,6 +220,9 @@ function entryFindings(entry: AnswerEntry): Array<{ rule: string; message: strin
 
   const match = options.find(option => same(option.text, chosen));
   if (!match) {
+    log.debug('chosen', 'Chosen names no offered option', {
+      requirementId: entry.requirementId, line: entry.line, chosen, offered: options.map(option => option.text),
+    });
     findings.push({ rule: 'chosen', message:
       `${where}: "Chosen: ${chosen}" is none of the offered options — copy the selected option's full text, or write "${OWN_ANSWER}" when the user composed their own` });
     return findings;
