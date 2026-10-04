@@ -469,6 +469,56 @@ export const DIAGNOSIS_ANCHORS: readonly Anchor[] = [
     why: 'without the entry test a limitation of this прогон fills the memory file' },
 ];
 
+/**
+ * The literal text that carries «the report hands over what only the user can
+ * do».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. The spec phase writes a
+ * placeholder as a labelled line that keeps one question per missing fact; the
+ * review phase records what is hard to undo from the per-commit diffs; preflight
+ * seeds that record; the acceptance phase turns the placeholders into a
+ * questionnaire with one question per idea, the most important first and a blank
+ * for the answer, says "not recorded" rather than "nothing" when no scan ran, and
+ * speaks the questionnaire in the прогон's language. The section list itself is
+ * held by `report-sections.ts`, and the scan's mechanical half by
+ * `scripts/gates/one-way.ts`. How two questions with the same number of
+ * требования are ordered is the orchestrator's judgement, so no anchor stands
+ * for it.
+ */
+export const REPORT_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/3-spec.md', literal: 'The `debt.placeholders` entry is one line with fixed labels',
+    why: 'a bare placeholder line gives the questionnaire nothing to ask and no reason to give' },
+  { file: 'phases/3-spec.md', literal: '`matters:` is what stays a placeholder until they do',
+    why: 'a question with no stake in it is the one nobody forwards' },
+  { file: 'phases/3-spec.md', literal: 'The same missing fact keeps the same `question:` text',
+    why: 'two wordings of one fact become two questions to the same person' },
+  { file: 'phases/0-preflight.md', literal: 'the review phase appends what is hard to undo',
+    why: 'an unseeded record cannot tell "nothing found" from "never scanned"' },
+  { file: 'phases/6-review.md', literal: 'Then record what is hard to undo',
+    why: 'the отчёт reads one-way changes only from the state, so a scan nobody runs is a section that always says nothing' },
+  { file: 'phases/6-review.md', literal: 'a `D` path that no run commit added',
+    why: 'a file the прогон created and removed is not the user\'s, and listing it buries the ones that are' },
+  { file: 'phases/6-review.md', literal: 'a review after a repair does not add a line that is already there',
+    why: 'a re-review would otherwise report one deletion twice' },
+  { file: 'phases/6-review.md', literal: 'This is a record, not a finding',
+    why: 'a one-way change the user asked for is not a defect, and blocking on it would stall the review' },
+  { file: 'phases/7-acceptance.md', literal: 'One question per idea',
+    why: 'one fact asked three times reads as three facts to whoever has to answer' },
+  { file: 'phases/7-acceptance.md', literal: 'Most important first',
+    why: 'the reader may answer only the first few' },
+  { file: 'phases/7-acceptance.md', literal: '`Answer: ______`',
+    why: 'a questionnaire with nowhere to answer comes back as a conversation' },
+  { file: 'phases/7-acceptance.md', literal: 'The block carries no `R##`, no path',
+    why: 'the block is sent to somebody outside the прогон, who cannot read its ids' },
+  { file: 'phases/7-acceptance.md', literal: 'Not recorded: this прогон began before the scan existed.',
+    why: 'saying "nothing" when nobody looked is a claim nobody checked' },
+  { file: 'phases/7-acceptance.md', literal: 'are Questions to forward and Hard to undo',
+    why: 'a list assembled again at the end differs from the state exactly on what was forgotten' },
+  { file: 'phases/7-acceptance.md',
+    literal: 'give them in the chat in the прогон\'s language, as one block the user can copy and send on as it is',
+    why: 'the отчёт on disk is English, and the person who knows the answer may not read it' },
+];
+
 /** Every anchor in `anchors` the documents fail to carry, as violations under `check`. */
 function missingAnchors(
   byFile: ReadonlyMap<string, string>,
@@ -702,6 +752,12 @@ export async function checkBundle(
   // Only a bundle with a repair phase diagnoses a repeat; Scout has none.
   if (byFile.has('phases/8-repair.md')) {
     for (const v of missingAnchors(byFile, DIAGNOSIS_ANCHORS, 'diagnosis')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- the отчёт hands over what only the user can do -------------------------
+  // Only a bundle with an acceptance phase writes an отчёт; Scout has none.
+  if (byFile.has('phases/7-acceptance.md')) {
+    for (const v of missingAnchors(byFile, REPORT_ANCHORS, 'report')) add(v.check, v.file, v.line, v.message);
   }
 
   if (skill.includes('<!-- maestro:delegation:native-explicit -->') || skill.includes('<!-- maestro:runtime:node -->')) {

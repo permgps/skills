@@ -23,6 +23,7 @@
     "hosts": "node scripts/validate/host-degradation.ts docs/spec skills/maestro",
     "doors": "node scripts/validate/repair-doors.ts docs/spec skills/maestro",
     "readers": "node scripts/validate/gate-readers.ts docs/spec skills/maestro",
+    "report": "node scripts/validate/report-sections.ts docs/spec skills/maestro",
     "dials": "node scripts/validate/dials-defaults.ts docs/spec skills/maestro",
     "view": "node scripts/validate/viewer-ownership.ts skills/maestro",
     "metrics": "node scripts/metrics/measure.ts",

@@ -9,6 +9,7 @@ import {
   BRIEFING_ANCHORS,
   CUT_ANCHORS,
   DIAGNOSIS_ANCHORS,
+  REPORT_ANCHORS,
   REVIEW_ANCHORS,
   bundleProfileFor,
   carriesLeafRule,
@@ -823,5 +824,46 @@ test('the отчёт losing the noCorrectSeam observations is reported on the ac
     await writeFile(acceptance, dropped, 'utf8');
     const violations = (await checkBundle(copy)).filter(v => v.check === 'diagnosis');
     assert.deepEqual(violations.map(v => v.file), [path.join('phases', '7-acceptance.md'), path.join('phases', '7-acceptance.md')]);
+  });
+});
+
+// --- the отчёт hands over what only the user can do ----------------------------
+
+test('every report anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(REPORT_ANCHORS.length > 0, 'REPORT_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of REPORT_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'report'), []);
+  });
+});
+
+test('the отчёт losing one question per idea is the one finding, named on the acceptance phase', async () => {
+  await withShippedCopy(async copy => {
+    const acceptance = path.join(copy, 'phases', '7-acceptance.md');
+    const body = await readFile(acceptance, 'utf8');
+    const dropped = body.replace('**One question per idea.**', '**Each placeholder is a question.**');
+    assert.notEqual(dropped, body);
+    await writeFile(acceptance, dropped, 'utf8');
+
+    const violations = await checkBundle(copy);
+    assert.equal(violations.length, 1, JSON.stringify(violations));
+    assert.equal(violations[0]?.check, 'report');
+    assert.equal(violations[0]?.file, path.join('phases', '7-acceptance.md'));
+  });
+});
+
+test('the review phase losing its one-way scan is reported on the review phase', async () => {
+  await withShippedCopy(async copy => {
+    const review = path.join(copy, 'phases', '6-review.md');
+    const body = await readFile(review, 'utf8');
+    const dropped = body.replace(/\*\*Then record what is hard to undo\.\*\*[\s\S]*?names no path\.\n/, '');
+    assert.notEqual(dropped, body);
+    await writeFile(review, dropped, 'utf8');
+    const files = (await checkBundle(copy)).filter(v => v.check === 'report').map(v => v.file);
+    assert.ok(files.length > 0);
+    assert.ok(files.every(file => file === path.join('phases', '6-review.md')), JSON.stringify(files));
   });
 });

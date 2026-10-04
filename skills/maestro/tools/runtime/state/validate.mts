@@ -15,6 +15,7 @@ import {
   LANGUAGES,
   LIFECYCLES,
   MODES,
+  ONE_WAY_KINDS,
   REGISTERS,
   REQUIREMENT_STATUSES,
   STAGE_IDS,
@@ -117,6 +118,9 @@ function checkRunDir(value: Record<string, unknown>, add: (field: string, messag
     add('dir', `dir must not end in ${WIP_SUFFIX} once the прогон is closed — write "${expected}"`);
   }
 }
+
+/** A `oneWay` line: one of the kinds, the dash, then a subject. */
+const ONE_WAY_LINE = new RegExp(`^(${ONE_WAY_KINDS.join('|')}) — \\S`);
 
 /** Statuses whose meaning is incomplete without a reason. */
 const REASON_REQUIRED = ['open', 'deferred', 'dropped', 'placeholder'];
@@ -577,6 +581,22 @@ export function validateState(value: unknown): StateViolation[] {
       }
     }
     requireStringArray('additions', value['additions']);
+
+    // Optional, not required: a contract-7 run already in progress has no
+    // `oneWay`, and an added optional field does not raise CONTRACT_VERSION.
+    // Preflight seeds it empty, so absence still means "never scanned".
+    if (value['oneWay'] !== undefined) {
+      requireStringArray('oneWay', value['oneWay']);
+      if (Array.isArray(value['oneWay'])) {
+        value['oneWay'].forEach((line, position) => {
+          if (typeof line === 'string' && !ONE_WAY_LINE.test(line)) {
+            add(`oneWay[${position}]`,
+              `oneWay[${position}] must start with ${ONE_WAY_KINDS.slice(0, -1).join(', ')} or `
+              + `${ONE_WAY_KINDS[ONE_WAY_KINDS.length - 1]} and " — "; write one change per line`);
+          }
+        });
+      }
+    }
   }
 
   if (atLeastV4) {

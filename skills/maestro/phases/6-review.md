@@ -67,6 +67,26 @@ tends to sit. A tag whose id is not a `DF-N` counts the same — any
 another таск's commit does not clear it. Log WARN `review` `debug tag left` with
 `{ taskId, commit, path, tagId }`.
 
+**Then record what is hard to undo.** The отчёт tells the user which changes
+are one-way before they build on top, and it reads them only from `oneWay` in
+the run state. Read each commit's file list with
+`git show --name-status --format= -M <commit>` and append one line per change:
+
+| Kind | When |
+|---|---|
+| `deleted` | a `D` path that no run commit added — a run commit is any commit in any `tasks[].commits`, so a file the прогон created and later removed is not the user's |
+| `renamed` | an `R` whose source path no run commit added; write `old → new` |
+| `migration` | an added path under a directory named `migrations` or `migrate`, or under `alembic/versions`. A data migration elsewhere, named as one by the task file or the executor's return, is added by judgement |
+| `dependency-major` | a version in `package.json`'s `dependencies`, `devDependencies`, `peerDependencies` or `optionalDependencies`, for a package on both sides, whose leading major changed — below `1.0` the minor counts as the major. A new package is not an upgrade. Read other manifests (`pyproject.toml`, `requirements.txt`, `Cargo.toml`, `go.mod`, `Gemfile`) by the same rule |
+
+Each line reads `<kind> — <subject> — <taskId> <first seven of the commit>`,
+for example `deleted — config/legacy.json — T03 a1b2c3d` or
+`dependency-major — react ^18.2.0 → ^19.0.0 — T04 9f8e7d6`. Append a line once:
+a review after a repair does not add a line that is already there. This is a
+record, not a finding — it blocks nothing and goes to no reviewer. Log INFO
+`review` `one-way changes recorded` with `{ taskId, kinds }`, where `kinds`
+counts lines per kind and names no path.
+
 **Do not review the tree.** By the time a repair lands, later waves are in it and
 always will be — waiting for a quiet tree would serialise the build, which is the
 one thing the wave order exists to avoid. A finding about what another таск put
@@ -234,7 +254,7 @@ said is one gate, at the end, blind.
 |---|---|
 | `.maestro/<dir>/reviews/NN-<slug>.md` | one per таск, findings quoted as they came back |
 | `.maestro/<dir>/reviews/standards.md` | once per прогон, the standards pass's observations quoted as they came back |
-| `.maestro/state.js` | every таск `done`, or `repair` where a review blocked it; `currentStage` moved on |
+| `.maestro/state.js` | every таск `done`, or `repair` where a review blocked it; `oneWay` appended from the per-commit diffs; `currentStage` moved on |
 | project code | unchanged — this phase writes none of it |
 
 Then read the acceptance phase file.

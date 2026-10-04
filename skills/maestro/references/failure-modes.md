@@ -44,7 +44,7 @@ it surfaced.
 | Every таск leaves a handoff | The cut was too large. The handoff exists for surprises; a plan producing one per таск is a plan to re-cut. |
 | A wave merged with conflicts | Two таски owned the same file. That is a defect in the cut, not a merge to resolve. |
 | A требование moved to `deferred` and no answer records the user agreeing | `S1`. Restore it and ask. |
-| The отчёт's Assumptions section is empty | Possible, and rare. Check it against `S3`: every placeholder standing in for a fact nobody supplied belongs there, and a run that invented nothing usually still assumed something. |
+| The отчёт's Assumptions section is empty | Possible, and rare. A run that invented nothing usually still decided something on the user's behalf, and every such decision belongs there. Then check *Questions to forward* against `S3`: every placeholder standing in for a fact nobody supplied is a question there. |
 | A таск finished far faster than the others in its wave | Either it was cut too small or it did less than it says. Read its diff against its *done means* before believing either. |
 | The same difference survives three доводка rounds | Three executors failed at one visible thing. Report it; a fourth attempt hides the pattern. |
 | A phase produced an artifact another phase was supposed to write | Two writers on one file. Find which phase wrote it and why — the first disagreement between them will be unattributable. |

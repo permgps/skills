@@ -726,6 +726,14 @@ export interface Debt {
 }
 
 /**
+ * What a `oneWay` line may record: an inward change the user should know about
+ * before building on top. Outward actions are S4's and are asked, not listed.
+ * Each line reads `<kind> — <subject> — <taskId> <short commit>`.
+ */
+export const ONE_WAY_KINDS = ['deleted', 'renamed', 'migration', 'dependency-major'] as const;
+export type OneWayKind = typeof ONE_WAY_KINDS[number];
+
+/**
  * The whole file. Written by the orchestrator at phase boundaries and task
  * transitions only; read by the dashboard and by nothing else.
  *
@@ -790,6 +798,11 @@ export interface RunState {
   debt?: Debt;
   /** Delivered beyond what was asked, one line apiece, with the требование it served. */
   additions?: string[];
+  /**
+   * Inward one-way changes, one line apiece, written by the review phase from
+   * the per-commit diffs. Absent in a run that began before the scan existed.
+   */
+  oneWay?: string[];
   /** The last full suite run. */
   tests?: TestResult;
   /** ISO 8601, set by the acceptance phase. */

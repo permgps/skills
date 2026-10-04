@@ -192,6 +192,7 @@ Construct the complete contract-7 candidate in temporary JSON. It carries:
 | `verification` | `version: 3`, `targetRevision: 1`, provisional acceptance input digest, `manifestDigest` as SHA-256 of empty draft, empty existing record arrays plus `sourceSnapshots`, `sourceClauses`, `manifestAudits`, `scopeMappings`, `journeys`, `negativeControls`; no invented `scopeBaseline`, `repairLimits: { perFinding: 2, total: 8 }`, and the verification-3 lists `readiness`, `defects`, `strategyReviews`, `inheritedExecutionIds`, `inheritedAttemptIds`, all empty |
 | `debt` | three empty lists: `placeholders`, `assumptions`, `emptyEnv` |
 | `additions` | empty |
+| `oneWay` | empty — the review phase appends what is hard to undo |
 | `tests` | `null` — no suite has run |
 
 Omit optional fields that have no value. In an active run, do not include

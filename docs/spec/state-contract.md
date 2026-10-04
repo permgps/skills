@@ -34,6 +34,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `verification` | versioned verification index, required in contracts 4–7 | preflight | dashboard |
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
+| `oneWay` | optional list of strings, one inward one-way change each | review | acceptance |
 | `tests` | `{ passed, failed }` | build | dashboard |
 | `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–7 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |

@@ -145,17 +145,19 @@ the residual set in the chat, publish the closure on their answer, then write
 the отчёт into the directory the result names as `relocated.to`. A round that
 does not close the run writes the отчёт here, where the run already is.
 
-`.maestro/<dir>/report.md`, written **by you**, in five sections and in that
-order. Cite every run artifact by a path relative to the отчёт's own directory
+`.maestro/<dir>/report.md`, written **by you**, in the sections below and in
+that order. Cite every run artifact by a path relative to the отчёт's own directory
 (`tasks/03-hero.md`, `evidence/X-1/pointer.png`), never through
-`.maestro/<dir>/`, so a later reopening cannot break a link. A second приёмка — after repair, or after доводка — appends its own five
+`.maestro/<dir>/`, so a later reopening cannot break a link. A second приёмка — after repair, or after доводка — appends its own
 sections under its own date rather than replacing what is there:
 
 | Section | Holds |
 |---|---|
 | What was asked | every `R##`, its status, and where it landed |
 | Disagreements | the G4 findings, each quoted against its требование |
-| Assumptions | `debt` as the прогон recorded it — every placeholder standing in for a fact nobody supplied, every decision taken on the user's behalf, every unfilled variable by name — plus any wording whose translation was uncertain |
+| Assumptions | `debt.assumptions` and `debt.emptyEnv` as the прогон recorded them — every decision taken on the user's behalf, every unfilled variable by name — plus any wording whose translation was uncertain |
+| Questions to forward | `debt.placeholders`, as a questionnaire the user can send on as it is — every placeholder standing in for a fact nobody supplied |
+| Hard to undo | `oneWay`, one plain sentence per change the прогон made that is hard to take back |
 | Observations | the non-blocking findings carried out of `reviews/`, each `unrequested` one with its tag; then, under their own sub-heading, the standards pass's observations from `reviews/standards.md` — or one line saying the pass did not run; then each `noCorrectSeam:` line of a repeated repair's diagnosis, as a defect repaired without a regression check, with its таск and the reason as written — never the hypotheses |
 | What is left | deferred and dropped требования, each with the reason recorded against it |
 
@@ -170,11 +172,41 @@ explain a row but never replace its structured result or declare an unsupported
 A section with nothing in it says so in one line. An absent section reads as a
 section nobody wrote.
 
-**Assumptions is read out of the state, not reconstructed from memory.** The
-phases wrote `debt` as they incurred it; assembling the list again here would
-produce a second answer to the same question, and the two would differ exactly
-on what was forgotten. What this phase adds is the last full suite result into
-`tests`, and `finishedAt`.
+**Questions to forward is a questionnaire, not a list.** A placeholder often
+waits on somebody other than the user, so the block is written to be sent to
+them unchanged:
+
+1. **One question per idea.** Group the `debt.placeholders` lines by their
+   `question:` text, compared trimmed and case-insensitively. Each group is one
+   question and carries every `R##` of its lines.
+2. **Most important first.** A question more требования wait on goes first;
+   between equals, order by what each `matters:` line says is held up.
+3. Write each as a numbered item: the question in bold, then
+   `Why it matters:`, then `Who may know:` only when an `ask:` was recorded,
+   then `Answer: ______`. The block carries no `R##`, no path and no word of
+   this прогон's own vocabulary — the reader is outside it. One line after the
+   block maps each question's number to its `R##`, for the user.
+4. A line without the labels — written before they existed, or without them —
+   is still a question: quote it as written, with `Why it matters: not
+   recorded`.
+
+Log DEBUG `report` `questionnaire composed` with `{ questions, unlabelled }`,
+both counts.
+
+**Hard to undo, in plain words.** Write each `oneWay` line as one sentence a
+non-programmer can act on — "Deleted `config/legacy.json`, a file that existed
+before this прогон (T03)", "Upgraded react from ^18.2.0 to ^19.0.0, a major
+version (T04)" — and end the section with one line saying these are worth
+knowing before building on top. An empty `oneWay` says `Nothing hard to undo was
+recorded.` A state with no `oneWay` at all says `Not recorded: this прогон began
+before the scan existed.` — never "nothing", because nobody looked.
+
+**Assumptions is read out of the state, not reconstructed from memory**, and so
+are Questions to forward and Hard to undo. The phases wrote `debt` as they
+incurred it and the review phase wrote `oneWay` from the diffs; assembling
+either list again here would produce a second answer to the same question, and
+the two would differ exactly on what was forgotten. What this phase adds is the
+last full suite result into `tests`, and `finishedAt`.
 
 Findings are quoted as they came back, not summarised — yours is the copy
 anybody checking the прогон will read, and a rewritten finding cannot be checked
@@ -206,6 +238,12 @@ and what was delivered, what disagreed, what was assumed. Labels are resolved
 from the словарь at that moment, out of the column that language owns; the
 отчёт itself stores none of them, and `report.md` on disk stays English either
 way.
+
+When there are questions to forward, give them in the chat in the прогон's
+language, as one block the user can copy and send on as it is — the file's
+English copy is for the record, and the person who knows the accountant's
+answer may not read English. When `oneWay` is not empty, say what is hard to
+undo in the same breath, before the user builds on top of it.
 
 ## When It Does Not Go That Way
 
@@ -241,8 +279,8 @@ build the прогон would accept. Stop and say which таск.
 ## The Dials Here
 
 **No mode changes this phase.** The отчёт is written in all four columns, and
-Assumptions is a section of it in all four — `full` changes how much lands there,
-never whether the section exists.
+Assumptions, Questions to forward and Hard to undo are sections of it in all
+four — `full` changes how much lands there, never whether a section exists.
 
 **No depth changes what G4 checks.** The манифест is the same document at every
 depth: it is the user's own words numbered, and depth decided only how far
@@ -268,7 +306,7 @@ chance to know rather than when it is still cheap to change.
 
 | Artifact | State |
 |---|---|
-| `.maestro/<dir>/report.md` | five sections for this round, appended; findings quoted as they came back |
+| `.maestro/<dir>/report.md` | its sections for this round, appended; findings quoted as they came back |
 | `.maestro/state.js` | G4 `passed`, `failed`, or `pending`; stage activity separate; `finishedAt` only at authorized lifecycle closure |
 | project code | unchanged — this phase writes none of it |
 

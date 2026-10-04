@@ -388,6 +388,49 @@ test('a placeholder requirement carries what is still missing', () => {
   );
 });
 
+test('a state with no oneWay list is accepted, because a run already in progress has none', () => {
+  const state = baseline();
+  assert.equal('oneWay' in state, false);
+  assert.deepEqual(validateState(state), []);
+});
+
+test('an empty oneWay list is accepted as a scan that found nothing', () => {
+  assert.deepEqual(validateState(withPatch({ oneWay: [] })), []);
+});
+
+test('a oneWay line of each kind is accepted', () => {
+  assert.deepEqual(
+    validateState(withPatch({
+      oneWay: [
+        'deleted — config/legacy.json — T03 a1b2c3d',
+        'renamed — src/a.ts → src/b.ts — T02 d4e5f6a',
+        'migration — db/migrations/0004_orders.sql — T05 0a1b2c3',
+        'dependency-major — react 18.3.1 → 19.0.0 — T04 9f8e7d6',
+      ],
+    })),
+    [],
+  );
+});
+
+test('a oneWay entry that is not a string is reported at its position', () => {
+  assert.deepEqual(fields(validateState(withPatch({ oneWay: ['deleted — a — T01 abc', 7] }))), ['oneWay[1]']);
+});
+
+test('a oneWay list that is not a list is reported', () => {
+  assert.deepEqual(fields(validateState(withPatch({ oneWay: 'deleted — a — T01 abc' }))), ['oneWay']);
+});
+
+test('a oneWay line with an unknown kind is reported with the four kinds named', () => {
+  const violations = validateState(withPatch({ oneWay: ['removed — x — T01 abc'] }));
+  assert.deepEqual(fields(violations), ['oneWay[0]']);
+  assert.match(violations[0]?.message ?? '', /deleted, renamed, migration or dependency-major/);
+});
+
+test('a oneWay line whose kind is not followed by the dash and a subject is reported', () => {
+  assert.deepEqual(fields(validateState(withPatch({ oneWay: ['deleted config/legacy.json'] }))), ['oneWay[0]']);
+  assert.deepEqual(fields(validateState(withPatch({ oneWay: ['deleted — '] }))), ['oneWay[0]']);
+});
+
 test('debt.emptyEnv holding a value rather than a name is reported', () => {
   // S2 is never broken on purpose. This is the shape it gets broken by accident.
   assert.deepEqual(
