@@ -300,6 +300,8 @@ your own terminal.
 **What it does not cover:**
 - a git alias (`git config alias.p push`, then `git p`);
 - a script, a Makefile or an `npm run` target that calls git internally;
+- a script a shell reads from its input rather than from `-c`, such as
+  `echo "git push" | sh` or a here-document handed to `bash`;
 - a program name built at run time, such as `$(echo git) push`.
 
 It reads the command line it is handed, and nothing else. Codex CLI, the Codex

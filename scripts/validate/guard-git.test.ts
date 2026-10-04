@@ -178,6 +178,8 @@ test('a blocked command is found behind separators, assignments, wrappers and gl
       ['command git push', 'push'],
       ['exec git push', 'push'],
       ['time git push', 'push'],
+      ['time -p git push', 'push'],
+      ['/usr/bin/time -f %e -o t.txt git push', 'push'],
       ['/usr/bin/git push', 'push'],
       ['git -C ../x push', 'push'],
       ['git -c a=b push', 'push'],
@@ -293,6 +295,17 @@ test('the neighbouring destructive forms are pinned as allowed, so widening the 
       'git filter-branch --tree-filter true',
       'git update-ref -d refs/heads/x',
       'git reflog expire --expire=now --all',
+    ], cwd);
+  } finally { await rm(cwd, { recursive: true, force: true }); }
+});
+
+test('a script a shell reads from stdin is not read, as docs/install.md states among the limits', async () => {
+  const cwd = await emptyDir();
+  try {
+    assertAllowed([
+      'echo "git push" | sh',
+      'bash <<EOF\ngit push\nEOF',
+      'bash < deploy.sh',
     ], cwd);
   } finally { await rm(cwd, { recursive: true, force: true }); }
 });

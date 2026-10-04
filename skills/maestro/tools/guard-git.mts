@@ -260,7 +260,9 @@ function splitCommands(text: string, depth: number, out: Segment[]): void {
   endCommand();
 }
 
-const RESERVED = new Set(['!', '{', '}', 'if', 'then', 'elif', 'else', 'fi', 'do', 'done', 'while', 'until', 'time']);
+// `time` is a reserved word too, but it takes flags (`time -p`), so it is
+// stripped as a wrapper below rather than here.
+const RESERVED = new Set(['!', '{', '}', 'if', 'then', 'elif', 'else', 'fi', 'do', 'done', 'while', 'until']);
 const SHELLS = new Set(['bash', 'sh', 'zsh', 'dash', 'ksh']);
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
