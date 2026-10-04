@@ -23,3 +23,7 @@ Thumbs.db
 /.agents/skills/maestro
 /.claude/skills/maestro
 /.gemini/skills/maestro
+
+# AI Factory skill installs are local tooling, not part of this repository.
+/.agents/skills/aif*
+/.opencode/skills/aif*
