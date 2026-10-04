@@ -19,6 +19,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import net from 'node:net';
+import { request as httpRequest } from 'node:http';
 import { mkdtemp, mkdir, writeFile, copyFile, readFile, rm, unlink, cp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -1307,4 +1308,41 @@ test('legacy ownership checks require the exact directory command and ready page
     assert.equal(await legacyOwner(root, process.pid, address.port, command.replace('http.server', 'unrelated-server')), false);
     assert.equal(await legacyOwner(root, process.pid, address.port, command.replace(String(address.port), '1')), false);
   } finally { await new Promise<void>(resolve => server.close(() => resolve())); await target.dispose(); }
+});
+
+/** One GET with the Host header chosen by the caller, as a rebinding page's browser would send it. */
+function getWithHost(port: number, resource: string, host: string): Promise<{ status: number; nosniff: boolean }> {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest({ host: '127.0.0.1', port, path: resource, method: 'GET', headers: { Host: host } }, (response) => {
+      response.resume();
+      response.on('end', () => resolve({
+        status: response.statusCode ?? 0,
+        nosniff: response.headers['x-content-type-options'] === 'nosniff',
+      }));
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+// A page on another origin whose name is rebound to 127.0.0.1 reaches the viewer
+// with its own name in Host; answering it hands that page every run's artifacts.
+test('the viewer answers only requests addressed to the loopback name it serves on', async () => {
+  const run = await session(STATE);
+  try {
+    const done = await run.run();
+    assert.equal(done.status, 0, done.out);
+    const { port } = await run.record();
+    for (const resource of ['/dashboard.html', '/.maestro-viewer-identity', '/serve.json']) {
+      assert.equal((await getWithHost(port, resource, 'attacker.example')).status, 403, `${resource} answered a foreign host`);
+      assert.equal((await getWithHost(port, resource, `attacker.example:${port}`)).status, 403, `${resource} answered a foreign host with the port`);
+    }
+    for (const host of [`localhost:${port}`, `127.0.0.1:${port}`]) {
+      const answer = await getWithHost(port, '/dashboard.html', host);
+      assert.equal(answer.status, 200, `${host} was refused`);
+      assert.ok(answer.nosniff, 'the page is served without nosniff');
+    }
+  } finally {
+    await run.dispose();
+  }
 });

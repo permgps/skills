@@ -200,7 +200,17 @@ async function prepareViewer(dir: string, entrypoint: string): Promise<ViewerAdd
   return { url: `http://localhost:${ready.port}/dashboard.html`, record, ...(movedFrom === undefined ? {} : { movedFrom, taken }) };
 }
 const MIME: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.css': 'text/css; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
+// Binding to 127.0.0.1 keeps other machines out but not other origins: a page whose name is rebound to
+// 127.0.0.1 reaches this socket with its own name in Host. Only the loopback names the viewer hands out
+// are answered.
+const loopbackHost = (host: string | undefined, port: number): boolean =>
+  host !== undefined && [`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`].includes(host.toLowerCase());
 async function serveRequest(root: string, record: ViewerRecord, req: IncomingMessage, res: ServerResponse): Promise<void> {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  if (!loopbackHost(req.headers.host, record.port)) {
+    log.warn('viewer', 'foreign host refused', { host: req.headers.host ?? null, port: record.port });
+    res.writeHead(403).end(); return;
+  }
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405).end(); return; }
   let resource: string;
   try { resource = decodeURIComponent((req.url ?? '/').split('?')[0]!); }

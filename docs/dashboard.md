@@ -236,7 +236,10 @@ so you get one page rather than two.
 Node viewer on `127.0.0.1`. Its directory, PID, port and instance identity are
 verified through local HTTP before reuse or cleanup. Both `/` and
 `/dashboard.html` work even without an index link. Decoded traversal and
-symlinks outside the run directory are refused.
+symlinks outside the run directory are refused. Only a request addressed to
+`localhost:<port>`, `127.0.0.1:<port>` or `[::1]:<port>` is answered: another
+name, such as a page whose domain was rebound to `127.0.0.1` or a custom
+hostname in front of the viewer, gets `403`.
 
 `serve.json` keeps the address across calls; a dead server may restart on its
 free old port. A foreign listener is preserved, with a new address reported.
