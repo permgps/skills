@@ -7,7 +7,9 @@ import path from 'node:path';
 import {
   checkHostDegradation,
   checkCodexRuntime,
+  checkMemoryFiles,
   findMarkers,
+  parseLoadGroups,
   readsAsStop,
   slugify,
   type Violation,
@@ -243,4 +245,55 @@ test('a stale state-writer declaration cannot claim the autonomous Node runtime'
     const findings = await checkCodexRuntime(root);
     assert.ok(findings.some(item => item.message.includes('state-writer')));
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+const SESSION_START = `# Hosts
+
+| Host id | Host | Loads at session start | Creates | Evidence |
+|---|---|---|---|---|
+| \`claude-code\` | Claude Code | \`CLAUDE.md\`, \`CLAUDE.local.md\`; else \`AGENTS.md\` | \`CLAUDE.md\` | docs |
+| \`gemini-cli\` | Gemini CLI | \`GEMINI.md\` | \`GEMINI.md\` | docs |
+`;
+
+const CODED = {
+  'claude-code': { groups: [['CLAUDE.md', 'CLAUDE.local.md'], ['AGENTS.md']], creates: 'CLAUDE.md' },
+  'gemini-cli': { groups: [['GEMINI.md']], creates: 'GEMINI.md' },
+};
+
+test('a load cell reads as precedence groups, highest first', () => {
+  assert.deepEqual(parseLoadGroups('`CLAUDE.md`, `CLAUDE.local.md`; else `AGENTS.md`'),
+    [['CLAUDE.md', 'CLAUDE.local.md'], ['AGENTS.md']]);
+  assert.deepEqual(parseLoadGroups('`GEMINI.md`'), [['GEMINI.md']]);
+});
+
+test('a session-start table the runtime restates exactly passes', () => {
+  assert.deepEqual(checkMemoryFiles(SESSION_START, 'hosts.md', CODED, 'memory.mts'), []);
+});
+
+test('a host missing from either side of the session-start fact is reported', () => {
+  const { 'gemini-cli': _gemini, ...withoutGemini } = CODED;
+  const missingInCode = checkMemoryFiles(SESSION_START, 'hosts.md', withoutGemini, 'memory.mts');
+  assert.deepEqual(checks(missingInCode), ['memory-file']);
+  assert.match(missingInCode[0]!.message, /gemini-cli.*no row for it/);
+
+  const extra = { ...CODED, codex: { groups: [['AGENTS.md']], creates: 'AGENTS.md' } };
+  const missingInSpec = checkMemoryFiles(SESSION_START, 'hosts.md', extra, 'memory.mts');
+  assert.deepEqual(checks(missingInSpec), ['memory-file']);
+  assert.match(missingInSpec[0]!.message, /codex.*hosts\.md records nothing/);
+});
+
+test('a file or an order that differs between hosts.md and the runtime is reported', () => {
+  const reordered = { ...CODED, 'claude-code': { groups: [['AGENTS.md'], ['CLAUDE.md', 'CLAUDE.local.md']], creates: 'CLAUDE.md' } };
+  assert.match(checkMemoryFiles(SESSION_START, 'hosts.md', reordered, 'memory.mts')[0]!.message, /claude-code loads/);
+  const created = { ...CODED, 'gemini-cli': { groups: [['GEMINI.md']], creates: 'AGENTS.md' } };
+  assert.match(checkMemoryFiles(SESSION_START, 'hosts.md', created, 'memory.mts')[0]!.message, /gemini-cli creates GEMINI\.md/);
+});
+
+test('a specification with no session-start table is reported once the runtime has a memory module', () => {
+  assert.deepEqual(checks(checkMemoryFiles(SPEC, 'hosts.md', CODED, 'memory.mts')), ['memory-file']);
+});
+
+test('the real hosts table matches the memory module the bundle ships', async () => {
+  const violations = await checkHostDegradation({ specDir: 'docs/spec', bundleDir: 'skills/maestro' });
+  assert.deepEqual(violations.filter(v => v.check === 'memory-file'), []);
 });

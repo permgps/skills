@@ -131,3 +131,18 @@ test('runtime replacement preserves run history and old viewer/opened records wh
     assert.equal(JSON.parse(updated.stdout).url, url);
   } finally { await target.dispose(); }
 });
+
+test('the installed memory write resolves the project from its own copy, not from cwd or PATH', async () => {
+  const target = await installedTarget('copy');
+  try {
+    await writeFile(path.join(target.target, 'AGENTS.md'), '# Team\n', 'utf8');
+    const written = spawnSync(process.execPath, [path.join(target.run, 'sync.mts'), '--memory-write', '--host', 'codex'], {
+      cwd: target.cwd, encoding: 'utf8', input: 'A fact.\n',
+      env: { ...process.env, PATH: target.bin, NODE_OPTIONS: '', MAESTRO_SYNC_NO_OPEN: '1', LOG_LEVEL: 'ERROR' },
+    });
+    assert.equal(written.status, 0, written.stdout + written.stderr);
+    assert.equal(JSON.parse(written.stdout).path, path.join(await realpath(target.target), 'AGENTS.md'));
+    assert.match(await readFile(path.join(target.target, 'AGENTS.md'), 'utf8'), /<!-- maestro:begin -->\nA fact\.\n<!-- maestro:end -->/);
+    assert.deepEqual(await readdir(target.cwd), []);
+  } finally { await target.dispose(); }
+});

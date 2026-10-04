@@ -19,13 +19,13 @@ import path from 'node:path';
 import { readRegisterRuns } from './register.mts';
 import { createLogger } from './shared/log.mts';
 import {
-  findOwnedBlock, renderOwnedBlock, spliceOwnedBlock, type Block, type Markers,
+  MarkerError, findOwnedBlock, renderOwnedBlock, spliceOwnedBlock, type Block, type Markers,
 } from './shared/owned-block.mts';
 import { parseRunDir } from './state/paths.mts';
 
 // The splice itself is shared with the run register; this module keeps the
 // memory file's names, its markers and its writer.
-export { MarkerError, type Block } from './shared/owned-block.mts';
+export { MarkerError, type Block };
 
 const log = createLogger('memory');
 
@@ -424,4 +424,98 @@ export function renderPrior(prior: PriorMemory, readAt: Date): string {
     out.push('');
   }
   return `${out.join('\n').trimEnd()}\n`;
+}
+
+export interface CommandOutcome {
+  result: Record<string, unknown>;
+  code: number;
+}
+
+const optionOf = (args: string[], name: string): string | undefined => {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
+};
+
+/**
+ * `--memory-read --run-dir <dir>`: write `<dir>/prior.md` once, from the memory
+ * files and the register. An existing `prior.md` is kept byte for byte, so a
+ * resumed preflight reads what the first one read rather than what is on disk
+ * now. Exit 0 written or kept; 2 when the run directory is not a usable one.
+ */
+async function readCommand(args: string[], runRoot: string, now: Date): Promise<CommandOutcome> {
+  const dir = optionOf(args, '--run-dir');
+  if (dir === undefined || !parseRunDir(dir)) {
+    log.error('read-command', 'run directory missing or not a run directory name', { dir });
+    return { result: { error: 'pass --run-dir <YYYY-MM-DD>-<slug>[--wip], the run directory under .maestro/' }, code: 2 };
+  }
+  const runPath = path.join(runRoot, dir);
+  if (!(await exists(runPath))) {
+    log.error('read-command', 'run directory does not exist', { dir });
+    return { result: { error: `.maestro/${dir} does not exist — create the run directory first` }, code: 2 };
+  }
+  const target = path.join(runPath, PRIOR_FILE);
+  if (await exists(target)) {
+    log.info('read-command', 'prior.md already written; kept', { target });
+    return { result: { action: 'kept', path: target }, code: 0 };
+  }
+  const prior = await readPriorMemory(path.dirname(runRoot), runRoot, dir);
+  await replaceKeepingMode(target, renderPrior(prior, now));
+  log.info('read-command', 'prior.md written', { target });
+  return {
+    result: {
+      action: 'written',
+      path: target,
+      blockFiles: prior.blocks.map(block => block.file),
+      runs: prior.runs.map(run => run.dir),
+      notRead: prior.notRead,
+    },
+    code: 0,
+  };
+}
+
+/**
+ * `--memory-write --host <id>`, block body on stdin. Exit 0 written; 1 when the
+ * files refuse it (the block in two files, malformed markers, a body carrying a
+ * marker); 2 when the host or the body could not be used.
+ */
+async function writeCommand(args: string[], runRoot: string, readInput: () => Promise<string | null>): Promise<CommandOutcome> {
+  const host = optionOf(args, '--host');
+  if (host === undefined || !isHostId(host)) {
+    log.error('write-command', 'host missing or unknown', { host });
+    return { result: { error: new UnknownHostError(host ?? '').message }, code: 2 };
+  }
+  const body = await readInput();
+  if (body === null) {
+    return { result: { error: 'pipe the block body on stdin' }, code: 2 };
+  }
+  if (body.trim() === '') {
+    // An empty block would erase the one already there. Writing nothing is done by not calling.
+    return { result: { error: 'the block body is empty — when there is nothing to write, do not call --memory-write' }, code: 2 };
+  }
+  try {
+    const written = await writeMemoryBlock(path.dirname(runRoot), body, host);
+    return { result: { ...written }, code: 0 };
+  } catch (error) {
+    const reason = reasonOf(error);
+    if (error instanceof MemoryFileConflictError) return { result: { error: reason, files: error.files }, code: 1 };
+    if (error instanceof MemoryFileMarkerError) return { result: { error: reason, file: error.file, lines: error.lines }, code: 1 };
+    if (error instanceof MarkerError) return { result: { error: reason }, code: 1 };
+    log.error('write-command', 'memory block could not be written', { reason });
+    return { result: { error: reason }, code: 2 };
+  }
+}
+
+/** The two memory actions of `sync.mts`; `runRoot` is `.maestro/`, the project root its parent. */
+export async function memoryCommand(
+  args: string[], runRoot: string, readInput: () => Promise<string | null>, now = new Date(),
+): Promise<CommandOutcome> {
+  log.debug('command', 'memory action', { action: args[0], runDir: optionOf(args, '--run-dir'), host: optionOf(args, '--host') });
+  try {
+    if (args[0] === '--memory-read') return await readCommand(args, runRoot, now);
+    return await writeCommand(args, runRoot, readInput);
+  } catch (error) {
+    const reason = reasonOf(error);
+    log.error('command', 'memory action failed', { action: args[0], reason });
+    return { result: { error: reason }, code: 2 };
+  }
 }

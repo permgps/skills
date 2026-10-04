@@ -16,7 +16,7 @@
 // degradation marker at all — degrading where the spec says stop is the same
 // defect pointing the other way.
 
-import { readFile, readdir } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -145,6 +145,78 @@ export async function checkCodexRuntime(bundleDir: string): Promise<Violation[]>
   return violations;
 }
 
+/** The runtime module that restates the session-start table, relative to the bundle. */
+const MEMORY_MODULE = path.join('tools', 'runtime', 'memory.mts');
+
+/** One host's row as either side states it: precedence groups, then the file created. */
+export interface HostMemoryFiles {
+  groups: readonly (readonly string[])[];
+  creates: string;
+}
+
+/** `\`A\`, \`B\`; else \`C\`` → [['A', 'B'], ['C']]. */
+export function parseLoadGroups(cell: string): string[][] {
+  return cell.split(';')
+    .map(group => group.trim().replace(/^else\s+/i, ''))
+    .filter(group => group !== '')
+    .map(group => group.split(',').map(name => clean(name)).filter(name => name !== ''));
+}
+
+const describeGroups = (groups: readonly (readonly string[])[]): string =>
+  groups.map(group => group.join(', ')).join('; else ');
+
+/**
+ * The session-start table in hosts.md against `MEMORY_FILES_BY_HOST`. The table
+ * is the fact's home, read from each host's documentation; the constant is what
+ * the memory write runs on. Two copies of one fact drift silently, so every
+ * host, every group and the created file must agree in both directions.
+ */
+export function checkMemoryFiles(
+  spec: string, specFile: string, runtime: Readonly<Record<string, HostMemoryFiles>>, runtimeFile: string,
+): Violation[] {
+  const violations: Violation[] = [];
+  const add = (file: string, line: number, message: string): void => {
+    violations.push({ check: 'memory-file', file, line, message });
+    log.error('memory-file', message, { file, line });
+  };
+
+  const table = findTable(parseTables(spec), ['Host id', 'Loads at session start', 'Creates']);
+  if (!table) {
+    add(specFile, 0, 'no table with columns Host id, Loads at session start and Creates — record which file each host loads, from its documentation');
+    return violations;
+  }
+
+  const documented = new Set<string>();
+  for (const row of table.rows) {
+    const host = clean(row['Host id']);
+    if (host === '') continue;
+    documented.add(host);
+    const groups = parseLoadGroups(String(row['Loads at session start'] ?? ''));
+    const creates = clean(row['Creates']);
+    const coded = runtime[host];
+    log.debug('memory-file', 'host compared', { host, groups, creates, coded: coded ?? null });
+    if (!coded) {
+      add(specFile, row.__line, `hosts.md records ${host}, and MEMORY_FILES_BY_HOST in ${runtimeFile} has no row for it — add it there`);
+      continue;
+    }
+    if (describeGroups(groups) !== describeGroups(coded.groups)) {
+      add(specFile, row.__line,
+        `hosts.md says ${host} loads "${describeGroups(groups)}"; MEMORY_FILES_BY_HOST says "${describeGroups(coded.groups)}" — fix the one that was not re-checked against the host's documentation`);
+    }
+    if (creates !== coded.creates) {
+      add(specFile, row.__line,
+        `hosts.md says ${host} creates ${creates}; MEMORY_FILES_BY_HOST says ${coded.creates} — fix the one that was not re-checked against the host's documentation`);
+    }
+  }
+  for (const host of Object.keys(runtime)) {
+    if (!documented.has(host)) {
+      add(specFile, table.line, `MEMORY_FILES_BY_HOST has ${host}, and hosts.md records nothing for it — read the host's documentation and add its row`);
+    }
+  }
+  log.info('memory-file', 'session-start files checked', { hosts: documented.size, violations: violations.length });
+  return violations;
+}
+
 export async function checkHostDegradation(options: CheckOptions = {}): Promise<Violation[]> {
   const specDir = options.specDir ?? 'docs/spec';
   const bundleDir = options.bundleDir ?? 'skills/maestro';
@@ -160,6 +232,15 @@ export async function checkHostDegradation(options: CheckOptions = {}): Promise<
   if (spec.includes('<!-- maestro:codex:contract -->')) {
     violations.push(...await checkCodexRuntime(bundleDir));
   }
+  // A bundle without the memory module (a synthetic fixture) has nothing to hold the table to.
+  const memoryModule = path.join(bundleDir, MEMORY_MODULE);
+  if (await access(memoryModule).then(() => true, () => false)) {
+    const { MEMORY_FILES_BY_HOST } = await import(pathToFileURL(path.resolve(memoryModule)).href) as {
+      MEMORY_FILES_BY_HOST: Record<string, HostMemoryFiles>;
+    };
+    violations.push(...checkMemoryFiles(spec, specFile, MEMORY_FILES_BY_HOST, memoryModule));
+  }
+
   const table = findTable(parseTables(spec), [
     'Capability',
     'Degrades',
