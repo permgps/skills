@@ -14,6 +14,8 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+## v0.0.9-alpha — 2026-10-05
+
 The dashboard now shows what the state already carried. `CONTRACT_VERSION`
 stays `7`: the two new fields are optional, and a run without them renders as
 before.
