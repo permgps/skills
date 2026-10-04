@@ -1,14 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   bundleProfileFor,
+  carriesLeafRule,
   checkBundle,
   checkProcedure,
   COMPLETION_PROCEDURES,
+  LEAF_RULE,
   procedureSection,
   findRelativeLinks,
   parseFrontmatter,
@@ -221,17 +224,20 @@ test('every violation in one bundle is reported, not just the first', async () =
 
 // --- prompts: subagent briefs, reachable from the phase that hands them over --
 
+/** A prompt body that also keeps its субагент a leaf, so a test sees only its own finding. */
+const brief = (body: string): string => `${body}\n- ${LEAF_RULE}\n`;
+
 test('a prompt linked from a phase file is valid', async () => {
   const violations = await violationsFor({
     'phases/1-manifest.md': `# Manifest\n\nHand over [the reader](../prompts/reader.md).\n`,
-    'prompts/reader.md': `# Reader\n\nYou have the brief and nothing else.\n`,
+    'prompts/reader.md': brief(`# Reader\n\nYou have the brief and nothing else.\n`),
   });
   assert.deepEqual(violations, []);
 });
 
 test('a prompt nobody links to is reported', async () => {
   const violations = await violationsFor({
-    'prompts/reader.md': `# Reader\n\nOrphan.\n`,
+    'prompts/reader.md': brief(`# Reader\n\nOrphan.\n`),
   });
   assert.equal(violations.length, 1);
   assert.equal(violations[0]?.check, 'reachability');
@@ -245,7 +251,7 @@ test('a prompt may be reached from SKILL.md as well as from a phase', async () =
     'phases/0-preflight.md': null,
     'phases/1-manifest.md': null,
     'references/state.md': null,
-    'prompts/reader.md': `# Reader\n\nBrief.\n`,
+    'prompts/reader.md': brief(`# Reader\n\nBrief.\n`),
   });
   assert.deepEqual(violations, []);
 });
@@ -253,7 +259,7 @@ test('a prompt may be reached from SKILL.md as well as from a phase', async () =
 test('a dead link inside a prompt is reported — prompts are checked, not trusted', async () => {
   const violations = await violationsFor({
     'phases/1-manifest.md': `# Manifest\n\nHand over [the reader](../prompts/reader.md).\n`,
-    'prompts/reader.md': `# Reader\n\nSee [gone](../references/gone.md).\n`,
+    'prompts/reader.md': brief(`# Reader\n\nSee [gone](../references/gone.md).\n`),
   });
   assert.equal(violations.length, 1);
   assert.equal(violations[0]?.check, 'links');
@@ -263,7 +269,7 @@ test('a dead link inside a prompt is reported — prompts are checked, not trust
 test('a prompt linking into phases/ is reported with its own reason', async () => {
   const violations = await violationsFor({
     'phases/1-manifest.md': `# Manifest\n\nHand over [the reader](../prompts/reader.md).\n`,
-    'prompts/reader.md': `# Reader\n\nFirst read [manifest](../phases/1-manifest.md).\n`,
+    'prompts/reader.md': brief(`# Reader\n\nFirst read [manifest](../phases/1-manifest.md).\n`),
   });
   assert.equal(violations.length, 1);
   assert.equal(violations[0]?.check, 'cross-phase');
@@ -274,7 +280,7 @@ test('a prompt linking into phases/ is reported with its own reason', async () =
 test('a prompt escaping the bundle is reported', async () => {
   const violations = await violationsFor({
     'phases/1-manifest.md': `# Manifest\n\nHand over [the reader](../prompts/reader.md).\n`,
-    'prompts/reader.md': `# Reader\n\nSee [outside](../../secrets.md).\n`,
+    'prompts/reader.md': brief(`# Reader\n\nSee [outside](../../secrets.md).\n`),
   });
   assert.equal(violations.length, 1);
   assert.equal(violations[0]?.check, 'links');
@@ -283,6 +289,48 @@ test('a prompt escaping the bundle is reported', async () => {
 
 test('a bundle with no prompts directory is valid', async () => {
   assert.deepEqual(await violationsFor({}), []);
+});
+
+// --- prompts: every brief keeps its субагент a leaf -------------------------
+
+test('a brief without the leaf rule is reported, and only that brief', async () => {
+  const violations = await violationsFor({
+    'phases/1-manifest.md': `# Manifest\n\n[reader](../prompts/reader.md) and [other](../prompts/other.md).\n`,
+    'prompts/reader.md': brief(`# Reader\n\nBrief.\n`),
+    'prompts/other.md': `# Other\n\nBrief.\n`,
+  });
+  assert.equal(violations.length, 1);
+  assert.equal(violations[0]?.check, 'leaf');
+  assert.equal(violations[0]?.file, path.join('prompts', 'other.md'));
+  assert.match(violations[0]?.message ?? '', /nested прогон/);
+});
+
+test('the leaf rule is still found when a paragraph wraps it across lines', () => {
+  assert.equal(carriesLeafRule('- Invoke no skill and dispatch no agent;\n  do the work in this context.\n'), true);
+  assert.equal(carriesLeafRule('Invoke no skill; do the work in this context.'), false);
+});
+
+test('every shipped brief keeps its субагент a leaf, and the executor losing the sentence is the one finding', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'bundle-integrity-leaf-'));
+  const copy = path.join(dir, 'maestro');
+  try {
+    await cp(fileURLToPath(new URL('../../skills/maestro', import.meta.url)), copy, { recursive: true });
+    assert.deepEqual(await checkBundle(copy), []);
+
+    const executor = path.join(copy, 'prompts', 'executor.md');
+    const words = LEAF_RULE.split(' ').map(word => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const sentence = new RegExp(words.join('\\s+'));
+    const body = await readFile(executor, 'utf8');
+    assert.match(body, sentence);
+    await writeFile(executor, body.replace(sentence, ''), 'utf8');
+
+    const violations = await checkBundle(copy);
+    assert.equal(violations.length, 1);
+    assert.equal(violations[0]?.check, 'leaf');
+    assert.equal(violations[0]?.file, path.join('prompts', 'executor.md'));
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 // --- the second bundle, and what the widening costs -------------------------

@@ -171,6 +171,16 @@ It also proves that nothing the page shows is mute: every region and every
 which are drawn at run time and so cannot be read statically — must be built
 with the button that opens them.
 
+`bundle-integrity` takes a bundle directory and proves its structure: the
+frontmatter, every link, that no phase file reaches another, and that every phase
+and brief is reachable. It also proves that every brief under `prompts/` keeps its
+субагент a leaf ([`phases.md`](phases.md), *A Субагент Is A Leaf*). The brief
+must carry the rule's sentence itself, matched with whitespace normalised so that
+re-wrapping a paragraph is not a failure. Unlike `viewer-ownership`, no marker is
+used here, because this sentence is identical in every brief and is the
+instruction itself: a marker would still pass after the sentence beside it was
+deleted.
+
 `host-degradation` takes the same two paths and proves that a capability
 [`hosts.md`](hosts.md) marks as degrading has both of its halves inside the
 bundle: preflight establishes it by trying it, and the phase that spends it says

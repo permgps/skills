@@ -216,6 +216,20 @@ being contradicted after the fact. It is reported against the plan, because
 resolving it means deciding what the project's code should say, and that is the
 one thing the orchestrator does not do ([`safety.md`](safety.md), `S5`).
 
+### A Субагент Is A Leaf
+
+**A субагент invokes no skill and dispatches no agent of its own; it does the
+work in the context it was handed. Only the orchestrator dispatches.** The
+прогон's own trigger — someone describing what they want built — is exactly what
+a task file reads like, so a субагент free to invoke skills can take its таск
+for a new бриф and start a nested прогон inside the first, and the fan-out
+multiplies at every level. Every brief in the bundle carries the rule, and
+`bundle-integrity` fails a brief that does not.
+
+It is not a safety rule. A runaway fan-out shows in cost and in time, so it fails
+the test [`safety.md`](safety.md) sets in *Why These And Not Others* — a result
+the user cannot detect by looking at it.
+
 ### The User's Viewer Is Not A Субагент's To Use
 
 **A субагент opens nothing in front of the user. An owned temporary server for

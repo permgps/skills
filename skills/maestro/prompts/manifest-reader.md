@@ -89,3 +89,7 @@ matching current inputs permits the coordinator to present agreement.
 <!-- maestro:view:no-viewer -->
 Do not open a page in the user's viewer, take over the dashboard pane, or start
 an unowned preview. Return text/evidence only; the orchestrator owns that viewer.
+
+## The Rule That Still Holds
+
+- Invoke no skill and dispatch no agent; do the work in this context.

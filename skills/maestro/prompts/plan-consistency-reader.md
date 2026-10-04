@@ -81,3 +81,7 @@ are none. Nothing else — no summary of the plan, no suggested fix, no praise.
 A finding is a coordination defect: it is fixed in the task files or
 `interfaces.md` before any executor is dispatched, and it never reduces a
 requirement.
+
+## The Rule That Still Holds
+
+- Invoke no skill and dispatch no agent; do the work in this context.

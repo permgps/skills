@@ -14,6 +14,14 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**Every субагент is a leaf.** Each of the eleven briefs in `prompts/` now tells
+its субагент to invoke no skill and dispatch no agent, and to do the work in its
+own context. Before this, an executor could read its таск as a new бриф and start
+a nested прогон. Five briefs already had a "rules that still hold" section and
+gained a third rule there; the other six gained the section. `npm run bundle`
+fails a brief that does not carry the sentence. `SKILL.md` is unchanged, so
+nothing resident grew. 873 tests pass.
+
 ## v0.0.7-alpha — 2026-10-01
 
 **Contract 7: a run's directory says when it started and whether it landed

@@ -96,6 +96,10 @@ have none. Nothing else — no summary of the таск, no suggested fix, no pra
 Your text is the gate's evidence. Somebody will act on each finding by editing
 the task file before any executor sees it.
 
+## The Rule That Still Holds
+
+- Invoke no skill and dispatch no agent; do the work in this context.
+
 ## Journey And Control Briefs
 
 For verification-only work require fixture/setup/reset/cleanup, ordered actions

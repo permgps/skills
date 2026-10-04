@@ -50,3 +50,7 @@ Never repeat credentials; name the variable only.
 Never open a user-visible page or take over the dashboard pane. An available
 headless browser and an owned temporary local server may execute reference
 checks; record their identity and clean up. Without one, record a limitation.
+
+## The Rule That Still Holds
+
+- Invoke no skill and dispatch no agent; do the work in this context.

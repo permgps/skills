@@ -183,6 +183,28 @@ export const COMPLETION_PROCEDURES = [
   ['references/verification-procedures.md', 'Selective Negative-Control Protocol'],
 ] as const;
 
+/**
+ * The one sentence every brief under `prompts/` carries.
+ *
+ * The skill's own trigger is someone describing what they want built, and that
+ * is exactly what a task file reads like. A субагент free to invoke a skill can
+ * recognise its таск as a new бриф and start a nested прогон inside the first
+ * one, and the fan-out multiplies at every level — a review pass that did this
+ * went past fifty agents. Only the orchestrator dispatches.
+ *
+ * Matched as the literal sentence, not as a marker the way `viewer-ownership`
+ * matches its rule. There each brief words its share of the rule for its own
+ * role, so only a marker is stable. Here the sentence is the same in every brief
+ * and *is* the instruction the субагент reads: a marker would keep passing after
+ * the sentence beside it was deleted.
+ */
+export const LEAF_RULE = 'Invoke no skill and dispatch no agent; do the work in this context.';
+
+/** Whitespace-normalised, so re-wrapping a paragraph never fails the check. */
+export function carriesLeafRule(body: string): boolean {
+  return body.replace(/\s+/g, ' ').includes(LEAF_RULE);
+}
+
 export function procedureSection(body: string, heading: string): string {
   if (!heading) return body;
   const lines = body.split('\n');
@@ -316,6 +338,23 @@ export async function checkBundle(
     prompts: promptFiles.length,
     linkedPrompts: promptFiles.filter(file => linkedAnywhere.has(file)).length,
   });
+
+  // --- every brief keeps its субагент a leaf --------------------------------
+  // See `LEAF_RULE` for why, and why the sentence rather than a marker.
+  let carrying = 0;
+  for (const { file, body } of documents) {
+    if (!file.startsWith(`${PROMPTS_DIR}${path.sep}`)) continue;
+    if (carriesLeafRule(body)) {
+      carrying += 1;
+      log.debug('leaf', 'brief carries the leaf rule', { file });
+      continue;
+    }
+    add('leaf', file, 0,
+      `brief does not carry "${LEAF_RULE}" — a субагент free to invoke a skill or `
+      + 'dispatch an agent can read its таск as a new бриф and start a nested прогон, '
+      + 'and the fan-out multiplies with every level');
+  }
+  log.info('leaf', 'leaf rule checked', { prompts: promptFiles.length, carrying });
 
   if (skill.includes('<!-- maestro:delegation:native-explicit -->') || skill.includes('<!-- maestro:runtime:node -->')) {
     if (!skill.includes('<!-- maestro:runtime:node -->')) add('runtime', 'SKILL.md', 0, 'declare the autonomous Node runtime marker');
