@@ -182,6 +182,11 @@ gate. If they ever differ anywhere else, one of them is wrong.
 A new capability always attaches to a parent требование. Depth buys thoroughness
 beneath the бриф; it never buys a direction away from it.
 
+`strict` is checked once more after the specification. The review phase records
+behaviour no таск was asked for as an `unrequested` observation, and under
+`strict` the orchestrator may send it to repair. The reviewer is never told the
+depth; see [`phases.md`](phases.md), Review.
+
 ## Finish
 
 | Finish | Default | Russian triggers | English triggers | Adds |

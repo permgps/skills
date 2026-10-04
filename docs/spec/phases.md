@@ -14,10 +14,10 @@ right thing was built.
 | spec | Specification | yes | `manifest.md`, `answers.md`, raw reference, `prior.md` | `spec.md`, obligation and source coverage map |
 | plan | Plan | yes | `spec.md`, obligations and checks, the repository's test, typecheck and lint configuration | `tasks/`, `interfaces.md`, ownership map |
 | build | Build | yes | task files, relevant raw reference, `interfaces.md`, blockers' `D##` rows | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
-| review | Review | yes | task files, obligations, evidence, `interfaces.md`, project code | `reviews/`, findings and check limits |
+| review | Review | yes | task files, obligations, evidence, `interfaces.md`, project code, the project's documented standards | `reviews/` including `reviews/standards.md` once per прогон, findings and check limits |
 | acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md` |
 | polish | Доводка | no | `reference.md`, project code after required parity | optional polished build, `tasks/` of its own |
-| memory | Memory | no | `discovered-interfaces.md`, `spec.md`, the Terms table of `interfaces.md`, `prior.md`, project code, run state | the memory block in the host's memory file, `decisions.md` |
+| memory | Memory | no | `discovered-interfaces.md`, `spec.md`, the Terms table of `interfaces.md`, the seam-level items of `reviews/standards.md`, `prior.md`, project code, run state | the memory block in the host's memory file, `decisions.md` |
 | repair | Repair | no | whatever one of its six doors provides | retried таск, `amendments.md` |
 
 `polish` runs only when the finish dial asked for it, inside the acceptance
@@ -464,6 +464,55 @@ that edits code to demonstrate a finding has stopped being a reviewer, and the
 project's code has one route into a прогон either way
 ([`safety.md`](safety.md), `S5`).
 
+**Behaviour nobody asked for is an observation tagged `unrequested`.** It is
+behaviour the diff adds that a user or a caller could observe and that no item
+of *done means*, no signature in `interfaces.md` and no assigned check accounts
+for. Internal structure the таск needed is not behaviour. The tag is not a third
+kind: the finding stays an observation, never blocking, because the reviewer is
+not told the depth and cannot weigh how much extra the прогон tolerates. Without
+it, extra behaviour had no owner — the reviewer counted only what was missing,
+and the acceptance reader is told extra is not its question.
+
+**Under `strict`, the orchestrator disposes of each `unrequested` observation.**
+`strict` promises «only what the requirement cannot work without», and this is
+the one place after the specification that promise is checked. Behaviour no
+требование needs may be sent to repair: the orchestrator appends a blocking
+finding of its own, origin `coordinator`, quoting the observation verbatim and
+the `strict` row. An observation it keeps gets one line naming the требование it
+serves. Under `normal` and `deep` it stays an observation and reaches the отчёт.
+This is the only cell of the review phase a dial changes, and it changes what the
+orchestrator does after the measurement, never the measurement.
+
+**Debug output a repair left behind is blocking.** A repair tags temporary
+diagnostics `[maestro-debug:DF-N]` and removes them before return. Before any
+reviewer is dispatched, the orchestrator reads each таск's per-commit diffs: a
+tagged line one of its commits added and no later commit of the same таск
+removed is a blocking finding of the orchestrator's own, origin `validator`,
+naming the tag id and the path but never the line. A removal in another таск's
+commit does not clear it.
+
+### One Standards Pass
+
+Executors work in isolation and each review sees one таск, so what lives between
+таски — duplication, a data clump passed through several seams — is invisible to
+both. **One fresh reader sees the whole прогон, once:** the first time the phase
+ends with every таск `done`, while `reviews/standards.md` does not yet exist.
+That file is the record, so a review round after a repair and a resumed session
+do not run the pass again.
+
+The reader, briefed by `prompts/standards-reader.md`, is given every таск's
+per-commit diffs and the project's documented standards — the host's memory file
+with the Maestro block cut out, `CONTRIBUTING`, and documents they name as the
+conventions — and a baseline of nine named code smells. It is withheld
+`spec.md`, the манифест, the task files, `interfaces.md`, `reviews/` and
+`prior.md` ([`gates.md`](gates.md) holds the list). A standard is quoted; a smell
+is labelled `judgement: <smell>` and never called a violation.
+
+Its output is observations only. It moves no таск, writes no state, enters no
+`verification.findings`, and is never looped on, because this axis does not
+converge. The отчёт carries its observations, and the memory phase reads its
+`scope: seam` items. It costs one субагент per прогон and nothing resident.
+
 ### The Таск Lifecycle
 
 A таск that has been committed is `review`, not `done`. The build phase writes
@@ -495,7 +544,9 @@ unattributable disagreement that table exists to prevent.
 ### No Gate
 
 No gate follows this phase. G4 asks a different question, against a different
-document, blind.
+document, blind. The debug-tag check is a blocking finding, not a gate: it sends
+one таск to repair and stops nothing else. `scripts/gates/debug-tags.ts` holds
+its condition executably, in the same way the gate scripts hold theirs.
 
 The acceptance phase reads `reviews/` — `artifacts.md` lists it as a reader —
 and the blind reader inside that phase does not. Those two statements only look
@@ -561,7 +612,7 @@ and passing it quietly are the same mistake made in opposite directions.
 | What was asked | every `R##`, its status, and where it landed |
 | Disagreements | G4's findings and failed/incomplete requirements, each against its требование and check evidence |
 | Assumptions | every placeholder standing in for a fact nobody supplied, and every wording whose translation was uncertain |
-| Observations | the non-blocking findings the reviews carried forward |
+| Observations | the non-blocking findings the reviews carried forward, each `unrequested` one with its tag; then, under their own sub-heading, the standards pass's observations, or one line saying it did not run |
 | What is left | deferred and dropped требования, unresolved work, closure outcome, and accepted exceptions without hiding technical failures |
 
 Fixed, because a отчёт whose shape is decided per прогон is a отчёт two прогона
@@ -725,6 +776,12 @@ noise:
   a stage took, what a review found and got fixed. That is what the отчёт and
   the run state are for, and they already hold it.
 
+A seam-level item of the standards pass is read here and passes the same test. It
+is a fact about how the project is put together across таски — one rule
+implemented twice, one clump of values passed through several seams — rather
+than something a review found and got fixed, and it enters only when the next
+session would otherwise rediscover it.
+
 `S2` applies here with no softening: the memory file is committed and read by
 every later session, so a credential reaching it is the worst version of the
 same violation. Redaction runs over what this phase writes exactly as it runs
@@ -828,6 +885,11 @@ handoff too, if the таск left one. Not `spec.md`, not the манифест, 
 withholding the build applies, for the same reason [`gates.md`](gates.md) gives:
 a finding derived from words the executor never saw is a finding nobody can act
 on, and that is as true of a retry's instructions as of a review's findings.
+
+Under contract 6 the brief also names the defect's `DF-N`. Any temporary
+diagnostic output the retry adds carries `[maestro-debug:DF-N]` on the same line
+and is removed before return; a tag left in a commit is the review phase's
+blocking finding against that таск.
 
 ### The Budget
 

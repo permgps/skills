@@ -17,6 +17,7 @@ project that was built, not with Maestro.
 │   ├── tasks/NN-<slug>.md
 │   ├── tasks/NN-<slug>-handoff.md
 │   ├── reviews/NN-<slug>.md
+│   ├── reviews/standards.md
 │   ├── evidence/<execution-id>/...
 │   ├── report.md
 │   ├── decisions.md
@@ -72,6 +73,7 @@ actually built.
 | `tasks/NN-<slug>.md` | plan | build, review, G3 | no |
 | `tasks/NN-<slug>-handoff.md` | build | build, review | no |
 | `reviews/NN-<slug>.md` | review | repair, acceptance | append-only |
+| `reviews/standards.md` | review | acceptance, memory | no, written once per прогон |
 | `report.md` | acceptance | the user | append-only |
 | `evidence/<execution-id>/...` | acceptance | verification validator, acceptance | no |
 | `decisions.md` | memory | the user, a later прогон's preflight | append-only |

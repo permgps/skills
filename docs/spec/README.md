@@ -196,8 +196,9 @@ capability it is the runtime half of, and a row that stops the прогон wher
 specification says it narrows — or the reverse — is the same defect seen from
 the reference side.
 
-`gate-readers` proves that the two gates decided in part by a subagent — G2 and
-G4 — hand their reader exactly what [`gates.md`](gates.md) says they do. That
+`gate-readers` proves that every independent reader — the gate readers of G1,
+G2, G3 and G4, and the standards reader that gates nothing — is handed exactly
+what [`gates.md`](gates.md) says it is. That
 list lives in five places: the gate table, the phase table, the phase file, the
 reader's own brief in `prompts/`, and `SKILL.md`. Four of them are prose a model
 reads at run time; the brief is the fifth, and it was the one nothing compared —
@@ -258,6 +259,7 @@ node scripts/gates/check-g1.ts <run-dir>   # after брифинг: every тре�
 node scripts/gates/check-g2.ts <run-dir>   # after the spec: none left open
 node scripts/gates/check-g3.ts <run-dir>   # after the plan: the map holds both ways
 node scripts/gates/check-g4.ts <run-dir>   # after приёмка: current checks and coverage establish G4
+node scripts/gates/debug-tags.ts <run-dir> [repo-dir]   # in review: no таск leaves a [maestro-debug:…] line behind
 ```
 
 Independent G1 source audit, G2 intent/reference discovery, and G4 blind discovery
@@ -268,6 +270,9 @@ publication checks; actual reader execution remains a separate prerequisite.
 These are **not** part of `npm run check`, and no phase file names them. They
 read a прогон's `state.js` — a file this repository never contains — so there is
 nothing here for them to run against. `<run-dir>` defaults to `.maestro`.
+`debug-tags` also reads git: it shows each commit in `tasks[].commits` from
+`[repo-dir]`, which defaults to the directory holding the run directory, and a
+commit it cannot show is the same `2` as an unreadable state.
 
 What they are for is making each gate's pass condition executable and tested
 rather than only described. `scripts/` ships with this repository and not inside

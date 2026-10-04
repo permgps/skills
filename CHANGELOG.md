@@ -14,6 +14,27 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**Review sees what nobody asked for.** The reviewer has a fifth part.
+Behaviour the diff adds that no *done means* item, interface or assigned check
+accounts for is an observation tagged `unrequested`. It never blocks, and the
+reviewer is never told the depth. Under `strict`, the orchestrator may send such
+an observation to repair with a blocking finding of its own. That is the one
+check after the specification that `strict` really means «only what the
+requirement cannot work without». A repair tags any temporary diagnostic output
+`[maestro-debug:DF-N]` and removes it before return. Before review, the
+orchestrator treats a tagged line that survives a таск's commits as a blocking
+finding that names the tag and the path, never the line.
+`scripts/gates/debug-tags.ts` holds that condition against real git. Once per
+прогон, after every таск is `done`, a new standards reader reads the union of
+the commits. It also reads the project's documented standards, without the
+Maestro block, and a baseline of nine named smells, each a judgement and never a
+violation. It writes observations only, to `reviews/standards.md`. The отчёт
+carries them, the memory phase reads the seam-level ones, and the pass is never
+repeated. The acceptance reader's «extra is a question for somewhere else» now
+names its owner. `npm run readers` holds the new reader's inputs, and
+`npm run bundle` holds the text as `REVIEW_ANCHORS`. The state contract and
+`SKILL.md` are unchanged.
+
 **The plan cuts for width and for something to show.** The plan phase now states
 four preferences, and it may decline any of them with a reason it names to the
 user. The first is a thin path end to end, so a таск's *done means* is something
