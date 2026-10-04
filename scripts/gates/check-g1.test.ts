@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { checkG1, type GateFinding } from './check-g1.ts';
+import { checkG1, checkG1Answers, type GateFinding } from './check-g1.ts';
+import { runGate } from './cli.ts';
 import { readState, parseStateSource, UnreadableStateError } from '../state/read.ts';
 import { writeState } from '../state/write.ts';
 import { InvalidStateError } from '../state/validate.ts';
@@ -143,5 +144,72 @@ test('an invalid state on disk throws rather than being gated', async () => {
       'utf8',
     );
     await assert.rejects(() => readState(dir), InvalidStateError);
+  });
+});
+
+// --- the answers half: answers.md of the run the state describes -------------
+
+const DELEGATED = [
+  '### R01 — способ оплаты',
+  'Asked: Как гость платит за заказ?',
+  'Options:',
+  '1. Оплата картой на сайте (recommended — деньги приходят до отправки)',
+  '2. Оплата при получении',
+  'Answer: как советуешь',
+  '',
+].join('\n');
+const CHOSEN = `${DELEGATED}Chosen: Оплата картой на сайте\n`;
+
+/** A run root holding a written state and, when given, its answers.md. */
+async function withRun(answers: string | null, body: (dir: string, state: RunState) => Promise<void>): Promise<void> {
+  await withDir(async dir => {
+    const state = stateWith([{ id: 'R01', status: 'in-spec' }]);
+    await writeState(dir, state);
+    if (answers !== null) {
+      await mkdir(path.join(dir, state.slug), { recursive: true });
+      await writeFile(path.join(dir, state.slug, 'answers.md'), answers, 'utf8');
+    }
+    await body(dir, state);
+  });
+}
+
+async function gateExit(dir: string): Promise<number> {
+  const original = process.stdout.write.bind(process.stdout);
+  process.stdout.write = (() => true) as typeof process.stdout.write;
+  try {
+    return await runGate('check-g1', checkG1, dir, checkG1Answers);
+  } finally {
+    process.stdout.write = original;
+  }
+}
+
+test('a delegated answer recorded without its chosen option fails G1 on its требование', async () => {
+  await withRun(DELEGATED, async (dir, state) => {
+    assert.deepEqual(ids(await checkG1Answers(state, dir)), ['R01']);
+    assert.equal(await gateExit(dir), 1);
+  });
+});
+
+test('the same answers.md with the chosen option written out passes G1', async () => {
+  await withRun(CHOSEN, async (dir, state) => {
+    assert.deepEqual(await checkG1Answers(state, dir), []);
+    assert.equal(await gateExit(dir), 0);
+  });
+});
+
+test('a run with no answers.md passes the answers half, because a бриф may open no forks', async () => {
+  await withRun(null, async (dir, state) => {
+    assert.deepEqual(await checkG1Answers(state, dir), []);
+    assert.equal(await gateExit(dir), 0);
+  });
+});
+
+test('an answers.md that cannot be read exits 2 instead of passing', async () => {
+  await withDir(async dir => {
+    const state = stateWith([{ id: 'R01', status: 'in-spec' }]);
+    await writeState(dir, state);
+    await mkdir(path.join(dir, state.slug, 'answers.md'), { recursive: true });
+    await assert.rejects(() => checkG1Answers(state, dir));
+    assert.equal(await gateExit(dir), 2);
   });
 });

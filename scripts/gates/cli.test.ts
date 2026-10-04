@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { runGate, targetFromArgv, type GateFinding } from './cli.ts';
+import { runGate, targetFromArgv, type GateFileCheck, type GateFinding } from './cli.ts';
 import { writeState } from '../state/write.ts';
 import { type RunState } from '../state/contract.ts';
 
@@ -35,6 +35,7 @@ async function capture(
   gate: string,
   check: (state: RunState) => GateFinding[],
   target: string,
+  files?: GateFileCheck,
 ): Promise<{ code: number; out: string }> {
   const original = process.stdout.write.bind(process.stdout);
   let out = '';
@@ -44,7 +45,7 @@ async function capture(
   }) as typeof process.stdout.write;
 
   try {
-    const code = await runGate(gate, check, target);
+    const code = await runGate(gate, check, target, files);
     return { code, out };
   } finally {
     process.stdout.write = original;
@@ -120,4 +121,34 @@ test('a state that fails validation exits 2 rather than passing a gate', async (
 test('the target defaults to .maestro and is taken from argv otherwise', () => {
   assert.equal(targetFromArgv(['node', 'check-g1.ts']), '.maestro');
   assert.equal(targetFromArgv(['node', 'check-g1.ts', 'other/.maestro']), 'other/.maestro');
+});
+
+test('findings from the run artifacts join the state findings and fail the gate together', async () => {
+  await withDir(async dir => {
+    await writeState(dir, validState());
+    let seenTarget = '';
+    const { code, out } = await capture('check-x', () => [
+      { requirementId: 'R01', message: 'state finding' },
+    ], dir, async (_state, target) => {
+      seenTarget = target;
+      return [{ requirementId: 'R02', message: 'answers finding' }];
+    });
+
+    assert.equal(code, 1);
+    assert.equal(seenTarget, dir);
+    assert.match(out, /state finding/);
+    assert.match(out, /answers finding/);
+    assert.match(out, /check-x: fail — 2 finding\(s\)/);
+  });
+});
+
+test('a run artifact that cannot be read exits 2, never a pass over an unread file', async () => {
+  await withDir(async dir => {
+    await writeState(dir, validState());
+    const { code, out } = await capture('check-x', () => [], dir, async () => {
+      throw new Error('EISDIR: answers.md is a directory');
+    });
+    assert.equal(code, 2);
+    assert.equal(out, 'check-x: EISDIR: answers.md is a directory\n');
+  });
 });
