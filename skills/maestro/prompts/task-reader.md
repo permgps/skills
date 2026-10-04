@@ -47,6 +47,9 @@ about the project:
 - **An undefined term.** The task file names something it never defines and
   `interfaces.md` does not either — a score without saying what it counts, a
   state without saying what it holds, a format without saying its shape.
+  `interfaces.md` carries a **Terms** table. A task file that uses a word that
+  table lists under *Words to avoid*, or a listed term with a different meaning
+  than its row gives, is this finding too. Quote the word and the row.
 - **A name that is not the real name.** The task file quotes an identifier, a
   path or a signature in a form that does not match `interfaces.md`, so building
   it literally would produce something nothing else can call.

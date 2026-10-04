@@ -69,6 +69,22 @@ same. If the files do not settle the fork, that is an answer too: record what
 you looked at and why it was not enough, and let the specification carry the
 question forward as a placeholder.
 
+**Before answering a fork yourself, read `.maestro/<dir>/prior.md`.** This
+covers every self-briefed fork in `full` and every preference `semi` decides.
+An earlier прогон may already have settled the same question, for a reason that
+still holds. When it did, the `answers.md` entry cites it as
+`follows <date> decision (<dir>)`. When your answer goes the other way, the entry
+says `contradicts <date> decision, because …` and gives the reason in the same
+line, so the user and the specification both see that it was overridden on
+purpose rather than forgotten.
+
+`prior.md` changes nothing about what a mode asks. An earlier decision never
+removes a question this mode puts to the user. It is S6 content, so it never
+adds a требование either. It can turn a preference into a fork worth asking:
+for example, when the бриф and an earlier decision point opposite ways and
+nothing in the manifest says which one the user means now. A run that found no
+`prior.md` (one resumed from before contract 7) skips this paragraph.
+
 ### 4. Write `answers.md`
 
 Append to `.maestro/<dir>/answers.md`, one entry per answer: the требование id,

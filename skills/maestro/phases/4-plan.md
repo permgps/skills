@@ -70,6 +70,21 @@ running at the same time agree without talking to each other.
   unattributable.
 - A boundary you are guessing at is a boundary the cut is wrong about. Re-cut so
   the guess is inside one таск.
+- Before the Seams, it carries a **Terms** table, one row per domain word that
+  more than one task file uses, or that the user said:
+
+  | Term | Meaning | Words to avoid | User's wording |
+  |---|---|---|---|
+
+  *Meaning* says what the word counts, holds or names, in one line an executor
+  can build from. *Words to avoid* lists the near-synonyms that would make two
+  таски name one thing two ways. *User's wording* quotes the original-language
+  span from the run state's `verification.sourceClauses` when the term came
+  from the user, and `—` when the прогон coined it. Terms the memory block in
+  `prior.md` carries are taken over as they are, unless the манифест changed
+  their meaning. If it did, the row says `contradicts <date> decision,
+  because …`. This table exists because of the incident step 5 tells: a task
+  file used «a running score» and never said what it counts.
 - It ends with a **Seams** table — seam, producer task, consumer tasks,
   integration owner, integration check — one row per route, DTO, migration,
   port or file that one таск produces and another consumes. A seam with no

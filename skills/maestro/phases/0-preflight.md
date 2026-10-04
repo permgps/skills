@@ -222,6 +222,32 @@ discovered after the run, when the file is final and nothing can be measured
 again. `node .maestro/sync.mts --publish` checks this before publication; that is what the
 check is for.
 
+### 4b. Read what earlier runs left
+
+```text
+node .maestro/sync.mts --memory-read --run-dir <dir>
+```
+
+This writes `.maestro/<dir>/prior.md`. It holds the maestro block of the
+project's memory file, and the `decisions.md` of every earlier run listed in
+the register. This run's own row is excluded by `--run-dir`. The read goes
+after step 4 because the helper is copied there. Phase 9 of an earlier прогон
+wrote these files so that this one would not rediscover what was already
+settled. Until this step, nothing read them.
+
+Do not interpret `prior.md` here. Briefing and the spec read it, at the moment
+they decide something. Its contents are S6 content, written by an earlier
+прогон and not said by the user: they may prompt a briefing question or ground
+an answer the прогон gives itself, and they never add or remove a требование.
+
+The JSON line names what was read. A `notRead` entry is said in the
+announcement (step 6) in one line. A memory file with broken markers is one
+example: it does not stop the run here, and phase 9 stops on it later, when it
+writes. A second call keeps the `prior.md` the first one wrote, so a resumed
+preflight reads what this one read. A run resumed from before contract 7 has no
+`dir` and skips this step. The phases that read `prior.md` then find none and
+go on without it.
+
 ### 5. Raise the dashboard
 
 <!-- maestro:view:opens-panel -->
@@ -352,6 +378,8 @@ it costs, one line each. A прогон that quietly ran its таски one at a
 because the host had no fan-out looks exactly like a прогон whose plan cut one
 таск, and this is the cheapest place to tell the two apart.
 
+**Add what step 4b could not read**, one line each, naming the file and why.
+
 It is a statement, not a question. Do not wait for a reply, in any mode.
 
 ## Gates
@@ -365,6 +393,7 @@ nothing yet to check against the user's words.
 |---|---|
 | `.maestro/<dir>/` | `<YYYY-MM-DD>-<slug>--wip`, created with a zero-byte provisional `manifest.md`; no source agreement yet |
 | `.maestro/README.md` | the register, with this run's row in progress — written by the first publish, never by hand |
+| `.maestro/<dir>/prior.md` | the memory block and earlier runs' decisions, written once by `--memory-read` |
 | `.maestro/state.js` | written, `preflight` active |
 | `.maestro/dashboard.html` | copied, mirrored, and opened |
 | `.maestro/sync.mts`, `runtime/`, `index.html` | complete helper copied and index placed when available |

@@ -15,7 +15,7 @@ task produces, a route one task serves and another calls by a different name.
 | Input | What it is |
 |---|---|
 | every task file | `tasks/NN-<slug>.md` for every таск of this прогон, each with its Prerequisites, Forbidden writes and Completion artifacts |
-| `interfaces.md` | the shared boundaries, including the Seams table: seam, producer task, consumer tasks, integration owner, integration check |
+| `interfaces.md` | the shared boundaries, including the Terms table (term, meaning, words to avoid, the user's wording) and the Seams table: seam, producer task, consumer tasks, integration owner, integration check |
 
 ## What You Are Not Given
 

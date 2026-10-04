@@ -24,7 +24,7 @@ right thing was built.
 
 | # | Phase | Rules | Produces |
 |---|---|---|---|
-| 0 | Preflight | [`phases/0-preflight.md`](phases/0-preflight.md) | resolved dials, run state, dashboard |
+| 0 | Preflight | [`phases/0-preflight.md`](phases/0-preflight.md) | resolved dials, run state, dashboard, `prior.md` |
 | 1 | Manifest | [`phases/1-manifest.md`](phases/1-manifest.md) | `brief.md`, `manifest.md` |
 | 2 | Briefing | [`phases/2-briefing.md`](phases/2-briefing.md) | `answers.md`, `reference.md` |
 | 3 | Specification | [`phases/3-spec.md`](phases/3-spec.md) | `spec.md` |

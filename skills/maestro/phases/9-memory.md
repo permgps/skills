@@ -16,7 +16,7 @@ and nobody is asked about it.
 | Run | Read | The question it answers |
 |---|---|---|
 | during Разработка | `discovered-interfaces.md`, the таск that returned, the run state | what did this таск run into that the next person will too |
-| after приёмка | `spec.md`, the project code, `discovered-interfaces.md`, the run state | what is this project now, and where are its seams |
+| after приёмка | `spec.md`, the project code, `discovered-interfaces.md`, the Terms table of `interfaces.md`, `prior.md`, the run state | what is this project now, where are its seams, and what does it call things |
 
 You do not read `brief.md`, `manifest.md` or `report.md` here. Those say what was
 asked and what was delivered; this phase records what was **learned**, and the
@@ -52,8 +52,32 @@ an old green G4 into a memory claim that the product was verified.
 
 ### 2. Write the block
 
-`AGENTS.md` in the project root, between `<!-- maestro:begin -->` and
-`<!-- maestro:end -->`.
+Pipe the block's body to the helper and name the host this session runs on —
+`claude-code`, `codex` or `gemini-cli`, the host preflight resolved:
+
+```text
+node .maestro/sync.mts --memory-write --host <id>
+```
+
+The helper picks the file and splices the block between
+`<!-- maestro:begin -->` and `<!-- maestro:end -->`. It never creates a second
+memory file. It writes into the file that already carries the block. If there
+is none, it writes into the host's own file, then into any memory file the
+project already has. Only when the project has no memory file does it create
+the one the host reads. `docs/spec/hosts.md` records which file that is for
+each host. The JSON line names the file.
+
+- **`loadedByHost: false`** means the block went into a file this host does
+  not load at session start, because the project already had that file. Tell
+  the user in one sentence, naming the file and the host. The file is theirs,
+  so the choice is theirs.
+- **Exit 1** means the files refused the write. One case is a block in two
+  files. Another is malformed markers: two begin markers, an unclosed one, or
+  an end before a begin. **Stop.** Say which files and which lines, from the
+  JSON. Do not pick the pair you think was meant. The text between the other
+  pair is somebody's, and a guess deletes it.
+- **Exit 2** means the host or the body was unusable. An empty body is refused
+  on purpose: when there is nothing to write, do not call it at all.
 
 **You own the region between those two lines and nothing else.** Everything
 above the begin marker and below the end marker belongs to the user. It is not
@@ -64,21 +88,40 @@ That is not politeness. A user who finds their own paragraph rewritten once will
 never again write anything there that they would mind losing, and the file stops
 being worth reading in the same moment.
 
-- The file does not exist → create it containing the block and nothing else.
-- The file exists without the markers → append the block, leave everything else
-  exactly as it was.
-- The file exists with the markers → replace what is between them.
-- The markers are malformed — two begin markers, an unclosed one, an end before
-  a begin — **stop.** Say which lines. Do not pick the pair you think was meant;
-  the text between the other pair is somebody's, and a guess deletes it.
+The block **replaces** the one before it, so start from the block `prior.md`
+carried. Keep what still holds and drop only what this прогон proved wrong.
+A fact an earlier прогон wrote down and this one silently left out gets
+rediscovered by the next one.
+
+**Carry the durable terms.** The Terms rows of `interfaces.md` that name
+something the project keeps go into the block as `term — meaning`, so the
+next прогон's plan names things the same way. Leave out the user's
+original-language quote, and leave out terms that only named this прогон's
+таски.
 
 Keep the block short. It is read by whoever opens the project next, before they
 have decided what they are doing, and length is what makes it skipped.
 
 ### 3. Write the decision records
 
-`.maestro/<dir>/decisions.md`, appended, never rewritten. One entry per
-decision that should outlive the прогон:
+`.maestro/<dir>/decisions.md`, appended, never rewritten. A later прогон reads
+it before it decides anything, through its own `prior.md`. So an entry here
+can make the next прогон cite a decision or contradict it in the open.
+
+**An entry goes in only when all three hold:**
+
+1. it is hard to reverse;
+2. a reader without this прогон's context would be surprised by it;
+3. there was a real alternative.
+
+A choice that fails any one of these is either cheap to redo or obvious. If it
+is cheap to redo, the next session simply redoes it. If it is obvious, it would
+make the same choice again. Either way, recording it only makes the file longer
+for the reader who asks why. Nothing checks this threshold mechanically,
+because whether a choice would surprise a reader is a judgement. Apply it here,
+where the judgement is made.
+
+Each entry has three parts:
 
 - what was decided,
 - what it was decided **instead of**,
@@ -102,7 +145,7 @@ write, exactly as it ran over the бриф.
 
 ## When It Does Not Go That Way
 
-**`AGENTS.md` has a block from another tool.** Markers that are not yours are
+**The memory file has a block from another tool.** Markers that are not yours are
 somebody else's owned region. Leave them, and add yours as its own block.
 
 **The fact worth remembering is a credential.** It does not go in — not the
@@ -114,8 +157,9 @@ It is an amendment, and it belongs to the repair phase; record it there and come
 back here only for what the project keeps afterwards.
 
 **The project already has a memory file from an earlier прогон.** Replace the
-block. Its previous contents were written by a run that is over, and two blocks
-would leave the next session to decide which one is current.
+block, starting from what `prior.md` carried of it (step 2). Two blocks would
+leave the next session to decide which one is current. The helper refuses to
+write while two exist.
 
 ## Gates
 
@@ -129,7 +173,7 @@ nothing worth keeping rather than failing at something.
 
 | Artifact | State |
 |---|---|
-| `AGENTS.md` | the owned block replaced or appended; everything outside it byte for byte as it was |
+| the memory file the helper resolved | the owned block replaced or appended; everything outside it byte for byte as it was |
 | `.maestro/<dir>/decisions.md` | one appended entry per decision, each naming the `D##` or `R##` it came from |
 | project code | unchanged — this phase writes none of it |
 
