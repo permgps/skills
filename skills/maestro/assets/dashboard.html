@@ -105,6 +105,7 @@
   .chip-failed { color: var(--fail); border-color: var(--fail); }
   #notice {
     margin: .75rem 0 0;
+    white-space: pre-line;
     padding: .6rem .8rem;
     border-left: 3px solid var(--warn);
     background: var(--panel);
@@ -229,6 +230,31 @@
   .track > .fill.queued { background: none; color: var(--muted); border: 1px dashed var(--line); }
   .track > .fill .phase { opacity: .85; font-size: .8rem; }
   #build-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
+  /* A row that opens says so on hover and on focus, and nowhere louder. */
+  .opens { cursor: pointer; border-radius: 4px; }
+  .opens:hover, .opens:focus-visible { background: var(--ghost); outline: none; }
+  /* The critical path is a mark at the row's edge, in the tone the page uses
+     for work in flight: it says where the time goes, not that anything failed. */
+  .task.critical .id { color: var(--warn); font-weight: 600; }
+  .task.critical .id::before { content: "◆ "; font-size: .7em; }
+  .detail {
+    margin: .2rem 0 .6rem 2.8rem; padding: 0; list-style: none;
+    font-size: .85rem; color: var(--muted);
+  }
+  .detail li { padding: .05rem 0; overflow-wrap: anywhere; }
+  .row .name .quote { color: var(--ink); }
+  .untraced { margin-left: .5rem; font-size: .8rem; }
+  .untraced-fail { color: var(--fail); }
+  .untraced-quiet { color: var(--muted); }
+
+  /* --- what only the user can settle --- */
+  .group-name {
+    font-size: .8rem; font-weight: 600; margin: .8rem 0 .25rem; color: var(--ink);
+  }
+  h4.group-name { font-weight: 400; color: var(--muted); margin: .4rem 0 .15rem 1rem; }
+  #handover .group-name:first-child { margin-top: 0; }
+  .group { margin: 0 0 .3rem 1rem; padding-left: 1rem; font-size: .9rem; }
+  .group li { overflow-wrap: anywhere; }
   /* The two view controls: the reader's own, and nothing to do with the прогон. */
   #controls {
     display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
@@ -337,6 +363,8 @@
     </div>
   </section>
 
+  <section data-region="handover"><h2 data-label="handover"></h2><div id="handover"></div></section>
+
   <section data-region="stages"><h2 data-label="stages"></h2><div id="stages"></div></section>
 
   <section data-region="build">
@@ -345,7 +373,12 @@
     <div id="tasks"></div>
   </section>
 
-  <section data-region="requirement-list"><h2 data-label="requirement-list"></h2><div id="requirements"></div></section>
+  <section data-region="requirement-list">
+    <h2 data-label="requirement-list"></h2>
+    <div id="requirements"></div>
+    <div id="requirement-rows"></div>
+    <div id="requirement-folds"></div>
+  </section>
   <section data-region="gates"><h2 data-label="gates"></h2><div id="gates"></div></section>
 </main>
 
@@ -438,6 +471,26 @@ globalThis.MAESTRO_LOGIC = (function () {
         passed: 'Пройдена', setup_failed: 'Ошибка настройки',
         unavailable: 'Недоступна', not_applicable: 'Не нужна'
       },
+      ONE_WAY_KIND: {
+        deleted: 'Удаления', renamed: 'Переименования', migration: 'Миграции',
+        'dependency-major': 'Крупные обновления зависимостей'
+      },
+      CHECK_RESULT: {
+        not_run: 'Не запускалась', passed: 'Пройдена', failed: 'Не прошла',
+        unavailable: 'Недоступна', stale: 'Устарела'
+      },
+      FAILURE_CAUSE: {
+        product: 'Ошибка в продукте', test: 'Ошибка в тесте',
+        setup: 'Ошибка настройки', unavailable_capability: 'Нечем проверить'
+      },
+      DEFECT_CAUSE: {
+        product: 'Продукт', test: 'Тест', contract: 'Контракт',
+        evidence: 'Доказательства', environment: 'Окружение'
+      },
+      DEFECT_STATUS: { open: 'Открыт', verified: 'Подтверждён', superseded: 'Заменён' },
+      REQUIREMENT_RESULT: {
+        passed: 'Прошло проверку', failed: 'Не прошло проверку', incomplete: 'Не проверено до конца'
+      },
       /** The words on screen that are the value of no field. */
       SCREEN: {
         dials: 'Тумблеры прогона',
@@ -465,6 +518,28 @@ globalThis.MAESTRO_LOGIC = (function () {
         repairBudget: 'Попытки исправления',
         strategy: 'Решение по стратегии',
         readiness: 'Готовность к проверке',
+        handover: 'Ваш ход',
+        placeholders: 'Заглушки',
+        promised: 'Обещано доделать',
+        oneWay: 'Необратимые изменения',
+        stopReason: 'Причина остановки',
+        holder: 'Метка прогона',
+        quote: 'Вашими словами',
+        checked: 'Как проверено',
+        openFindings: 'Открытые замечания',
+        tasksFor: 'Таски требования',
+        untraced: 'Не покрыто тасками',
+        context: 'Услышано, но не взято',
+        additions: 'Сверх запрошенного',
+        files: 'Файлы',
+        zone: 'Зона таска',
+        commits: 'Сохранено в истории',
+        handoffs: 'Передачи свежему субагенту',
+        repairs: 'Заходы в ремонт',
+        retries: 'Перезапуски',
+        serves: 'Служит требованиям',
+        waitsFor: 'Ждёт тасков',
+        onCriticalPath: 'На критическом пути',
         G1: 'G1', G2: 'G2', G3: 'G3', G4: 'G4'
       },
       UI: {
@@ -662,6 +737,34 @@ globalThis.MAESTRO_LOGIC = (function () {
             ? 'В последний раз что-то менялось ' + quiet + ' назад.'
             : 'Последняя запись — ' + quiet + ' назад.';
         },
+        stopReasonLine: function (reason) { return L10N.ru.SCREEN.stopReason + ': ' + reason; },
+        holderLine: function (token, moment) {
+          return L10N.ru.SCREEN.holder + ': ' + token + ' с ' + moment + '.';
+        },
+        handoverEmpty: 'Сейчас от вас ничего не ждут.',
+        oneWayUnknown: 'Вид не распознан',
+        foldMore: function (count) { return 'Показать ещё ' + count; },
+        foldLess: 'Свернуть',
+        detail: function (name, value) { return name + ': ' + value; },
+        taskTests: function (tests) { return 'прошло ' + tests.passed + ', упало ' + tests.failed; },
+        taskAria: function (id) { return 'Подробности таска ' + id; },
+        requirementAria: function (id) { return 'Подробности требования ' + id; },
+        notEstablished: 'Проверка не установлена.',
+        recordUnreadable: 'Запись проверки не читается.',
+        noChecks: 'Проверок по этому требованию пока нет.',
+        noTasksFor: 'Ни один таск не называет это требование.',
+        quote: function (text) { return '«' + text + '»'; },
+        checkLine: function (check, result, cause) {
+          var line = check.id + ' · ' + check.method + ' — ' + result;
+          if (cause) line += ' · ' + cause;
+          if (check.limitation) line += ' · ' + check.limitation;
+          return line;
+        },
+        defectLine: function (defect, status, cause) {
+          return defect.id + ' — ' + status + ' · ' + cause + ': ' + defect.counterexample;
+        },
+        contextLine: function (item) { return '«' + item.quote + '» — ' + item.reason; },
+        groupToggle: function (name, count) { return name + ' — ' + count; },
         themeLight: 'Светлая',
         themeDark: 'Тёмная',
         themeAria: 'Тема страницы',
@@ -709,6 +812,26 @@ globalThis.MAESTRO_LOGIC = (function () {
         passed: 'Passed', setup_failed: 'Setup failed',
         unavailable: 'Unavailable', not_applicable: 'Not needed'
       },
+      ONE_WAY_KIND: {
+        deleted: 'Deletions', renamed: 'Renames', migration: 'Migrations',
+        'dependency-major': 'Major dependency upgrades'
+      },
+      CHECK_RESULT: {
+        not_run: 'Not run', passed: 'Passed', failed: 'Did not pass',
+        unavailable: 'Unavailable', stale: 'Out of date'
+      },
+      FAILURE_CAUSE: {
+        product: 'Fault in the product', test: 'Fault in the test',
+        setup: 'Setup failed', unavailable_capability: 'No way to check'
+      },
+      DEFECT_CAUSE: {
+        product: 'Product', test: 'Test', contract: 'Contract',
+        evidence: 'Evidence', environment: 'Environment'
+      },
+      DEFECT_STATUS: { open: 'Open', verified: 'Verified', superseded: 'Superseded' },
+      REQUIREMENT_RESULT: {
+        passed: 'Passed the check', failed: 'Did not pass the check', incomplete: 'Not fully checked'
+      },
       SCREEN: {
         dials: 'Dials',
         progress: 'Project progress',
@@ -735,6 +858,28 @@ globalThis.MAESTRO_LOGIC = (function () {
         repairBudget: 'Repair attempts',
         strategy: 'Strategy decision',
         readiness: 'Readiness',
+        handover: 'Your move',
+        placeholders: 'Placeholders',
+        promised: 'Promised work',
+        oneWay: 'One-way changes',
+        stopReason: 'Why it stopped',
+        holder: 'Run claim',
+        quote: 'In your words',
+        checked: 'How it was checked',
+        openFindings: 'Open findings',
+        tasksFor: 'Tasks for it',
+        untraced: 'No task covers it',
+        context: 'Heard, not taken',
+        additions: 'Beyond the ask',
+        files: 'Files',
+        zone: 'Owned area',
+        commits: 'Saved in history',
+        handoffs: 'Passed to a fresh subagent',
+        repairs: 'Trips to repair',
+        retries: 'Restarts',
+        serves: 'Serves',
+        waitsFor: 'Waits for',
+        onCriticalPath: 'On the critical path',
         G1: 'G1', G2: 'G2', G3: 'G3', G4: 'G4'
       },
       UI: {
@@ -916,6 +1061,34 @@ globalThis.MAESTRO_LOGIC = (function () {
             ? 'Something last changed ' + quiet + ' ago.'
             : 'Last write — ' + quiet + ' ago.';
         },
+        stopReasonLine: function (reason) { return L10N.en.SCREEN.stopReason + ': ' + reason; },
+        holderLine: function (token, moment) {
+          return L10N.en.SCREEN.holder + ': ' + token + ' since ' + moment + '.';
+        },
+        handoverEmpty: 'Nothing is waiting on you right now.',
+        oneWayUnknown: 'Kind not recognised',
+        foldMore: function (count) { return 'Show ' + count + ' more'; },
+        foldLess: 'Fold',
+        detail: function (name, value) { return name + ': ' + value; },
+        taskTests: function (tests) { return tests.passed + ' passed, ' + tests.failed + ' failed'; },
+        taskAria: function (id) { return 'Details of task ' + id; },
+        requirementAria: function (id) { return 'Details of requirement ' + id; },
+        notEstablished: 'Verification not established.',
+        recordUnreadable: 'Verification record cannot be read.',
+        noChecks: 'No checks for this requirement yet.',
+        noTasksFor: 'No task names this requirement.',
+        quote: function (text) { return '«' + text + '»'; },
+        checkLine: function (check, result, cause) {
+          var line = check.id + ' · ' + check.method + ' — ' + result;
+          if (cause) line += ' · ' + cause;
+          if (check.limitation) line += ' · ' + check.limitation;
+          return line;
+        },
+        defectLine: function (defect, status, cause) {
+          return defect.id + ' — ' + status + ' · ' + cause + ': ' + defect.counterexample;
+        },
+        contextLine: function (item) { return '«' + item.quote + '» — ' + item.reason; },
+        groupToggle: function (name, count) { return name + ' — ' + count; },
         themeLight: 'Light',
         themeDark: 'Dark',
         themeAria: 'Page theme',
@@ -1348,7 +1521,16 @@ globalThis.MAESTRO_LOGIC = (function () {
   }
 
   /** The longest chain of таски still to run, counted in таски. */
-  function criticalPath(tasks) {
+  /**
+   * The longest unfinished chain of blocked таски: its length and its ids.
+   *
+   * One walk for both, because the card prints the length and the build rows
+   * mark the chain, and two walks would be two renderings of one number. The
+   * chain is read back from the same depths the length came from, earliest
+   * таск first; a cycle in `blockedBy` is cut where it closes, so a broken plan
+   * still terminates.
+   */
+  function criticalWalk(tasks) {
     var list = tasks || [];
     var byId = {};
     list.forEach(function (task) { if (task && task.id) byId[task.id] = task; });
@@ -1370,10 +1552,41 @@ globalThis.MAESTRO_LOGIC = (function () {
     }
 
     var longest = 0;
+    var head = null;
     list.forEach(function (task) {
-      if (task && task.id) longest = Math.max(longest, depth(task.id, {}));
+      if (!task || !task.id) return;
+      var reach = depth(task.id, {});
+      if (reach > longest) { longest = reach; head = task.id; }
     });
-    return longest;
+
+    var chain = [];
+    var visited = {};
+    var current = head;
+    while (current !== null && !visited[current] && chain.length < longest) {
+      visited[current] = true;
+      chain.unshift(current);
+      var next = null;
+      var best = 0;
+      (byId[current].blockedBy || []).forEach(function (blocker) {
+        if (visited[blocker]) return;
+        var reach = depth(blocker, {});
+        if (reach > best) { best = reach; next = blocker; }
+      });
+      current = next;
+    }
+    return { length: longest, chain: chain };
+  }
+
+  // The length of the marked chain, not the depth it was found by: the two are
+  // equal on any plan without a cycle, and on one with a cycle the card must
+  // still count exactly the rows it marks.
+  function criticalPath(tasks) {
+    return criticalWalk(tasks).chain.length;
+  }
+
+  /** The ids on the critical path, earliest first — what the build rows mark. */
+  function criticalChain(tasks) {
+    return criticalWalk(tasks).chain;
   }
 
   /**
@@ -1476,13 +1689,14 @@ globalThis.MAESTRO_LOGIC = (function () {
     return peak;
   }
 
+  // Counted from `handoverOf`, so the Долг card and the Ваш ход region read one
+  // list and cannot disagree about how many placeholders there are.
   function debtCounts(state) {
-    var debt = (state && state.debt) || {};
-    var count = function (list) { return Array.isArray(list) ? list.length : 0; };
+    var handover = handoverOf(state);
     var out = {
-      placeholders: count(debt.placeholders),
-      assumptions: count(debt.assumptions),
-      emptyEnv: count(debt.emptyEnv)
+      placeholders: handover.placeholders.length,
+      assumptions: handover.assumptions.length,
+      emptyEnv: handover.emptyEnv.length
     };
     out.total = out.placeholders + out.assumptions + out.emptyEnv;
     return out;
@@ -1800,6 +2014,324 @@ globalThis.MAESTRO_LOGIC = (function () {
     return null;
   }
 
+  /**
+   * The reason a stopped прогон gave, as it wrote it; null when it gave none.
+   *
+   * The page never composes a reason of its own. A state that carries the
+   * field as something other than a string is shown as written, through the
+   * same reader that keeps a finding from becoming `[object Object]`.
+   */
+  function stopReasonOf(state) {
+    if (!state || state.stopReason === undefined || state.stopReason === null) return null;
+    var line = lineOf(state.stopReason).trim();
+    return line === '' ? null : line;
+  }
+
+  /**
+   * The claim on this прогон — its token and when it was written — or null.
+   *
+   * A claim, not a lease: nothing here says whether its holder is alive, and
+   * the one place the page shows it is the raised silence notice, where the
+   * reader is about to go to the chat and may meet the same token there.
+   */
+  function holderOf(state) {
+    var held = state && state.heldBy;
+    if (!held || typeof held !== 'object') return null;
+    if (typeof held.token !== 'string' || held.token.trim() === '') return null;
+    if (typeof held.since !== 'string' || isNaN(Date.parse(held.since))) return null;
+    return { token: held.token, since: held.since };
+  }
+
+  /** The kinds a one-way line may carry, in the order the region lists them. */
+  var ONE_WAY_ORDER = ['deleted', 'renamed', 'migration', 'dependency-major'];
+
+  /**
+   * Everything only the user can settle, gathered for the Ваш ход region.
+   *
+   * Every line passes through `lineOf`. A one-way line is `<kind> — <rest>`; it
+   * is filed under its kind with the kind cut off, because the group heading
+   * already says it. A line whose kind the contract does not define is kept
+   * whole in `unknownOneWay` — dropping it would hide an irreversible change,
+   * and filing it under a guessed kind would be the page writing the state.
+   * Promised work exists only from contract 4, where the record carries it.
+   */
+  function handoverOf(state) {
+    var debt = (state && state.debt) || {};
+    var lines = function (list) { return Array.isArray(list) ? list.map(lineOf) : []; };
+    var record = state && state.contractVersion >= 4 ? state.verification : null;
+    var promised = record && Array.isArray(record.promisedWork)
+      ? record.promisedWork
+        .filter(function (item) { return item && item.status === 'open'; })
+        .map(function (item) { return lineOf(item.description); })
+      : [];
+    var oneWay = {};
+    var unknownOneWay = [];
+    lines(state && state.oneWay).forEach(function (line) {
+      var cut = line.indexOf(' — ');
+      var kind = cut === -1 ? '' : line.slice(0, cut).trim();
+      if (ONE_WAY_ORDER.indexOf(kind) === -1) { unknownOneWay.push(line); return; }
+      (oneWay[kind] = oneWay[kind] || []).push(line.slice(cut + 3));
+    });
+    var out = {
+      emptyEnv: lines(debt.emptyEnv),
+      placeholders: lines(debt.placeholders),
+      promised: promised,
+      oneWay: oneWay,
+      unknownOneWay: unknownOneWay,
+      assumptions: lines(debt.assumptions)
+    };
+    var oneWayCount = unknownOneWay.length;
+    ONE_WAY_ORDER.forEach(function (kind) { oneWayCount += (oneWay[kind] || []).length; });
+    out.oneWayCount = oneWayCount;
+    out.total = out.emptyEnv.length + out.placeholders.length + out.promised.length
+      + oneWayCount + out.assumptions.length;
+    return out;
+  }
+
+  /** How many lines of one group are shown before the rest is folded. */
+  var FOLD_AFTER = 5;
+
+  /**
+   * What the state holds for one таск, and nothing it does not.
+   *
+   * A field the state does not carry is left out rather than reported as zero:
+   * «Перезапуски: 0» would be a claim, and an absent field makes none. A state
+   * from before contract 3 carried one `commit`; it is read as a list of one.
+   */
+  function taskDetailOf(state, id) {
+    var tasks = (state && state.tasks) || [];
+    var task = null;
+    tasks.forEach(function (item) { if (item && item.id === id) task = item; });
+    if (!task) return null;
+    var out = { id: task.id, onCriticalPath: criticalChain(tasks).indexOf(task.id) !== -1 };
+    var list = function (value) { return Array.isArray(value) ? value.map(lineOf) : null; };
+    var files = list(task.files);
+    if (files && files.length) out.files = files;
+    var zone = list(task.zone);
+    if (zone && zone.length) out.zone = zone;
+    var commits = list(task.commits) || (typeof task.commit === 'string' ? [task.commit] : null);
+    if (commits && commits.length) out.commits = commits.map(function (hash) { return hash.slice(0, 7); });
+    var serves = list(task.requirementIds);
+    if (serves && serves.length) out.requirementIds = serves;
+    var waits = list(task.blockedBy);
+    if (waits && waits.length) out.blockedBy = waits;
+    ['retries', 'repairs', 'handoffs'].forEach(function (key) {
+      if (typeof task[key] === 'number' && isFinite(task[key])) out[key] = task[key];
+    });
+    if (task.tests && typeof task.tests.passed === 'number' && typeof task.tests.failed === 'number') {
+      out.tests = { passed: task.tests.passed, failed: task.tests.failed };
+    }
+    var closure = null;
+    try { closure = closureOf(state); } catch (error) { closure = null; }
+    if (closure && closure.defects[task.id]) out.defects = closure.defects[task.id];
+    return out;
+  }
+
+  /**
+   * One требование's chain: the user's words, the таски that name it, and —
+   * from contract 4 — how it was checked.
+   *
+   * The check results are the ones `verificationOf` derives the требование's
+   * own result from, stale when a fingerprint moved, so the chain cannot say
+   * «passed» beside a требование the page counts as failed. A record that does
+   * not read leaves `unreadable` set and no partial chain: half a chain looks
+   * like a whole one to a reader who cannot see the other half.
+   */
+  function requirementDetailOf(state, id) {
+    var requirements = (state && state.requirements) || [];
+    var entry = null;
+    requirements.forEach(function (item) { if (item && item.id === id) entry = item; });
+    if (!entry) return null;
+    var out = {
+      id: entry.id,
+      status: entry.status,
+      title: typeof entry.title === 'string' && entry.title.trim() !== '' ? entry.title : null,
+      servingTaskIds: ((state && state.tasks) || [])
+        .filter(function (task) { return task && Array.isArray(task.requirementIds) && task.requirementIds.indexOf(id) !== -1; })
+        .map(function (task) { return task.id; }),
+      quotes: [],
+      result: null,
+      checks: [],
+      openFindings: [],
+      defects: [],
+      established: false,
+      unreadable: false
+    };
+    var record = state && state.contractVersion >= 4 ? state.verification : null;
+    if (!record) return out;
+    try {
+      var summary = verificationOf(state);
+      if (summary.legacy) return out;
+      var names = function (item) { return Array.isArray(item.requirementIds) && item.requirementIds.indexOf(id) !== -1; };
+      var quotes = record.version >= 2 && Array.isArray(record.sourceClauses)
+        ? record.sourceClauses
+          .filter(function (clause) { return clause && clause.classification === 'requirement' && names(clause); })
+          .map(function (clause) { return lineOf(clause.quote); })
+        : [];
+      var checkIds = [];
+      record.obligations
+        .filter(function (item) { return item.targetRevision === record.targetRevision && names(item); })
+        .forEach(function (item) {
+          item.checkIds.forEach(function (check) { if (checkIds.indexOf(check) === -1) checkIds.push(check); });
+        });
+      var checks = [];
+      checkIds.forEach(function (checkId) {
+        var check = record.checks.filter(function (item) { return item.id === checkId; })[0];
+        if (!check) return;
+        var execution = effectiveExecution(check, record);
+        var line = { id: check.id, method: lineOf(check.method), result: summary.checkResults[check.id] || 'not_run' };
+        if (execution && execution.failureCause) line.failureCause = execution.failureCause;
+        if (execution && execution.limitation) line.limitation = lineOf(execution.limitation);
+        checks.push(line);
+      });
+      var findings = record.findings.filter(function (item) { return item.status === 'open' && names(item); });
+      var ownFindingIds = record.findings.filter(names).map(function (item) { return item.id; });
+      var defects = record.version >= 3 && Array.isArray(record.defects)
+        ? record.defects
+          .filter(function (defect) {
+            if (defect.status === 'superseded') return false;
+            return [defect.rootFindingId].concat(defect.findingIds || [])
+              .some(function (findingId) { return ownFindingIds.indexOf(findingId) !== -1; });
+          })
+          .map(function (defect) {
+            return { id: defect.id, status: defect.status, causeClass: defect.causeClass,
+              counterexample: lineOf(defect.counterexample) };
+          })
+        : [];
+      out.quotes = quotes;
+      out.result = summary.requirementResults[id] || null;
+      out.checks = checks;
+      out.openFindings = findings.map(function (item) { return lineOf(item.description); });
+      out.defects = defects;
+      out.established = true;
+    } catch (error) {
+      out.unreadable = true;
+    }
+    return out;
+  }
+
+  /**
+   * The user's words the manifest phase classified as context, each with its
+   * reason — what makes «nothing the user said quietly vanished» checkable.
+   */
+  function contextClausesOf(state) {
+    var record = state && state.contractVersion >= 4 ? state.verification : null;
+    if (!record || record.version < 2 || !Array.isArray(record.sourceClauses)) return [];
+    return record.sourceClauses
+      .filter(function (clause) { return clause && clause.classification === 'context'; })
+      .map(function (clause) {
+        return { quote: lineOf(clause.quote), reason: lineOf(clause.exclusionReason) };
+      });
+  }
+
+  /** What the прогон delivered beyond the ask, one line each, as written. */
+  function additionsOf(state) {
+    return state && Array.isArray(state.additions) ? state.additions.map(lineOf) : [];
+  }
+
+  /**
+   * Live требования no таск names, and the tone to mark them in.
+   *
+   * Nothing is untraced before the plan has cut a single таск: every
+   * требование would be, and a screen of marks saying the plan has not happened
+   * yet says nothing the stage card does not. After G3 has passed, the plan
+   * check has already ruled on the trace, so the mark is a record, not an alarm.
+   */
+  function untracedOf(state) {
+    var tasks = (state && state.tasks) || [];
+    if (tasks.length === 0) return { ids: [], tone: 'quiet' };
+    var named = {};
+    tasks.forEach(function (task) {
+      ((task && task.requirementIds) || []).forEach(function (id) { named[id] = true; });
+    });
+    var ids = ((state && state.requirements) || [])
+      .filter(function (item) { return item && item.status !== 'deferred' && item.status !== 'dropped' && !named[item.id]; })
+      .map(function (item) { return item.id; });
+    var plan = null;
+    ((state && state.gates) || []).forEach(function (gate) { if (gate && gate.id === 'G3') plan = gate; });
+    return { ids: ids, tone: plan && plan.status === 'passed' ? 'quiet' : 'fail' };
+  }
+
+  /**
+   * The set of opened rows with one key flipped, as a new object.
+   *
+   * The regions are rebuilt on every poll, so an opened detail is remembered by
+   * key — таск id, требование id, group name — rather than by the node that
+   * held it, the way an opened findings list is remembered by gate id.
+   */
+  function toggled(open, key) {
+    var next = {};
+    Object.keys(open || {}).forEach(function (name) { if (open[name]) next[name] = true; });
+    if (next[key]) delete next[key]; else next[key] = true;
+    return next;
+  }
+
+  /**
+   * The lines an opened таск row shows, in the прогон's language.
+   *
+   * Composed here rather than in the view so a test can read them: the view is
+   * the half of this page nothing in the repository executes.
+   */
+  function describeTask(state, id, language) {
+    var detail = taskDetailOf(state, id);
+    if (!detail) return [];
+    var said = words(language);
+    var name = said.SCREEN;
+    var lines = [];
+    if (detail.onCriticalPath) lines.push(name.onCriticalPath);
+    if (detail.requirementIds) lines.push(said.UI.detail(name.serves, detail.requirementIds.join(', ')));
+    if (detail.blockedBy) lines.push(said.UI.detail(name.waitsFor, detail.blockedBy.join(', ')));
+    if (detail.files) lines.push(said.UI.detail(name.files, detail.files.join(', ')));
+    if (detail.zone) lines.push(said.UI.detail(name.zone, detail.zone.join(', ')));
+    if (detail.commits) lines.push(said.UI.detail(name.commits, detail.commits.join(', ')));
+    if (detail.retries !== undefined) lines.push(said.UI.detail(name.retries, detail.retries));
+    if (detail.repairs !== undefined) lines.push(said.UI.detail(name.repairs, detail.repairs));
+    if (detail.handoffs !== undefined) lines.push(said.UI.detail(name.handoffs, detail.handoffs));
+    if (detail.tests) lines.push(said.UI.detail(name.tests, said.UI.taskTests(detail.tests)));
+    if (detail.defects) lines.push(said.UI.taskDefects(detail.defects));
+    return lines;
+  }
+
+  /**
+   * The lines an opened требование row shows: the user's words, its таски,
+   * then — only where verification is established — its checks, open findings
+   * and defects. An unreadable record says so in the run notice's own words and
+   * shows no partial chain.
+   */
+  function describeRequirement(state, id, language) {
+    var detail = requirementDetailOf(state, id);
+    if (!detail) return [];
+    var said = words(language);
+    var name = said.SCREEN;
+    var lines = [];
+    detail.quotes.forEach(function (quote) {
+      lines.push(said.UI.detail(name.quote, said.UI.quote(quote)));
+    });
+    lines.push(detail.servingTaskIds.length > 0
+      ? said.UI.detail(name.tasksFor, detail.servingTaskIds.join(', '))
+      : said.UI.noTasksFor);
+    if (detail.unreadable) { lines.push(said.UI.recordUnreadable); return lines; }
+    if (!detail.established) { lines.push(said.UI.notEstablished); return lines; }
+    if (detail.checks.length === 0) {
+      lines.push(said.UI.noChecks);
+    } else {
+      lines.push(name.checked + ':');
+      detail.checks.forEach(function (check) {
+        lines.push(said.UI.checkLine(check, label(said.CHECK_RESULT, check.result),
+          check.failureCause ? label(said.FAILURE_CAUSE, check.failureCause) : null));
+      });
+    }
+    if (detail.openFindings.length > 0) {
+      lines.push(name.openFindings + ':');
+      detail.openFindings.forEach(function (finding) { lines.push(finding); });
+    }
+    detail.defects.forEach(function (defect) {
+      lines.push(said.UI.defectLine(defect, label(said.DEFECT_STATUS, defect.status),
+        label(said.DEFECT_CAUSE, defect.causeClass)));
+    });
+    return lines;
+  }
+
   /** Coarse on purpose, and never rounded up to a minute it has not reached. */
   function formatGap(ms, language) {
     return words(language).UI.gap(ms);
@@ -1856,10 +2388,13 @@ globalThis.MAESTRO_LOGIC = (function () {
     var quiet = Math.max(0, now - last);
     var record = longestSilence(marks);
     if (record !== null && quiet > record) {
-      return {
-        alarming: true,
-        line: say.silenceAlarming(say.gap(quiet), say.gap(record), plain)
-      };
+      // The claim is named here and only here: the reader is about to go to
+      // the chat, and a second chat that found the прогон claimed names the
+      // same token. The calm notice has nothing wrong to explain.
+      var holder = holderOf(state);
+      var line = say.silenceAlarming(say.gap(quiet), say.gap(record), plain);
+      if (holder) line += ' ' + say.holderLine(holder.token, formatMoment(holder.since));
+      return { alarming: true, line: line };
     }
     return { alarming: false, line: say.silenceCalm(say.gap(quiet), plain) };
   }
@@ -2037,7 +2572,8 @@ globalThis.MAESTRO_LOGIC = (function () {
           ? 'Таски ещё не нарезаны.'
           : 'Волн ' + groupByWave(tasks).length + ', тасков ' + tasks.length
             + ', наибольшая одновременность — ' + peakParallel(tasks, state, now) + '.',
-        'Одновременность читается по часам, а не по размеру волны: волна — это то, что можно было запустить вместе, а не то, что действительно шло вместе.'
+        'Одновременность читается по часам, а не по размеру волны: волна — это то, что можно было запустить вместе, а не то, что действительно шло вместе.',
+        'Строка таска нажимается: откроются его файлы, зона, сохранения в истории, требования, блокеры, перезапуски, заходы в ремонт и передачи свежему субагенту. Таски на критическом пути отмечены — в цепочке ' + criticalPath(tasks) + '; это та же цепочка, что посчитана в карточке «Осталось».'
       ];
     },
 
@@ -2048,7 +2584,21 @@ globalThis.MAESTRO_LOGIC = (function () {
         counts.total === 0
           ? 'Требования ещё не записаны.'
           : 'Живых ' + counts.live + ' из ' + counts.total + '.',
-        'Это тот же манифест, что и в карточке наверху: там счёт, здесь строки.'
+        'Это тот же манифест, что и в карточке наверху: там счёт, здесь строки.',
+        'Строка требования нажимается: слова пользователя, из которых оно выросло (с контракта 5), его таски, проверки с результатом и причиной сбоя, открытые замечания и дефекты. Не покрыто тасками: ' + untracedOf(state).ids.length + '. Ниже свёрнуты «Услышано, но не взято» (' + contextClausesOf(state).length + ') и «Сверх запрошенного» (' + additionsOf(state).length + ').'
+      ];
+    },
+
+    handover: function (state) {
+      var h = handoverOf(state);
+      return [
+        'То, что может решить только пользователь: пустые переменные окружения (только имена), заглушки, обещанная и не сделанная работа, необратимые изменения и допущения.',
+        h.total === 0
+          ? 'Сейчас от вас ничего не ждут.'
+          : 'Переменных ' + h.emptyEnv.length + ', заглушек ' + h.placeholders.length
+            + ', обещано доделать ' + h.promised.length + ', необратимых изменений ' + h.oneWayCount
+            + ', допущений ' + h.assumptions.length + '.',
+        'Карточка «Долг» считает те же списки, поэтому её числа и этот блок не расходятся. Обещанная работа видна с контракта 4. Группа длиннее пяти строк свёрнута.'
       ];
     },
 
@@ -2268,7 +2818,8 @@ globalThis.MAESTRO_LOGIC = (function () {
           ? 'Работу ещё не нарезали на таски.'
           : 'Волн ' + groupByWave(tasks).length + ', тасков ' + tasks.length
             + ', больше всего одновременно шло — ' + peakParallel(tasks, state, now) + '.',
-        'Волна — это таски, которые можно было запустить вместе. Сколько шло вместе на самом деле, читается по часам, а не по размеру волны.'
+        'Волна — это таски, которые можно было запустить вместе. Сколько шло вместе на самом деле, читается по часам, а не по размеру волны.',
+        'Строку таска можно нажать: откроются его файлы, сохранённые шаги в истории проекта, требования, которым он служит, и таски, которых он ждёт. «Передачи свежему субагенту» — не ошибка: таск оказался длинным, и его отдали новому субагенту. Отмеченные таски — самая длинная цепочка, которая ещё не закончена; по ней считается «Осталось».'
       ];
     },
 
@@ -2279,7 +2830,21 @@ globalThis.MAESTRO_LOGIC = (function () {
         counts.total === 0
           ? 'Список ещё не записан.'
           : 'Живых ' + counts.live + ' из ' + counts.total + '.',
-        'Это тот же список, что и в карточке наверху: там счёт, здесь строки.'
+        'Это тот же список, что и в карточке наверху: там счёт, здесь строки.',
+        'Строку можно нажать: откроются ваши собственные слова, из которых выросло требование, таски, которые его делают, и как его проверяли. Ниже свёрнуты ваши слова, которые не стали требованиями, с причиной (' + contextClausesOf(state).length + '), и то, что сделали сверх просьбы (' + additionsOf(state).length + ').'
+      ];
+    },
+
+    handover: function (state) {
+      var h = handoverOf(state);
+      return [
+        'Здесь собрано то, что можете сделать только вы: вписать значения настроек (здесь только их имена — сами значения сюда никогда не пишутся), заменить заглушки — временные тексты на месте ваших цен, адресов и описаний, — посмотреть на изменения, которые нельзя отменить, и решить, согласны ли вы с допущениями.',
+        h.total === 0
+          ? 'Сейчас от вас ничего не ждут.'
+          : 'Настроек без значения ' + h.emptyEnv.length + ', заглушек ' + h.placeholders.length
+            + ', обещанной и не сделанной работы ' + h.promised.length + ', изменений, которые нельзя отменить, '
+            + h.oneWayCount + ', допущений ' + h.assumptions.length + '.',
+        'Допущение — это решение, которое прогон принял за вас, потому что не спросил. Карточка «Долг» считает то же самое, поэтому её числа с этим блоком не расходятся.'
       ];
     },
 
@@ -2484,7 +3049,8 @@ globalThis.MAESTRO_LOGIC = (function () {
           ? 'No tasks cut yet.'
           : 'Waves ' + groupByWave(tasks).length + ', tasks ' + tasks.length
             + ', and the most that ran at once — ' + peakParallel(tasks, state, now) + '.',
-        'What ran at once is read off the clocks and never off the size of a wave: a wave is what could have been started together, not what actually was.'
+        'What ran at once is read off the clocks and never off the size of a wave: a wave is what could have been started together, not what actually was.',
+        'A task row opens on a press: its files, owned area, saved history entries, requirements, blockers, restarts, trips to repair and passes to a fresh subagent. Tasks on the critical path are marked — ' + criticalPath(tasks) + ' in the chain; it is the same chain the Remaining card counts.'
       ];
     },
 
@@ -2495,7 +3061,21 @@ globalThis.MAESTRO_LOGIC = (function () {
         counts.total === 0
           ? 'No requirements written down yet.'
           : 'Live ' + counts.live + ' of ' + counts.total + '.',
-        'This is the same manifest as the card above: there it is counted, here it is listed.'
+        'This is the same manifest as the card above: there it is counted, here it is listed.',
+        'A requirement row opens on a press: the user\'s words it grew from (from contract 5), its tasks, its checks with result and failure cause, open findings and defects. No task covers ' + untracedOf(state).ids.length + '. Folded below: «Heard, not taken» (' + contextClausesOf(state).length + ') and «Beyond the ask» (' + additionsOf(state).length + ').'
+      ];
+    },
+
+    handover: function (state) {
+      var h = handoverOf(state);
+      return [
+        'What only the user can settle: empty environment variables (names only), placeholders, promised work not yet done, one-way changes and assumptions.',
+        h.total === 0
+          ? 'Nothing is waiting on you right now.'
+          : 'Variables ' + h.emptyEnv.length + ', placeholders ' + h.placeholders.length
+            + ', promised work ' + h.promised.length + ', one-way changes ' + h.oneWayCount
+            + ', assumptions ' + h.assumptions.length + '.',
+        'The Debt card counts the same lists, so its numbers and this block cannot disagree. Promised work appears from contract 4. A group longer than five lines is folded.'
       ];
     },
 
@@ -2716,7 +3296,8 @@ globalThis.MAESTRO_LOGIC = (function () {
           ? 'The work has not been cut into tasks yet.'
           : 'Waves ' + groupByWave(tasks).length + ', tasks ' + tasks.length
             + ', and the most that went at the same time — ' + peakParallel(tasks, state, now) + '.',
-        'A wave is the tasks that could have been started together. How many actually went together is read off the clocks, not off the size of the wave.'
+        'A wave is the tasks that could have been started together. How many actually went together is read off the clocks, not off the size of the wave.',
+        'Press a task row to see its files, the saved steps in the project history, the requirements it serves and the tasks it waits for. «Passed to a fresh subagent» is not a mistake: the task was long, and it was handed to a new subagent. The marked tasks are the longest chain not yet finished; «Remaining» is counted along it.'
       ];
     },
 
@@ -2727,7 +3308,21 @@ globalThis.MAESTRO_LOGIC = (function () {
         counts.total === 0
           ? 'The list has not been written down yet.'
           : 'Live ' + counts.live + ' of ' + counts.total + '.',
-        'This is the same list as the card above: there it is counted, here it is spelled out.'
+        'This is the same list as the card above: there it is counted, here it is spelled out.',
+        'Press a row to see your own words it grew from, the tasks that make it, and how it was checked. Folded below are your words that did not become requirements, each with the reason (' + contextClausesOf(state).length + '), and what was made beyond what you asked (' + additionsOf(state).length + ').'
+      ];
+    },
+
+    handover: function (state) {
+      var h = handoverOf(state);
+      return [
+        'This is what only you can do: fill in the settings named here (only their names are ever written down, never their values), replace the placeholders — stand-in texts where your prices, addresses and descriptions go — look over the changes that cannot be undone, and decide whether you agree with the assumptions.',
+        h.total === 0
+          ? 'Nothing is waiting on you right now.'
+          : 'Settings without a value ' + h.emptyEnv.length + ', placeholders ' + h.placeholders.length
+            + ', promised work not yet done ' + h.promised.length + ', changes that cannot be undone '
+            + h.oneWayCount + ', assumptions ' + h.assumptions.length + '.',
+        'An assumption is a decision the run made for you because it did not ask. The Debt card counts the same things, so its numbers and this block cannot disagree.'
       ];
     },
 
@@ -2857,7 +3452,7 @@ globalThis.MAESTRO_LOGIC = (function () {
   /** The regions the page must be able to explain, in the order they appear. */
   var EXPLAIN_ORDER = [
     'dials', 'progress', 'coverage', 'stage', 'elapsed', 'estimate', 'tasks', 'debt',
-    'tests', 'requirements', 'stages', 'build', 'requirement-list', 'gates'
+    'tests', 'requirements', 'stages', 'build', 'requirement-list', 'gates', 'handover'
   ];
 
   function explain(key, state, now, marks, register, language) {
@@ -3004,6 +3599,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     taskDurations: taskDurations,
     medianTaskMs: medianTaskMs,
     criticalPath: criticalPath,
+    criticalChain: criticalChain,
     estimateMs: estimateMs,
     groupByWave: groupByWave,
     peakParallel: peakParallel,
@@ -3012,6 +3608,19 @@ globalThis.MAESTRO_LOGIC = (function () {
     contractNotice: contractNotice,
     verificationOf: verificationOf,
     closureOf: closureOf,
+    stopReasonOf: stopReasonOf,
+    holderOf: holderOf,
+    ONE_WAY_ORDER: ONE_WAY_ORDER,
+    handoverOf: handoverOf,
+    FOLD_AFTER: FOLD_AFTER,
+    taskDetailOf: taskDetailOf,
+    requirementDetailOf: requirementDetailOf,
+    contextClausesOf: contextClausesOf,
+    additionsOf: additionsOf,
+    untracedOf: untracedOf,
+    toggled: toggled,
+    describeTask: describeTask,
+    describeRequirement: describeRequirement,
     scopeProgressOf: function (state) { return scopeProgressOf(state, verificationOf(state)); },
     textDigest: textDigest,
     runNotice: runNotice,
@@ -3071,6 +3680,12 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
 
   /** Which gates' findings the reader has opened, kept across the redraw. */
   var openFindings = {};
+  /**
+   * Which таск rows, требование rows and folded groups the reader has opened,
+   * keyed `task:<id>`, `req:<id>` and `group:<name>`, kept across the redraw
+   * for the reason `openFindings` is.
+   */
+  var openRows = {};
   var TICK_MS = 1000;
   var LANGUAGE_KEY = 'maestro.language';
 
@@ -3356,7 +3971,12 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     useLanguage(storedLanguage() || L.languageOf(state));
     el('run-title').textContent = T.UI.title(state.slug, L.runDateOf(state));
 
-    var notices = [L.runNotice(state, lang), L.contractNotice(state.contractVersion, lang)]
+    // The reason a stopped прогон gave sits on its own line under the closure
+    // notice: the outcome says the run stopped, only the reason says whether
+    // the reader has a move.
+    var reason = L.stopReasonOf(state);
+    var notices = [L.runNotice(state, lang), reason ? T.UI.stopReasonLine(reason) : null,
+      L.contractNotice(state.contractVersion, lang)]
       .filter(function (line) { return !!line; });
     // Recomputed on every poll rather than on every tick: `apply` calls
     // `render` each time state.js is read, whether or not it changed, so the
@@ -3365,7 +3985,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     var silence = L.silenceNotice(state, Date.now(), marks, register, lang);
     if (silence) notices.push(silence.line);
     var notice = el('notice');
-    notice.textContent = notices.join(' ');
+    notice.textContent = notices.join('\n');
     notice.hidden = notices.length === 0;
     notice.className = silence && silence.alarming ? 'alarm' : '';
 
@@ -3388,6 +4008,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     renderBuild(state);
     renderRequirements(state);
     renderGates(state);
+    renderHandover(state);
     refillOpenExplainer();
     tick();
   }
@@ -3541,6 +4162,8 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     // less than the total, and the page is losing a таск in front of the reader.
     if (counts.offContract > 0) chip(chips, T.SCREEN.offContract, counts.offContract);
 
+    var critical = L.criticalChain(tasks);
+
     L.groupByWave(tasks).forEach(function (group) {
       // The claim of parallelism is read from the clocks, never from the size
       // of the wave: a wave is what may run together, not what did.
@@ -3548,7 +4171,10 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       put(host, 'div', T.UI.waveName(group.wave, parallel), 'wave-name');
 
       group.tasks.forEach(function (task) {
-        var row = put(host, 'div', null, 'task task-' + task.status);
+        var onPath = critical.indexOf(task.id) !== -1;
+        var row = put(host, 'div', null, 'task task-' + task.status + (onPath ? ' critical' : ''));
+        if (onPath) row.title = T.SCREEN.onCriticalPath;
+        opener(row, 'task:' + task.id, T.UI.taskAria(task.id), function () { renderBuild(state); tick(); });
         put(row, 'span', task.id, 'id');
 
         var track = put(row, 'div', null, 'track');
@@ -3573,8 +4199,102 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
           clock.dataset.from = task.startedAt;
           clock.dataset.until = task.finishedAt || '';
         }
+
+        if (openRows['task:' + task.id]) {
+          var detail = put(host, 'ul', null, 'detail');
+          L.describeTask(state, task.id, lang).forEach(function (line) { put(detail, 'li', line); });
+        }
       });
     });
+  }
+
+  /**
+   * Make a drawn row open and close its detail, by mouse and by keyboard.
+   *
+   * The row stays a `div` because it holds a block track; a `button` may not.
+   * The open state lives in `openRows` under `key`, so the detail survives the
+   * redraw every poll performs.
+   */
+  function opener(row, key, aria, redraw) {
+    var open = !!openRows[key];
+    row.setAttribute('role', 'button');
+    row.setAttribute('tabindex', '0');
+    row.setAttribute('aria-expanded', open ? 'true' : 'false');
+    row.setAttribute('aria-label', aria);
+    row.classList.add('opens');
+    var flip = function () {
+      openRows = L.toggled(openRows, key);
+      redraw();
+    };
+    row.addEventListener('click', flip);
+    row.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      flip();
+    });
+  }
+
+  /**
+   * A heading and its lines, the lines past FOLD_AFTER folded behind a press.
+   * Nothing is drawn for an empty list: an empty group is not news.
+   */
+  function drawGroup(host, key, heading, lines, redraw, nested) {
+    if (lines.length === 0) return;
+    put(host, nested ? 'h4' : 'h3', T.UI.groupToggle(heading, lines.length), 'group-name');
+    var open = !!openRows['group:' + key];
+    var list = put(host, 'ul', null, 'group');
+    (open ? lines : lines.slice(0, L.FOLD_AFTER)).forEach(function (line) { put(list, 'li', line); });
+    if (lines.length <= L.FOLD_AFTER) return;
+    var toggle = put(host, 'button',
+      open ? T.UI.foldLess : T.UI.foldMore(lines.length - L.FOLD_AFTER), 'findings-toggle');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.addEventListener('click', function () {
+      openRows = L.toggled(openRows, 'group:' + key);
+      redraw();
+    });
+  }
+
+  /**
+   * A whole list behind one press, for a record nobody has to act on — the
+   * words heard but not taken, and what was delivered beyond the ask.
+   */
+  function drawFolded(host, key, heading, lines, redraw) {
+    if (lines.length === 0) return;
+    var open = !!openRows['group:' + key];
+    var toggle = put(host, 'button', T.UI.groupToggle(heading, lines.length), 'findings-toggle');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.addEventListener('click', function () {
+      openRows = L.toggled(openRows, 'group:' + key);
+      redraw();
+    });
+    if (!open) return;
+    var list = put(host, 'ul', null, 'findings findings-quiet');
+    lines.forEach(function (line) { put(list, 'li', line); });
+  }
+
+  function renderHandover(state) {
+    var host = clear(el('handover'));
+    var handover = L.handoverOf(state);
+    if (handover.total === 0) {
+      empty(host, T.UI.handoverEmpty);
+      return;
+    }
+    var again = function () { renderHandover(state); };
+    // Names only: S2 keeps every value out of the state, and this list is
+    // where a value would be most tempting to show.
+    drawGroup(host, 'emptyEnv', T.SCREEN.variables, handover.emptyEnv, again);
+    drawGroup(host, 'placeholders', T.SCREEN.placeholders, handover.placeholders, again);
+    drawGroup(host, 'promised', T.SCREEN.promised, handover.promised, again);
+    if (handover.oneWayCount > 0) {
+      put(host, 'h3', T.UI.groupToggle(T.SCREEN.oneWay, handover.oneWayCount), 'group-name');
+      L.ONE_WAY_ORDER.forEach(function (kind) {
+        drawGroup(host, 'oneWay:' + kind, L.label(T.ONE_WAY_KIND, kind), handover.oneWay[kind] || [], again, true);
+      });
+      drawGroup(host, 'oneWay:unknown', T.UI.oneWayUnknown, handover.unknownOneWay, again, true);
+    }
+    drawGroup(host, 'assumptions', T.SCREEN.assumptions, handover.assumptions, again);
   }
 
   function renderRequirements(state) {
@@ -3599,6 +4319,44 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     var closure = null;
     try { closure = L.closureOf(state); } catch (error) { closure = null; }
     if (closure) put(host, 'p', T.UI.readinessRow(closure.readiness), 'total');
+    renderRequirementRows(state);
+  }
+
+  /**
+   * One row per требование, opening to its chain, then the two folded records
+   * below the list. Redrawn on its own when a row opens, so the counts above
+   * and the explainer beside the heading are left where they are.
+   */
+  function renderRequirementRows(state) {
+    var rows = clear(el('requirement-rows'));
+    var folds = clear(el('requirement-folds'));
+    var again = function () { renderRequirementRows(state); };
+    var untraced = L.untracedOf(state);
+
+    (state.requirements || []).forEach(function (requirement) {
+      if (!requirement || !requirement.id) return;
+      var detail = L.requirementDetailOf(state, requirement.id);
+      var row = put(rows, 'div', null, 'row req req-' + L.lineOf(requirement.status));
+      opener(row, 'req:' + requirement.id, T.UI.requirementAria(requirement.id), again);
+      put(row, 'span', requirement.id, 'id');
+      var words = put(row, 'span', null, 'name');
+      if (detail && detail.quotes.length > 0) put(words, 'span', T.UI.quote(detail.quotes[0]), 'quote');
+      else if (detail && detail.title) put(words, 'span', detail.title, 'quote');
+      if (untraced.ids.indexOf(requirement.id) !== -1) {
+        put(words, 'span', T.SCREEN.untraced, 'untraced untraced-' + untraced.tone);
+      }
+      put(row, 'span', L.label(T.REQUIREMENT_STATUS, requirement.status), 'status');
+      put(row, 'span', detail && detail.result ? L.label(T.REQUIREMENT_RESULT, detail.result) : '', 'status');
+
+      if (openRows['req:' + requirement.id]) {
+        var list = put(rows, 'ul', null, 'detail');
+        L.describeRequirement(state, requirement.id, lang).forEach(function (line) { put(list, 'li', line); });
+      }
+    });
+
+    drawFolded(folds, 'context', T.SCREEN.context,
+      L.contextClausesOf(state).map(function (item) { return T.UI.contextLine(item); }), again);
+    drawFolded(folds, 'additions', T.SCREEN.additions, L.additionsOf(state), again);
   }
 
   function renderGates(state) {

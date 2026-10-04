@@ -115,6 +115,30 @@ half-supported.
 | `verification.readiness[].probes[].result` | `setup_failed` | Ошибка настройки | Setup failed |
 | `verification.readiness[].probes[].result` | `unavailable` | Недоступна | Unavailable |
 | `verification.readiness[].probes[].result` | `not_applicable` | Не нужна | Not needed |
+| `oneWay[].kind` | `deleted` | Удаления | Deletions |
+| `oneWay[].kind` | `renamed` | Переименования | Renames |
+| `oneWay[].kind` | `migration` | Миграции | Migrations |
+| `oneWay[].kind` | `dependency-major` | Крупные обновления зависимостей | Major dependency upgrades |
+| `verification.checks[].result` | `not_run` | Не запускалась | Not run |
+| `verification.checks[].result` | `passed` | Пройдена | Passed |
+| `verification.checks[].result` | `failed` | Не прошла | Did not pass |
+| `verification.checks[].result` | `unavailable` | Недоступна | Unavailable |
+| `verification.checks[].result` | `stale` | Устарела | Out of date |
+| `verification.executions[].failureCause` | `product` | Ошибка в продукте | Fault in the product |
+| `verification.executions[].failureCause` | `test` | Ошибка в тесте | Fault in the test |
+| `verification.executions[].failureCause` | `setup` | Ошибка настройки | Setup failed |
+| `verification.executions[].failureCause` | `unavailable_capability` | Нечем проверить | No way to check |
+| `verification.defects[].causeClass` | `product` | Продукт | Product |
+| `verification.defects[].causeClass` | `test` | Тест | Test |
+| `verification.defects[].causeClass` | `contract` | Контракт | Contract |
+| `verification.defects[].causeClass` | `evidence` | Доказательства | Evidence |
+| `verification.defects[].causeClass` | `environment` | Окружение | Environment |
+| `verification.defects[].status` | `open` | Открыт | Open |
+| `verification.defects[].status` | `verified` | Подтверждён | Verified |
+| `verification.defects[].status` | `superseded` | Заменён | Superseded |
+| `verification.acceptanceRounds[].requirementResults` | `passed` | Прошло проверку | Passed the check |
+| `verification.acceptanceRounds[].requirementResults` | `failed` | Не прошло проверку | Did not pass the check |
+| `verification.acceptanceRounds[].requirementResults` | `incomplete` | Не проверено до конца | Not fully checked |
 
 `Готово` and `Готов` differ because one describes a stage and the other a таск,
 and Russian will not let one form serve both without reading as a mistake. They
@@ -168,6 +192,28 @@ term, and a term with two homes drifts.
 | Попытки исправления | Repair attempts | Contract 6: repair attempts used out of the total limit, on the Таски card |
 | Решение по стратегии | Strategy decision | Contract 6: the latest strategy review's decision, beside the repair attempts |
 | Готовность к проверке | Readiness | Contract 6: whether the current candidate's latest readiness record passed, failed in setup, or lacks a capability, with the probe kinds that did not pass |
+| Ваш ход | Your move | What only the user can settle, gathered in one region |
+| Заглушки | Placeholders | Visible stand-ins for facts only the user has — prices, addresses, texts |
+| Обещано доделать | Promised work | Work the прогон promised and has not finished — contract 4 and later |
+| Необратимые изменения | One-way changes | Inward changes the user should know about before building on top: deletions, renames, migrations, major upgrades |
+| Причина остановки | Why it stopped | The reason a прогон stopped without full verification, as the прогон wrote it |
+| Метка прогона | Run claim | The short token a chat writes when it takes the прогон, shown only when the прогон has gone quiet for too long |
+| Вашими словами | In your words | The user's own words a требование came from, quoted in the language they were said in |
+| Как проверено | How it was checked | The checks behind one требование, each with its result |
+| Открытые замечания | Open findings | Findings against one требование that are not yet resolved |
+| Таски требования | Tasks for it | The таски that name one требование |
+| Не покрыто тасками | No task covers it | A live требование no таск names |
+| Услышано, но не взято | Heard, not taken | The user's words the manifest phase classified as context rather than a требование, each with its reason |
+| Сверх запрошенного | Beyond the ask | What the прогон delivered that nobody asked for |
+| Файлы | Files | What a таск delivered, as paths |
+| Зона таска | Owned area | The part of the boundary map one таск owns |
+| Сохранено в истории | Saved in history | The project-history entries a таск landed in, as short hashes |
+| Передачи свежему субагенту | Passed to a fresh subagent | Times a таск outgrew a context and was relayed — not a defect |
+| Заходы в ремонт | Trips to repair | Times a таск went through the repair phase |
+| Перезапуски | Restarts | Times a таск was started again from scratch |
+| Служит требованиям | Serves | The требования one таск names |
+| Ждёт тасков | Waits for | The таски one таск is blocked by |
+| На критическом пути | On the critical path | The marker on a таск that sits on the chain the estimate is measured along |
 | G1 | G1 | The gate after брифинг, shown as a row of Гейты |
 | G2 | G2 | The gate after спецификация |
 | G3 | G3 | The gate after план |

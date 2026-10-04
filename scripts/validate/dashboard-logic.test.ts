@@ -95,6 +95,28 @@ interface Logic {
   taskDurations: (state: unknown, now: number, marks?: number[]) => number[];
   medianTaskMs: (state: unknown, now: number, marks?: number[]) => number | null;
   criticalPath: (tasks: unknown) => number;
+  criticalChain: (tasks: unknown) => string[];
+  stopReasonOf: (state: unknown) => string | null;
+  holderOf: (state: unknown) => { token: string; since: string } | null;
+  ONE_WAY_ORDER: string[];
+  FOLD_AFTER: number;
+  handoverOf: (state: unknown) => {
+    emptyEnv: string[]; placeholders: string[]; promised: string[];
+    oneWay: Record<string, string[]>; unknownOneWay: string[]; assumptions: string[];
+    oneWayCount: number; total: number;
+  };
+  taskDetailOf: (state: unknown, id: string) => Record<string, unknown> | null;
+  requirementDetailOf: (state: unknown, id: string) => {
+    id: string; status: string; title: string | null; servingTaskIds: string[]; quotes: string[];
+    result: string | null; checks: Array<Record<string, string>>; openFindings: string[];
+    defects: Array<Record<string, string>>; established: boolean; unreadable: boolean;
+  } | null;
+  contextClausesOf: (state: unknown) => Array<{ quote: string; reason: string }>;
+  additionsOf: (state: unknown) => string[];
+  untracedOf: (state: unknown) => { ids: string[]; tone: string };
+  toggled: (open: Record<string, boolean>, key: string) => Record<string, boolean>;
+  describeTask: (state: unknown, id: string, language?: string) => string[];
+  describeRequirement: (state: unknown, id: string, language?: string) => string[];
   estimateMs: (state: unknown, now: number, marks?: number[]) => { low: number; high: number } | null;
   groupByWave: (tasks: unknown) => Array<{ wave: number; tasks: Array<{ id: string }> }>;
   peakParallel: (tasks: unknown, state: unknown, now: number) => number;
@@ -957,7 +979,7 @@ const busy = (): Record<string, unknown> => run({
 const NOW = AT('2026-08-19T10:35:00.000Z');
 
 test('the page can explain every region it renders', () => {
-  assert.equal(L.EXPLAIN_ORDER.length, 14);
+  assert.equal(L.EXPLAIN_ORDER.length, 15);
   for (const key of L.EXPLAIN_ORDER) {
     const state = busy();
     const lines = L.explain(key, state, NOW, L.collectMarks(state));
@@ -1366,4 +1388,211 @@ test('a state without a parseable dir keeps the slug-only title', () => {
     assert.equal(L.runDateOf(state), null);
   }
   assert.equal(titleIn('ru')('landing-page', L.runDateOf({ slug: 'landing-page' })), 'Прогон: landing-page');
+});
+
+// --- what the state already holds, now on the page ---------------------------
+
+test('a stopped run\'s reason is read as written, and a record is shown rather than [object Object]', () => {
+  assert.equal(L.stopReasonOf(bare({ stopReason: 'The schema task never closed' })), 'The schema task never closed');
+  assert.equal(L.stopReasonOf(bare({ stopReason: { why: 'budget' } })), '{"why":"budget"}');
+  assert.equal(L.stopReasonOf(bare()), null);
+  assert.equal(L.stopReasonOf(bare({ stopReason: '   ' })), null);
+  assert.equal(ui('ru')['stopReasonLine']!('бюджет исчерпан'), 'Причина остановки: бюджет исчерпан');
+  assert.equal(ui('en')['stopReasonLine']!('budget spent'), 'Why it stopped: budget spent');
+});
+
+test('a malformed claim names no holder', () => {
+  assert.equal(L.holderOf(bare()), null);
+  assert.equal(L.holderOf(bare({ heldBy: { token: '', since: '2026-08-19T10:00:00.000Z' } })), null);
+  assert.equal(L.holderOf(bare({ heldBy: { token: 'k7f2', since: 'yesterday-ish' } })), null);
+  assert.equal(L.holderOf(bare({ heldBy: 'k7f2' })), null);
+  assert.deepEqual(plain(L.holderOf(bare({ heldBy: { token: 'k7f2', since: '2026-08-19T10:00:00.000Z' } }))),
+    { token: 'k7f2', since: '2026-08-19T10:00:00.000Z' });
+});
+
+test('the claim is named in the raised silence notice and never in the calm one', () => {
+  const state = run({ heldBy: { token: 'k7f2', since: '2026-08-19T10:00:00.000Z' } });
+  const marks = L.collectMarks(state);
+  const raised = L.silenceNotice(state, AT('2026-08-19T11:15:00.000Z'), marks);
+  assert.ok(raised);
+  assert.equal(raised.alarming, true);
+  assert.match(raised.line, /Метка прогона: k7f2 с 2026-08-19 \d\d:\d\d\.$/);
+  const english = L.silenceNotice(state, AT('2026-08-19T11:15:00.000Z'), marks, 'plain', 'en');
+  assert.match(english!.line, /Run claim: k7f2 since 2026-08-19 \d\d:\d\d\.$/);
+  const calm = L.silenceNotice(state, AT('2026-08-19T10:35:00.000Z'), marks);
+  assert.equal(calm!.alarming, false);
+  assert.doesNotMatch(calm!.line, /k7f2/);
+});
+
+test('handover gathers what only the user can settle, and the Долг card counts the same lists', () => {
+  const state = structuredClone(verifiedState()) as unknown as Record<string, unknown> & ReturnType<typeof verifiedState>;
+  state.debt = { placeholders: ['price of the large plan'], assumptions: ['English copy', { quote: 'x' } as unknown as string],
+    emptyEnv: ['STRIPE_KEY'] };
+  state.oneWay = ['deleted — src/old.js — 01 abc1234', 'migration — users table — 02 def5678',
+    'renamed — header.js → masthead.js — 01 abc1234', 'teleported — somewhere — 03 0000000'];
+  state.verification!.promisedWork = [
+    { id: 'P-1', description: 'Wire the contact form', status: 'open' },
+    { id: 'P-2', description: 'Already wired', status: 'done' },
+  ];
+  const handover = plain(L.handoverOf(state));
+  assert.deepEqual(handover, {
+    emptyEnv: ['STRIPE_KEY'],
+    placeholders: ['price of the large plan'],
+    promised: ['Wire the contact form'],
+    oneWay: {
+      deleted: ['src/old.js — 01 abc1234'],
+      migration: ['users table — 02 def5678'],
+      renamed: ['header.js → masthead.js — 01 abc1234'],
+    },
+    unknownOneWay: ['teleported — somewhere — 03 0000000'],
+    assumptions: ['English copy', '{"quote":"x"}'],
+    oneWayCount: 4,
+    total: 9,
+  });
+  assert.deepEqual(plain(L.debtCounts(state)), { placeholders: 1, assumptions: 2, emptyEnv: 1, total: 4 });
+});
+
+test('promised work is read only where the record carries it, from contract 4', () => {
+  const older = bare({ contractVersion: 3, verification: { promisedWork: [{ id: 'P-1', description: 'x', status: 'open' }] } });
+  assert.deepEqual(plain(L.handoverOf(older).promised), []);
+  assert.equal(L.handoverOf(bare()).total, 0);
+});
+
+test('the critical chain is the rows the card counts, earliest first', () => {
+  const tasks = [
+    task('01', { status: 'done' }),
+    task('02', { blockedBy: ['01'] }),
+    task('03', { blockedBy: ['02'] }),
+    task('04'),
+  ];
+  assert.deepEqual(plain(L.criticalChain(tasks)), ['02', '03']);
+  assert.equal(L.criticalPath(tasks), L.criticalChain(tasks).length);
+  const cycle = [task('01', { blockedBy: ['02'] }), task('02', { blockedBy: ['01'] })];
+  assert.equal(L.criticalPath(cycle), L.criticalChain(cycle).length);
+  assert.ok(L.criticalChain(cycle).length >= 1);
+  assert.deepEqual(plain(L.criticalChain([])), []);
+});
+
+test('an opened таск shows what the state holds and leaves out what it does not', () => {
+  const state = bare({
+    tasks: [
+      task('01', { status: 'done', files: ['src/a.js'], zone: ['src'], commits: ['abcdef0123', '1234567890'],
+        retries: 1, handoffs: 2, tests: { passed: 4, failed: 0 } }),
+      task('02', { blockedBy: ['01'] }),
+      { id: '03', title: 'bare', requirementIds: [], status: 'queued', blockedBy: [] },
+    ],
+  });
+  const first = plain(L.taskDetailOf(state, '01')) as Record<string, unknown>;
+  assert.deepEqual(first['commits'], ['abcdef0', '1234567']);
+  assert.equal(first['handoffs'], 2);
+  assert.equal(first['onCriticalPath'], false);
+  const sparse = plain(L.taskDetailOf(state, '03')) as Record<string, unknown>;
+  for (const absent of ['files', 'zone', 'commits', 'retries', 'repairs', 'handoffs', 'tests', 'requirementIds']) {
+    assert.ok(!(absent in sparse), `${absent} is shown for a таск that never carried it`);
+  }
+  assert.equal(L.taskDetailOf(state, '99'), null);
+
+  const waiting = L.describeTask(state, '02', 'ru');
+  assert.ok(waiting.includes('На критическом пути'));
+  assert.ok(waiting.includes('Ждёт тасков: 01'));
+  const done = L.describeTask(state, '01', 'en');
+  assert.ok(done.includes('Saved in history: abcdef0, 1234567'));
+  assert.ok(done.includes('Passed to a fresh subagent: 2'));
+  assert.ok(done.includes('Tests: 4 passed, 0 failed'));
+  assert.ok(!done.some(line => line.includes('[object Object]')));
+});
+
+test('a таск written before commits became a list shows its one commit', () => {
+  const state = bare({ tasks: [{ id: '01', title: 'old', requirementIds: ['R01'], status: 'done', blockedBy: [],
+    commit: 'abcdef0999' }] });
+  assert.deepEqual((plain(L.taskDetailOf(state, '01')) as Record<string, unknown>)['commits'], ['abcdef0']);
+});
+
+test('a требование before contract 4 shows its таски and says verification is not established', () => {
+  const state = bare({ contractVersion: 3, requirements: [{ id: 'R01', status: 'in-spec' }], tasks: [task('01')] });
+  const detail = L.requirementDetailOf(state, 'R01')!;
+  assert.equal(detail.established, false);
+  assert.deepEqual(plain(detail.servingTaskIds), ['01']);
+  assert.deepEqual(plain(L.describeRequirement(state, 'R01', 'ru')),
+    ['Таски требования: 01', 'Проверка не установлена.']);
+  assert.equal(L.requirementDetailOf(state, 'R99'), null);
+});
+
+test('a contract-4 требование shows its checks with the result its own result is derived from', () => {
+  const detail = L.requirementDetailOf(verifiedState(), 'R01')!;
+  assert.equal(detail.established, true);
+  assert.equal(detail.result, 'passed');
+  assert.deepEqual(plain(detail.quotes), []);
+  assert.deepEqual(plain(detail.checks), [{ id: 'C-1', method: 'browser-interaction', result: 'passed' }]);
+  assert.deepEqual(plain(L.describeRequirement(verifiedState(), 'R01', 'en')),
+    ['Tasks for it: 01', 'How it was checked:', 'C-1 · browser-interaction — Passed']);
+});
+
+test('from contract 5 the требование quotes the user\'s words in the language they were said in', () => {
+  const state = sourceVerifiedState();
+  const detail = L.requirementDetailOf(state, 'R01')!;
+  assert.deepEqual(plain(detail.quotes), ['Не сохранять больше 3 записей. Меню открывается при наведении.']);
+  assert.equal(L.describeRequirement(state, 'R01', 'en')[0],
+    'In your words: «Не сохранять больше 3 записей. Меню открывается при наведении.»');
+});
+
+test('a contract-6 требование shows its open findings, failure cause and live defects only', () => {
+  const state = repairContract6State();
+  state.verification!.executions[0] = { ...state.verification!.executions[0]!, result: 'failed', failureCause: 'product',
+    limitation: 'only desktop was checked' };
+  state.verification!.defects.push({ ...state.verification!.defects[0]!, id: 'DF-0', status: 'superseded' });
+  const detail = L.requirementDetailOf(state, 'R01')!;
+  assert.equal(detail.result, 'failed');
+  assert.deepEqual(plain(detail.openFindings), ['Reviewer finding F-1']);
+  assert.deepEqual(plain(detail.defects.map(item => item['id'])), ['DF-1']);
+  const lines = L.describeRequirement(state, 'R01', 'en');
+  assert.ok(lines.includes('C-1 · browser-interaction — Did not pass · Fault in the product · only desktop was checked'));
+  assert.ok(lines.includes('Open findings:'));
+  assert.ok(lines.includes('DF-1 — Open · Product: Hovering the trigger leaves the panel hidden'));
+});
+
+test('an unreadable record shows no partial chain', () => {
+  const state = structuredClone(verifiedState()) as unknown as Record<string, Record<string, unknown>>;
+  state['verification']!['obligations'] = null;
+  const detail = L.requirementDetailOf(state, 'R01')!;
+  assert.equal(detail.unreadable, true);
+  assert.deepEqual(plain(detail.checks), []);
+  assert.deepEqual(plain(L.describeRequirement(state, 'R01', 'ru')),
+    ['Таски требования: 01', 'Запись проверки не читается.']);
+});
+
+test('the user\'s words classified as context are listed with their reason', () => {
+  const state = sourceVerifiedState();
+  const clause = state.verification!.sourceClauses[0]!;
+  state.verification!.sourceClauses.push({ ...clause, id: 'CL-9', quote: 'Когда-нибудь хочу тёмную тему',
+    classification: 'context', requirementIds: [], exclusionReason: 'A wish for later, not for this run' });
+  assert.deepEqual(plain(L.contextClausesOf(state)),
+    [{ quote: 'Когда-нибудь хочу тёмную тему', reason: 'A wish for later, not for this run' }]);
+  assert.equal(ui('ru')['contextLine']!(L.contextClausesOf(state)[0]),
+    '«Когда-нибудь хочу тёмную тему» — A wish for later, not for this run');
+  assert.deepEqual(plain(L.contextClausesOf(verifiedState())), []);
+});
+
+test('what was delivered beyond the ask is shown as written', () => {
+  assert.deepEqual(plain(L.additionsOf(bare({ additions: ['A favicon (R03)', { what: 'x' }] }))),
+    ['A favicon (R03)', '{"what":"x"}']);
+  assert.deepEqual(plain(L.additionsOf(bare())), []);
+});
+
+test('a live требование no таск names is marked, in the failure tone only until the plan check passes', () => {
+  const requirements = [{ id: 'R01', status: 'in-spec' }, { id: 'R02', status: 'in-spec' },
+    { id: 'R03', status: 'dropped', reason: 'withdrawn' }];
+  assert.deepEqual(plain(L.untracedOf(bare({ requirements }))), { ids: [], tone: 'quiet' });
+  const planned = bare({ requirements, tasks: [task('01')] });
+  assert.deepEqual(plain(L.untracedOf(planned)), { ids: ['R02'], tone: 'fail' });
+  const passed = bare({ requirements, tasks: [task('01')], gates: [{ id: 'G3', status: 'passed', findings: [] }] });
+  assert.deepEqual(plain(L.untracedOf(passed)), { ids: ['R02'], tone: 'quiet' });
+});
+
+test('an opened row is remembered by key, and toggling never edits the set it was given', () => {
+  const none = {};
+  const one = L.toggled(none, 'task:01');
+  assert.deepEqual(plain(one), { 'task:01': true });
+  assert.deepEqual(plain(none), {});
+  assert.deepEqual(plain(L.toggled(L.toggled(one, 'req:R01'), 'task:01')), { 'req:R01': true });
 });

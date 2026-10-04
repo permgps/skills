@@ -34,6 +34,12 @@ const VOCABULARY = `# Vocabulary
 | \`explain\` | \`plain\` | Простые | Plain |
 | \`verification.strategyReviews[].decision\` | \`stop_incomplete\` | Остановить | Stop |
 | \`verification.readiness[].probes[].result\` | \`passed\` | Пройдена | Passed |
+| \`oneWay[].kind\` | \`deleted\` | Удаления | Deletions |
+| \`verification.checks[].result\` | \`stale\` | Устарела | Out of date |
+| \`verification.executions[].failureCause\` | \`setup\` | Ошибка настройки | Setup failed |
+| \`verification.defects[].causeClass\` | \`test\` | Тест | Test |
+| \`verification.defects[].status\` | \`open\` | Открыт | Open |
+| \`verification.acceptanceRounds[].requirementResults\` | \`incomplete\` | Не проверено до конца | Not fully checked |
 
 ## Screen Labels
 
@@ -124,6 +130,12 @@ const RU = {
   REGISTER: "{ plain: 'Простые' }",
   STRATEGY_DECISION: "{ stop_incomplete: 'Остановить' }",
   READINESS_RESULT: "{ passed: 'Пройдена' }",
+  ONE_WAY_KIND: "{ deleted: 'Удаления' }",
+  CHECK_RESULT: "{ stale: 'Устарела' }",
+  FAILURE_CAUSE: "{ setup: 'Ошибка настройки' }",
+  DEFECT_CAUSE: "{ test: 'Тест' }",
+  DEFECT_STATUS: "{ open: 'Открыт' }",
+  REQUIREMENT_RESULT: "{ incomplete: 'Не проверено до конца' }",
   EXPLAIN: "{ progress: function () { return ['что это', 'что показывает']; } }",
   STAGE_EXPLAIN: "{ preflight: function () { return ['подготовка заводит прогон']; },"
     + " build: function () { return ['разработка пишет код']; } }",
@@ -144,6 +156,12 @@ const EN = {
   REGISTER: "{ plain: 'Plain' }",
   STRATEGY_DECISION: "{ stop_incomplete: 'Stop' }",
   READINESS_RESULT: "{ passed: 'Passed' }",
+  ONE_WAY_KIND: "{ deleted: 'Deletions' }",
+  CHECK_RESULT: "{ stale: 'Out of date' }",
+  FAILURE_CAUSE: "{ setup: 'Setup failed' }",
+  DEFECT_CAUSE: "{ test: 'Test' }",
+  DEFECT_STATUS: "{ open: 'Open' }",
+  REQUIREMENT_RESULT: "{ incomplete: 'Not fully checked' }",
   EXPLAIN: "{ progress: function () { return ['what it is', 'what it holds']; } }",
   STAGE_EXPLAIN: "{ preflight: function () { return ['setup opens the run']; },"
     + " build: function () { return ['development writes the code']; } }",
@@ -168,7 +186,8 @@ const EXPLAINED = ['progress', 'gates'];
 
 const REGIONS = [
   'run-clock', 'stage-clock', 'dials', 'progress', 'cards',
-  'stages', 'tasks', 'requirements', 'gates',
+  'stages', 'tasks', 'requirements', 'gates', 'handover',
+  'requirement-rows', 'requirement-folds',
 ];
 
 /** The reader's own controls: one button per theme, one per language. */
@@ -803,4 +822,21 @@ test('a page whose run directory grammar drifted from the runtime grammar is ref
   assert.match(messages(page({ logic: { RUN_DIR_PATTERN: String.raw`/^(\d{4}-\d{2}-\d{2})-(.+)$/` } })),
     /RUN_DIR_PATTERN is .* but skills\/maestro\/tools\/runtime\/state\/paths\.mts holds/);
   assert.match(messages(page({ logic: { RUN_DIR_PATTERN: 'null' } })), /RUN_DIR_PATTERN is missing/);
+});
+
+test('a link built from the state is reported, and the page\'s own two files are not', () => {
+  const linked = page({ body: '<script>\n  anchor.href = detail.files[0];\n</script>' });
+  assert.match(messages(linked), /\.href\s*=.*builds an address/);
+  const attribute = page({ body: '<script>\n  image.setAttribute(\'src\', evidence.path);\n</script>' });
+  assert.match(messages(attribute), /setAttribute\('src'.*builds an address/);
+  const markup = page({ body: '<script>\n  row.innerHTML = finding;\n</script>' });
+  assert.match(messages(markup), /"innerHTML" builds an address or markup/);
+  const own = page({ body: '<script>\n  script.src = STATE_FILE + \'?v=\' + generation;\n'
+    + '  validation.src = VALIDATION_FILE + \'?v=\' + generation;\n</script>' });
+  assert.equal(checkDashboard(own, SPEC).filter(v => v.check === 'links').length, 0);
+});
+
+test('a one-way kind the vocabulary labels and the English page forgot is reported', () => {
+  const found = messages(page({ en: { ONE_WAY_KIND: '{}' } }));
+  assert.match(found, /oneWay\[\]\.kind \(en\) "deleted" has a label in the specification and none in the page/);
 });

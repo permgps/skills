@@ -32,7 +32,8 @@ const log = createLogger('dashboard-integrity');
 const REQUIRED_REGIONS = [
   'run-clock', 'stage-clock', 'dials',
   'progress', 'cards',
-  'stages', 'tasks', 'requirements', 'gates',
+  'stages', 'tasks', 'requirements', 'gates', 'handover',
+  'requirement-rows', 'requirement-folds',
 ];
 
 /** Anything that would make the page depend on a network it may not have. */
@@ -66,6 +67,12 @@ const VALUE_MAPS: Array<{ field: string; map: string }> = [
   { field: 'explain', map: 'REGISTER' },
   { field: 'verification.strategyReviews[].decision', map: 'STRATEGY_DECISION' },
   { field: 'verification.readiness[].probes[].result', map: 'READINESS_RESULT' },
+  { field: 'oneWay[].kind', map: 'ONE_WAY_KIND' },
+  { field: 'verification.checks[].result', map: 'CHECK_RESULT' },
+  { field: 'verification.executions[].failureCause', map: 'FAILURE_CAUSE' },
+  { field: 'verification.defects[].causeClass', map: 'DEFECT_CAUSE' },
+  { field: 'verification.defects[].status', map: 'DEFECT_STATUS' },
+  { field: 'verification.acceptanceRounds[].requirementResults', map: 'REQUIREMENT_RESULT' },
 ];
 
 /** The two registers, and the map each one's explanations live in. */
@@ -294,6 +301,26 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     }
   });
   log.info('external', 'origins and network APIs checked', { lines: lines.length, externals });
+
+  // --- and it links into nothing the state names ----------------------------
+  //
+  // The state carries paths — evidence, files, a таск's own — and a link built
+  // from one is the page opening an artifact, which dashboard.md forbids: it
+  // reads state.js and nothing else. The only addresses the page may build are
+  // its own two files, loaded by script tag on every poll.
+  let links = 0;
+  lines.forEach((text, index) => {
+    const hits = text.match(/\.(?:href|src)\s*=(?!=)|setAttribute\(\s*['"](?:href|src)['"]|innerHTML/g) ?? [];
+    for (const hit of hits) {
+      if (hit.startsWith('.src') && /=\s*(?:STATE_FILE|VALIDATION_FILE)\b/.test(text)) continue;
+      links += 1;
+      add('links', index + 1,
+        `"${hit.trim()}" builds an address or markup at run time — the page reads state.js `
+        + 'and its validation file only, and shows every value through textContent; '
+        + 'print a path as text instead of linking to it');
+    }
+  });
+  log.debug('links', 'run-time addresses checked', { links });
 
   // --- every region has somewhere to render ---------------------------------
   for (const region of REQUIRED_REGIONS) {

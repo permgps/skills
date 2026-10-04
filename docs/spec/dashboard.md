@@ -47,6 +47,7 @@ like to look at it.
 | `build` | Ход разработки | The таски grouped by волна, each with its status, phase and clock | `tasks[]` |
 | `requirement-list` | Требования (список) | The манифест one требование at a time, with technical result | `requirements[]`, `verification` |
 | `gates` | Gates | G1–G4 with status, derived G4 evidence, and findings | `gates[]`, `verification`, `lifecycle`, `outcome` |
+| `handover` | Ваш ход | What only the user can settle: empty variables by name, placeholders, open promised work, one-way changes by kind, assumptions | `debt`, `verification.promisedWork`, `oneWay` |
 
 The `Key` column is the region's name in the page: it is the `data-region`
 attribute in the markup and the entry in `EXPLAIN_ORDER` in the logic block.
@@ -457,6 +458,95 @@ verification-3 record and rendered in one place:
 
 A contract-5 or earlier page renders none of the three. The labels are the
 value and screen labels in [`vocabulary.md`](vocabulary.md), in both languages.
+
+## Why It Stopped
+
+A прогон closed as `stopped_incomplete` must carry `stopReason`, and the page
+prints it on its own line beside the closure notice, labelled «Причина
+остановки». The outcome alone says that the run stopped; the reason is the only
+thing that says whether the user has a move. A state without the field says
+nothing more than it did — the page never composes a reason of its own.
+
+## Who Holds It
+
+`heldBy` is shown in exactly one place: inside the **raised** silence notice, as
+the claim's token and the moment it was written — «Метка прогона: k7f2 с
+21:27». It is the same token the chat names when a second chat finds the run
+claimed, so the reader can match the two. The calm notice never shows it, and
+neither does a finished or interrupted прогон: nothing has gone wrong there,
+and a token on a calm screen invites a question nobody needs to ask.
+
+The page claims nothing about whether the holder is alive. It cannot know, and
+neither can the orchestrator — the contract records the claim, not a lease.
+
+## Your Move
+
+The `handover` region gathers what only the user can settle, in this order:
+empty environment variables (**names only** — S2), placeholders, open promised
+work, one-way changes grouped by kind, then assumptions. A group longer than five
+lines is folded and opens on a press. An empty region says so in one muted line.
+
+The Долг card keeps its counts, and both read one function, so the card and the
+region cannot disagree about how many placeholders there are. Open promised work
+appears only from contract 4, where the verification record carries it. A
+one-way line whose kind the contract does not define is kept in its own group,
+as written — never dropped and never guessed into a known kind.
+
+## A Таск Opens
+
+A row of `build` is a button. Pressing it shows what the state holds for that
+таск and nothing it does not: files, the owned area (`zone`), the commits as
+short hashes in plain text, the требования it serves, the таски it waits for,
+restarts, trips to repair, passes to a fresh субагент, and its tests. A field the
+state does not carry is left out rather than shown as zero. Passes to a fresh
+субагент are labelled as what they are: a таск outgrew a context, which is not a
+defect.
+
+**The critical path is marked.** The таски on the longest unfinished chain carry
+a marker, computed by the very walk that gives the «Критический путь» count
+under «Осталось», so the number on the card and the marked rows are one chain:
+the count is the length of the marked chain, never a second figure beside it.
+
+An opened row is remembered by таск id and survives every poll, the way a folded
+findings list is: a detail that snapped shut every two seconds could not be read.
+
+## A Требование Opens
+
+Each row of `requirement-list` names one требование: its id, its planning
+status, its verification result, and — from verification 2 — the user's own
+words it came from, quoted from `sourceClauses` in the language they were said
+in. The page never translates the quote.
+
+Pressing the row opens its chain:
+
+| State | Shown |
+|---|---|
+| contract 3 or earlier | the таски that serve it; «проверка не установлена» |
+| contract 4 | + each check of its current obligations with its derived result, failure cause and limitation; its open findings |
+| contract 5 | + the quote |
+| contract 6–7 | + its unsuperseded defects with cause and counterexample |
+| record unreadable | the same sentence the run notice gives, never a partial chain |
+
+A check's result is the one the requirement's own result is derived from —
+stale when its fingerprint moved — so the chain cannot say «passed» beside a
+требование the page counts as failed.
+
+A live требование that no таск names is marked «Не покрыто тасками». That mark
+takes the failure tone only while G3 has not passed; after it, the plan gate has
+already ruled on it and the mark is a record.
+
+## Heard But Not Taken
+
+Below the list, folded: every source clause classified as `context`, with its
+`exclusionReason`. These are the user's words the manifest phase decided were
+not requirements, and showing them is what makes «the user's words never
+quietly vanish» something a reader can check.
+
+## Delivered Beyond The Ask
+
+Also folded below the list: `additions`, one line each, as written. Nobody asked
+for them, and the page does not pass judgement on them; it only makes sure they
+are not invisible.
 
 ## Node Viewer Ownership
 
