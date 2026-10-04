@@ -114,6 +114,40 @@ one opened together, before the file is opened. Read first and open after, and
 the preparation — the rules, the diffs, the briefs handed to subagents — falls
 into the gap between two стадии and is counted by neither.
 
+### What Stays Resident
+
+The loading rule has one exception, and it is the bundle's `SKILL.md`, which
+stays in context for the whole прогон. A rule lives there rather than in a phase
+file when every phase performs it. Every phase writes the state, opens a стадия,
+can open a page, and speaks to the user, and a rule copied into nine phase files
+becomes nine rules that drift apart. The resident groups, by their `SKILL.md`
+headings:
+
+- *Recovery* — claiming the прогон with `heldBy` and re-reading `updatedAt`
+  before every write;
+- *Opening A Стадия* — closing one стадия and opening the next in one write;
+- *The Dashboard* — publishing every transition through `sync.mts`, which is
+  performed dozens of times in a run;
+- the view boundary under *The Dashboard* — the one page in front of the user,
+  because a page that lands on their screen mid-таск reads as something going
+  wrong to the one person with no way to check;
+- *Speaking Plainly* — the `plain` register, because every phase speaks to the
+  user;
+- *Asking A Question* — what a stop owes its reader, because five places ask.
+
+`SKILL.md` states these rules and not the reason they are resident. The reason
+is maintenance knowledge, and a sentence that changes no behaviour costs context
+on every turn of every прогон. `bundle-integrity` holds the file's size; see
+[`README.md`](README.md) *Running The Checks*.
+
+**The last two have no reader.** The dashboard's plain strings are held to the
+banned list by `dashboard-integrity`, but nothing reads a sentence the
+orchestrator composes in the chat, so *Speaking Plainly* is the whole of the
+guarantee there. For questions only the recorded side is checked: G1 holds each
+`answers.md` entry to its options, its recommendation and its `Chosen:` line. No
+validator reads the question as composed, so there the discipline is the whole
+of the guarantee.
+
 ## Recovery
 
 After a context compaction, a resuming session re-reads **the state, not the

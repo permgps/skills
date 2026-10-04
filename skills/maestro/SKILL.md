@@ -1,6 +1,6 @@
 ---
 name: maestro
-description: Turn a dictated idea into a finished, verified project in one dialogue. Use when the user describes something they want built, changed, or finished — a feature, a page, a service, a whole project — rather than asking a question or requesting a single edit. Records their words as numbered requirements, asks only about genuine forks, writes a specification, cuts it into tasks, builds them with parallel executors, reviews the result, and checks the build against the original words with the specification withheld.
+description: Turn a dictated idea into a finished, verified project in one dialogue. Use when the user describes something they want built, changed, or finished — a feature, a page, a service, a whole project — rather than asking a question or requesting a single edit.
 argument-hint: "[full|semi|interview|manual] [strict|normal|deep] [polish] <what you want built>"
 disable-model-invocation: true
 ---
@@ -43,11 +43,10 @@ its review, or by carrying a требование G4 disagreed about.
 Dial resolution has its own file, [`phases/0-dials.md`](phases/0-dials.md), read
 at the start of Preflight before anything else.
 
-Every phase named here now has a rules file. **If you ever reach one whose file
-is missing, stop and say so.** Do not improvise it from the sentence that names
-it or from a row of the table above: what is written down anywhere here is what a
-phase produces, never how, and a phase run from its output description is a phase
-run without its rules.
+**If you ever reach a phase whose file is missing, stop and say so.** Do not
+improvise it from the sentence that names it or from a row of the table above:
+what is written down anywhere here is what a phase produces, never how, and a
+phase run from its output description is a phase run without its rules.
 
 ## The Бриф And The Манифест
 
@@ -81,11 +80,7 @@ nobody.
 **`manifest.md` holds requirement text and nothing else.** No status column, no
 notes, ever. It grows by rows — an added требование is another row — and a
 withdrawn one keeps its row unchanged, because a withdrawal is a status and
-statuses live in the run state. It has to stay this way for S1's sake: the
-manifest is the one document a gate compares against `brief.md`, and two
-documents compared is one comparison. A status column here would give that
-comparison two answers to choose from, and nothing in the прогон could tell
-which one the user meant.
+statuses live in the run state.
 
 **Preservation work has an authority register.** A request to clone, port,
 replace, or preserve an existing artifact names a reference even without the
@@ -110,14 +105,9 @@ coverage reviews, and promised work from `verification`. Keep superseded
 executions as history and replay stale checks before claiming conformance. The
 dashboard and report derive their verdicts from this same record.
 
-If `contractVersion` is below 4, inspect it with
-`node .maestro/sync.mts --project .maestro/state.js`. Its historical G4 and
-finished timestamp remain readable, but verification is not established.
-Resuming is an explicit candidate transition: retain the old record, create
-contract-4 verification entries for the still-applicable requirements with
-incomplete results and open findings, and publish through `--publish` with
-`--expect`. Never infer passing checks from historical task or gate statuses;
-fresh executions and acceptance are required before `completed`.
+If `contractVersion` is below 4, open
+[`references/legacy-recovery.md`](references/legacy-recovery.md) before
+writing anything.
 
 **A прогон that stopped without finishing is recovered the same way, and never
 restarted.** If the user says anything at all to a run that is not at one of its
@@ -138,10 +128,7 @@ already holds their answers.
 2. **Remember the `updatedAt` you last read**, and **re-read `.maestro/state.js`
    immediately before every write.** A стадия boundary or a таск transition can
    be minutes after the read that preceded it.
-3. **If `updatedAt` moved, do not write.** Somebody else wrote in between, and
-   laying your version over theirs loses their work silently — which is exactly
-   what almost happened when two sessions reviewed one таск of `board-sizes` on
-   2026-08-20.
+3. **If `updatedAt` moved, do not write.**
 4. **If `heldBy` carries a token that is not yours, do not take the прогон.**
    You cannot tell a live holder from a dead one, so this is not yours to
    decide.
@@ -156,18 +143,12 @@ Say it in the прогон's own language and ask:
 > запись от 21:27. Значит, кто-то писал параллельно. Я ничего не перезаписал.
 > Перечитать и продолжить с того, что там сейчас?»
 
-The sentence is the point. Both прогоны that hit this had nothing to say, so
-neither said anything, and the user found out from the file.
+The sentence is the point.
 
-`scripts/state/write.ts` guards repository writes. A real прогон uses the
-bundled `sync.mts --publish` path below: supply the complete candidate and the
-last `updatedAt` plus your holder token. The helper rechecks them immediately
-before publication. This is an optimistic guard, not a lock; the re-read is
-still a step you perform.
-
-This is here rather than in each phase file for the reason the rule below is:
-every phase writes the state, and a rule copied into nine files is nine rules
-that drift apart.
+A real прогон uses the bundled `sync.mts --publish` path below: supply the
+complete candidate and the last `updatedAt` plus your holder token. The helper
+rechecks them immediately before publication. This is an optimistic guard, not
+a lock; the re-read is still a step you perform.
 
 ## Opening A Стадия
 
@@ -176,26 +157,14 @@ opening the one that begins is a **single write**, performed the moment the
 previous phase's output is complete — before this phase's rules are loaded,
 before its diffs are gathered, before a subagent is briefed.
 
-That preparation is the beginning of the new стадия, and it is not small. Written
-the other way round it belongs to no стадия at all: the dashboard shows a stopped
-clock on a phase that has already finished, and the tool that measures the прогон
-cannot see the interval either, because it measures `stages[]`.
+That preparation is the beginning of the new стадия, and it is not small.
 
 So `finishedAt` of one стадия and `startedAt` of the next are the same instant.
-`scripts/state/validate.ts` and the bundled publisher reject a state where they
-are not.
 
 **A стадия's status and its stamps are written in the same breath**, because the
 status is a claim about the clock. `active` means a `startedAt` and no
 `finishedAt`; `done` means both; `pending` means neither; `skipped` means a
-`note` instead. The validator rejects a стадия whose status and stamps disagree,
-and it does so on the стадия alone — the rule above needs two стадии before it
-can speak, and a стадия opened without a stamp would otherwise stay invisible
-until the next one arrived.
-
-**This is here rather than in the phase files because every phase begins**, for
-the same reason the line below is: a rule copied into nine files is nine rules
-that drift apart.
+`note` instead.
 
 ## The Dashboard
 
@@ -233,10 +202,8 @@ the user says the panel is gone, `node .maestro/sync.mts --reopen` is the
 whole of the answer; if your harness shows the page in a pane of its own, pass
 `--no-open` in preflight so the user does not get two.
 
-**This is here rather than in the phase files because every phase writes state.**
-A rule copied into nine files is nine rules that drift apart, and this one is
-performed dozens of times in a run. Skipping publication leaves the old
-verified snapshot on screen and is not a completed transition.
+Skipping publication leaves the old verified snapshot on screen and is not a
+completed transition.
 
 <!-- maestro:view:owner -->
 **The прогон puts exactly one page in front of the user, and it is this one.** No
@@ -248,11 +215,6 @@ capability is absent, the affected check stays unavailable and the requirement
 incomplete. Never take over the dashboard pane or an unowned server. When `sync.mts` reports that
 the panel's address moved, say the new address in the chat once — the link the
 user is holding is dead, and that tool is the only thing that knows it.
-
-**This is here rather than in the phase files because every phase can open
-something.** The user's screen is showing the прогон, and a page that lands on it
-mid-таск is read as something going wrong, by the one person with no way to
-check.
 
 ## What The State's Lists Hold
 
@@ -337,8 +299,6 @@ about how much to be asked. Switching to a mode with more gates adds them for
 what is left; switching to one with fewer never removes a gate that has already
 passed. Record the change in `dialChanges[]` with the phase it took effect at, so
 the отчёт can say which parts of the прогон were produced under which settings.
-The reasoning is in [`phases/0-dials.md`](phases/0-dials.md); what is above is
-what you do.
 
 No dial removes a gate below, and no dial removes a safety rule. The mode matrix
 changes who is asked and when — never what is checked.
@@ -385,21 +345,12 @@ its one clause the first time, like every other term: «субагент — э�
 
 **The specification's own `executor` and `independent reader` keep those names.**
 They are the ids of prompt files and the words the phase files pass between
-themselves; the user reads none of them. The word you *say* and the word the
-repository *stores* are allowed to differ, and `vocabulary.md` records the
-boundary so nobody later renames twenty-six files to close a gap that is not one.
+themselves; the user reads none of them.
 
 **The register buys language and nothing else.** You do not skip a fork, soften
 a gate, shorten the манифест, or settle on the user's behalf anything you would
 have asked about in `normal`. A fork about technique is still put to them — in
 words they can answer. `S3` still holds.
-
-**This is here rather than in the phase files because every phase speaks to the
-user**, which is the same reason as the two rules above it: a rule copied into
-nine files is nine rules that drift apart. It is also the only guarantee the
-chat has. The dashboard's plain strings are held to the banned list by
-`scripts/validate/dashboard-integrity.ts`; nothing reads a sentence you compose
-here, so this rule is the whole of it.
 
 ## Asking A Question
 
@@ -450,12 +401,6 @@ So an intent and the act that serves it belong to the same turn. «Сейчас 
 посмотрю» is not a turn — it is the first sentence of one whose last act is the
 looking. If the work is long, it is still one turn; if it needs the user, it is
 one of the stops above and it carries its answers.
-
-**This is here rather than in the phase files for the reason above it** — five
-places ask, and a rule copied five times is five rules that drift apart. Only
-the recorded side is checked: G1 holds each `answers.md` entry to its options,
-its recommendation and its `Chosen:` line. No validator reads the question
-you compose, so there the discipline is the whole of the guarantee.
 
 ## Reporting Progress
 
@@ -570,10 +515,10 @@ preference, never from questions about consequence.
 `report.md`, the code and its comments — in both languages of the dial. Those
 files are read by the next прогон and by whoever maintains the project
 afterwards, and one language across them is what keeps them readable. The dial
-does not touch this rule. It has exactly one exception, named below, and one
-thing that looks like a second and is not: a quotation is the user's text, not
-yours, and it keeps the language it was said in — see *A quote keeps the language
-it was said in* below.
+does not touch this rule.
+
+The отчёт is English and quotes findings as they came back, so a `ru` прогон's
+отчёт carries Russian lines inside it.
 
 **Everything the user reads is in the dial's language.** The chat, every
 question and every answer you offer with it, the манифест as it is shown, the
@@ -592,31 +537,12 @@ visibility rather than shape: `debt` reaches the page as three counts,
 `additions` is not rendered there at all, and a требование's `reason` is read
 out of the отчёт rather than off the screen.
 
-**A quote keeps the language it was said in.** The отчёт is English and quotes
-findings as they came back, so a `ru` прогон's отчёт carries Russian lines
-inside it. The additions block of `brief.md` is the same rule one step further
-out: it is a quotation of the user, so it stays in the user's language inside a
-file that is otherwise English, and translating it would be translating the ruler
-the приёмка reader measures against. That is the same rule as everywhere else — a
-quotation is evidence, and evidence that has been translated is no longer the
-thing that was said.
-
-`node .maestro/sync.mts` holds the three fields for `ru` and says which line
-is wrong. It cannot hold `en`: an English finding quoting the user's own Russian
-sentence is correct, and no check can tell that from a breach. For `en` this
-paragraph is the whole of the guarantee.
 **The бриф is translated into English exactly once**, in the Manifest phase, and
 only when it was not written in English already. When the dial's language and
 the бриф's agree, nothing is translated at all and the numbered манифест is the
 user's own words back. When they differ, the манифест is shown in the dial's
 language with the original line beneath each one, so what is being agreed is a
 translation the user can see rather than a substitution they cannot.
-
-**The chat is the part nothing checks.** Every label and every explanation this
-repository ships is held against `vocabulary.md` in both languages by a
-validator; not one sentence you compose at run time is. That makes this section
-the whole of the guarantee for the chat, the same way *Speaking Plainly* is for
-the register.
 
 ## Start
 
