@@ -153,6 +153,7 @@ node scripts/validate/report-sections.ts \
   docs/spec skills/maestro                               # the отчёт's sections, both copies
 node scripts/validate/viewer-ownership.ts skills/maestro    # the view boundary
 node --test 'scripts/**/*.test.ts'                     # the checkers themselves
+node scripts/validate/readme-references.ts README.md   # the root README's links, scripts and sections; held by the suite above
 npm run parity:browser                                 # real pointer regression; requires browser and loopback
 npm run parity:workflow                                # real independent discovery; requires Codex CLI
 
