@@ -464,9 +464,9 @@ When a gate fails, open
 excuses and red flags. It is read at the failure and closed again; nothing in it
 is a rule, and keeping it in context is how a catalogue turns into one.
 
-A failed gate returns control to the phase it follows, which runs again with the
-gate's findings as input. A gate may fail twice on the same finding; on the third
-failure the run stops and reports what cannot be satisfied rather than looping.
+A failed gate returns control to the phase it follows, which runs again with the gate's findings as input.
+A gate may fail twice on the same finding; on the third failure the run stops and reports what cannot be
+satisfied rather than looping. A stop that asks nothing writes `interruptedAt`, never with `awaiting`.
 **A gate is never passed with notes** — findings are acted on, or recorded as an
 explicit deferral against a requirement id, which itself changes that
 requirement's status.

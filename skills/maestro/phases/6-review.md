@@ -42,9 +42,10 @@ those:**
 git show <commit> -- .        for every commit in tasks[].commits, in order
 ```
 
-Before dispatch, confirm that list against the commit IDs the executors actually
-returned for this таск. A commit in one and not the other is a build defect to
-report, not a list to reconcile by guessing.
+Before dispatch, confirm that every commit in that list exists and that the build
+recorded it for this таск at its commit step. A commit git cannot show, or one the
+list and the build disagree on, is a build defect to report, not a list to
+reconcile by guessing.
 
 **Not a range.** `commits[0]^..commits[-1]` carries every foreign commit that
 landed between the original and its repair, and a reviewer handed it judges
@@ -96,6 +97,15 @@ three uncheckable items already.
 A таск with no commit to point at did not finish the way the build recorded it.
 That is a build defect: report it and stop, rather than reviewing whatever sits
 in the working tree and attributing it to a таск.
+
+<!-- maestro:degrades:version-control -->
+Where preflight found no version control, no таск has a commit, and this is the
+one case the tree is read. Hand each reviewer the current text of the files its
+task file owns in place of its diffs, and say once in the chat and in each review
+file that the review read the working tree rather than the таск's own changes.
+The debug-tag check reads those files: a `[maestro-debug:` line in one is left
+behind. `oneWay` cannot be read without commits, so append nothing to it and say
+so in the отчёт. Every other step of this phase runs unchanged.
 
 ### 3. Hand every таск over, all at once
 
@@ -263,8 +273,6 @@ said is one gate, at the end, blind.
 | `.maestro/state.js` | every таск `done`, or `repair` where a review blocked it; `oneWay` appended from the per-commit diffs; `currentStage` moved on |
 | project code | unchanged — this phase writes none of it |
 
-Then read the acceptance phase file.
-
 ## Verify Execution Handoffs
 
 Entry: task-owned journey/control returns and capture identities. Open
@@ -280,3 +288,5 @@ Entry: task-owned journey/control returns and capture identities. Open
 Valid: failed persistence observation goes to owning implementation task.
 Invalid: call a missing restart assertion a non-blocking note because unit tests
 passed. Output: returned evidence review; next action repair or acceptance.
+
+Then read the acceptance phase file.

@@ -102,7 +102,7 @@ runtime/acceptanceInput/relevantPaths/inputHashes), invocation, tool, host,
 executor, executedAt, assertions [{name,result,evidenceIds}], evidenceIds,
 task-local captures [{id,path,sha256,mediaType,capturedAt}], optional limitation.
 The executor returns these as one `format: maestro-execution-return/1` block
-per check, adding the actual exit code, readinessId, its `red:` run, commit and,
+per check, adding the actual exit code, readinessId, its `red:` run, the HEAD it worked on as `commit` and,
 for a failed or unavailable result, failureCause; the executor brief's template
 is the one shape. It never invents an execution ID. The
 orchestrator assigns execution IDs and seals captures before publication.
@@ -179,7 +179,7 @@ main identity or invalid evidence. DEBUG: safe fixture/digest/command identity,
 never credentials or raw user text. No summary you author substitutes for an
 actual independent/executor return. Missing return stays incomplete. A return
 that is not one `maestro-execution-return/1` block per check, or whose commit
-is not among the таск's commits, is not imported. Nor is a block with no red
+is not the base the таск was handed (for a repair, the parent commit), is not imported. Nor is a block with no red
 run and no allowed `red: not applicable`, or a skipped or pending test reported
 as `passed`: that test is `unavailable` with its cause. INFO the review verdict of a
 repaired таск with `{ defectVerified, residualCount }`; WARN a detector that

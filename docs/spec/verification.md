@@ -386,9 +386,11 @@ or the reproduction minimal is judgement.
    state; goldens come only from the reference origin. Rules 4–6 are procedure,
    held by review and the bundle's verification procedures; the validator holds
    rules 1–3. It can check that an attempt's commit is among its task's
-   commits, but not that `commits` lists every commit an executor returned:
-   the state never holds the executor's return, so that comparison is the
-   orchestrator's before review dispatch. The same is why the red run lives in
+   commits. An executor never commits: its return's `commit` names the HEAD
+   it worked on, and the commit that holds its work is the orchestrator's,
+   made after the import. The state never holds the executor's return, so
+   holding that `commit` to the base the таск was handed is the import's
+   comparison, not the validator's. The same is why the red run lives in
    the return and not in the state. The block's shape, the red run included,
    is held by `scripts/gates/execution-return.ts` against the template the
    executor brief ships. Whether the red run truly preceded the implementation,

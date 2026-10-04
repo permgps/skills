@@ -12,6 +12,8 @@ import {
   REPORT_ANCHORS,
   REVIEW_ANCHORS,
   SIGNAL_ANCHORS,
+  STOP_ANCHORS,
+  textAfterHandoff,
   bundleProfileFor,
   carriesLeafRule,
   checkBundle,
@@ -1045,4 +1047,50 @@ test('allow_implicit_invocation: false outside a policy block is not a declarati
     await writeFile(path.join(copy, 'agents', 'openai.yaml'), 'interface:\n  allow_implicit_invocation: false\n', 'utf8');
   });
   assert.deepEqual(violations.map(v => v.file), [path.join('agents', 'openai.yaml')]);
+});
+
+// --- a stop says it stopped, and a missing capability has a path --------------
+
+test('every stop anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(STOP_ANCHORS.length > 0, 'STOP_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of STOP_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'stops'), []);
+  });
+});
+
+test('the executor brief losing its S4 rule is the one stop finding, named on the brief', async () => {
+  await withShippedCopy(async copy => {
+    const brief = path.join(copy, 'prompts', 'executor.md');
+    const body = await readFile(brief, 'utf8');
+    const dropped = body.replace(/Do no irreversible or outward-facing action/, 'Mind what you do');
+    assert.notEqual(dropped, body);
+    await writeFile(brief, dropped, 'utf8');
+    const found = (await checkBundle(copy)).filter(v => v.check === 'stops');
+    assert.deepEqual(found.map(v => v.file), [path.join('prompts', 'executor.md')]);
+  });
+});
+
+// --- the hand-off is the last line a phase file holds --------------------------
+
+test('no shipped phase file holds text after its hand-off to the next phase', async () => {
+  await withShippedCopy(async copy => {
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'handoff'), []);
+  });
+});
+
+test('a section after the hand-off is a finding on its first line, naming the hand-off it hides behind', () => {
+  const body = '# Phase\n\nStep one.\n\nThen read the build phase file.\n\n## Late Section\n\nA step nobody reads.\n';
+  const found = textAfterHandoff('phases/4-plan.md', body);
+  assert.equal(found.length, 1);
+  assert.equal(found[0]!.line, 7);
+  assert.match(found[0]!.message, /hand-off on line 5/);
+});
+
+test('a hand-off followed only by blank lines, or a phase with no hand-off, is not a finding', () => {
+  assert.deepEqual(textAfterHandoff('phases/1-manifest.md', 'Step.\n\nThen read the briefing phase file.\n\n\n'), []);
+  assert.deepEqual(textAfterHandoff('phases/9-memory.md', '# Memory\n\nNo next phase.\n'), []);
 });

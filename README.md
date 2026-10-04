@@ -420,7 +420,9 @@ alone — you see «R03 — оплата картой», not «R03».
 | A gate fails a third time | the same finding fails one gate three times | all | the run stops and reports what cannot be satisfied |
 
 While the run waits on any of these, the dashboard says it is waiting for your
-reply rather than counting silence.
+reply rather than counting silence. A stop that asks nothing — a gate failing a
+third time, a таск failing its third attempt — shows the run as interrupted
+instead.
 
 ## Talking To A Run In Progress
 

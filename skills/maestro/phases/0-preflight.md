@@ -402,8 +402,6 @@ nothing yet to check against the user's words.
 | the dashboard address | said in the chat, with the tool's folded-pane line beside it |
 | the announcement | shown, with any missing host capability named |
 
-Then read the manifest phase file.
-
 ## Source Audit Capability
 
 Before claiming independent context, probe a real fresh-context dispatch, wait
@@ -449,3 +447,5 @@ keeps every published record, drops `outcome` and `finishedAt`, and sets `dir`
 back to `<YYYY-MM-DD>-<slug>--wip` with the date and slug unchanged. Publication
 moves the folder back and returns the register row to in progress; say in the
 chat that the run was reopened under its original date.
+
+Then read the manifest phase file.

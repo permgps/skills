@@ -190,8 +190,6 @@ that reached the run state and not the бриф.
 | `.maestro/<dir>/spec.md` | written once, English, one entry per `in-spec` требование |
 | `.maestro/state.js` | no требование left `open`; `G2` recorded as passed |
 
-Then read the plan phase file.
-
 ## Integrated Outcomes And Readiness
 
 Entry: current audited R requirements and reference observations. Open
@@ -210,3 +208,5 @@ Entry: current audited R requirements and reference observations. Open
 Valid: restart retention is an integrated check. Invalid: replace it with
 passing save/read unit tests. Output: journey/check specifications and control
 selection basis; next action plan ownership, never an invented execution pass.
+
+Then read the plan phase file.

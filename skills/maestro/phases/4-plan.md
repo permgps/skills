@@ -358,7 +358,8 @@ pass.
 ## Gates
 
 **G3 runs after this phase.** It has two halves, and the second one is step 5:
-the task-file readers and the plan-consistency reader.
+the task-file readers and the plan-consistency reader. *Journey And Control
+Ownership*, below, publishes its graph before G3 runs.
 
 The map between требования and таски holds in **both** directions:
 
@@ -395,8 +396,6 @@ itself.
 | `.maestro/<dir>/tasks/NN-<slug>.md` | one file per таск, each self-sufficient |
 | `.maestro/state.js` | `tasks[]` filled whole — ids, `requirementIds`, `blockedBy`, `wave`, `zone`, counters at zero; `G3` recorded as passed |
 
-Then read the build phase file.
-
 ## Journey And Control Ownership
 
 Entry: current journey/check specifications and selected critical controls.
@@ -417,3 +416,5 @@ Open [verification-procedures.md](../references/verification-procedures.md).
    dependency or a task that must open spec.md to discover its assertions.
 Output: executable owned journeys/control selections. Next action: G3 and build dispatch. Missing tool/capability
 remains an explicit unavailable path in the task, never permission to pass.
+
+Then read the build phase file.

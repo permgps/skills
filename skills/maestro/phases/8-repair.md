@@ -210,7 +210,8 @@ or open prerequisites remain. Append the attempt with its `repeatKind`,
 after the actual return. INFO the defect and its forecast.
 
 **A таск is retried at most twice.** On the third failure, stop: name the таск,
-both attempts, and what each produced. That is the number
+both attempts, and what each produced. This stop asks nothing, so it writes
+`interruptedAt` in the run state and leaves `awaiting` out. That is the number
 [`../SKILL.md`](../SKILL.md) already uses for a gate failing on the same
 finding, and it is the same number on purpose.
 

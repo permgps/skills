@@ -319,6 +319,10 @@ export const BRIEFING_ANCHORS: readonly Anchor[] = [
  * anchor stands for them.
  */
 export const TESTING_ANCHORS: readonly Anchor[] = [
+  { file: 'prompts/executor.md', literal: '`commit` is the HEAD you worked on, unchanged',
+    why: 'an executor told never to commit cannot also be asked for the commit that holds its work' },
+  { file: 'references/verification-procedures.md', literal: 'whose commit is not the base the таск was handed',
+    why: 'the import runs before the orchestrator commits, so it can only hold a return to the base' },
   { file: 'prompts/executor.md', literal: 'format: maestro-execution-return/1',
     why: 'the return block is the one shape the import step and the parser read' },
   { file: 'prompts/executor.md', literal: 'Red observed',
@@ -583,6 +587,51 @@ export const SIGNAL_ANCHORS: readonly Anchor[] = [
     literal: '`SIG-<n> withheld-request — <manifest.md or report.md> — polish-reader round <k>` to `signals`',
     why: 'the polish reader asking for the требования turns its comparison into another one' },
 ];
+
+/**
+ * The literal text that carries what a прогон does when it stops, or meets a
+ * capability it lacks, where the promise and the doing sit in different files.
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. The state contract
+ * says a stop that is not a question writes `interruptedAt`; the build phase
+ * promises that review reads the working tree where there is no version
+ * control; the safety table says an irreversible or outward-facing action is a
+ * question. Each was stated in one file and done in none, and each failure is
+ * silent: a stopped прогон that looks frozen, a review that stops on its first
+ * таск, an executor that publishes because nobody told it S4. Whether a given
+ * action is outward-facing is the executor's judgement, so no anchor stands for it.
+ */
+export const STOP_ANCHORS: readonly Anchor[] = [
+  { file: 'SKILL.md', literal: 'writes `interruptedAt`',
+    why: 'a stop that writes neither `awaiting` nor `interruptedAt` shows the user a frozen прогон and raises the silence alarm' },
+  { file: 'phases/8-repair.md', literal: 'writes `interruptedAt`',
+    why: 'the repair stops are the ones a прогон most often ends on' },
+  { file: 'phases/6-review.md', literal: '<!-- maestro:degrades:version-control -->',
+    why: 'the build promises review will read the working tree; without the branch review stops on the first таск' },
+  { file: 'prompts/executor.md', literal: 'Do no irreversible or outward-facing action',
+    why: 'S4 binds the orchestrator, and the executor doing real integration work is the one holding the shell' },
+];
+
+/** A phase file's hand-off to the next phase, which must be the last thing read in it. */
+const HANDOFF_LINE = /^Then read the .+ phase file\.\s*$/;
+
+/**
+ * Text after a phase file's hand-off line, as violations under `handoff`.
+ *
+ * A phase file is read top to bottom, and the hand-off sends the reader to the
+ * next file. A section placed after it is read only by an executor that ignores
+ * the instruction it just followed, so it is skipped by exactly the one that obeys.
+ */
+export function textAfterHandoff(file: string, body: string): Violation[] {
+  const lines = body.split(/\r?\n/);
+  let handoff = -1;
+  lines.forEach((line, index) => { if (HANDOFF_LINE.test(line)) handoff = index; });
+  if (handoff < 0) return [];
+  const after = lines.findIndex((line, index) => index > handoff && line.trim() !== '');
+  if (after < 0) return [];
+  return [{ check: 'handoff', file, line: after + 1,
+    message: `text follows the hand-off on line ${handoff + 1} — an executor that obeys "${lines[handoff]!.trim()}" never reads it; move it above the hand-off, into the step that runs it` }];
+}
 
 /** Every anchor in `anchors` the documents fail to carry, as violations under `check`. */
 function missingAnchors(
@@ -899,6 +948,19 @@ export async function checkBundle(
   if (byFile.has('phases/7-acceptance.md')) {
     for (const v of missingAnchors(byFile, REPORT_ANCHORS, 'report')) add(v.check, v.file, v.line, v.message);
   }
+
+  // --- a stop says it stopped, and a missing capability has a path ------------
+  // Only a bundle with an executor brief builds and stops; Scout has none.
+  if (byFile.has('prompts/executor.md')) {
+    for (const v of missingAnchors(byFile, STOP_ANCHORS, 'stops')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- the hand-off is the last line a phase file holds ------------------------
+  for (const { file, body } of documents) {
+    if (!file.startsWith(`${PHASES_DIR}${path.sep}`)) continue;
+    for (const v of textAfterHandoff(file, body)) add(v.check, v.file, v.line, v.message);
+  }
+  log.info('handoff', 'phase hand-offs checked', { phases: phaseFiles.length });
 
   if (skill.includes('<!-- maestro:delegation:native-explicit -->') || skill.includes('<!-- maestro:runtime:node -->')) {
     if (!skill.includes('<!-- maestro:runtime:node -->')) add('runtime', 'SKILL.md', 0, 'declare the autonomous Node runtime marker');

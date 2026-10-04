@@ -147,7 +147,8 @@ For each таск that returns done, in this order:
     import goes back to the executor as incomplete, never in as a pass. Keep
     earlier executions immutable after replay.
 2. **Merge its worktree back**, if it had one.
-3. **Commit**, one commit per finished таск. A прогон survives a compaction and
+3. **Commit**, one commit per finished таск — yours, never the executor's, whose
+   `commit:` only names the HEAD it worked on. A прогон survives a compaction and
    a crash by what is committed, and the review phase judges each таск against
    the diff of its own commit.
    <!-- maestro:degrades:version-control -->
@@ -288,8 +289,6 @@ not the бриф.
 | `.maestro/<dir>/tasks/NN-<slug>-handoff.md` | only for a таск that ran out of context; normally absent |
 | `.maestro/state.js` | every таск `review`, or `repair` where a recorded divergence sent it back; `currentStage` moved on |
 
-Then read the review phase file.
-
 ## Execute Journeys And Selected Controls
 
 Entry: integrated reviewed prerequisites and complete verification-only brief.
@@ -318,3 +317,5 @@ Open [verification-procedures.md](../references/verification-procedures.md).
 Valid: restored pass and unchanged main input hashes. Invalid: oracle/mask
 changed to accommodate a defect, or sandbox pass reported as real integration.
 Output: sealed evidence and actual results; next action review then acceptance.
+
+Then read the review phase file.
