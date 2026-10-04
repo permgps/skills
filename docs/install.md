@@ -415,7 +415,8 @@ npm run check     # everything below, in this order
 | `npm run completion:workflow` | provider-neutral completion evaluation with explicit authorized adapter; unconfigured/unavailable exits 2 |
 | `npm run completion:workflow:prepare` | isolated target preparation only, no agent execution credit |
 
-`npm run metrics -- <run-dir>` measures a finished run. It is not part of
+`npm run metrics -- <project>/.maestro` measures a finished run and closes with
+a retrospective for whoever maintains Maestro. It is not part of
 `npm run check`, because this repository contains no run for it to measure.
 
 Individual checks are documented in [the specification README](spec/README.md).

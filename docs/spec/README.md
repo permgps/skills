@@ -264,9 +264,12 @@ directory could not be read.
 ## Measuring A Finished Прогон
 
 ```bash
-node scripts/metrics/measure.ts <run-dir>   # or: npm run metrics -- <run-dir>
-node scripts/metrics/measure.ts <run-dir> --json
+node scripts/metrics/measure.ts <project>/.maestro   # or: npm run metrics -- <project>/.maestro
+node scripts/metrics/measure.ts <project>/.maestro --json
 ```
+
+The target is the directory that holds `state.js` — `.maestro/`, beside the run
+directories, which is also the default — or the `state.js` file itself.
 
 It reads `state.js` and nothing else, which is the rule
 [`dashboard.md`](dashboard.md) sets for the same reason: a measurement that
@@ -277,6 +280,34 @@ inferred from a neighbouring field.
 Exit codes are `0` measured and `2` the state could not be read. There is no `1`:
 this script checks nothing, and a прогон that went badly is measured exactly as
 successfully as one that went well.
+
+### The Retrospective
+
+The last section, `retrospective`, is for whoever maintains Maestro rather than
+for the user. It groups what the прогон recorded about itself into five classes,
+always in this order, each labelled by what it would propose:
+
+| Class | Proposes | Read from | Cites |
+|---|---|---|---|
+| withheld requests | judgement | `signals` lines of kind `withheld-request` | `SIG-N` |
+| briefs exceeded | judgement | `signals` lines of kind `brief-exceeded` | `SIG-N` |
+| writes outside files | mechanical | `signals` lines of kind `out-of-zone-write` | `SIG-N` |
+| superseded readiness | mechanical | `verification.readiness[].supersedes` | `RD-a→RD-b` and the probes that did not pass |
+| repeated defect causes | judgement | same-cause `repeatKind` attempts, and a non-`product` `causeClass` shared by live defects of two or more таски | `RA-N (DF-M)`, `DF-N (<cause>)` |
+
+**Mechanical** proposes a validator; **judgement** proposes a prompt rule. A
+class with something cited prints its proposal on the line below. The proposals
+are prompts for a maintainer, not verdicts: nothing at `npm run check` proves
+one right. `product` defects are not cited, because a product defect in several
+таски is the work repair exists for; the other causes recurring point at the
+прогон's method.
+
+**"not recorded" is not zero.** The first three classes read `signals`, which
+a прогон begun before the field existed does not carry; the last two read the
+version-3 verification record, which contracts below 6 do not carry. Either
+prints `not recorded`. Only structured fields are read: a `counterexample` or
+a `diagnosis` is prose, and grouping prose by resemblance would make the
+retrospective an opinion.
 
 ## Running The Gates
 

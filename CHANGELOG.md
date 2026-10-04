@@ -14,6 +14,32 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**A retrospective from recorded signals.** Four phases said "record that it
+asked" or "record that the brief was exceeded" and named no place to record it.
+A new optional `signals` list in the run state holds those signals, one line
+apiece: `SIG-<n> <kind> — <subject> — <who>`.
+- Build appends an executor asking for `spec.md`.
+- Review appends a reviewer asking for it, a reviewer returning a patch, and
+  each path a таск's commits touched outside its files.
+- Acceptance appends the G4 reader asking for `spec.md` or the бриф.
+- Polish appends its reader asking for the манифест or the отчёт.
+- Preflight seeds the list empty. `CONTRACT_VERSION` stays 7, and the
+  dashboard does not render it.
+
+`npm run metrics` closes with a `retrospective` section for whoever maintains
+Maestro. It groups five classes, each labelled mechanical or judgement and
+citing its record ids:
+- withheld requests;
+- briefs exceeded;
+- writes outside a таск's files;
+- superseded readiness records;
+- repeated defect causes.
+
+A list the прогон predates prints "not recorded", never zero. The state
+validator holds the line grammar, `state-matches-spec` the kinds, and
+`SIGNAL_ANCHORS` the phase sentences. No check holds whether a proposal is
+right, or that every out-of-zone path in the commits reached the list.
+
 **A leaner resident orchestrator, started only by the user.** `SKILL.md` stays
 in context for a whole прогон, and every sentence in it was put to one test:
 does it change the прогон's behaviour? A sentence that failed was deleted whole.

@@ -246,7 +246,7 @@ actual capability. See [runtime installation](docs/install.md#autonomous-runtime
 
 ```bash
 npm run check     # typecheck, twelve validator runs across two skills, and their tests
-npm run metrics   # measure a finished run
+npm run metrics   # measure a finished run, with a retrospective for maintainers
 ```
 
 ## The language it speaks
