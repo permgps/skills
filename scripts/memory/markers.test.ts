@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, chmod, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, chmod, writeFile, lstat, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -253,5 +253,49 @@ test('an unknown host is refused before any file is read or written', async () =
     await assert.rejects(writeMemoryBlock(dir, 'A fact.', 'cursor'), UnknownHostError);
     await assert.rejects(resolveMemoryFile(dir, ''), UnknownHostError);
     assert.deepEqual(await readdir(dir), []);
+  });
+});
+
+// `CLAUDE.md -> AGENTS.md` is how many projects give two hosts one file. A rename
+// onto the link replaced it with a regular file, and from then on the two names
+// held different text with nobody told.
+test('a memory file reached through a symlink is written through it, and the link survives', async () => {
+  await withDir(async dir => {
+    await put(dir, 'AGENTS.md', 'Team.\n');
+    await symlink('AGENTS.md', path.join(dir, 'CLAUDE.md'));
+    await writeMemoryBlock(dir, 'A fact.', 'claude-code');
+    assert.ok((await lstat(path.join(dir, 'CLAUDE.md'))).isSymbolicLink(), 'the link was replaced by a file');
+    assert.equal(await readFile(path.join(dir, 'AGENTS.md'), 'utf8'), `Team.\n\n${wrap('A fact.')}\n`);
+    assert.deepEqual((await readdir(dir)).sort(), ['AGENTS.md', 'CLAUDE.md'], 'no temporary file left behind');
+  });
+});
+
+test('one file under two names is one memory file, so a second write replaces its block', async () => {
+  await withDir(async dir => {
+    await put(dir, 'AGENTS.md', 'Team.\n');
+    await symlink('AGENTS.md', path.join(dir, 'CLAUDE.md'));
+    await writeMemoryBlock(dir, 'A fact.', 'claude-code');
+    const second = await writeMemoryBlock(dir, 'A different fact.', 'claude-code');
+    assert.equal(second.action, 'replaced');
+    assert.equal(await readFile(path.join(dir, 'AGENTS.md'), 'utf8'), `Team.\n\n${wrap('A different fact.')}\n`);
+  });
+});
+
+test('a symlinked memory file outside the known names is written through, not replaced', async () => {
+  await withDir(async dir => {
+    await put(dir, 'docs/agents.md', 'Team.\n');
+    await symlink('docs/agents.md', path.join(dir, 'CLAUDE.md'));
+    await writeMemoryBlock(dir, 'A fact.', 'claude-code');
+    assert.ok((await lstat(path.join(dir, 'CLAUDE.md'))).isSymbolicLink());
+    assert.equal(await readFile(path.join(dir, 'docs/agents.md'), 'utf8'), `Team.\n\n${wrap('A fact.')}\n`);
+  });
+});
+
+test('a memory file that is a symlink to nothing is refused, not replaced by a new file', async () => {
+  await withDir(async dir => {
+    await symlink('missing.md', path.join(dir, 'CLAUDE.md'));
+    await assert.rejects(writeMemoryBlock(dir, 'A fact.', 'claude-code'), /symlink to a file that does not exist/);
+    assert.ok((await lstat(path.join(dir, 'CLAUDE.md'))).isSymbolicLink(), 'the dangling link was replaced');
+    assert.deepEqual(await readdir(dir), ['CLAUDE.md'], 'nothing else was created');
   });
 });

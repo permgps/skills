@@ -13,7 +13,7 @@
 //
 // Contract: docs/spec/phases.md, section "Memory".
 
-import { open, readFile, rename, stat, unlink } from 'node:fs/promises';
+import { lstat, open, readFile, realpath, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 
 import { readRegisterRuns } from './register.mts';
@@ -133,6 +133,30 @@ async function readIfPresent(target: string): Promise<string | null> {
   }
 }
 
+/**
+ * The file a write should rename onto: the path itself, or the file a symlink
+ * there points at. A link to nothing is refused rather than replaced by a new
+ * file, which would quietly cut whatever the user meant it to reach.
+ */
+async function throughLink(target: string): Promise<string> {
+  let isLink = false;
+  try { isLink = (await lstat(target)).isSymbolicLink(); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return target;
+    throw error;
+  }
+  if (!isLink) return target;
+  try {
+    const real = await realpath(target);
+    log.debug('write', 'memory file is a symlink; writing the file it points at', { target, real });
+    return real;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    log.error('write', 'memory file is a symlink to nothing', { target });
+    throw new Error(`${target} is a symlink to a file that does not exist — point it at the memory file or remove it, then write again`);
+  }
+}
+
 async function exists(target: string): Promise<boolean> {
   try { await stat(target); return true; }
   catch (error) {
@@ -163,9 +187,21 @@ export interface MemoryScan {
 export async function scanMemoryFiles(projectRoot: string): Promise<MemoryScan> {
   const texts = new Map<string, string>();
   const blockFiles: string[] = [];
+  // `CLAUDE.md -> AGENTS.md` is one file under two names. Counted twice, its one
+  // block reads as a conflict nobody can resolve by hand; the first name in
+  // KNOWN_MEMORY_FILES order stands for the file.
+  const seen = new Map<string, string>();
   for (const file of KNOWN_MEMORY_FILES) {
-    const text = await readIfPresent(path.join(projectRoot, file));
+    const target = path.join(projectRoot, file);
+    const text = await readIfPresent(target);
     if (text === null) continue;
+    const real = await realpath(target);
+    const alias = seen.get(real);
+    if (alias !== undefined) {
+      log.debug('scan', 'memory file is another name for one already read', { file, alias });
+      continue;
+    }
+    seen.set(real, file);
     texts.set(file, text);
     if (blockIn(file, text) !== null) blockFiles.push(file);
   }
@@ -247,8 +283,12 @@ export async function resolveMemoryFile(projectRoot: string, host: string): Prom
  * Not the state's `atomicText`: that one creates its temporary file `0600`,
  * which is right for run state and wrong here — the rename would quietly
  * narrow the permissions of a file the project owns and other people read.
+ *
+ * A symlink is followed rather than replaced: the rename lands on the file it
+ * points at, so the link and every other name for that file keep one text.
  */
-async function replaceKeepingMode(target: string, body: string): Promise<void> {
+async function replaceKeepingMode(link: string, body: string): Promise<void> {
+  const target = await throughLink(link);
   let mode = 0o644;
   try { mode = (await stat(target)).mode & 0o777; }
   catch (error) {
