@@ -111,3 +111,57 @@ export async function upsertRegister(runRoot: string, state: RunState): Promise<
   log.info('upsert', 'register row written', { runId: state.runId, dir: state.dir, status, action });
   return { path: target, action, status };
 }
+
+/** One row of the register, as a later run reads it back. */
+export interface RegisterRun {
+  runId: string;
+  dir: string;
+  started: string;
+  status: string;
+  finished: string;
+  /** 1-based line of the row in `README.md`. */
+  line: number;
+}
+
+/** The row grammar {@link renderRegisterRow} writes, and nothing looser. */
+const ROW = /^\|\s*(\d{4}-\d{2}-\d{2})\s*\|\s*\[([^\]]+)\]\([^)]*\)\s*\|\s*([^|]+?)\s*\|\s*([^|]*?)\s*<!-- run:([^ ]+) -->\s*\|\s*$/;
+
+/**
+ * Every run row in `<runRoot>/README.md`, in register order. A missing register
+ * is an empty one. Malformed markers are a {@link MarkerError}, as they are for
+ * the writer. A row that does not parse is skipped with a warning and never
+ * thrown: the reader is a later run's preflight, and a hand-edited row must not
+ * stop it.
+ */
+export async function readRegisterRuns(runRoot: string): Promise<RegisterRun[]> {
+  const target = path.join(runRoot, REGISTER_FILE);
+  let text: string;
+  try { text = await readFile(target, 'utf8'); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    log.debug('read', 'no register yet', { target });
+    return [];
+  }
+
+  const block = findOwnedBlock(text, REGISTER_MARKERS);
+  if (!block) {
+    log.debug('read', 'register has no owned block', { target });
+    return [];
+  }
+
+  const runs: RegisterRun[] = [];
+  block.body.split('\n').forEach((raw, index) => {
+    if (!ROW_KEY.test(raw)) return;
+    const line = block.start + 1 + index;
+    const match = ROW.exec(raw);
+    if (!match) {
+      log.warn('read', 'register row does not parse; skipped', { target, line });
+      return;
+    }
+    runs.push({
+      started: match[1]!, dir: match[2]!, status: match[3]!, finished: match[4]!, runId: match[5]!, line,
+    });
+  });
+  log.info('read', 'register read', { target, runs: runs.length });
+  return runs;
+}

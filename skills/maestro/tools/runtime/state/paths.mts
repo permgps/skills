@@ -160,6 +160,8 @@ function artifactsIn(name: string, slug: string) {
     brief: (when: Date): string => inside(`${toDate(when)}-brief.md`),
     manifest: (): string => inside('manifest.md'),
     answers: (): string => inside('answers.md'),
+    /** What earlier runs left, read once by preflight and withheld from every blind reader. */
+    prior: (): string => inside('prior.md'),
     reference: (): string => inside('reference.md'),
     spec: (): string => inside('spec.md'),
     /** Boundaries the plan derived from the spec. */

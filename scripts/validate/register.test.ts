@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
-  REGISTER_FILE, REGISTER_MARKERS, RegisterRowError, renderRegisterRow, upsertRegister,
+  REGISTER_FILE, REGISTER_MARKERS, RegisterRowError, readRegisterRuns, renderRegisterRow, upsertRegister,
 } from '../../skills/maestro/tools/runtime/register.mts';
 import { activeContract7State, contract7State } from '../state/fixtures/verification.ts';
 
@@ -78,3 +78,28 @@ test('a state that cannot key or locate a row is refused, not written half-way',
   const { dir: _dir, ...legacy } = contract7State();
   assert.throws(() => renderRegisterRow({ ...legacy, contractVersion: 6 }), RegisterRowError);
 });
+
+test('the register reads back the rows publication wrote, in order', () => withRoot(async root => {
+  await upsertRegister(root, contract7State());
+  await upsertRegister(root, { ...activeContract7State(), runId: 'run-synthetic-2', slug: 'second-menu',
+    dir: '2026-09-29-second-menu--wip' });
+  const runs = await readRegisterRuns(root);
+  assert.deepEqual(runs.map(({ line: _line, ...run }) => run), [
+    { runId: 'run-synthetic-1', dir: '2026-09-29-synthetic-menu', started: '2026-09-29', status: 'completed', finished: '2026-09-29' },
+    { runId: 'run-synthetic-2', dir: '2026-09-29-second-menu--wip', started: '2026-09-29', status: 'in progress', finished: '—' },
+  ]);
+  const text = (await readFile(path.join(root, REGISTER_FILE), 'utf8')).split('\n');
+  for (const run of runs) assert.match(text[run.line - 1]!, new RegExp(`run:${run.runId}`));
+}));
+
+test('a project with no register yet has no earlier runs, not an error', () => withRoot(async root => {
+  assert.deepEqual(await readRegisterRuns(root), []);
+}));
+
+test('a hand-edited row that no longer parses is skipped and the others are still read', () => withRoot(async root => {
+  await upsertRegister(root, contract7State());
+  const target = path.join(root, REGISTER_FILE);
+  const text = await readFile(target, 'utf8');
+  await writeFile(target, text.replace(REGISTER_MARKERS.end, '| broken row <!-- run:run-x --> |\n' + REGISTER_MARKERS.end), 'utf8');
+  assert.deepEqual((await readRegisterRuns(root)).map(run => run.runId), ['run-synthetic-1']);
+}));

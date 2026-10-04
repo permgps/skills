@@ -80,6 +80,49 @@ whose output has been recorded is verified, and one that has only been read abou
 is marked as unrun. A host list that grows by reading release notes is a
 compatibility claim, and this project makes one host at a time instead.
 
+## Instruction File At Session Start
+
+The memory phase writes its block into a file the next session will actually
+load, and which file that is depends on the host. Each host's own documentation
+was read for this table. That makes it a documented fact, and it does not move
+any host's status above: a row here says what the host promises to load, not
+that a прогон has run on it.
+
+| Host id | Host | Loads at session start | Creates | Evidence |
+|---|---|---|---|---|
+| `claude-code` | Claude Code | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`; else `AGENTS.md` | `CLAUDE.md` | host documentation, https://code.claude.com/docs/en/memory, read 2026-10-04 |
+| `codex` | Codex CLI and Codex app | `AGENTS.override.md`; else `AGENTS.md` | `AGENTS.md` | host documentation, https://learn.chatgpt.com/docs/agent-configuration/agents-md, read 2026-10-04 |
+| `gemini-cli` | Gemini CLI | `GEMINI.md` | `GEMINI.md` | host documentation, https://geminicli.com/docs/cli/gemini-md/, read 2026-10-04 |
+
+How to read the third column: each `;`-separated group outranks the ones after
+it, and the host loads the first group that has any file in the project root.
+So Claude Code reads `AGENTS.md` only when none of the three `CLAUDE` files
+exists. Since Claude Code v2.1.277 it does this without an import. Codex reads
+`AGENTS.md` only when there is no `AGENTS.override.md` beside it.
+
+Three files the hosts load are never written into:
+
+- `CLAUDE.local.md` is personal and kept out of version control.
+- `AGENTS.override.md` exists to outrank the team's file.
+- Gemini CLI's file name and Codex's fallback names can be changed in the
+  user's settings.
+
+The table records each host's default. A project that changed it is not
+detected, and the write reports `loadedByHost` from the default alone.
+
+**Which file the memory phase writes**:
+
+1. the file that already carries the прогон's block;
+2. otherwise, the first file the host loads that exists and may be written;
+3. otherwise, any other existing file from the table, in the order `AGENTS.md`,
+   `CLAUDE.md`, `.claude/CLAUDE.md`, `GEMINI.md`;
+4. only when none exists, the file in the `Creates` column.
+
+A project never gains a second memory file because the host changed. When step 3
+picks a file the host does not load, the прогон says so to the user. The same
+block in two files is a stop, never a choice. `npm run hosts` holds this table
+and `MEMORY_FILES_BY_HOST` in `tools/runtime/memory.mts` to each other.
+
 ## Independent Returns And Evaluation
 
 Probe a real fresh-context dispatch and wait for its return before using source
