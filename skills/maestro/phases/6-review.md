@@ -174,7 +174,7 @@ Give the reader, briefed by
   lint command already enforces it. With none found, say «none documented».
 
 **Nothing else** — not `spec.md`, not the манифест, not the task files, not
-`interfaces.md`, not the review files.
+`interfaces.md`, not the review files, not `prior.md`.
 
 Write `reviews/standards.md` from its text, quoted as it came back. Its output is
 observations only, so it moves no таск and writes no state; none of it enters

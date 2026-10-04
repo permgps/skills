@@ -408,6 +408,8 @@ export const REVIEW_ANCHORS: readonly Anchor[] = [
     why: 'a tag is a promise to remove the line, and the review phase checks it' },
   { file: 'prompts/acceptance-reader.md', literal: 'Extra is the per-таск review\'s question',
     why: 'a question pointed «somewhere else» is a question nobody owns' },
+  { file: 'prompts/standards-reader.md', literal: 'labelled `judgement: <smell>`',
+    why: 'an unlabelled smell reads as the project\'s own standard' },
   { file: 'prompts/standards-reader.md', literal: 'never a violation',
     why: 'a smell called a violation turns a judgement into a blocking finding' },
   { file: 'prompts/standards-reader.md', literal: '`scope: seam`',
