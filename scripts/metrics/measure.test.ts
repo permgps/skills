@@ -197,3 +197,61 @@ test('a measurement names the run by its directory when the state carries one', 
   assert.match(render(m), /^прогон \S+ \(2026-08-19-landing-page--wip\)/);
   assert.equal(measure(baseline()).dir, baseline().slug);
 });
+
+// --- the retrospective -------------------------------------------------------
+
+/** What `main` printed, with stdout put back however the body ends. */
+async function printed(body: () => Promise<number>): Promise<{ code: number; out: string }> {
+  const write = process.stdout.write.bind(process.stdout);
+  let out = '';
+  process.stdout.write = ((chunk: string | Uint8Array): boolean => { out += String(chunk); return true; }) as typeof process.stdout.write;
+  try {
+    return { code: await body(), out };
+  } finally {
+    process.stdout.write = write;
+  }
+}
+
+const withSignals = (): RunState => ({
+  ...baseline(),
+  signals: [
+    'SIG-1 withheld-request — spec.md — executor 03',
+    'SIG-2 brief-exceeded — patch instead of finding — reviewer 03',
+    'SIG-3 withheld-request — brief.md — acceptance-reader G4',
+  ],
+});
+
+test('a прогон from before the signals list renders every retrospective class as not recorded', () => {
+  const text = render(measure(baseline()));
+  const section = text.slice(text.indexOf('  retrospective'));
+  assert.equal(section.match(/not recorded/g)?.length, 5, section);
+  assert.doesNotMatch(section, /→/);
+});
+
+test('a class with recorded signals renders its ids and one proposal line, and an empty class renders none', () => {
+  const text = render(measure(withSignals()));
+  const section = text.slice(text.indexOf('  retrospective'));
+  assert.match(section, /withheld requests\s+judgement\s+2 {2}SIG-1, SIG-3\n/);
+  assert.match(section, /briefs exceeded\s+judgement\s+1 {2}SIG-2\n/);
+  assert.match(section, /writes outside files\s+mechanical\s+0\n/);
+  assert.equal(section.match(/→ /g)?.length, 2, section);
+});
+
+test('the JSON measurement carries the five classes in their fixed order', async () => {
+  await withState(withSignals(), async dir => {
+    const { code, out } = await printed(() => main(dir, true));
+    assert.equal(code, 0);
+    const m = JSON.parse(out) as { retrospective: Array<{ class: string; count: number }> };
+    assert.deepEqual(m.retrospective.map(group => group.class), [
+      'withheld-requests', 'briefs-exceeded', 'writes-outside-files', 'superseded-readiness', 'repeated-defect-causes',
+    ]);
+    assert.deepEqual(m.retrospective.map(group => group.count), [2, 1, 0, 0, 0]);
+  });
+});
+
+test('a прогон full of signals is measured, not judged: main still exits 0', async () => {
+  await withState(withSignals(), async dir => {
+    const { code } = await printed(() => main(dir, false));
+    assert.equal(code, 0);
+  });
+});

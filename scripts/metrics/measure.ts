@@ -10,6 +10,10 @@
 // inferred from a neighbouring field: a stage with no `startedAt` has no
 // duration, and printing a plausible one would make the whole table unusable as
 // evidence.
+//
+// The retrospective section is for whoever maintains Maestro, not for the user:
+// it groups what the прогон recorded about itself (see `signals.ts`), and it is
+// read from the same state and nothing else.
 
 import { pathToFileURL } from 'node:url';
 
@@ -29,6 +33,7 @@ import {
 import { readState } from '../state/read.ts';
 import type { ScopeProgress } from '../state/verification.ts';
 import { projectState } from '../state/projection.ts';
+import { retrospect, type SignalGroup } from './signals.ts';
 
 const log = createLogger('metrics');
 
@@ -85,6 +90,8 @@ export interface Measurement {
   verificationEstablished: boolean;
   scopeProgress: ScopeProgress;
   conformance: { g4: string; passed: number; failed: number; incomplete: number };
+  /** The five signal classes, in their fixed order. */
+  retrospective: SignalGroup[];
 }
 
 const countBy = <T extends string>(values: readonly T[], seen: readonly string[]): Record<T, number> => {
@@ -180,6 +187,7 @@ export function measure(state: RunState): Measurement {
       failed: results.filter(result => result === 'failed').length,
       incomplete: results.filter(result => result === 'incomplete').length,
     },
+    retrospective: retrospect(state),
   };
 }
 
@@ -231,6 +239,16 @@ export function render(m: Measurement): string {
   }
   row('  exclusions', `${m.scopeProgress.deferredIds.length} deferred, ${m.scopeProgress.droppedIds.length} dropped`);
   row('  changes', `${m.scopeProgress.addedIds.length} added, ${m.scopeProgress.changedIds.length} changed, ${m.scopeProgress.exceptionDecisionIds.length} exceptions`);
+
+  // Its own label column: the longest class name does not fit the 22 above.
+  lines.push('', '  retrospective');
+  for (const group of m.retrospective) {
+    const found = group.status === 'recorded'
+      ? [String(group.count), ...group.recordIds.length > 0 ? [group.recordIds.join(', ')] : []].join('  ')
+      : group.status;
+    lines.push(`    ${group.class.replaceAll('-', ' ').padEnd(24)}${group.label.padEnd(12)}${found}`);
+    if (group.proposal !== null) lines.push(`    ${''.padEnd(24)}→ ${group.proposal}`);
+  }
   return `${lines.join('\n')}\n`;
 }
 
@@ -270,6 +288,8 @@ export async function main(target: string, json: boolean): Promise<number> {
     requirements: state.requirements.length,
     gates: measurement.gates.length,
     finished: measurement.finished,
+    signalsRecorded: measurement.retrospective.filter(group => group.status === 'recorded').length,
+    signalsFound: measurement.retrospective.reduce((total, group) => total + group.count, 0),
   });
   return 0;
 }
