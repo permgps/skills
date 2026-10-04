@@ -216,7 +216,10 @@ export function carriesLeafRule(body: string): boolean {
  * were deleted. Whether a decision clears the threshold for `decisions.md` is
  * a judgement, so no anchor stands for it; `phases/9-memory.md` says so.
  */
-export const MEMORY_ANCHORS: readonly { file: string; literal: string; why: string }[] = [
+/** One literal a bundle file must carry, and what breaks without it. */
+export interface Anchor { file: string; literal: string; why: string }
+
+export const MEMORY_ANCHORS: readonly Anchor[] = [
   { file: 'phases/0-preflight.md', literal: 'sync.mts --memory-read',
     why: 'preflight is where the memory and earlier decisions are read; without it nothing ever reads them' },
   { file: 'phases/9-memory.md', literal: 'sync.mts --memory-write',
@@ -234,6 +237,58 @@ export const MEMORY_ANCHORS: readonly { file: string; literal: string; why: stri
   { file: 'prompts/task-reader.md', literal: 'Words to avoid',
     why: 'the task reader is what holds a task file to the Terms table' },
 ];
+
+/**
+ * The literal text that carries «briefing proposes, the user disposes».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. The fork-table rows are
+ * the rows that route a question: losing the repository-fact row sends a
+ * question the code answers back to the user, and losing a contradiction row
+ * lets two sentences of the бриф that disagree reach the spec unasked. Whether a
+ * recommendation was the right one is a judgement, so no anchor stands for it;
+ * what G1 can hold of it is the `answers.md` entry (`scripts/gates/answers.ts`).
+ */
+export const BRIEFING_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/2-briefing.md', literal: 'The answer is a fact about the repository',
+    why: 'a question the code answers is read in every mode, never put to the user' },
+  { file: 'phases/2-briefing.md', literal: 'Two sentences of the бриф contradict each other',
+    why: 'a contradiction inside the бриф is a fork, quoted both ways' },
+  { file: 'phases/2-briefing.md', literal: 'The бриф contradicts the existing code',
+    why: 'a бриф that disagrees with the code is a fork, not a silent pick' },
+  { file: 'phases/2-briefing.md', literal: 'One word is used for two things',
+    why: 'an overloaded word is a fork, settled before two таски name one thing two ways' },
+  { file: 'phases/2-briefing.md', literal: 'at most two rounds',
+    why: 'rounds are bounded, so a run cannot interview the user without end' },
+  { file: 'phases/2-briefing.md', literal: '(recommended — <reason in one clause>)',
+    why: 'every question carries the прогон\'s own answer and its reason' },
+  { file: 'phases/2-briefing.md', literal: 'Chosen:',
+    why: 'a delegated reply is recorded as the full text of the option it chose' },
+  { file: 'phases/2-briefing.md', literal: 'own answer',
+    why: 'a composed reply is recorded as composed, never forced into an option' },
+  { file: 'SKILL.md', literal: 'never travels alone',
+    why: 'an R## the user reads always carries the gist of its требование' },
+  { file: 'SKILL.md', literal: '«Не понял» is not an answer',
+    why: 'a reply that did not understand leaves the stop open and re-asks with the premise' },
+];
+
+/** Every anchor in `anchors` the documents fail to carry, as violations under `check`. */
+function missingAnchors(
+  byFile: ReadonlyMap<string, string>,
+  anchors: readonly Anchor[],
+  check: string,
+): Violation[] {
+  const missing: Violation[] = [];
+  for (const anchor of anchors) {
+    const found = carriesLiteral(byFile.get(anchor.file) ?? '', anchor.literal);
+    log.debug(check, 'anchor checked', { file: anchor.file, literal: anchor.literal, found });
+    if (!found) {
+      missing.push({ check, file: anchor.file.split('/').join(path.sep), line: 0,
+        message: `does not carry "${anchor.literal}" — ${anchor.why}` });
+    }
+  }
+  log.info(check, 'anchors checked', { anchors: anchors.length, missing: missing.length });
+  return missing;
+}
 
 const PRIOR_MEMORY_FILE = 'prior.md';
 const NOT_GIVEN_HEADING = 'What You Are Not Given';
@@ -397,14 +452,7 @@ export async function checkBundle(
   // Only a bundle with a memory phase has a path to hold; Scout has none.
   const byFile = new Map(documents.map(({ file, body }) => [file.split(path.sep).join('/'), body]));
   if (byFile.has('phases/9-memory.md')) {
-    for (const anchor of MEMORY_ANCHORS) {
-      const found = carriesLiteral(byFile.get(anchor.file) ?? '', anchor.literal);
-      log.debug('memory', 'anchor checked', { file: anchor.file, literal: anchor.literal, found });
-      if (!found) {
-        add('memory', anchor.file.split('/').join(path.sep), 0,
-          `does not carry "${anchor.literal}" — ${anchor.why}`);
-      }
-    }
+    for (const v of missingAnchors(byFile, MEMORY_ANCHORS, 'memory')) add(v.check, v.file, v.line, v.message);
     // Executors and reviewers are not in the gate reader table, so the
     // withholding `npm run readers` holds has to be held here for them.
     for (const { file, body } of documents) {
@@ -418,6 +466,14 @@ export async function checkBundle(
       }
     }
     log.info('memory', 'memory read path checked', { anchors: MEMORY_ANCHORS.length });
+  }
+
+  // --- briefing proposes, the user disposes ---------------------------------
+  // Only a брифинг phase SKILL.md actually opens routes questions this way. An
+  // orphan file of that name is reachability's finding, not this one's, and
+  // Scout grills by its own step file.
+  if (byFile.has('phases/2-briefing.md') && skill.includes('phases/2-briefing.md')) {
+    for (const v of missingAnchors(byFile, BRIEFING_ANCHORS, 'briefing')) add(v.check, v.file, v.line, v.message);
   }
 
   if (skill.includes('<!-- maestro:delegation:native-explicit -->') || skill.includes('<!-- maestro:runtime:node -->')) {

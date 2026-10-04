@@ -415,7 +415,7 @@ cannot, number them in the sentence. The dials phase is what this looks like
 when it is done right: the four modes arrive as a table with the built-in one
 marked, and the user picks rather than composes.
 
-Three things every stop owes the reader:
+Four things every stop owes the reader:
 
 - **The answer that continues, named, and what continuing does.** «Да» — or
   «yes» — is not an answer until something has said what it starts.
@@ -427,6 +427,15 @@ Three things every stop owes the reader:
   shortcut and never the whole set: every one of these stops is a question
   about their project, and no list you wrote contains everything they might
   say.
+- **One option marked as the прогон's choice, with its reason in one clause.**
+  How briefing records the reply is in `phases/2-briefing.md`.
+
+**`R##` never travels alone.** In anything the user reads, an id carries a short
+gist of its требование: «R03 — оплата картой», never a bare «R03».
+
+**«Не понял» is not an answer.** The stop stays open and the same question comes
+again with the premise it was missing. Switching register is a different thing
+and keeps its own trigger words (*The Dials*).
 
 **A turn that is not a question is not a stop.** The прогон ends its turn in
 exactly two places: at one of the stops above, and at the end of the run. Nowhere
@@ -442,9 +451,10 @@ looking. If the work is long, it is still one turn; if it needs the user, it is
 one of the stops above and it carries its answers.
 
 **This is here rather than in the phase files for the reason above it** — five
-places ask, and a rule copied five times is five rules that drift apart. Like
-the section above, nothing checks it: no validator reads a question you
-compose, so the discipline is the whole of the guarantee.
+places ask, and a rule copied five times is five rules that drift apart. Only
+the recorded side is checked: G1 holds each `answers.md` entry to its options,
+its recommendation and its `Chosen:` line. No validator reads the question
+you compose, so there the discipline is the whole of the guarantee.
 
 ## Reporting Progress
 

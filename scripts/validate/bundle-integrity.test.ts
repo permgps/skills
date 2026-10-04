@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  BRIEFING_ANCHORS,
   bundleProfileFor,
   carriesLeafRule,
   checkBundle,
@@ -18,6 +19,7 @@ import {
   parseFrontmatter,
   type Violation,
 } from './bundle-integrity.ts';
+import { checkAnswers, parseAnswers } from '../gates/answers.ts';
 
 const FRONTMATTER = `---
 name: maestro
@@ -533,4 +535,68 @@ test('a brief that hands its субагент prior.md is reported, while withho
     assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'executor.md')]);
     assert.match(violations[0]?.message ?? '', /only withhold it/);
   });
+});
+
+// --- briefing proposes, the user disposes -------------------------------------
+
+const SHIPPED_BRIEFING = fileURLToPath(new URL('../../skills/maestro/phases/2-briefing.md', import.meta.url));
+
+/** The fenced `answers.md` template step 4 of the shipped briefing phase prescribes. */
+async function shippedAnswersTemplate(): Promise<string> {
+  const body = await readFile(SHIPPED_BRIEFING, 'utf8');
+  const match = /```markdown\n(### R\d{2,}[\s\S]*?)```/.exec(body);
+  assert.ok(match, 'phases/2-briefing.md carries no fenced answers.md entry');
+  return match[1]!;
+}
+
+test('every briefing anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  await withShippedCopy(async copy => {
+    for (const anchor of BRIEFING_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'briefing'), []);
+  });
+});
+
+test('briefing losing the repository-fact row is the one finding, named on the briefing phase', async () => {
+  await withShippedCopy(async copy => {
+    const briefing = path.join(copy, 'phases', '2-briefing.md');
+    const body = await readFile(briefing, 'utf8');
+    const row = body.split('\n').find(line => line.startsWith('| The answer is a fact about the repository'));
+    assert.ok(row);
+    await writeFile(briefing, body.replace(`${row}\n`, ''), 'utf8');
+
+    const violations = await checkBundle(copy);
+    assert.equal(violations.length, 1, JSON.stringify(violations));
+    assert.equal(violations[0]?.check, 'briefing');
+    assert.equal(violations[0]?.file, path.join('phases', '2-briefing.md'));
+    assert.match(violations[0]?.message ?? '', /never put to the user/);
+  });
+});
+
+test('SKILL.md losing «Не понял» is reported on SKILL.md', async () => {
+  await withShippedCopy(async copy => {
+    const skill = path.join(copy, 'SKILL.md');
+    const body = await readFile(skill, 'utf8');
+    await writeFile(skill, body.replace('«Не понял» is not an answer', '«Не понял» is a reply'), 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'briefing');
+    assert.deepEqual(violations.map(v => v.file), ['SKILL.md']);
+  });
+});
+
+test('the answers.md template the briefing phase ships passes the G1 answers check', async () => {
+  const entries = parseAnswers(await shippedAnswersTemplate());
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0]?.requirementId, 'R03');
+  assert.deepEqual(entries[0]?.options?.map(option => option.recommended), [true, false]);
+  assert.deepEqual(checkAnswers(entries), []);
+});
+
+test('the shipped template without its Chosen line is exactly one G1 finding', async () => {
+  const template = await shippedAnswersTemplate();
+  const withoutChosen = template.split('\n').filter(line => !line.startsWith('Chosen:')).join('\n');
+  const findings = checkAnswers(parseAnswers(withoutChosen));
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0]?.requirementId, 'R03');
 });
