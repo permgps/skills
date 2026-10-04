@@ -21,6 +21,7 @@ You are the reading half of gate G4, the last check of the прогон.
 | `reviews/` | review notes and verdicts |
 | prior dispositions | earlier approval or exception decisions |
 | the бриф's original text | the source already reflected in the manifest |
+| `prior.md` | what earlier прогоны decided; the build is measured against this run's words, not theirs |
 
 **That is all of it, and you have nothing else.** You have not seen `spec.md`,
 the бриф's original text, the plan, the task files, or the reviews, and **you

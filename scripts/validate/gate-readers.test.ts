@@ -8,10 +8,12 @@ import {
   checkGateReaders,
   declaredInputs,
   normalizeName,
+  PRIOR_MEMORY_INPUT,
   sectionBody,
   splitNames,
   type Violation,
 } from './gate-readers.ts';
+import { PRIOR_FILE } from '../memory/markers.ts';
 
 // Fixtures are generated per test, as everywhere else in this directory: each
 // one differs from the agreeing baseline by exactly the defect under test.
@@ -25,8 +27,8 @@ const SPEC = `# Gates
 
 | Gate | Reader's brief | Given | Withheld |
 |---|---|---|---|
-| G2 | \`independent-reader.md\` | \`brief.md\`, \`spec.md\` | the манифест |
-| G4 | \`acceptance-reader.md\` | \`manifest.md\`, the additions block of \`brief.md\`, the running build | \`spec.md\` |
+| G2 | \`independent-reader.md\` | \`brief.md\`, \`spec.md\` | the манифест, \`prior.md\` |
+| G4 | \`acceptance-reader.md\` | \`manifest.md\`, the additions block of \`brief.md\`, the running build | \`spec.md\`, \`prior.md\` |
 `;
 
 const INDEPENDENT = `# Independent Reader
@@ -43,6 +45,7 @@ const INDEPENDENT = `# Independent Reader
 | Input | What it is |
 |---|---|
 | the манифест | the interpreted requirement list |
+| \`prior.md\` | what earlier runs decided |
 
 ## Your Question
 
@@ -64,6 +67,7 @@ const ACCEPTANCE = `# Acceptance Reader
 | Input | What it is |
 |---|---|
 | \`spec.md\` | the implementation specification |
+| \`prior.md\` | what earlier runs decided |
 
 ## Your Question
 
@@ -204,10 +208,38 @@ test('a name is compared without the decoration it was written with', () => {
 
 test('a reader cannot both receive and withhold the same source interpretation', async () => {
   const violations = await violationsFor({ spec: SPEC.replace(
-    '| G2 | `independent-reader.md` | `brief.md`, `spec.md` | the манифест |',
-    '| G2 | `independent-reader.md` | `brief.md`, `spec.md`, the манифест | the манифест |'),
+    '| G2 | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `prior.md` |',
+    '| G2 | `independent-reader.md` | `brief.md`, `spec.md`, the манифест | the манифест, `prior.md` |'),
     independent: INDEPENDENT.replace('| `spec.md` | what is going to be built |',
       '| `spec.md` | what is going to be built |\n| the манифест | supplied interpretation |'),
   });
   assert.ok(violations.some(item => item.check === 'boundary'));
+});
+
+test('a prior decision handed to the spec reader is reported', async () => {
+  const violations = await violationsFor({
+    spec: SPEC.replace(
+      '| G2 | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `prior.md` |',
+      '| G2 | `independent-reader.md` | `brief.md`, `spec.md`, `prior.md` | the манифест |'),
+    independent: INDEPENDENT
+      .replace('| `spec.md` | what is going to be built |',
+        '| `spec.md` | what is going to be built |\n| `prior.md` | what earlier runs decided |')
+      .replace('| `prior.md` | what earlier runs decided |\n\n## Your Question', '\n## Your Question'),
+  });
+  const memory = violations.filter(item => item.check === 'memory');
+  assert.equal(memory.length, 1, JSON.stringify(violations));
+  assert.match(memory[0]!.message, /gate G2 gives its reader prior\.md/);
+});
+
+test('a reader row that does not withhold prior memory is reported, even with its brief agreeing', async () => {
+  const violations = await violationsFor({
+    spec: SPEC.replace('| `spec.md`, `prior.md` |', '| `spec.md` |'),
+    acceptance: ACCEPTANCE.replace('| `prior.md` | what earlier runs decided |\n', ''),
+  });
+  assert.deepEqual(checks(violations), ['memory']);
+  assert.match(violations[0]!.message, /gate G4 does not withhold prior\.md/);
+});
+
+test('the withheld name is the file the memory read actually writes, so the two cannot drift apart', () => {
+  assert.equal(PRIOR_MEMORY_INPUT, PRIOR_FILE);
 });

@@ -16,6 +16,7 @@ You are the reading half of gate G2.
 | the манифест | the already interpreted requirement list |
 | `answers.md` | earlier answers and decisions |
 | this phase's own reasoning | the rationale that produced the specification |
+| `prior.md` | what earlier прогоны decided and remembered; the specification is checked against this бриф, not theirs |
 
 **That is all of it, and you have nothing else.** You have not seen the
 манифест, `answers.md`, the plan, or any reasoning that produced the

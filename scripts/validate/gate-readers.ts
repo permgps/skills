@@ -35,6 +35,18 @@ const WITHHELD_HEADING = 'What You Are Not Given';
  * that reader is handed. */
 const GATES_TABLE_COLUMNS = ['Gate', "Reader's brief", 'Given', 'Withheld'];
 
+/**
+ * What earlier прогоны left, as preflight wrote it into the run directory.
+ *
+ * Every gate reader is blind by construction, and an earlier run's decisions
+ * are exactly the reasoning a blind reader must not inherit: a reader holding
+ * them confirms the past rather than checking the user's words. So this one
+ * name is held as a blanket rule rather than row by row: every row of the
+ * table must withhold it and none may give it. A reader added to the table
+ * later inherits the withholding without anyone having to remember it.
+ */
+export const PRIOR_MEMORY_INPUT = 'prior.md';
+
 /** The reader's brief declares its inputs in a table with these two columns. */
 const INPUT_TABLE_COLUMNS = ['Input', 'What it is'];
 
@@ -134,6 +146,19 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
     add('declared', specFile, declared.line, 'the reader table declares no gates');
     return violations;
   }
+
+  for (const row of rows) {
+    const withholdsPrior = row.withheld.includes(PRIOR_MEMORY_INPUT);
+    log.debug('memory', 'reader checked for prior memory', { gate: row.gate, withholdsPrior });
+    if (row.given.includes(PRIOR_MEMORY_INPUT)) {
+      add('memory', specFile, row.line,
+        `gate ${row.gate} gives its reader ${PRIOR_MEMORY_INPUT} — a blind reader never receives what earlier runs decided; move it to Withheld`);
+    } else if (!withholdsPrior) {
+      add('memory', specFile, row.line,
+        `gate ${row.gate} does not withhold ${PRIOR_MEMORY_INPUT} — add it to the row's Withheld cell and to the brief's "${WITHHELD_HEADING}" table`);
+    }
+  }
+  log.info('memory', 'prior memory withheld from every reader checked', { gates: rows.length });
 
   const present = new Set(await readdir(promptsDir));
   const compared: Array<{ gate: string; brief: string; inputs: string[] }> = [];

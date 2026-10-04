@@ -12,6 +12,7 @@ import {
   checkProcedure,
   COMPLETION_PROCEDURES,
   LEAF_RULE,
+  MEMORY_ANCHORS,
   procedureSection,
   findRelativeLinks,
   parseFrontmatter,
@@ -472,4 +473,64 @@ test('runtime import scanning ignores quoted data and comments and rejects impor
   // Object data has a colon, so the scanner must not treat it as a from declaration.
   assert.deepEqual(runtimeImports("const data = { 'from': 'value' }; // import 'external';\nimport './runtime/module.mts';").imports, ['./runtime/module.mts']);
   assert.equal(runtimeImports('const data = `${await import("external")}`;').computed, true);
+});
+
+// --- the memory read path, end to end ---------------------------------------
+
+/** A copy of the shipped bundle, so each test differs from the real one by one edit. */
+async function withShippedCopy(body: (copy: string) => Promise<void>): Promise<void> {
+  const dir = await mkdtemp(path.join(tmpdir(), 'bundle-integrity-memory-'));
+  const copy = path.join(dir, 'maestro');
+  try {
+    await cp(fileURLToPath(new URL('../../skills/maestro', import.meta.url)), copy, { recursive: true });
+    await body(copy);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+test('every memory anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  await withShippedCopy(async copy => {
+    for (const anchor of MEMORY_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'memory'), []);
+  });
+});
+
+test('preflight losing its memory read is the one finding, named on preflight', async () => {
+  await withShippedCopy(async copy => {
+    const preflight = path.join(copy, 'phases', '0-preflight.md');
+    const body = await readFile(preflight, 'utf8');
+    assert.ok(body.includes('sync.mts --memory-read'));
+    await writeFile(preflight, body.split('sync.mts --memory-read').join('sync.mts'), 'utf8');
+
+    const violations = await checkBundle(copy);
+    assert.equal(violations.length, 1, JSON.stringify(violations));
+    assert.equal(violations[0]?.check, 'memory');
+    assert.equal(violations[0]?.file, path.join('phases', '0-preflight.md'));
+    assert.match(violations[0]?.message ?? '', /nothing ever reads them/);
+  });
+});
+
+test('the plan losing the Terms table header is reported on the plan phase', async () => {
+  await withShippedCopy(async copy => {
+    const plan = path.join(copy, 'phases', '4-plan.md');
+    const body = await readFile(plan, 'utf8');
+    await writeFile(plan, body.replace("| Term | Meaning | Words to avoid | User's wording |", '| Term | Meaning |'), 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'memory');
+    assert.deepEqual(violations.map(v => v.file), [path.join('phases', '4-plan.md')]);
+  });
+});
+
+test('a brief that hands its субагент prior.md is reported, while withholding it is not', async () => {
+  await withShippedCopy(async copy => {
+    const executor = path.join(copy, 'prompts', 'executor.md');
+    const body = await readFile(executor, 'utf8');
+    await writeFile(executor, body.replace('# ', '# Also read `.maestro/<dir>/prior.md` first.\n\n# '), 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'memory');
+    assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'executor.md')]);
+    assert.match(violations[0]?.message ?? '', /only withhold it/);
+  });
 });

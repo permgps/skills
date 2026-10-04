@@ -17,6 +17,7 @@ You are the reference-discovery half of G2 for preservation work.
 | generated inventory conclusions | the current run's interpreted coverage |
 | implementation rationale | the reasoning behind existing work |
 | prior verdicts | earlier pass or failure decisions |
+| `prior.md` | what earlier runs decided and remembered |
 
 Receive the original request and current user additions, plus the neutral
 reference register with raw locations and access conditions. You may inspect

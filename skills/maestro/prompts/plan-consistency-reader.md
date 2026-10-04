@@ -23,6 +23,7 @@ task produces, a route one task serves and another calls by a different name.
 |---|---|
 | `spec.md` | the specification the tasks were cut from |
 | `manifest.md` | the numbered requirement list |
+| `prior.md` | what earlier прогоны decided and remembered |
 
 **That is all of it, and you must not ask for more.** If you are offered the
 specification or the манифест, decline it and say so in your output. Whether

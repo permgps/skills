@@ -20,6 +20,7 @@ facts. Do not ask for withheld inputs. This pass precedes agreement, not G4.
 | answers.md | Later interpretation |
 | tasks | Implementation plan and task files |
 | prior audit conclusions | Prior verdicts that could bias this pass |
+| `prior.md` | What earlier runs decided, withheld so this pass reads the user's words and not a past run's |
 
 ## Entry
 

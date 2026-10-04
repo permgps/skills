@@ -205,6 +205,43 @@ export function carriesLeafRule(body: string): boolean {
   return body.replace(/\s+/g, ' ').includes(LEAF_RULE);
 }
 
+/**
+ * The literal text that carries the memory read path through the bundle.
+ *
+ * Phase 9 writes what a прогон learned and preflight reads it back for the next
+ * one. Each step of that path lives in a different file, and the path is broken
+ * the moment any one of them loses its line. Each anchor is the instruction
+ * itself — a command, a template, a table header — matched literally for the
+ * reason `LEAF_RULE` is: a marker would keep passing after the words beside it
+ * were deleted. Whether a decision clears the threshold for `decisions.md` is
+ * a judgement, so no anchor stands for it; `phases/9-memory.md` says so.
+ */
+export const MEMORY_ANCHORS: readonly { file: string; literal: string; why: string }[] = [
+  { file: 'phases/0-preflight.md', literal: 'sync.mts --memory-read',
+    why: 'preflight is where the memory and earlier decisions are read; without it nothing ever reads them' },
+  { file: 'phases/9-memory.md', literal: 'sync.mts --memory-write',
+    why: 'the block is spliced by the helper, never re-derived in prose' },
+  { file: 'phases/2-briefing.md', literal: 'prior.md',
+    why: 'a fork the прогон settles itself is checked against what earlier runs decided' },
+  { file: 'phases/2-briefing.md', literal: 'contradicts <date> decision, because',
+    why: 'an answer that overrides an earlier decision has to say so' },
+  { file: 'phases/3-spec.md', literal: 'prior.md',
+    why: 'the spec reads what earlier runs decided before it settles the same thing' },
+  { file: 'phases/3-spec.md', literal: 'contradicts <date> decision, because',
+    why: 'a spec entry against an earlier decision is never a silent override' },
+  { file: 'phases/4-plan.md', literal: "| Term | Meaning | Words to avoid | User's wording |",
+    why: 'interfaces.md names each domain word once, so two таски cannot name one thing two ways' },
+  { file: 'prompts/task-reader.md', literal: 'Words to avoid',
+    why: 'the task reader is what holds a task file to the Terms table' },
+];
+
+const PRIOR_MEMORY_FILE = 'prior.md';
+const NOT_GIVEN_HEADING = 'What You Are Not Given';
+
+/** Whitespace-normalised, as for the leaf rule. */
+const carriesLiteral = (body: string, literal: string): boolean =>
+  body.replace(/\s+/g, ' ').includes(literal.replace(/\s+/g, ' '));
+
 export function procedureSection(body: string, heading: string): string {
   if (!heading) return body;
   const lines = body.split('\n');
@@ -355,6 +392,33 @@ export async function checkBundle(
       + 'and the fan-out multiplies with every level');
   }
   log.info('leaf', 'leaf rule checked', { prompts: promptFiles.length, carrying });
+
+  // --- the memory read path, end to end -------------------------------------
+  // Only a bundle with a memory phase has a path to hold; Scout has none.
+  const byFile = new Map(documents.map(({ file, body }) => [file.split(path.sep).join('/'), body]));
+  if (byFile.has('phases/9-memory.md')) {
+    for (const anchor of MEMORY_ANCHORS) {
+      const found = carriesLiteral(byFile.get(anchor.file) ?? '', anchor.literal);
+      log.debug('memory', 'anchor checked', { file: anchor.file, literal: anchor.literal, found });
+      if (!found) {
+        add('memory', anchor.file.split('/').join(path.sep), 0,
+          `does not carry "${anchor.literal}" — ${anchor.why}`);
+      }
+    }
+    // Executors and reviewers are not in the gate reader table, so the
+    // withholding `npm run readers` holds has to be held here for them.
+    for (const { file, body } of documents) {
+      if (!file.startsWith(`${PROMPTS_DIR}${path.sep}`)) continue;
+      const notGiven = procedureSection(body, NOT_GIVEN_HEADING);
+      const outside = notGiven === '' ? body : body.replace(notGiven, '');
+      if (outside.includes(PRIOR_MEMORY_FILE)) {
+        add('memory', file, 0,
+          `brief mentions ${PRIOR_MEMORY_FILE} outside "## ${NOT_GIVEN_HEADING}" — no субагент is handed `
+          + 'what earlier runs decided; only withhold it');
+      }
+    }
+    log.info('memory', 'memory read path checked', { anchors: MEMORY_ANCHORS.length });
+  }
 
   if (skill.includes('<!-- maestro:delegation:native-explicit -->') || skill.includes('<!-- maestro:runtime:node -->')) {
     if (!skill.includes('<!-- maestro:runtime:node -->')) add('runtime', 'SKILL.md', 0, 'declare the autonomous Node runtime marker');

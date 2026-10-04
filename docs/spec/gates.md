@@ -72,11 +72,11 @@ present in one and not the other is a finding that names both places.
 
 | Gate | Reader's brief | Given | Withheld |
 |---|---|---|---|
-| G1 source | `manifest-reader.md` | redacted source snapshots, candidate manifest | coordinator clause inventory, spec.md, answers.md, tasks, prior audit conclusions |
-| G3 consistency | `plan-consistency-reader.md` | every task file, `interfaces.md` | `spec.md`, `manifest.md` |
-| G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning |
-| G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts |
-| G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, neutral raw reference register and capture identity, the running build | `spec.md`, the plan, the task files, `reviews/`, prior dispositions, the бриф's original text |
+| G1 source | `manifest-reader.md` | redacted source snapshots, candidate manifest | coordinator clause inventory, spec.md, answers.md, tasks, prior audit conclusions, `prior.md` |
+| G3 consistency | `plan-consistency-reader.md` | every task file, `interfaces.md` | `spec.md`, `manifest.md`, `prior.md` |
+| G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning, `prior.md` |
+| G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts, `prior.md` |
+| G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, neutral raw reference register and capture identity, the running build | `spec.md`, the plan, the task files, `reviews/`, prior dispositions, the бриф's original text, `prior.md` |
 
 The reference reader's first discovery pass is not bounded by the generated
 inventory. The orchestrator then reconciles its findings with all other
