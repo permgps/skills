@@ -14,6 +14,20 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**The briefing proposes, and the user disposes.** Every question now arrives
+with one option marked as the прогон's choice, with its reason in one clause. It
+is the same answer `full` would self-brief. A reply like «как советуешь» or a
+bare «да» is recorded in `answers.md` as the full text of the option it chose,
+on a `Chosen:` line, and shown back to the user. G1 checks the entry's fixed
+shape through `scripts/gates/answers.ts`. Facts about the repository are read in
+every mode, never asked, and the read-only ceiling is unchanged. Two
+contradicting sentences of the бриф, a бриф that contradicts the code, and one
+word used for two things are now forks, put to the user as a concrete scenario.
+Rounds follow the frontier, at most two. In user-facing text an `R##` always
+carries a gist of its требование. «Не понял» keeps the stop open and re-asks with
+the missing premise. `npm run bundle` holds these rules as `BRIEFING_ANCHORS`
+and checks the shipped `answers.md` template against the G1 parser.
+
 **The next прогон reads what the last one remembered.** Phase 9 wrote the memory
 block and `decisions.md`, and nothing ever read either. Preflight now runs
 `sync.mts --memory-read` and writes `prior.md`: the block plus every earlier run's

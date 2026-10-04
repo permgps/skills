@@ -58,6 +58,45 @@ The manifest grows by rows and by nothing else. An added требование be
 in the state and in the additions, which is what keeps the manifest's two
 readings comparable.
 
+## Briefing
+
+The briefing proposes and the user disposes. Its aim is that a user who has
+never built software answers fast, and is never asked something the repository
+already knows.
+
+| The question | What happens |
+|---|---|
+| a fork — two answers, two different builds | asked, by mode (the Mode Matrix below) |
+| a preference the spec can decide | decided, and listed under Assumptions |
+| a fact about the user (`S3`) or a consequence (`S4`) | asked; `S4` in every mode, `full` included |
+| a fact about the repository | **never asked, read** — in every mode |
+| two sentences of the бриф that contradict each other | a fork; both are quoted |
+| a бриф that contradicts the existing code | a fork; the sentence and the file are quoted |
+| one word used for two things | a fork; both meanings are named |
+
+- **Reading has a ceiling, and it is the same in every mode.** The прогон reads
+  the project's files to settle a fact. It never runs the project, drives its
+  interface, reproduces a defect or changes a line, and the reading ends in the
+  turn that started it.
+- **Every question carries options, and one is recommended** with its reason in
+  one clause. The recommended option is the answer `full` would self-brief, so it
+  is checked against `prior.md` like any self-briefed fork. A fork is put as a
+  concrete scenario rather than an abstraction, in both registers.
+- **Rounds follow the frontier, and there are at most two.** A question that
+  depends on one still unanswered is folded into the parent's options or held
+  back. An answer that opens a new fork earns the second round. A fork still
+  open after it is recorded `open` with its reason.
+- **`R##` never travels alone** in user-facing text: it carries a short gist of
+  its требование.
+- **«Не понял» is not an answer.** The stop stays open and the question is asked
+  again, in the same round, with the premise it was missing. It is not the
+  register's trigger, which keeps its own words ([`dials.md`](dials.md)).
+- **A delegated reply is recorded as the option it chose.** «Как советуешь» or a
+  bare «да» goes into `answers.md` with the selected option's full text on a
+  `Chosen:` line, and that text is shown back to the user. The entry shape is in
+  [`artifacts.md`](artifacts.md), and [`gates.md`](gates.md) states what G1
+  checks of it.
+
 ## Loading Rule
 
 **One file at a time, and never ahead.** A phase's rules are read at the moment
@@ -816,6 +855,10 @@ there, by a reader that never saw any of this.
 | acceptance | отчёт | отчёт | отчёт | отчёт |
 
 Two cells are all that separate `interview` from `manual`: spec and plan.
+
+The briefing row's `self-briefed` is not a fourth kind of answer. It is the
+option the other three columns put in front of the user marked as recommended,
+taken without asking.
 
 **`auto` means the phase does not wait for approval — not that it says
 nothing.** Preflight asks about a dirty working tree and about an English name

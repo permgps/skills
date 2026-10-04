@@ -254,7 +254,7 @@ successfully as one that went well.
 ## Running The Gates
 
 ```bash
-node scripts/gates/check-g1.ts <run-dir>   # after брифинг: every требование has a status
+node scripts/gates/check-g1.ts <run-dir>   # after брифинг: every требование has a status, every answer its chosen option
 node scripts/gates/check-g2.ts <run-dir>   # after the spec: none left open
 node scripts/gates/check-g3.ts <run-dir>   # after the plan: the map holds both ways
 node scripts/gates/check-g4.ts <run-dir>   # after приёмка: current checks and coverage establish G4

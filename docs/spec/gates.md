@@ -5,7 +5,7 @@ that fails is not a warning: the phase is redone.
 
 | Gate | After phase | Pass condition |
 |---|---|---|
-| G1 | briefing | Every требование has a status and no unexplained open entry; contract 5 also requires a fresh returned independent source audit and frozen initial agreement |
+| G1 | briefing | Every требование has a status and no unexplained open entry; every `answers.md` entry that offered options marks exactly one recommended and records the chosen option in full; contract 5 also requires a fresh returned independent source audit and frozen initial agreement |
 | G2 | spec | Every live требование is dispositioned; independent intent and raw-reference passes find no unresolved mandatory coverage gap |
 | G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner that transitively depends on each integration dependency; no two таски share a file unless one transitively blocks the other; a task reader finds each task executable, and a plan-consistency reader given every task file finds no coordination defect between them |
 | G4 | acceptance | Current, applicable evidence and independent discovery cover the current contract; failures and incomplete checks are reconciled under [`verification.md`](verification.md); contract 6 also closes `completed` with no open defect, and stops after an exhausted budget only with a `budget_exhausted` strategy review |
@@ -14,7 +14,7 @@ that fails is not a warning: the phase is redone.
 
 | Gate | What proves it |
 |---|---|
-| G1 | The status map has no unexplained open entries; v5 has a current source/manifest audit and initial agreement baseline |
+| G1 | The status map has no unexplained open entries; each `answers.md` entry with options carries a gist, one recommendation, an `Answer:` and a `Chosen:` that names an offered option or `own answer`; v5 has a current source/manifest audit and initial agreement baseline |
 | G2 | Status map, obligation/source coverage map, independent intent and raw-reference discovery findings |
 | G3 | Requirement → obligation → implementation task and obligation → check → execution task mappings, including verification-only tasks |
 | G4 | Current check executions, complete coverage reviews, union of substantiated findings, and a fresh acceptance round |
@@ -24,6 +24,22 @@ G4 finding that names no `R##` cannot be counted against the coverage the
 dashboard renders, cannot be handed to whoever repairs it, and cannot be told
 apart from a remark about the build — so it does not satisfy the gate it was
 produced by.
+
+### What G1 Reads In `answers.md`
+
+The entry shape is in [`artifacts.md`](artifacts.md). For every entry that put
+options to the user, G1 reports a heading that is a bare `R##`, a count of
+recommended options other than one, a missing `Answer:`, a missing
+`Chosen:`, a `Chosen:` that is neither `own answer` nor one of the offered
+options, and a `self-briefed` answer whose `Chosen:` is not the recommended
+option. Entries without options — facts settled by reading, and runs recorded
+before the rule — are not read, and a missing `answers.md` is a бриф that
+opened no forks. A file that exists and cannot be read leaves the gate
+unchecked, never passed.
+
+Nothing checks whether the recommendation was the right one, whether the
+question was worth asking, or whether the chosen text was shown back to the
+user. Those stay the phase file's discipline.
 
 ## Why The Manifest Is Checked Twice
 

@@ -96,7 +96,7 @@ a warning: the phase is redone.
 
 | Gate | After | Passes when |
 |---|---|---|
-| G1 | briefing | every requirement has a status/reason; v5 also requires a fresh independent source audit and frozen agreement |
+| G1 | briefing | every requirement has a status/reason; every question in `answers.md` records its recommended option and the option chosen; v5 also requires a fresh independent source audit and frozen agreement |
 | G2 | specification | intent and independent raw-reference readers find no unresolved mandatory gap |
 | G3 | plan | each required obligation has an implementation owner, each check has an execution owner, and the task reader finds the handoff executable |
 | G4 | acceptance | all current required checks and coverage pass; missing evidence remains pending |

@@ -64,7 +64,7 @@ actually built.
 | `brief.md` | manifest | manifest, G2, acceptance (the manifest plus the additions) | append-only |
 | `manifest.md` | manifest | briefing, spec, plan, acceptance, G1, G2, G3, G4 | append-only |
 | `prior.md` | preflight | briefing, spec, memory | no |
-| `answers.md` | briefing | spec | append-only |
+| `answers.md` | briefing | spec, G1 | append-only |
 | `reference.md` | briefing | G2 reference reader, acceptance reference reader, polish | append-only |
 | `spec.md` | spec | plan, build, review | yes, by amendment only |
 | `interfaces.md` | plan | build, review, G3, memory | no |
@@ -147,6 +147,36 @@ that is not an edit to the specification — it is a new fact, written by the
 phase that established it, and read by everyone downstream. Two phases editing
 one file would leave the first disagreement between them with no owner, which is
 the single thing this table exists to prevent.
+
+### The Shape Of An `answers.md` Entry
+
+One entry per question the брифинг put, or settled itself. The labels are
+English and fixed, because G1 reads the entry by them; the values are the
+прогон's language, after redaction.
+
+```markdown
+### R03 — способ оплаты
+Asked: Как гость платит за заказ?
+Options:
+1. Оплата картой на сайте (recommended — деньги приходят до отправки заказа)
+2. Оплата при получении
+Answer: как советуешь
+Chosen: Оплата картой на сайте
+```
+
+| Line | Holds |
+|---|---|
+| heading | the `R##` and a short gist of its требование — an id never travels alone |
+| `Asked:` | the question as it was actually put |
+| `Options:` | the numbered options; exactly one carries `(recommended — <reason>)`, and it is the answer `full` would self-brief |
+| `Answer:` | the user's reply verbatim, or `self-briefed` for a fork the прогон settled itself |
+| `Chosen:` | the full text of the option the reply selected, or `own answer`; an earlier decision's `follows …` / `contradicts …` citation goes at its end |
+
+A delegated reply — «как советуешь», a bare «да» — is why `Chosen:` exists. The
+acceptance reader never sees the question, so the reply alone has lost the
+decision; the option it selected, written out, has not. A fact the прогон read
+in the repository instead of asking writes `Settled by reading: <paths>` and
+one line of what they say, with no options.
 
 ### What The `Mutable` Column Means
 
