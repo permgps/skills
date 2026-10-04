@@ -17,7 +17,7 @@ right thing was built.
 | review | Review | yes | task files, obligations, evidence, `interfaces.md`, project code, the project's documented standards | `reviews/` including `reviews/standards.md` once per прогон, findings and check limits |
 | acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md` |
 | polish | Доводка | no | `reference.md`, project code after required parity | optional polished build, `tasks/` of its own |
-| memory | Memory | no | `discovered-interfaces.md`, `spec.md`, the Terms table of `interfaces.md`, the seam-level items of `reviews/standards.md`, `prior.md`, project code, run state | the memory block in the host's memory file, `decisions.md` |
+| memory | Memory | no | `discovered-interfaces.md`, `spec.md`, the Terms table of `interfaces.md`, the seam-level items of `reviews/standards.md`, the `noCorrectSeam:` lines of repeated repairs' diagnoses, `prior.md`, project code, run state | the memory block in the host's memory file, `decisions.md` |
 | repair | Repair | no | whatever one of its six doors provides | retried таск, `amendments.md` |
 
 `polish` runs only when the finish dial asked for it, inside the acceptance
@@ -612,7 +612,7 @@ and passing it quietly are the same mistake made in opposite directions.
 | What was asked | every `R##`, its status, and where it landed |
 | Disagreements | G4's findings and failed/incomplete requirements, each against its требование and check evidence |
 | Assumptions | every placeholder standing in for a fact nobody supplied, and every wording whose translation was uncertain |
-| Observations | the non-blocking findings the reviews carried forward, each `unrequested` one with its tag; then, under their own sub-heading, the standards pass's observations, or one line saying it did not run |
+| Observations | the non-blocking findings the reviews carried forward, each `unrequested` one with its tag; then, under their own sub-heading, the standards pass's observations, or one line saying it did not run; then each `noCorrectSeam:` line of a repeated repair's diagnosis, as a defect repaired without a regression check, with its таск and reason — never the hypotheses |
 | What is left | deferred and dropped требования, unresolved work, closure outcome, and accepted exceptions without hiding technical failures |
 
 Fixed, because a отчёт whose shape is decided per прогон is a отчёт two прогона
@@ -782,6 +782,11 @@ implemented twice, one clump of values passed through several seams — rather
 than something a review found and got fixed, and it enters only when the next
 session would otherwise rediscover it.
 
+A `noCorrectSeam:` line from a repeated repair's diagnosis passes the same test.
+A place where the project offers no seam for a regression check is a fact about
+how it is built, and the next session meets it again when it tries to test the
+same thing. It is written without the hypotheses around it.
+
 `S2` applies here with no softening: the memory file is committed and read by
 every later session, so a credential reaching it is the worst version of the
 same violation. Redaction runs over what this phase writes exactly as it runs
@@ -914,6 +919,34 @@ renames, task and defect splits and executors; per-root at most two. Under
 contract 5 the finite global budget never increases; under contract 6 it rises
 only by a user-authorized `limit_increase` answering a `request_limit` strategy
 review with a closure forecast. See [verification.md](verification.md).
+
+The first repair stays undiagnosed, to keep its cost. From the repeated repair
+onward the diagnostician is asked for competing hypotheses rather than one
+grounded next approach:
+
+- **three to five ranked hypotheses**, most likely first, each with the
+  observation that would falsify it;
+- **the cheapest probe that tells them apart, run first** — by the
+  diagnostician when it writes nothing to the project, otherwise as the first
+  step of the next executor's brief, before any change, with its output tagged
+  `[maestro-debug:DF-N]`. An executor whose probe contradicts the brief's
+  hypothesis stops before the change and returns `still_failing`;
+- **a reproduction minimised** until every element in it is needed;
+- **one variable changed at a time**, and a performance defect starting from a
+  measured baseline;
+- **the seam** where the regression check sits, or `noCorrectSeam:` with why
+  none exists. That absence is itself the finding: it is carried into the
+  отчёт's Observations and offered to the memory phase.
+
+All of it lives inside the existing `diagnosis` text as labelled lines (see
+[verification.md](verification.md)), so the state contract does not move. A
+diagnosis that breaks the shape is sent back to a fresh diagnostician once; a
+send-back spends no repair attempt, and a second malformed return is
+`unavailable`. The run state is the floor: it refuses a repeated attempt
+carrying such a diagnosis. **Hypotheses never reach the user** — not in a status
+line, a question or the отчёт. Whether the probe was the cheapest, the
+reproduction minimal or a `noCorrectSeam` reason true is the diagnostician's
+judgement, and nothing mechanical holds it.
 
 ### Defects, Closure Forecasts And Strategy Review
 

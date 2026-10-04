@@ -14,6 +14,23 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**Repair diagnoses by competing hypotheses.** The first repair stays
+undiagnosed. From the repeated repair onward, the diagnostician no longer
+proposes one grounded next approach. It ranks three to five hypotheses, each
+with the observation that would falsify it, and runs the cheapest probe that
+tells them apart first. When the probe needs a change, it becomes the
+executor's first step, before any change. The reproduction is minimised until
+every element is needed, one variable changes at a time, and a performance
+defect starts from a measured baseline. The diagnosis names where the
+regression check sits, or writes `noCorrectSeam:` with why none exists. That
+line reaches the отчёт's Observations and the memory phase; the hypotheses
+never reach the user. All of it lives as labelled lines inside the existing
+`diagnosis` text, so the state contract is unchanged. The closure rules refuse
+a repeated attempt whose diagnosis breaks that shape. The repair phase sends
+such a diagnosis back once, without spending an attempt. The synthetic
+regression of the failed contract-6 прогон now refuses a single-hypothesis
+diagnosis, and `npm run bundle` holds the text as `DIAGNOSIS_ANCHORS`.
+
 **Review sees what nobody asked for.** The reviewer has a fifth part.
 Behaviour the diff adds that no *done means* item, interface or assigned check
 accounts for is an observation tagged `unrequested`. It never blocks, and the

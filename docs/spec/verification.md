@@ -273,6 +273,30 @@ write. The rules below that demand a new field skip exactly these records and
 nothing else, so history stays readable without inventing readiness or defects
 it never had.
 
+A repeated attempt — one with a `predecessorId`, not named in
+`inheritedAttemptIds` — carries its diagnosis as labelled lines inside the
+existing `diagnosis` string; no field is added and the contract version does
+not move. The labels are fixed English tokens; any other line is free prose:
+
+```
+H1: <cause> — falsified by: <observation>
+H2: <cause> — falsified by: <observation>
+H3: <cause> — falsified by: <observation>
+Probe: <the cheapest probe that tells them apart> — result: <what it showed>
+Reproduction: <the minimised reproduction>
+Seam: <where the regression check sits>      (or)      noCorrectSeam: <why none exists>
+```
+
+The closure rules refuse the attempt unless: three to five `H` lines are
+numbered `H1` to `Hn` in order; each has a cause and a non-empty
+`falsified by:`; no two causes are the same; there is exactly one non-empty
+`Probe:`, one `Reproduction:`, and one of `Seam:` or `noCorrectSeam:`; and the
+attempt's `hypothesis` is one of the `H` causes, written as its line writes it.
+`DIAGNOSIS_HYPOTHESES` in `tools/runtime/state/closure.mts` is the one home of
+the three-to-five bound. A first attempt and every verification-2 attempt keep
+a prose diagnosis. Only the shape is held: whether the probe was the cheapest
+or the reproduction minimal is judgement.
+
 ### Readiness
 
 1. A readiness record names the candidate it probed in `targetFingerprint`.
