@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -118,4 +118,16 @@ test('a missing file is unreadable input', async () => {
   await withTree({ bundle: bundlePhase(SEVEN), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
     await assert.rejects(() => checkReportSections({ specDir, bundleDir }));
   });
+});
+
+test('the shipped bundle and spec list the same report sections', async () => {
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  const violations = await checkReportSections({
+    specDir: path.join(root, 'docs', 'spec'), bundleDir: path.join(root, 'skills', 'maestro'),
+  });
+  assert.deepEqual(violations, []);
+  const shipped = readSectionTable(
+    await readFile(path.join(root, 'skills', 'maestro', 'phases', '7-acceptance.md'), 'utf8'),
+    '### 4. Write the отчёт');
+  assert.deepEqual(shipped?.sections, SEVEN);
 });

@@ -245,7 +245,7 @@ no Python, compiler, loader, target build or npm install. Preflight checks the
 actual capability. See [runtime installation](docs/install.md#autonomous-runtime-layout).
 
 ```bash
-npm run check     # typecheck, eleven validator runs across two skills, and their tests
+npm run check     # typecheck, twelve validator runs across two skills, and their tests
 npm run metrics   # measure a finished run
 ```
 

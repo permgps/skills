@@ -149,6 +149,8 @@ node scripts/validate/dials-defaults.ts \
   docs/spec skills/maestro                               # the mode set and its default
 node scripts/validate/gate-readers.ts \
   docs/spec skills/maestro                               # what each blind reader is handed
+node scripts/validate/report-sections.ts \
+  docs/spec skills/maestro                               # the отчёт's sections, both copies
 node scripts/validate/viewer-ownership.ts skills/maestro    # the view boundary
 node --test 'scripts/**/*.test.ts'                     # the checkers themselves
 npm run parity:browser                                 # real pointer regression; requires browser and loopback
@@ -212,6 +214,14 @@ reader brief. This checks declared input boundaries; an actual dispatch still
 needs workflow evaluation because a prompt file cannot prove what the agent
 received at run time.
 
+`report-sections` proves that the отчёт's sections are one list. The bundle's
+acceptance phase and [`phases.md`](phases.md) each carry a `| Section | Holds |`
+table; their Section columns must name the same sections in the same order,
+both must carry *Questions to forward* and *Hard to undo*, and neither they nor
+[`artifacts.md`](artifacts.md) may say how many sections there are — a count in
+prose had already been written out six times, and it is the copy nobody updates.
+It reads the bundle and this specification, never a прогон's `report.md`.
+
 `repair-doors` proves that every door into the repair phase declared in
 [`phases.md`](phases.md) is listed by the bundle's own repair phase and marked
 `<!-- maestro:opens:<door> -->` in the phase that sends work through it. The same
@@ -260,6 +270,7 @@ node scripts/gates/check-g2.ts <run-dir>   # after the spec: none left open
 node scripts/gates/check-g3.ts <run-dir>   # after the plan: the map holds both ways
 node scripts/gates/check-g4.ts <run-dir>   # after приёмка: current checks and coverage establish G4
 node scripts/gates/debug-tags.ts <run-dir> [repo-dir]   # in review: no таск leaves a [maestro-debug:…] line behind
+node scripts/gates/one-way.ts <run-dir> [repo-dir]      # in review: oneWay records every mechanical one-way change
 ```
 
 Independent G1 source audit, G2 intent/reference discovery, and G4 blind discovery

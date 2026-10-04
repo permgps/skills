@@ -491,6 +491,17 @@ removed is a blocking finding of the orchestrator's own, origin `validator`,
 naming the tag id and the path but never the line. A removal in another таск's
 commit does not clear it.
 
+**What is hard to undo is recorded from the same diffs.** Before dispatch the
+orchestrator also reads each commit's file list and appends to `oneWay` one line
+per inward one-way change: a deleted or renamed path no commit of the прогон
+added, a new file under a `migrations` or `migrate` directory or under
+`alembic/versions`, and a dependency whose leading major changed in
+`package.json` (below `1.0`, the minor). A data migration elsewhere and the
+other manifests are read by the same rule, by judgement. It is a record for the
+отчёт, not a finding, and it blocks nothing. `scripts/gates/one-way.ts` holds
+the mechanical half against a real repository; it does not ship with the
+bundle.
+
 ### One Standards Pass
 
 Executors work in isolation and each review sees one таск, so what lives between
@@ -605,13 +616,15 @@ and passing it quietly are the same mistake made in opposite directions.
 
 ### The Отчёт
 
-`report.md` has five sections and they are fixed:
+`report.md` has these sections, in this order, and they are fixed:
 
 | Section | Holds |
 |---|---|
 | What was asked | every `R##`, its status, and where it landed |
 | Disagreements | G4's findings and failed/incomplete requirements, each against its требование and check evidence |
-| Assumptions | every placeholder standing in for a fact nobody supplied, and every wording whose translation was uncertain |
+| Assumptions | every decision taken on the user's behalf, every unfilled variable by name, and every wording whose translation was uncertain |
+| Questions to forward | every placeholder standing in for a fact nobody supplied, as a questionnaire the user can send on to whoever knows |
+| Hard to undo | every inward change the прогон made that is hard to take back — migrations, deleted or renamed user files, major dependency upgrades — in plain words |
 | Observations | the non-blocking findings the reviews carried forward, each `unrequested` one with its tag; then, under their own sub-heading, the standards pass's observations, or one line saying it did not run; then each `noCorrectSeam:` line of a repeated repair's diagnosis, as a defect repaired without a regression check, with its таск and reason — never the hypotheses |
 | What is left | deferred and dropped требования, unresolved work, closure outcome, and accepted exceptions without hiding technical failures |
 
@@ -620,15 +633,35 @@ cannot be compared through. A section with nothing in it says so in one line
 rather than disappearing; an absent section reads as a section nobody wrote.
 
 When приёмка runs a second time — after a failed G4 sent its disagreements to
-repair — the five sections are written again, under that round's date, beneath
+repair — the sections are written again, under that round's date, beneath
 the ones already there. The отчёт accumulates rounds rather than replacing them:
 the earlier round is what the build did before it was repaired, and nothing else
 in the прогон records that.
 
-Assumptions is where `S3` in [`safety.md`](safety.md) sends every invented fact
-it replaced with a placeholder, and where the manifest phase sends a translation
-it was not sure of. It is the one section that exists to be read even when
-everything passed.
+Assumptions is where the прогон lists what it decided for the user, and where
+the manifest phase sends a translation it was not sure of. Questions to forward
+is where `S3` in [`safety.md`](safety.md) sends every invented fact it replaced
+with a placeholder. With Hard to undo, these are the sections that exist to be
+read even when everything passed: they hand over what only the user can do.
+
+**Questions to forward is a questionnaire, built from the state.** The spec
+phase writes each `debt.placeholders` entry as one labelled line —
+`question:`, `matters:`, and `ask:` when somebody likely to know is known —
+keeping one `question:` text per missing fact. Приёмка groups the lines by that
+text, so each idea is asked once and carries every требование that waits on it,
+and puts the question more требования wait on first. Each is written with why
+it matters, who may know, and a blank for the answer, and the block carries no
+id or path, because it is sent to somebody outside the прогон; one line after
+it maps question numbers to `R##` for the user. A line without labels is still
+asked, quoted as written. **How two questions with the same count are ordered
+is the orchestrator's judgement, and no check holds it.** In the chat the
+questionnaire is spoken in the прогон's language as one block ready to send on.
+
+**Hard to undo reads `oneWay` and nothing else.** The review phase records each
+one-way change from the per-commit diffs (see *Review*); приёмка writes each as
+a plain sentence and closes the section by saying these are worth knowing
+before building on top. An empty list says nothing hard to undo was recorded; a
+state without the field says it was not recorded, because no scan ran.
 
 **The отчёт is English, and what is said about it in the chat is Russian.**
 *Translate Once* in [`artifacts.md`](artifacts.md) has no exception for the last
@@ -1048,10 +1081,11 @@ column including the first.
 
 
 The acceptance row does not vary either, and it used to: the отчёт was described
-as carrying Assumptions only in `full`. It carries that section in every mode.
-`S3` sends an invented fact there whoever was asked, and the briefing writes
-into it whenever it decides a wording instead of raising it. What `full` changes
-is how much lands there — not whether the section exists.
+as carrying Assumptions only in `full`. It carries that section in every mode,
+and Questions to forward and Hard to undo with it. The briefing writes into
+Assumptions whenever it decides a wording instead of raising it, and `S3` sends
+an invented fact to Questions to forward whoever was asked. What `full` changes
+is how much lands there — not whether a section exists.
 
 No cell in this table removes a gate from `gates.md` or a rule from
 `safety.md`. Those run identically in all four columns, because they are checks

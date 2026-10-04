@@ -14,6 +14,24 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**The отчёт hands over what only the user can do.** Two sections follow
+Assumptions. *Questions to forward* turns the placeholders into a questionnaire
+the user can send on unchanged to whoever knows the answer. It asks one question
+per idea, says why each matters and who may know, leaves a blank for the
+answer, and puts the most important question first. In the chat it is spoken in
+the прогон's language. To feed it, the spec phase writes each placeholder as a
+labelled line (`question:`, `matters:`, optional `ask:`), and S3 now sends an
+invented fact there instead of to Assumptions. *Hard to undo* lists, in plain
+words, the inward one-way changes the прогон made: deleted or renamed user
+files, migrations, and major dependency upgrades. The review phase records them
+from the per-commit diffs into a new optional `oneWay` list in the run state,
+and preflight seeds it empty. An absent list reads "not recorded", never
+"nothing". `CONTRACT_VERSION` stays `7`. `scripts/gates/one-way.ts` holds the
+scan's mechanical half against git. `npm run report` holds the отчёт's section
+list in the bundle and the specification and forbids a stated count.
+`REPORT_ANCHORS` holds the prose. The placeholder labels are not refused at
+`sync`, and ordering two equally weighted questions is judgement.
+
 **Repair diagnoses by competing hypotheses.** The first repair stays
 undiagnosed. From the repeated repair onward, the diagnostician no longer
 proposes one grounded next approach. It ranks three to five hypotheses, each

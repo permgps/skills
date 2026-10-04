@@ -151,8 +151,25 @@ zero for the whole run is a claim nobody checked. `emptyEnv` holds variable
 credential ever reaching disk, and a list of environment variables is the
 obvious place to break that by accident.
 
-**`gates[].findings`, the three lists inside `debt`, and `additions` hold
-strings, one line each.** The rows above say so and the validator enforces it;
+**A `debt.placeholders` line carries labels**, so the отчёт can turn it into a
+question somebody else can answer: `R05 — question: … — matters: … — ask: …`,
+with `ask:` optional and the same `question:` text kept for one missing fact.
+The labels are prose's to keep, not the validator's: a line without them is
+still accepted, and the отчёт quotes it as its own question.
+
+**`oneWay` is what the прогон did that is hard to take back**, written by the
+review phase from the per-commit diffs, one line per change:
+`<kind> — <subject> — <taskId> <first seven of the commit>`. The kinds are
+`deleted`, `renamed`, `migration` and `dependency-major`; their one home is
+`ONE_WAY_KINDS` in `contract.mts`, and the validator refuses a line that does
+not start with one of them and ` — `. The field is optional — an added optional
+field raises nothing (see *Versioning*), and a contract-7 run already in
+progress has none — but preflight seeds it empty, so an absent `oneWay` means
+the scan never ran and the отчёт says "not recorded", never "nothing". Outward
+actions are not listed here: `S4` asks before them.
+
+**`gates[].findings`, the three lists inside `debt`, `additions` and `oneWay`
+hold strings, one line each.** The rows above say so and the validator enforces it;
 it is repeated here because the phase writing one of them is pulled the other
 way. A finding names a требование, quotes what the reader said, and records what
 was done about it, which reads like three fields — and a writer that gives it
@@ -406,7 +423,9 @@ contract does not have.
 **Version 7** requires a new field, `dir`, and gives the run directory a
 meaning it did not have: a dated name whose suffix tracks the lifecycle. The
 dashboard's `KNOWN_CONTRACT_VERSION` moves with it, and a contract-6 state
-renders as it did, titled by its slug alone.
+renders as it did, titled by its slug alone. **`oneWay` arrived later within
+version 7 and raised nothing**: it is optional, the dashboard does not render
+it, and a state without it is read as one written before the scan existed.
 
 **Version 6** changes four value sets — the repair outcome gains
 `defect_verified` and `prerequisite_blocked` and loses `repaired`, decisions

@@ -143,7 +143,7 @@ remedy.
 `report.md` is append-only rather than written once, and that is a consequence
 of a failed G4 routing to repair. A прогон whose disagreements were repaired
 reaches приёмка a second time, against a build that has changed. The second
-reading appends its own five sections under its own date; it does not replace the
+reading appends its own sections under its own date; it does not replace the
 first, because the first is the record of what the build did before it was
 repaired, and that is the part somebody checking the прогон afterwards has no
 other way to see.
