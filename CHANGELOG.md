@@ -14,6 +14,12 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+## v0.0.10-alpha — 2026-10-05
+
+Fixes from a whole-project review. `CONTRACT_VERSION` stays `7`, but the
+validator is stricter: a state with loose stamps or duplicate ids that used to
+pass is now refused.
+
 - **The git guard reads commands the way the shell and git do.** An apostrophe
   in a here-document commit message (`Don't`) no longer hides the command after
   it, a `$(…)` whose quote never closes is refused as `unreadable`, and an
@@ -46,7 +52,6 @@ number that claimed more than that would be claiming it falsely.
   promised no-version-control branch; the executor carries S4; a stop that asks
   nothing writes `interruptedAt`; and the executor's `commit:` names the HEAD it
   worked on, since only the orchestrator commits. `bundle-integrity` holds each.
-
 - **A refused write no longer blanks the dashboard.** When `sync.mts` rejected a
   candidate, the page hid every region until the next accepted write, leaving
   only the header and the error. The last accepted прогон now stays on screen
