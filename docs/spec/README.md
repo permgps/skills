@@ -183,6 +183,22 @@ used here, because this sentence is identical in every brief and is the
 instruction itself: a marker would still pass after the sentence beside it was
 deleted.
 
+For Maestro it also holds two things its profile declares. **The resident
+budget:** `SKILL.md`'s line count and the length of its `description` each have
+an exact ceiling in `MAESTRO_BUNDLE`. A file over its ceiling is refused, and so
+is a file under it, until the constant is lowered to match. So the number can
+only fall, and a shortening that leaves the old ceiling in place fails the run.
+The ceiling makes room costly; it does not keep the reasoning in
+[`phases.md`](phases.md) *What Stays Resident* out of the file — the sentence
+test does that. **Who starts the skill:** only the user, and both hosts are
+told. Claude Code reads `disable-model-invocation: true` from the frontmatter,
+and Codex reads `policy.allow_implicit_invocation: false` from
+`agents/openai.yaml`. The bundle is refused when either declaration is missing,
+so the two cannot drift apart ([`hosts.md`](hosts.md) *Who Starts The Skill*).
+Two things are not held. One is whether a kept sentence changes the прогон's
+behaviour: the ceiling holds length, and which sentence goes is judgement.
+The other is Scout, whose profile carries neither rule.
+
 `host-degradation` takes the same two paths and proves that a capability
 [`hosts.md`](hosts.md) marks as degrading has both of its halves inside the
 bundle: preflight establishes it by trying it, and the phase that spends it says

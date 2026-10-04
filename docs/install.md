@@ -244,6 +244,10 @@ broken install.
 
 ## The First Run Asks One Thing
 
+A прогон starts only when you type `/maestro`. Claude Code does not start the
+skill on its own, however much a request sounds like a build: the frontmatter
+declares `disable-model-invocation: true`.
+
 Installing settles nothing about how a прогон behaves. The first `/maestro` in a
 project asks which mode it should start in when the arguments do not say — the
 four are shown with a line each, `semi` marked as the built-in default. If that
@@ -329,6 +333,10 @@ Start Codex in the target directory (open that project in the app) and invoke:
 ```text
 $maestro Build a notes page with local saving.
 ```
+
+Typing `$maestro` is the only way in. The bundle's `agents/openai.yaml` sets
+`policy.allow_implicit_invocation: false`, so Codex does not start the skill on
+its own. Keep that file when copying the bundle by hand.
 
 There is no need to supply `SKILL.md` to the prompt. Supporting files resolve
 relative to the installed skill, including `references/codex.md`, prompts,

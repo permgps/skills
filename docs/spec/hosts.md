@@ -123,6 +123,24 @@ picks a file the host does not load, the прогон says so to the user. The s
 block in two files is a stop, never a choice. `npm run hosts` holds this table
 and `MEMORY_FILES_BY_HOST` in `tools/runtime/memory.mts` to each other.
 
+## Who Starts The Skill
+
+Only the user. A прогон opens a dashboard and asks questions at once, so a model
+that starts one because a request looked like a build costs the user a прогон
+they did not ask for. Each host is told in its own file, and `bundle-integrity`
+refuses a bundle that tells one host and not the other.
+
+| Host id | Declaration | File | Evidence |
+|---|---|---|---|
+| `claude-code` | `disable-model-invocation: true` | `SKILL.md` frontmatter | host documentation, https://code.claude.com/docs/en/skills, read 2026-10-04: `/maestro` still works, and the skill is no longer loaded into the model's context |
+| `codex` | `policy.allow_implicit_invocation: false` | `agents/openai.yaml` | host documentation, https://developers.openai.com/codex/skills, read 2026-10-04: explicit `$maestro` still works |
+| `gemini-cli` | none documented | — | the skill may start implicitly there; nothing is declared, because nothing documented exists to declare |
+
+The `description` still matters with implicit start switched off. It is what a
+host shows in its skill list and what the user reads when choosing, and on any
+host that still loads it, it is resident on every turn. It carries trigger
+conditions only.
+
 ## Independent Returns And Evaluation
 
 Probe a real fresh-context dispatch and wait for its return before using source

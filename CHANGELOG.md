@@ -14,6 +14,27 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**A leaner resident orchestrator, started only by the user.** `SKILL.md` stays
+in context for a whole прогон, and every sentence in it was put to one test:
+does it change the прогон's behaviour? A sentence that failed was deleted whole.
+The file went from 625 lines to 552.
+- Gone: the six explanations of why a rule is resident, the history of past
+  прогоны, and the notes on which validator holds what.
+- The reasoning now lives under *What Stays Resident* in `docs/spec/phases.md`.
+- The rule that a quotation is not translated is stated once.
+- Recovery of a run below contract 4 moved to `references/legacy-recovery.md`.
+- The description dropped its retelling of the pipeline and keeps trigger
+  conditions only, going from 515 characters to 256.
+
+`bundle-integrity` now holds both numbers as exact ceilings. A file over its
+ceiling is refused, and so is a file under it until the constant comes down to
+match, so the numbers can only fall. Only the user starts the skill:
+`disable-model-invocation: true` for Claude Code, and
+`policy.allow_implicit_invocation: false` in the new `agents/openai.yaml` for
+Codex. The checker refuses a bundle that declares one without the other. Gemini
+CLI documents no equivalent. No check holds whether a kept sentence passes the
+test.
+
 **The отчёт hands over what only the user can do.** Two sections follow
 Assumptions. *Questions to forward* turns the placeholders into a questionnaire
 the user can send on unchanged to whoever knows the answer. It asks one question
