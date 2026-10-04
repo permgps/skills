@@ -14,6 +14,32 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**An optional guard against destructive git.** `tools/guard-git.mts` is a
+Claude Code `PreToolUse` hook that refuses:
+- `git push`, forced or not;
+- `reset --hard`;
+- a forced `clean`;
+- `branch -D`;
+- a checkout, switch or restore that overwrites the working tree.
+
+It finds these behind pipes, wrappers, `bash -c`, `eval` and `$(…)`. An
+ambiguous `git checkout <word>` counts as a discard when the word exists on
+disk. Everything else goes on to the usual permission prompt, because the guard
+never answers `allow`.
+
+`docs/install.md` offers it at install. A прогон never installs it, since that
+would edit the user's settings outside S5's boundary. It is shipped for Claude
+Code only; on Codex and Gemini CLI the S4 question stays the floor.
+
+What holds it:
+- `guard-git.test.ts` checks each blocked and allowed form, the hook contract
+  through a subprocess, and an installed copy;
+- `guard-git-bundle.test.ts` checks that no bundle file uses a refused command
+  or names the guard.
+
+No check holds that a Claude Code session calls the hook, or catches git
+aliases and scripts.
+
 **A retrospective from recorded signals.** Four phases said "record that it
 asked" or "record that the brief was exceeded" and named no place to record it.
 A new optional `signals` list in the run state holds those signals, one line

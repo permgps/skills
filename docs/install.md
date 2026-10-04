@@ -242,6 +242,95 @@ package's, and `diff -r` reports no difference for either. Compare against a
 uncommitted work — otherwise the diff reports your own edits and looks like a
 broken install.
 
+## Optional: A Guard Against Destructive Git
+
+S4 makes a history rewrite or a publish a question the прогон asks you, in every
+mode. On Claude Code you can raise that from a question to a refusal: the bundle
+ships `tools/guard-git.mts`, a `PreToolUse` hook that denies these commands
+whatever the agent believes you agreed to.
+
+| Rule | Refuses |
+|---|---|
+| `push` | every `git push`, including `--force`, `--force-with-lease`, `--mirror` and `--delete` |
+| `reset-hard` | `git reset --hard` |
+| `clean-force` | `git clean` with `-f`, `--force` or a cluster containing `f` such as `-xdf` |
+| `branch-force-delete` | `git branch -D`, or `-d` / `--delete` together with `-f` / `--force` |
+| `discarding-checkout` | `git checkout` that overwrites files: `--`, `.`, `-f`, `-p`, `--ours` / `--theirs`, a pathspec, or a word that names an existing file or directory |
+| `discarding-switch` | `git switch --discard-changes` or `-f` |
+| `discarding-restore` | `git restore`, unless it names `--staged` and not `--worktree` |
+
+It finds these behind `&&`, pipes, `env`, `sudo`, `xargs`, `timeout`,
+`bash -c`, `eval` and `$(…)`. A plain `git checkout main` still switches
+branches. Everything it does not refuse goes on to your usual permission prompt:
+the guard never answers `allow`.
+
+**Nothing installs it for you, and a прогон never will.** Wiring a hook means
+editing your Claude Code settings, which lies outside the one boundary the
+orchestrator writes within, and asking about it would put a technical question
+to someone who came to dictate a brief. It is offered here, once, and it is your
+decision.
+
+To install it for one project, add this to that project's
+`.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "node \"$CLAUDE_PROJECT_DIR/.claude/skills/maestro/tools/guard-git.mts\"" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+For every project, put the same block in `~/.claude/settings.json` with the
+command `node ~/.claude/skills/maestro/tools/guard-git.mts`, which is where a
+global install puts the skill. A `--copy` install and a symlinked one resolve
+the same path. To remove the guard, delete the hook entry.
+
+**With the guard installed, a push you approved is yours to run.** The agent is
+told the command is blocked in every mode and asked to hand it to you. Run it in
+your own terminal.
+
+**What it does not cover:**
+- a git alias (`git config alias.p push`, then `git p`);
+- a script, a Makefile or an `npm run` target that calls git internally;
+- a program name built at run time, such as `$(echo git) push`.
+
+It reads the command line it is handed, and nothing else. Codex CLI, the Codex
+app and Gemini CLI get nothing equivalent from this bundle; on those hosts the
+question S4 asks is the whole rule. See
+[`docs/spec/hosts.md`](spec/hosts.md#optional-git-guard).
+
+**Verified 2026-10-04** against a real install made with
+`npx skills add /path/to/maestro -s maestro -a claude-code -y --copy` in an
+empty git project. `diff -r` against the source reported no difference. Run
+under Node v26.8.1:
+
+```text
+$ echo '{"tool_name":"Bash","tool_input":{"command":"git push --force"}}' \
+    | node .claude/skills/maestro/tools/guard-git.mts
+INFO [guard-git.decision] blocked {"rule":"push","subcommand":"push"}
+{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Maestro git guard: git push publishes history. It is blocked in every mode. If the user wants it done, ask them to run it in their own terminal."}}
+$ echo $?
+0
+$ echo '{"tool_name":"Bash","tool_input":{"command":"git status"}}' \
+    | node .claude/skills/maestro/tools/guard-git.mts
+$ echo $?
+0
+```
+
+The first line goes to stderr and the deny line to stdout. The allowed call
+prints nothing. **Not verified:** that a Claude Code session calls the hook
+through the settings above. This record pipes the payload by hand, and
+`npm run check` proves only what the guard decides, through
+`scripts/validate/guard-git.test.ts`.
+
 ## The First Run Asks One Thing
 
 A прогон starts only when you type `/maestro`. Claude Code does not start the

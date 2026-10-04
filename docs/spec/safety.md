@@ -39,6 +39,15 @@ contradicts — and by then the бриф is the one document nobody is re-readin
   other path in the repository belongs to an executor.
 - **S4 asks even in the no-questions mode.** That mode buys the user freedom from
   questions about preference, never from questions about consequence.
+- **S4 has one optional mechanical raise, and only on Claude Code.** The bundle
+  ships `tools/guard-git.mts`, a `PreToolUse` hook that refuses push,
+  `reset --hard`, a forced `clean`, `branch -D`, and a checkout, switch or
+  restore that overwrites the working tree. The user is offered it at install
+  ([`docs/install.md`](../install.md#optional-a-guard-against-destructive-git))
+  and a прогон never installs it, because wiring it edits the user's settings,
+  which is outside S5's boundary. With it installed, those commands are refused
+  even after the user agrees under S4; the user runs them in their own terminal.
+  Without it, or on another host, the question S4 asks is the whole rule.
 - **Verification runs inside a write boundary, which is how S2, S4 and S5 hold
   while a build is exercised.** Before a broad, browser or integrated run, the
   orchestrator records readiness against a disposable source-only verification

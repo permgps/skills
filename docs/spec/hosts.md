@@ -219,3 +219,17 @@ alongside the dashboard, retaining run state and viewer/opened records. Verify
 the replacement before removing the obsolete copied helper. No target build,
 npm install, TS compiler, loader, Python or external network is needed after
 installation. Local loopback HTTP remains available. Scout gains no runtime.
+
+## Optional Git Guard
+
+`tools/guard-git.mts` is a `PreToolUse` hook shipped for Claude Code only. It
+refuses the destructive git commands listed in [`safety.md`](safety.md) under
+S4's raise. Nothing equivalent is shipped for Codex CLI, the Codex app or
+Gemini CLI, and on those hosts the prose rule is the floor. This states what
+the bundle ships, not what those hosts could support.
+
+The guard is not a capability a прогон spends, so it has no row in the table
+above and no probe or degrade marker. Preflight neither probes for it nor
+copies it into `.maestro/`; it runs from the installed skill directory, and
+only when the user has wired it. Installing it is described in
+[`docs/install.md`](../install.md#optional-a-guard-against-destructive-git).

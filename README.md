@@ -32,6 +32,10 @@ Add `-s maestro` or `-s scout` to install one. Measured 2026-08-21 against a
 publish-shaped export of this repository — [`docs/install.md`](docs/install.md)
 has that run, the picker, the local-checkout form and their real output.
 
+On Claude Code you can also wire an optional hook that refuses `git push`,
+`reset --hard` and other destructive git commands outright. Nothing installs it
+for you: see [the git guard](docs/install.md#optional-a-guard-against-destructive-git).
+
 For **Codex CLI or the Codex app**, install Maestro under
 `.agents/skills/maestro` and invoke `$maestro` from the target project, for example:
 
