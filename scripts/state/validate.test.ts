@@ -1053,3 +1053,45 @@ test('a question is not an interruption, so a state carrying both is reported', 
   assert.deepEqual(fields(violations), ['awaiting']);
   assert.match(violations[0]?.message ?? '', /interrupt/);
 });
+
+test('a contract-7 run stamp that is not an ISO 8601 moment is refused by name, and no dir is guessed from it', () => {
+  // "attempt 1" is a day in 2001 to V8, so a dir judged against it would be
+  // told to carry a date nobody wrote; "29.09.2026" is no day at all, and the
+  // dir rule used to fall silent on it.
+  for (const junk of ['attempt 1', '29.09.2026 09:00', '2026-09-29T09:00:00']) {
+    const started = contract7State(); started.startedAt = junk;
+    assert.deepEqual(fields(validateState(started)), ['startedAt'], `startedAt = ${junk}`);
+    const updated = contract7State(); updated.updatedAt = junk;
+    assert.deepEqual(fields(validateState(updated)), ['updatedAt'], `updatedAt = ${junk}`);
+    const finished = contract7State(); finished.finishedAt = junk;
+    assert.ok(fields(validateState(finished)).includes('finishedAt'), `finishedAt = ${junk}`);
+    const interrupted = activeContract7State(); interrupted.interruptedAt = junk;
+    assert.deepEqual(fields(validateState(interrupted)), ['interruptedAt'], `interruptedAt = ${junk}`);
+    const task = activeContract7State(); task.tasks[0]!.finishedAt = junk;
+    assert.deepEqual(fields(validateState(task)), ['tasks[0].finishedAt'], `tasks[0].finishedAt = ${junk}`);
+  }
+  const offset = activeContract7State();
+  offset.updatedAt = '2026-09-29T12:20:00.5+03:00';
+  offset.interruptedAt = '2026-09-29T12:21:00+03:00';
+  assert.deepEqual(validateState(offset), []);
+});
+
+test('a state written before contract 4 keeps the stamps it was written with', () => {
+  // Metrics and the page still read these runs; the strict moment is the rule
+  // of the contracts publication accepts, not a reason to call history corrupt.
+  assert.deepEqual(validateState(withPatch({ startedAt: '2026-08-19 09:00', updatedAt: '2026-08-19T09:12:00' })), []);
+});
+
+test('a second task, requirement, gate or стадия under an id already taken is refused', () => {
+  // Every reader finds the first entry by id, so a failed twin behind a done
+  // таск, an open R01 behind an in-spec one, or a failed G4 behind a passed one
+  // would be published and never seen.
+  const state = contract7State();
+  state.tasks.push({ ...state.tasks[0]!, status: 'failed' });
+  state.requirements.push({ id: 'R01', status: 'open', reason: 'still unclear' });
+  state.gates.push({ id: 'G4', status: 'failed', findings: ['R01 — the panel stays hidden'] });
+  state.stages.push({ ...state.stages[0]! });
+  const violations = validateState(state);
+  assert.deepEqual(fields(violations), ['stages[1].id', 'tasks[1].id', 'requirements[1].id', 'gates[4].id']);
+  assert.match(violations[1]!.message, /tasks\[0\] already carries id "01"/);
+});

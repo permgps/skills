@@ -81,6 +81,27 @@ test('accepted: upstream first — the schema defect is verified, then the order
   assert.deepEqual(validateStateTransition(schemaFixed, relaunched), []);
 });
 
+test('refused: a task that first appears already running waits on its blockers like one launched from the queue', () => {
+  const prior = retrospectiveState();
+  prior.tasks = prior.tasks.filter(item => item.id !== '03');
+  const next = structuredClone(prior);
+  next.tasks.push({ ...prior.tasks[0]!, id: '03', title: 'Synthetic task 03', status: 'running',
+    blockedBy: ['02'], repairs: 0, commits: [] });
+  assert.match(transition(prior, next), /task 03 cannot run while blocker 02 is repair/);
+  next.tasks.at(-1)!.blockedBy = [];
+  assert.deepEqual(validateStateTransition(prior, next), []);
+});
+
+test('refused: an attempt stamped with a moment no reader can parse does not slip out of the batch rule', () => {
+  // NaN compares false both ways, so the attempt used to drop out of every
+  // batch and the third repair went ahead with no review.
+  const state = retrospectiveState();
+  const attempts = batchAttempts(3);
+  attempts[1]!.at = '29.09.2026 10:20';
+  state.verification!.repairAttempts = attempts;
+  assert.match(messages(state), /verification\.repairAttempts\[1\]\.at: /);
+});
+
 test('refused: a larger limit proposed with no user authorization', () => {
   const prior = retrospectiveState();
   const next = structuredClone(prior);

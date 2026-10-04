@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 
 import { createLogger } from '../shared/log.mts';
-import { REPAIR_OUTCOMES, STAGE_IDS } from './contract.mts';
+import { REPAIR_OUTCOMES, STAGE_IDS, isMoment } from './contract.mts';
 import type {
   CheckExecution, CheckResult, RunState, VerificationCheck,
   VerificationObligation, VerificationRecord, SafeguardedRecord, VerificationResult, NegativeControl,
@@ -47,6 +47,25 @@ export function sameFingerprint(left: unknown, right: unknown): boolean {
       === (hashesB as Record<string, unknown>)[String(path)]);
 }
 
+/**
+ * Newest first, by the moment a stamp names rather than by its text: as text,
+ * `12:15+03:00` sorts after `10:00Z`, though it is the earlier moment. Equal
+ * moments fall back to the id so the order never depends on array position. A
+ * stamp no reader can parse sorts oldest; validation refuses it anyway, but a
+ * NaN comparator would leave the order to the sort algorithm.
+ */
+function latestFirst<T extends { id: string }>(stamp: (item: T) => string): (a: T, b: T) => number {
+  const instant = (item: T): number => {
+    const value = Date.parse(stamp(item));
+    return Number.isNaN(value) ? -Infinity : value;
+  };
+  return (a, b) => {
+    const left = instant(a);
+    const right = instant(b);
+    return right > left ? 1 : right < left ? -1 : b.id.localeCompare(a.id);
+  };
+}
+
 export function effectiveExecution(
   check: VerificationCheck,
   executions: CheckExecution[],
@@ -54,7 +73,7 @@ export function effectiveExecution(
   const candidates = executions.filter(item => item.checkId === check.id);
   const superseded = new Set(candidates.flatMap(item => item.supersedes ? [item.supersedes] : []));
   return candidates.filter(item => !superseded.has(item.id))
-    .sort((a, b) => b.executedAt.localeCompare(a.executedAt) || b.id.localeCompare(a.id))[0];
+    .sort(latestFirst(item => item.executedAt))[0];
 }
 
 function checkResult(check: VerificationCheck, record: VerificationRecord): CheckResult {
@@ -113,7 +132,7 @@ export function deriveVerification(state: RunState): VerificationSummary {
     const reviews = record.coverageReviews.filter(item => item.requirementId === requirement.id
       && item.inputDigest === record.acceptanceInputDigest
       && item.targetRevision === record.targetRevision);
-    const latestReview = reviews.sort((a, b) => b.reviewedAt.localeCompare(a.reviewedAt))[0];
+    const latestReview = reviews.sort(latestFirst(item => item.reviewedAt))[0];
     const results = obligations.map(item => obligationResults[item.id]);
     if (openFinding || results.includes('failed')) requirementResults[requirement.id] = 'failed';
     else if (obligations.length === 0 || !latestReview || latestReview.status !== 'complete'
@@ -127,7 +146,7 @@ export function deriveVerification(state: RunState): VerificationSummary {
     .filter(([, result]) => result === 'incomplete').map(([id]) => id);
   const rounds = record.acceptanceRounds.filter(item => item.inputDigest === record.acceptanceInputDigest
     && item.targetRevision === record.targetRevision);
-  const latestRound = rounds.sort((a, b) => b.performedAt.localeCompare(a.performedAt))[0];
+  const latestRound = rounds.sort(latestFirst(item => item.performedAt))[0];
   const requiredChecks = record.checks.filter(check => check.required
     && currentObligations.some(obligation => obligation.checkIds.includes(check.id)));
   const roundCurrent = latestRound !== undefined
@@ -180,24 +199,28 @@ function validateShape(value: unknown): VerificationViolation[] {
   if (typeof value['acceptanceInputDigest'] !== 'string' || value['acceptanceInputDigest'] === '') {
     add('verification.acceptanceInputDigest', 'current acceptance input digest is required');
   }
-  const collections: Record<string, Record<string, 'string' | 'array' | 'boolean' | 'number'>> = {
+  // A `moment` is a stamp the records are ordered by: the effective execution,
+  // the latest review and round, and the batch a repair attempt belongs to.
+  // Held to `isMoment`, because a non-empty string that is no moment silently
+  // drops its record out of every one of those orders.
+  const collections: Record<string, Record<string, 'string' | 'moment' | 'array' | 'boolean' | 'number'>> = {
     references: { id: 'string', statement: 'string', role: 'string', location: 'string', accessMethod: 'string', available: 'boolean', revision: 'string', conditions: 'array', approvedDeviationIds: 'array' },
     surfaces: { id: 'string', referenceId: 'string', source: 'string', inspected: 'boolean', variantIds: 'array' },
     obligations: { id: 'string', requirementIds: 'array', referenceIds: 'array', surfaceIds: 'array', expectation: 'string', discovery: 'string', sourceEvidenceIds: 'array', variantIds: 'array', checkIds: 'array', implementationTaskIds: 'array', targetRevision: 'number' },
     checks: { id: 'string', obligationIds: 'array', method: 'string', target: 'string', procedure: 'array', oracle: 'string', oracleEvidenceIds: 'array', variantIds: 'array', integrationDependencies: 'array', required: 'boolean' },
-    executions: { id: 'string', checkId: 'string', result: 'string', invocation: 'string', tool: 'string', host: 'string', executor: 'string', executedAt: 'string', assertions: 'array', evidenceIds: 'array' },
-    evidence: { id: 'string', path: 'string', sha256: 'string', mediaType: 'string', capturedAt: 'string', origin: 'string' },
+    executions: { id: 'string', checkId: 'string', result: 'string', invocation: 'string', tool: 'string', host: 'string', executor: 'string', executedAt: 'moment', assertions: 'array', evidenceIds: 'array' },
+    evidence: { id: 'string', path: 'string', sha256: 'string', mediaType: 'string', capturedAt: 'moment', origin: 'string' },
     findings: { id: 'string', requirementIds: 'array', obligationIds: 'array', checkIds: 'array', evidenceIds: 'array', origin: 'string', description: 'string', status: 'string' },
-    decisions: { id: 'string', kind: 'string', authorizedBy: 'string', authorizedAt: 'string', authorization: 'string', presentedFindingIds: 'array', presentedObligationIds: 'array', selectedFindingIds: 'array', selectedObligationIds: 'array' },
-    coverageReviews: { id: 'string', requirementId: 'string', targetRevision: 'number', status: 'string', inspectedSurfaceIds: 'array', uninspectedSurfaceIds: 'array', reviewer: 'string', reviewedAt: 'string', inputDigest: 'string' },
-    acceptanceRounds: { id: 'string', targetRevision: 'number', inputDigest: 'string', referenceIds: 'array', executionIds: 'array', findingIds: 'array', coverageReviewIds: 'array', performedAt: 'string', g4: 'string' },
+    decisions: { id: 'string', kind: 'string', authorizedBy: 'string', authorizedAt: 'moment', authorization: 'string', presentedFindingIds: 'array', presentedObligationIds: 'array', selectedFindingIds: 'array', selectedObligationIds: 'array' },
+    coverageReviews: { id: 'string', requirementId: 'string', targetRevision: 'number', status: 'string', inspectedSurfaceIds: 'array', uninspectedSurfaceIds: 'array', reviewer: 'string', reviewedAt: 'moment', inputDigest: 'string' },
+    acceptanceRounds: { id: 'string', targetRevision: 'number', inputDigest: 'string', referenceIds: 'array', executionIds: 'array', findingIds: 'array', coverageReviewIds: 'array', performedAt: 'moment', g4: 'string' },
     promisedWork: { id: 'string', description: 'string', status: 'string' },
-    repairAttempts: { id: 'string', findingId: 'string', taskId: 'string', at: 'string', outcome: 'string' },
+    repairAttempts: { id: 'string', findingId: 'string', taskId: 'string', at: 'moment', outcome: 'string' },
   };
   if (safeguarded) {
-    collections['sourceSnapshots'] = { id: 'string', origin: 'string', text: 'string', sha256: 'string', capturedAt: 'string', targetRevision: 'number' };
+    collections['sourceSnapshots'] = { id: 'string', origin: 'string', text: 'string', sha256: 'string', capturedAt: 'moment', targetRevision: 'number' };
     collections['sourceClauses'] = { id: 'string', sourceId: 'string', start: 'number', end: 'number', quote: 'string', classification: 'string', requirementIds: 'array' };
-    collections['manifestAudits'] = { id: 'string', sourceIds: 'array', manifestDigest: 'string', targetRevision: 'number', clauseIds: 'array', findings: 'array', result: 'string', auditedAt: 'string' };
+    collections['manifestAudits'] = { id: 'string', sourceIds: 'array', manifestDigest: 'string', targetRevision: 'number', clauseIds: 'array', findings: 'array', result: 'string', auditedAt: 'moment' };
     collections['scopeMappings'] = { id: 'string', originalRequirementId: 'string', currentRequirementIds: 'array', relation: 'string', originalCheckIds: 'array', targetRevision: 'number' };
     collections['journeys'] = { id: 'string', requirementIds: 'array', obligationIds: 'array', checkIds: 'array', fixture: 'string', variantIds: 'array', steps: 'array', integrationDependencies: 'array', executionTaskId: 'string', targetRevision: 'number', reset: 'string', cleanup: 'string' };
     collections['negativeControls'] = { id: 'string', checkId: 'string', targetRevision: 'number', selectionBasis: 'string', applicability: 'string', defect: 'string', expectedAssertion: 'string', isolationFingerprint: 'string', oracleDigest: 'string', result: 'string', runs: 'array' };
@@ -250,6 +273,10 @@ function validateShape(value: unknown): VerificationViolation[] {
       if (!recordValue(row)) { add(at, 'entry must be an object'); return; }
       for (const [field, kind] of Object.entries(fields)) {
         const item = row[field];
+        if (kind === 'moment') {
+          if (!isMoment(item)) add(`${at}.${field}`, `${field} must be an ISO 8601 moment with Z or a ±hh:mm offset — got ${JSON.stringify(item ?? null)}`);
+          continue;
+        }
         const valid = kind === 'array' ? Array.isArray(item)
           : kind === 'number' ? typeof item === 'number' && Number.isInteger(item)
           : kind === 'string' ? typeof item === 'string' && item !== ''
@@ -599,7 +626,7 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
   if (state.lifecycle === 'active') {
     if (state.outcome || state.finishedAt) add('lifecycle', 'active state cannot have terminal outcome or finishedAt');
   } else if (state.lifecycle === 'closed') {
-    if (!state.finishedAt || Number.isNaN(Date.parse(state.finishedAt))) add('finishedAt', 'closed state needs a closure timestamp');
+    if (!isMoment(state.finishedAt)) add('finishedAt', 'closed state needs a closure timestamp, an ISO 8601 moment with Z or a ±hh:mm offset');
     if (!state.outcome) add('outcome', 'closed state needs an outcome');
     if (record.promisedWork.some(item => item.status === 'open')) add('verification.promisedWork', 'open promised work blocks closure');
     if (state.outcome === 'completed' && summary.g4 !== 'passed') add('outcome', 'completed requires verified passing G4');
@@ -793,7 +820,7 @@ function validateSourceRecords(state: RunState, record: SafeguardedRecord): Veri
     for (const id of values) if (!known.includes(id)) add(field, `unknown ID ${id}`);
   };
   const moment = (field: string, value: string): void => {
-    if (Number.isNaN(Date.parse(value))) add(field, 'timestamp must name a moment');
+    if (!isMoment(value)) add(field, 'timestamp must be an ISO 8601 moment with Z or a ±hh:mm offset');
   };
   const ids = record.sourceSnapshots.map(source => source.id);
   const clauses = record.sourceClauses.map(clause => clause.id);
@@ -982,7 +1009,7 @@ export function validateCompletionRecords(state: RunState, record: SafeguardedRe
       runIds.add(run.id);
       reference(at, run.evidenceIds, evidence);
       if (!['clean', 'mutated', 'restored'].includes(run.phase) || !['passed', 'failed'].includes(run.result)) add(at, 'unknown control run phase/result');
-      if (!run.evidenceIds.length || !run.assertions.length || Number.isNaN(Date.parse(run.executedAt))) add(at, 'control run needs assertions, immutable captures and timestamp');
+      if (!run.evidenceIds.length || !run.assertions.length || !isMoment(run.executedAt)) add(at, 'control run needs assertions, immutable captures and timestamp');
       if (run.oracleDigest !== control.oracleDigest) add(at, 'control runs must keep the oracle unchanged');
       if (run.result === 'failed' && !run.assertions.some(item => item.result === 'failed')) add(at, 'failed control run must name its failed assertion');
       if (run.result === 'passed' && run.assertions.some(item => item.result === 'failed')) add(at, 'passing control run contains failed assertion');

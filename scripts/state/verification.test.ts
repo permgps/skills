@@ -9,9 +9,9 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { CAPTURES, SOURCE_MANIFEST, activeContract6State, activeContract7State, fingerprint, planningOwnershipState, repairContract6State, sha256, v3Attempt, verifiedState } from './fixtures/verification.ts';
+import { CAPTURES, SOURCE_MANIFEST, activeContract6State, activeContract7State, contract7State, fingerprint, planningOwnershipState, repairContract6State, repairContract7State, sha256, v3Attempt, verifiedState } from './fixtures/verification.ts';
 import { validateStateTransition } from './closure.ts';
-import { deriveVerification, validateVerificationTransition } from './verification.ts';
+import { deriveVerification, effectiveExecution, validateVerificationTransition } from './verification.ts';
 import { validateState, InvalidStateError } from './validate.ts';
 import { importEvidence, validateEvidence } from './evidence.ts';
 import { formatAcceptanceTable, prepareLegacyResume, projectAcceptanceReport, projectState } from './projection.ts';
@@ -520,4 +520,57 @@ test('task captures of a contract-7 run are sealed into its dated directory', as
     await rm(project, { recursive: true, force: true });
     await rm(taskRoot, { recursive: true, force: true });
   }
+});
+
+test('the effective execution is the latest moment, so a zone offset cannot hide a later failure', () => {
+  // As text, `12:15+03:00` sorts after `10:00Z`; as a moment it is 09:15Z, and
+  // the failure at 10:00Z is the run that counts.
+  const state = contract7State();
+  const record = state.verification!;
+  const passed = record.executions[0]!;
+  passed.executedAt = '2026-09-29T12:15:00+03:00';
+  record.executions.push({ ...passed, id: 'X-2', result: 'failed', failureCause: 'product',
+    executedAt: '2026-09-29T10:00:00Z', evidenceIds: [],
+    assertions: [{ name: 'panel opens', result: 'failed', evidenceIds: [] }] });
+  assert.equal(effectiveExecution(record.checks[0]!, record.executions)?.id, 'X-2');
+  assert.equal(deriveVerification(state).checkResults['C-1'], 'failed');
+  assert.equal(deriveVerification(state).g4, 'failed');
+  const refused = validateState(state).map(item => item.field);
+  assert.ok(refused.includes('outcome'), refused.join(', '));
+  assert.ok(refused.includes('gates[G4].status'), refused.join(', '));
+});
+
+test('the latest coverage review and acceptance round are the latest moments, not the latest strings', () => {
+  const reviewed = contract7State();
+  const reviews = reviewed.verification!;
+  reviews.coverageReviews[0]!.reviewedAt = '2026-09-29T12:16:00+03:00';
+  reviews.coverageReviews.push({ ...reviews.coverageReviews[0]!, id: 'CR-2', status: 'incomplete',
+    inspectedSurfaceIds: [], uninspectedSurfaceIds: ['S-1'], reviewedAt: '2026-09-29T09:30:00Z' });
+  reviews.acceptanceRounds[0]!.coverageReviewIds = ['CR-1', 'CR-2'];
+  assert.equal(deriveVerification(reviewed).requirementResults['R01'], 'incomplete');
+
+  const rounds = contract7State();
+  const record = rounds.verification!;
+  record.acceptanceRounds[0]!.performedAt = '2026-09-29T12:19:00+03:00';
+  record.acceptanceRounds.push({ ...record.acceptanceRounds[0]!, id: 'AR-2', performedAt: '2026-09-29T09:25:00Z' });
+  assert.equal(deriveVerification(rounds).currentRoundId, 'AR-2');
+});
+
+test('a verification stamp that is not an ISO 8601 moment with a zone is refused by its field', () => {
+  // V8 reads "attempt 1" as a day in 2001 and a zoneless stamp as local time,
+  // so `Date.parse` alone would take each of these for a clock.
+  const cases = [['executions', 'executedAt'], ['coverageReviews', 'reviewedAt'], ['acceptanceRounds', 'performedAt']] as const;
+  for (const junk of ['attempt 1', '29.09.2026 10:20', '2026-09-29T09:15:00']) {
+    for (const [collection, field] of cases) {
+      const state = contract7State();
+      (state.verification![collection][0] as unknown as Record<string, unknown>)[field] = junk;
+      assert.ok(validateState(state).some(item => item.field === `verification.${collection}[0].${field}`), `${collection}.${field} = ${junk}`);
+    }
+    const repair = repairContract7State();
+    repair.verification!.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', junk)];
+    assert.ok(validateState(repair).some(item => item.field === 'verification.repairAttempts[0].at'), `repairAttempts.at = ${junk}`);
+  }
+  const repair = repairContract7State();
+  repair.verification!.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T13:20:00.250+03:00')];
+  assert.deepEqual(validateState(repair), []);
 });

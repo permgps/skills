@@ -299,7 +299,11 @@ from one that was met.
 
   **A stamp is a moment, not a note.** Whatever a стадия carries must be
   readable by `Date.parse`, which is what every reader of this state uses — the
-  chain rule, `scripts/metrics/`, and the page alike. A string none of them can
+  chain rule, `scripts/metrics/`, and the page alike. From contract 4 on, every
+  stamp in the state is held stricter: an ISO 8601 date and time with `Z` or an
+  offset. `Date.parse` alone reads `attempt 1` as a date in 2001, and stamps
+  compared as strings put `12:15+03:00` after `10:00Z`, so a later failure
+  could hide behind an earlier pass. States before contract 4 keep the looser rule. A string none of them can
   read is reported as its own finding rather than as a missing stamp, because
   the repair differs: one field has to be written, the other corrected.
 

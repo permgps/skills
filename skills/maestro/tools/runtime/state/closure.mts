@@ -25,6 +25,7 @@ import { createLogger } from '../shared/log.mts';
 import {
   DEFECT_CAUSES, DEFECT_STATUSES, EXPECTED_PROGRESS, FAILURE_CAUSES, READINESS_PROBE_KINDS,
   READINESS_PROBE_RESULTS, REPEAT_KINDS, SAME_CAUSE_REPEAT_KINDS, STRATEGY_DECISIONS, STRATEGY_TRIGGERS,
+  isMoment,
 } from './contract.mts';
 import type {
   CheckExecutionV3, Defect, ReadinessProbeKind, ReadinessRecord, RepairAttemptV2, RepairAttemptV3,
@@ -39,6 +40,7 @@ const log = createLogger('state');
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+/** The instant of a stamp `isMoment` already accepted; only ordering reads it. */
 const moment = (value: string): number => Date.parse(value);
 
 /** A blocker is finished when what its dependents build on exists and was not found wrong. */
@@ -284,7 +286,7 @@ export function validateClosureRecord(state: RunState): VerificationViolation[] 
   // --- readiness ---------------------------------------------------------------
   for (const item of record.readiness) {
     const at = `verification.readiness[${item.id}]`;
-    if (Number.isNaN(moment(item.executedAt))) add(at, 'readiness needs the moment it was probed');
+    if (!isMoment(item.executedAt)) add(`${at}.executedAt`, 'readiness needs the moment it was probed, an ISO 8601 moment with Z or a ±hh:mm offset');
     validateInputHashes(item.targetFingerprint, `${at}.targetFingerprint`, add);
     if (item.probes.length === 0) add(at, 'readiness needs at least one probe');
     if (new Set(item.probes.map(probe => probe.kind)).size !== item.probes.length) add(at, 'each probe kind appears once per record');
@@ -445,7 +447,7 @@ export function validateClosureRecord(state: RunState): VerificationViolation[] 
   const returns = new Set<string>();
   for (const review of record.strategyReviews) {
     const at = `verification.strategyReviews[${review.id}]`;
-    if (Number.isNaN(moment(review.at))) add(at, 'review needs the moment it returned');
+    if (!isMoment(review.at)) add(`${at}.at`, 'review needs the moment it returned, an ISO 8601 moment with Z or a ±hh:mm offset');
     if (!STRATEGY_TRIGGERS.includes(review.trigger)) add(at, 'unknown review trigger');
     if (!STRATEGY_DECISIONS.includes(review.decision)) add(at, 'unknown review decision');
     if (review.trigger === 'budget_exhausted' && review.decision === 'change_strategy') {
@@ -641,14 +643,17 @@ export function validateClosureTransition(previous: RunState, next: RunState): V
   // --- dispatch: launch on finished blockers, repair after prerequisites ------------
   for (const task of next.tasks) {
     const earlier = before.get(task.id);
-    if (task.status !== 'running' || !earlier || earlier.status === 'running') continue;
+    // A таск first published already running was launched all the same; letting
+    // its absence from the prior state excuse it would make appearing a way round
+    // the blockers that a queued таск is held to.
+    if (task.status !== 'running' || earlier?.status === 'running') continue;
     for (const blockerId of task.blockedBy) {
       const status = tasks.get(blockerId)?.status ?? 'missing';
       if (!FINISHED.includes(status)) {
         add(`tasks[${task.id}].status`, `task ${task.id} cannot run while blocker ${blockerId} is ${status}`, { taskId: task.id, blockerId, status });
       }
     }
-    if (earlier.status !== 'repair') continue;
+    if (earlier?.status !== 'repair') continue;
     for (const defect of current.defects.filter(item => item.parentTaskId === task.id && item.status === 'open')) {
       const latest = current.repairAttempts.filter((item): item is RepairAttemptV3 => isV3Attempt(item) && item.defectId === defect.id).at(-1);
       if (latest?.outcome !== 'prerequisite_blocked') continue;

@@ -148,6 +148,23 @@ export type CheckResult = 'not_run' | 'passed' | 'failed' | 'unavailable' | 'sta
 export const CHECK_RESULTS: readonly CheckResult[] =
   ['not_run', 'passed', 'failed', 'unavailable', 'stale'];
 
+/** An ISO 8601 date and time that names its zone: `Z` or `±hh:mm`. */
+const MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/**
+ * Whether a stamp is a moment every reader of the state agrees on.
+ *
+ * `Date.parse` alone is not the rule: V8 reads "attempt 1" as a day in 2001
+ * and a zoneless stamp as the reader's local time, so two machines would order
+ * the same records differently. The pattern refuses both, and `Date.parse`
+ * still has to accept what the pattern let through, which refuses a thirteenth
+ * month or a twenty-fifth hour.
+ * This is the one rule; validate, verification and closure all ask it.
+ */
+export function isMoment(value: unknown): value is string {
+  return typeof value === 'string' && MOMENT.test(value) && Number.isFinite(Date.parse(value));
+}
+
 export type ReferenceRole = 'authoritative_behavior' | 'visual_reference' | 'contextual_example' | 'other';
 export type DiscoveryStatus = 'observed' | 'source_derived' | 'unresolved';
 export type FindingStatus = 'open' | 'resolved';

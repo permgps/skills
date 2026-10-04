@@ -23,6 +23,7 @@ import {
   STAGE_IDS,
   STAGE_STATUSES,
   TASK_STATUSES,
+  isMoment,
   type RunState,
 } from './contract.mts';
 import { validateClosureRecord } from './closure.mts';
@@ -99,9 +100,11 @@ function checkRunDir(value: Record<string, unknown>, add: (field: string, messag
   const active = value['lifecycle'] === 'active';
   let expected: string | undefined;
   try {
-    if (typeof slug === 'string' && typeof startedAt === 'string') expected = toRunDir(startedAt, slug, active);
+    // Only a moment dates a directory: V8 reads "attempt 1" as a day in 2001,
+    // and a name built from that would send the repair to the wrong field.
+    if (typeof slug === 'string' && isMoment(startedAt)) expected = toRunDir(startedAt, slug, active);
   } catch {
-    // slug or startedAt is already reported by its own rule; there is no name to compare with.
+    // An unsafe slug: the contract-4 slug rule reports it, and there is no name to compare with.
   }
   const parsed = parseRunDir(dir);
   if (!parsed) {
@@ -237,6 +240,45 @@ export function validateState(value: unknown): StateViolation[] {
   const atLeastV3 = typeof version === 'number' && version >= 3;
   const atLeastV4 = typeof version === 'number' && version >= 4 && version <= CONTRACT_VERSION;
 
+  /**
+   * Whether a stamp is a moment, under the rule its contract is read by.
+   *
+   * From contract 4 — every contract publication accepts — that is `isMoment`,
+   * the one rule verification and closure order their records by. A прогон
+   * written before it is still read by metrics and the page, and it was
+   * written against "readable by `Date.parse`"; holding it to the stricter
+   * rule would turn "this run predates the rule" into "this run is corrupt",
+   * the wrong sentence the contract-1 courtesy below already refuses to say.
+   */
+  const isStamp = (raw: unknown): boolean => atLeastV4
+    ? isMoment(raw)
+    : typeof raw === 'string' && !Number.isNaN(Date.parse(raw));
+  /** A contract-4 stamp that is present, a string, and no moment; absent and non-string are other rules' findings. */
+  const requireMoment = (field: string, raw: unknown): void => {
+    if (!atLeastV4 || typeof raw !== 'string' || isMoment(raw)) return;
+    add(field, `${field} is not a moment: ${JSON.stringify(raw)} — write ISO 8601 with Z or a ±hh:mm offset`);
+  };
+  /**
+   * The first entry an id belongs to. Every reader finds an entry by its id and
+   * takes the first, so a second one under the same id — a failed G4 behind a
+   * passed one, an open R01 behind an in-spec one — would be published and
+   * never read by anything that decides.
+   */
+  const requireUniqueIds = (collection: string, entries: unknown[]): void => {
+    const first = new Map<string, number>();
+    entries.forEach((entry, index) => {
+      if (!isRecord(entry) || typeof entry['id'] !== 'string' || entry['id'] === '') return;
+      const earlier = first.get(entry['id']);
+      if (earlier === undefined) { first.set(entry['id'], index); return; }
+      add(`${collection}[${index}].id`,
+        `${collection}[${earlier}] already carries id "${entry['id']}" — merge the two entries or give this one its own id`);
+    });
+  };
+
+  requireMoment('startedAt', value['startedAt']);
+  requireMoment('updatedAt', value['updatedAt']);
+  requireMoment('interruptedAt', value['interruptedAt']);
+
   // --- heldBy ---------------------------------------------------------------
   // Optional at every version, and absent means unclaimed rather than free: the
   // field arrived after 2 was already in use, and a прогон nobody claimed never
@@ -255,7 +297,7 @@ export function validateState(value: unknown): StateViolation[] {
       // below, and reported separately from a missing `since` for the same
       // reason: one field has to be written, the other has to be corrected.
       const since = heldBy['since'];
-      if (typeof since === 'string' && since !== '' && Number.isNaN(Date.parse(since))) {
+      if (typeof since === 'string' && since !== '' && !isStamp(since)) {
         add('heldBy.since', `heldBy.since is not a moment: ${JSON.stringify(since)}`);
       }
     }
@@ -281,7 +323,7 @@ export function validateState(value: unknown): StateViolation[] {
       requireOneOf('awaiting.kind', awaiting['kind'], AWAITING_KINDS);
       requireString('awaiting.since', awaiting['since']);
       const since = awaiting['since'];
-      if (typeof since === 'string' && since !== '' && Number.isNaN(Date.parse(since))) {
+      if (typeof since === 'string' && since !== '' && !isStamp(since)) {
         log.debug('validate', 'awaiting rejected', { field: 'awaiting.since', found: since });
         add('awaiting.since', `awaiting.since is not a moment: ${JSON.stringify(since)}`);
       }
@@ -345,14 +387,15 @@ export function validateState(value: unknown): StateViolation[] {
       const present = (field: string): boolean =>
         typeof entry[field] === 'string' && entry[field] !== '';
 
-      // A stamp is a moment, not a note. `Date.parse` is what every reader of
-      // this state uses — the chain rule below, `scripts/metrics/`, the page —
-      // so a string none of them can read is a стадия with no clock wearing the
-      // shape of one, and the rules below would take it for a clock. Said
-      // separately from a missing stamp because the repair differs: one field
-      // has to be written, the other has to be corrected.
+      // A stamp is a moment, not a note. A string the readers of this state —
+      // the chain rule below, `scripts/metrics/`, the page — cannot agree on is
+      // a стадия with no clock wearing the shape of one, and the rules below
+      // would take it for a clock. `isStamp` is the rule, so a стадия is held to
+      // the same moment as every other stamp of its contract. Said separately
+      // from a missing stamp because the repair differs: one field has to be
+      // written, the other has to be corrected.
       const unreadable = (field: string): void => {
-        if (present(field) && Number.isNaN(Date.parse(String(entry[field])))) {
+        if (present(field) && !isStamp(entry[field])) {
           add(`${at}.${field}`,
             `${named} carries a ${field} that is not a moment: ${JSON.stringify(entry[field])}`);
         }
@@ -386,6 +429,7 @@ export function validateState(value: unknown): StateViolation[] {
         add(`${at}.finishedAt`, `${named} is done and carries no finishedAt`);
       }
     });
+    requireUniqueIds('stages', stages);
 
     // Two стадии open at once is the same forgotten write as the rule below
     // catches, arriving in a state that has nothing to compare. A прогон can
@@ -441,8 +485,11 @@ export function validateState(value: unknown): StateViolation[] {
       previous = entry;
       if (!before) continue;
 
-      const closed = Date.parse(String(before['finishedAt'] ?? ''));
-      const opened = Date.parse(String(entry['startedAt'] ?? ''));
+      // A stamp the rule above refused is no clock here either, or a "2001"
+      // read out of "attempt 1" would be measured as a gap of decades.
+      const instant = (raw: unknown): number => isStamp(raw) ? Date.parse(String(raw)) : Number.NaN;
+      const closed = instant(before['finishedAt']);
+      const opened = instant(entry['startedAt']);
 
       // The стадия that is running now has no `finishedAt` — but the one after
       // it has not started either, and that pair is what the give-up below is
@@ -524,6 +571,9 @@ export function validateState(value: unknown): StateViolation[] {
       }
       optionalString(`${at}.startedAt`, entry['startedAt']);
       optionalString(`${at}.finishedAt`, entry['finishedAt']);
+      // A таск's finishedAt counts closures for the closure batch rule.
+      requireMoment(`${at}.startedAt`, entry['startedAt']);
+      requireMoment(`${at}.finishedAt`, entry['finishedAt']);
       optionalTests(`${at}.tests`, entry['tests']);
 
       // A таск that has not landed yet carries an empty list, not a missing
@@ -556,6 +606,7 @@ export function validateState(value: unknown): StateViolation[] {
         requireCount(`${at}.handoffs`, entry['handoffs']);
       }
     });
+    requireUniqueIds('tasks', tasks);
   }
 
   // --- requirements[] -------------------------------------------------------
@@ -582,6 +633,7 @@ export function validateState(value: unknown): StateViolation[] {
         add(`${at}.reason`, `требование with status "${status}" has no recorded reason`);
       }
     });
+    requireUniqueIds('requirements', requirements);
   }
 
   // --- gates[] --------------------------------------------------------------
@@ -600,6 +652,7 @@ export function validateState(value: unknown): StateViolation[] {
         });
       }
     });
+    requireUniqueIds('gates', gates);
   }
 
   // --- debt, additions and the suite ----------------------------------------
