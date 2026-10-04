@@ -47,6 +47,7 @@ const VALUE_SET_CONSTANTS: Record<string, string> = {
   'verification.repairAttempts[].expectedProgress': 'EXPECTED_PROGRESS',
   'verification.strategyReviews[].trigger': 'STRATEGY_TRIGGERS',
   'verification.strategyReviews[].decision': 'STRATEGY_DECISIONS',
+  'signals[]': 'SIGNAL_KINDS',
 };
 
 /** Stage ids belong to phases.md; the contract only mirrors them. */

@@ -18,6 +18,7 @@ import {
   ONE_WAY_KINDS,
   REGISTERS,
   REQUIREMENT_STATUSES,
+  SIGNAL_KINDS,
   STAGE_IDS,
   STAGE_STATUSES,
   TASK_STATUSES,
@@ -121,6 +122,9 @@ function checkRunDir(value: Record<string, unknown>, add: (field: string, messag
 
 /** A `oneWay` line: one of the kinds, the dash, then a subject. */
 const ONE_WAY_LINE = new RegExp(`^(${ONE_WAY_KINDS.join('|')}) — \\S`);
+
+/** A `signals` line: its id, one of the kinds, a subject, then who it is about. */
+const SIGNAL_LINE = new RegExp(`^(SIG-[1-9][0-9]*) (${SIGNAL_KINDS.join('|')}) — \\S.* — \\S`);
 
 /** Statuses whose meaning is incomplete without a reason. */
 const REASON_REQUIRED = ['open', 'deferred', 'dropped', 'placeholder'];
@@ -594,6 +598,31 @@ export function validateState(value: unknown): StateViolation[] {
               `oneWay[${position}] must start with ${ONE_WAY_KINDS.slice(0, -1).join(', ')} or `
               + `${ONE_WAY_KINDS[ONE_WAY_KINDS.length - 1]} and " — "; write one change per line`);
           }
+        });
+      }
+    }
+
+    // Optional for the reason `oneWay` is, and seeded empty by preflight for
+    // the same one: absence means the прогон began before the field existed,
+    // which the metrics tool reports as not recorded rather than as none.
+    if (value['signals'] !== undefined) {
+      requireStringArray('signals', value['signals']);
+      if (Array.isArray(value['signals'])) {
+        const seen = new Set<string>();
+        value['signals'].forEach((line, position) => {
+          if (typeof line !== 'string') return;
+          const match = SIGNAL_LINE.exec(line);
+          if (match === null) {
+            add(`signals[${position}]`,
+              `signals[${position}] must read "SIG-<n> <kind> — <subject> — <who>", the kind being `
+              + `${SIGNAL_KINDS.slice(0, -1).join(', ')} or ${SIGNAL_KINDS[SIGNAL_KINDS.length - 1]}; write one signal per line`);
+            return;
+          }
+          const id = match[1]!;
+          if (seen.has(id)) {
+            add(`signals[${position}]`, `${id} appears twice; append with the next number`);
+          }
+          seen.add(id);
         });
       }
     }

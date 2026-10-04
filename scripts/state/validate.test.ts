@@ -431,6 +431,71 @@ test('a oneWay line whose kind is not followed by the dash and a subject is repo
   assert.deepEqual(fields(validateState(withPatch({ oneWay: ['deleted — '] }))), ['oneWay[0]']);
 });
 
+test('a state with no signals list is accepted, because a run already in progress has none', () => {
+  const state = baseline();
+  assert.equal('signals' in state, false);
+  assert.deepEqual(validateState(state), []);
+});
+
+test('an empty signals list is accepted as a прогон that recorded none', () => {
+  assert.deepEqual(validateState(withPatch({ signals: [] })), []);
+});
+
+test('a signals line of each kind is accepted', () => {
+  assert.deepEqual(
+    validateState(withPatch({
+      signals: [
+        'SIG-1 withheld-request — spec.md — executor T03',
+        'SIG-2 brief-exceeded — patch instead of finding — reviewer T04',
+        'SIG-3 out-of-zone-write — src/shared/db.ts — T02 a1b2c3d F-4',
+      ],
+    })),
+    [],
+  );
+});
+
+test('a signals entry that is not a string is reported at its position', () => {
+  assert.deepEqual(
+    fields(validateState(withPatch({ signals: ['SIG-1 withheld-request — spec.md — executor T03', 7] }))),
+    ['signals[1]'],
+  );
+});
+
+test('a signals list that is not a list is reported', () => {
+  assert.deepEqual(
+    fields(validateState(withPatch({ signals: 'SIG-1 withheld-request — spec.md — executor T03' }))),
+    ['signals'],
+  );
+});
+
+test('a signals line with an unknown kind is reported with the three kinds named', () => {
+  const violations = validateState(withPatch({ signals: ['SIG-1 asked-for-spec — spec.md — executor T03'] }));
+  assert.deepEqual(fields(violations), ['signals[0]']);
+  assert.match(violations[0]?.message ?? '', /withheld-request, brief-exceeded or out-of-zone-write/);
+});
+
+test('a signals line without its id, its subject or who it is about is reported', () => {
+  for (const line of [
+    'withheld-request — spec.md — executor T03',
+    'SIG-0 withheld-request — spec.md — executor T03',
+    'SIG-1 withheld-request — spec.md',
+    'SIG-1 withheld-request —  — executor T03',
+  ]) {
+    assert.deepEqual(fields(validateState(withPatch({ signals: [line] }))), ['signals[0]'], line);
+  }
+});
+
+test('a signals id used twice is reported at the second line', () => {
+  const violations = validateState(withPatch({
+    signals: [
+      'SIG-1 withheld-request — spec.md — executor T03',
+      'SIG-1 brief-exceeded — patch instead of finding — reviewer T04',
+    ],
+  }));
+  assert.deepEqual(fields(violations), ['signals[1]']);
+  assert.match(violations[0]?.message ?? '', /SIG-1 appears twice/);
+});
+
 test('debt.emptyEnv holding a value rather than a name is reported', () => {
   // S2 is never broken on purpose. This is the shape it gets broken by accident.
   assert.deepEqual(

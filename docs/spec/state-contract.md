@@ -35,6 +35,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
 | `oneWay` | optional list of strings, one inward one-way change each | review | acceptance |
+| `signals` | optional list of strings, one recorded signal each, appended by build, review, acceptance and polish | preflight | metrics |
 | `tests` | `{ passed, failed }` | build | dashboard |
 | `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–7 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
@@ -168,14 +169,30 @@ progress has none — but preflight seeds it empty, so an absent `oneWay` means
 the scan never ran and the отчёт says "not recorded", never "nothing". Outward
 actions are not listed here: `S4` asks before them.
 
-**`gates[].findings`, the three lists inside `debt`, `additions` and `oneWay`
-hold strings, one line each.** The rows above say so and the validator enforces it;
-it is repeated here because the phase writing one of them is pulled the other
-way. A finding names a требование, quotes what the reader said, and records what
-was done about it, which reads like three fields — and a writer that gives it
-three fields produces a state the dashboard prints as `[object Object]`, the
-metrics tool counts as nothing, and G4's own checker cannot read at all. The id
-goes inside the line. Prose that does not fit a line belongs in the phase's
+**`signals` is what a reader did that the phase was told to record**, so the
+next прогон can be planned against it rather than against someone's memory of
+this one. One line per signal: `SIG-<n> <kind> — <subject> — <who>`. The kinds are
+`withheld-request` (a reader asked for an input it is denied),
+`brief-exceeded` (a reader did work its brief forbids) and `out-of-zone-write`
+(a таск's commit touched a path outside the files it owns); their one home is
+`SIGNAL_KINDS` in `contract.mts`. The subject is a withheld input's file name,
+the phrase `patch instead of finding`, or a repository path — never content,
+so a secret has no way into a line. `<who>` names the reader and the таск, and
+for an out-of-zone write the short commit and the finding the review imported.
+`n` is the list's length plus one at append time, and the validator refuses a
+line of another shape and an id used twice. Optional and seeded empty by
+preflight on the same terms as `oneWay`: an absent `signals` means the прогон
+began before the field existed, and the metrics tool prints "not recorded",
+never zero. Nothing in the прогон reads it back; the dashboard does not render it.
+
+**`gates[].findings`, the three lists inside `debt`, `additions`, `oneWay` and
+`signals` hold strings, one line each.** The rows above say so and the validator
+enforces it; it is repeated here because the phase writing one of them is pulled
+the other way. A finding names a требование, quotes what the reader said, and
+records what was done about it, which reads like three fields — and a writer
+that gives it three fields produces a state the dashboard prints as
+`[object Object]`, the metrics tool counts as nothing, and G4's own checker
+cannot read at all. The id goes inside the line. Prose that does not fit a line belongs in the phase's
 document, which is where a прогон keeps its prose; the state carries what the
 dashboard shows.
 
@@ -206,6 +223,7 @@ cannot.
 | `verification.repairAttempts[].expectedProgress` | `defect_verified`, `scenario_verified`, `task_closure` |
 | `verification.strategyReviews[].trigger` | `batch_without_closure`, `same_cause_survived`, `budget_exhausted`, `limit_request` |
 | `verification.strategyReviews[].decision` | `change_strategy`, `stop_incomplete`, `request_limit` |
+| `signals[]` | `withheld-request`, `brief-exceeded`, `out-of-zone-write` |
 
 **`pending` is a стадия's word and a гейт's, and never a таск's.** The three
 sets sit one under another above and the middle one is the odd column out, which
@@ -426,6 +444,8 @@ dashboard's `KNOWN_CONTRACT_VERSION` moves with it, and a contract-6 state
 renders as it did, titled by its slug alone. **`oneWay` arrived later within
 version 7 and raised nothing**: it is optional, the dashboard does not render
 it, and a state without it is read as one written before the scan existed.
+**`signals` arrived later still within version 7 and raised nothing**, for the
+same reasons.
 
 **Version 6** changes four value sets — the repair outcome gains
 `defect_verified` and `prerequisite_blocked` and loses `repaired`, decisions

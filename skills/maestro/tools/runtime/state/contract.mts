@@ -501,6 +501,8 @@ export const REPAIR_OUTCOMES: readonly RepairOutcomeV3[] = ['defect_verified', '
 export type RepeatKind = 'first' | 'same_action_failed' | 'different_action_same_cause'
   | 'new_cause_same_surface' | 'prerequisite_blocked' | 'coordination_correction';
 export const REPEAT_KINDS: readonly RepeatKind[] = ['first', 'same_action_failed', 'different_action_same_cause', 'new_cause_same_surface', 'prerequisite_blocked', 'coordination_correction'];
+/** The two repeat kinds that say the method, not the executor, is what failed. */
+export const SAME_CAUSE_REPEAT_KINDS: readonly RepeatKind[] = ['same_action_failed', 'different_action_same_cause'];
 
 export type ExpectedProgress = 'defect_verified' | 'scenario_verified' | 'task_closure';
 export const EXPECTED_PROGRESS: readonly ExpectedProgress[] = ['defect_verified', 'scenario_verified', 'task_closure'];
@@ -734,6 +736,17 @@ export const ONE_WAY_KINDS = ['deleted', 'renamed', 'migration', 'dependency-maj
 export type OneWayKind = typeof ONE_WAY_KINDS[number];
 
 /**
+ * What a `signals` line may record: a reader that asked for an input it is
+ * denied, a reader that did work its brief forbids, and a таск that wrote outside
+ * the files it owns. Each line reads `SIG-<n> <kind> — <subject> — <who>`, and
+ * the subject is a file name or a path, never content — so a secret has no way
+ * into the line. Read by the metrics tool, which groups them for whoever
+ * maintains Maestro.
+ */
+export const SIGNAL_KINDS = ['withheld-request', 'brief-exceeded', 'out-of-zone-write'] as const;
+export type SignalKind = typeof SIGNAL_KINDS[number];
+
+/**
  * The whole file. Written by the orchestrator at phase boundaries and task
  * transitions only; read by the dashboard and by nothing else.
  *
@@ -803,6 +816,12 @@ export interface RunState {
    * the per-commit diffs. Absent in a run that began before the scan existed.
    */
   oneWay?: string[];
+  /**
+   * Recorded signals, one `SIG-<n> <kind> — <subject> — <who>` line apiece,
+   * appended by build, review, acceptance and polish. Absent in a run that began
+   * before the field existed.
+   */
+  signals?: string[];
   /** The last full suite run. */
   tests?: TestResult;
   /** ISO 8601, set by the acceptance phase. */

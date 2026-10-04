@@ -24,7 +24,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { createLogger } from '../shared/log.mts';
 import {
   DEFECT_CAUSES, DEFECT_STATUSES, EXPECTED_PROGRESS, FAILURE_CAUSES, READINESS_PROBE_KINDS,
-  READINESS_PROBE_RESULTS, REPEAT_KINDS, STRATEGY_DECISIONS, STRATEGY_TRIGGERS,
+  READINESS_PROBE_RESULTS, REPEAT_KINDS, SAME_CAUSE_REPEAT_KINDS, STRATEGY_DECISIONS, STRATEGY_TRIGGERS,
 } from './contract.mts';
 import type {
   CheckExecutionV3, Defect, ReadinessProbeKind, ReadinessRecord, RepairAttemptV2, RepairAttemptV3,
@@ -43,8 +43,6 @@ const moment = (value: string): number => Date.parse(value);
 
 /** A blocker is finished when what its dependents build on exists and was not found wrong. */
 const FINISHED: readonly string[] = ['review', 'done'];
-/** The two repeat kinds that say the method, not the executor, is what failed. */
-const SAME_CAUSE_REPEATS: readonly string[] = ['same_action_failed', 'different_action_same_cause'];
 const ANSWER_FIELDS = ['contractConsistent', 'dependenciesReady', 'environmentEvaluable',
   'detectorDistinguishes', 'rootCauseTargeted', 'taskClosable', 'nextChange'] as const;
 
@@ -471,7 +469,7 @@ export function validateClosureRecord(state: RunState): VerificationViolation[] 
     const opened = Math.min(...batch.map(other => moment(other.at)));
     const closures = state.tasks.filter(task => task.status === 'done' && task.finishedAt
       && moment(task.finishedAt) > opened && moment(task.finishedAt) <= when).length;
-    const repeated = batch.some(other => isV3Attempt(other) && SAME_CAUSE_REPEATS.includes(other.repeatKind));
+    const repeated = batch.some(other => isV3Attempt(other) && SAME_CAUSE_REPEAT_KINDS.includes(other.repeatKind));
     if ((batch.length >= 2 && closures === 0) || repeated) {
       add(`verification.repairAttempts[${attempt.id}]`,
         `${batch.length} attempt(s) since the last strategy review closed ${closures} task(s)${repeated ? ' and a cause survived a similar repair' : ''}; a returned strategy review must precede this attempt`,
