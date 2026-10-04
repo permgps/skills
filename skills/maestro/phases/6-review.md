@@ -218,16 +218,22 @@ neither is decided here.
 the review says and however good the change is. That list is the only thing
 keeping parallel таски apart; a write outside it landed in a file another таск
 may have been holding, and no later reading of the history can say whose it was.
+Once the finding is imported, append one line per path to `signals`:
+`SIG-<n> out-of-zone-write — <path> — <taskId> <first seven of the commit> <F-N>`,
+`n` being the list's length plus one. Log INFO `review` `signal recorded` with
+`{ id, kind, taskId }`.
 
-**A reviewer asks for `spec.md`.** Refuse, and record that it asked. It is the
-same signal as an executor asking: a task file that sends its reader looking for
-the specification did not carry what it needed, and the plan phase is where that
-is fixed for the next прогон.
+**A reviewer asks for `spec.md`.** Refuse, and append
+`SIG-<n> withheld-request — spec.md — reviewer <taskId>` to `signals`, logged as
+above. It is the same signal as an executor asking: a task file that sends its
+reader looking for the specification did not carry what it needed, and the plan
+phase is where that is fixed for the next прогон.
 
 **A reviewer returns a patch instead of a finding.** Do not apply it. Take the
-finding out of it, discard the code, and record that the brief was exceeded.
-Applying it would put project code in your hands — which is the one thing this
-phase and the previous one agree about.
+finding out of it, discard the code, and append
+`SIG-<n> brief-exceeded — patch instead of finding — reviewer <taskId>` to
+`signals`, logged as above. Applying it would put project code in your hands —
+which is the one thing this phase and the previous one agree about.
 
 ## The Dials Here
 

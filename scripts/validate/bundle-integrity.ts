@@ -552,6 +552,38 @@ export const REPORT_ANCHORS: readonly Anchor[] = [
     why: 'the отчёт on disk is English, and the person who knows the answer may not read it' },
 ];
 
+/**
+ * The literal text that carries «the phases record what the retrospective
+ * reads».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. Preflight seeds
+ * `signals`; build, review, acceptance and polish each append the line for the
+ * signal they used to be told only to "record" — a reader asking for an input it
+ * is denied, a reviewer returning a patch, a таск writing outside its files. The
+ * line's grammar is held by the state validator, and the kinds by
+ * `state-matches-spec`. Whether an orchestrator notices a reader asking is its
+ * judgement, so no anchor stands for it.
+ */
+export const SIGNAL_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/0-preflight.md', literal: '| `signals` | empty — build, review, acceptance and polish append',
+    why: 'an unseeded list cannot tell "nothing recorded" from "never recorded"' },
+  { file: 'phases/5-build.md', literal: '`SIG-<n> withheld-request — spec.md — executor <taskId>` to `signals`',
+    why: 'an executor asking for the spec is the plan\'s signal, and a signal with no field is never read' },
+  { file: 'phases/6-review.md', literal: '`SIG-<n> out-of-zone-write — <path> — <taskId>',
+    why: 'a write outside a таск\'s files lives otherwise only in a free-text finding' },
+  { file: 'phases/6-review.md', literal: '`SIG-<n> withheld-request — spec.md — reviewer <taskId>` to `signals`',
+    why: 'a reviewer asking for the spec says the task file did not carry what it needed' },
+  { file: 'phases/6-review.md',
+    literal: '`SIG-<n> brief-exceeded — patch instead of finding — reviewer <taskId>` to `signals`',
+    why: 'a reviewer returning code is a brief that did not hold' },
+  { file: 'phases/7-acceptance.md',
+    literal: '`SIG-<n> withheld-request — <spec.md or brief.md> — acceptance-reader G4` to `signals`',
+    why: 'the blind reader asking for what it is denied is the gate\'s own signal' },
+  { file: 'phases/7-polish.md',
+    literal: '`SIG-<n> withheld-request — <manifest.md or report.md> — polish-reader round <k>` to `signals`',
+    why: 'the polish reader asking for the требования turns its comparison into another one' },
+];
+
 /** Every anchor in `anchors` the documents fail to carry, as violations under `check`. */
 function missingAnchors(
   byFile: ReadonlyMap<string, string>,
@@ -854,6 +886,12 @@ export async function checkBundle(
   // Only a bundle with a repair phase diagnoses a repeat; Scout has none.
   if (byFile.has('phases/8-repair.md')) {
     for (const v of missingAnchors(byFile, DIAGNOSIS_ANCHORS, 'diagnosis')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- the phases record what the retrospective reads -------------------------
+  // Only a bundle with a review phase records signals; Scout has none.
+  if (byFile.has('phases/6-review.md')) {
+    for (const v of missingAnchors(byFile, SIGNAL_ANCHORS, 'signals')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- the отчёт hands over what only the user can do -------------------------

@@ -263,7 +263,10 @@ decision with the exact displayed and selected finding/obligation IDs and
 authorization. “All” means all in that captured presentation only; later
 findings remain unaccepted. Neither decision rewrites a failed check as passed.
 
-**The reader asks for `spec.md` or the бриф.** Refuse, and record that it asked.
+**The reader asks for `spec.md` or the бриф.** Refuse, and append
+`SIG-<n> withheld-request — <spec.md or brief.md> — acceptance-reader G4` to
+`signals`, `n` being the list's length plus one. Log INFO `acceptance`
+`signal recorded` with `{ id, kind, taskId }`, `taskId` being `null`.
 Handing either over ends the gate — not the reading, the gate — because the
 answer that comes back afterwards is no longer blind and nothing in the прогон
 can tell that it was not.

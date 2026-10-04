@@ -226,9 +226,12 @@ they did not. Report it against the plan. **Do not resolve the conflict** —
 resolving it means deciding what the project's code should say, which is the one
 thing this phase may not do.
 
-**An executor asks for `spec.md`.** Refuse, and record that it asked. A task file
-that sends its executor looking for the specification is a task file that did not
-carry what it needed, and that is worth knowing before the next таск repeats it.
+**An executor asks for `spec.md`.** Refuse, and append
+`SIG-<n> withheld-request — spec.md — executor <taskId>` to `signals`, `n` being
+the list's length plus one. Log INFO `build` `signal recorded` with
+`{ id, kind, taskId }`. A task file that sends its executor looking for the
+specification is a task file that did not carry what it needed, and that is worth
+knowing before the next таск repeats it.
 
 ### 6. Before leaving: open the door for what you recorded
 

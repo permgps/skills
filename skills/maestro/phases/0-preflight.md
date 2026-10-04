@@ -193,6 +193,7 @@ Construct the complete contract-7 candidate in temporary JSON. It carries:
 | `debt` | three empty lists: `placeholders`, `assumptions`, `emptyEnv` |
 | `additions` | empty |
 | `oneWay` | empty — the review phase appends what is hard to undo |
+| `signals` | empty — build, review, acceptance and polish append what a reader asked for or did beyond its brief |
 | `tests` | `null` — no suite has run |
 
 Omit optional fields that have no value. In an active run, do not include

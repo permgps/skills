@@ -11,6 +11,7 @@ import {
   DIAGNOSIS_ANCHORS,
   REPORT_ANCHORS,
   REVIEW_ANCHORS,
+  SIGNAL_ANCHORS,
   bundleProfileFor,
   carriesLeafRule,
   checkBundle,
@@ -879,6 +880,47 @@ test('the review phase losing its one-way scan is reported on the review phase',
     const files = (await checkBundle(copy)).filter(v => v.check === 'report').map(v => v.file);
     assert.ok(files.length > 0);
     assert.ok(files.every(file => file === path.join('phases', '6-review.md')), JSON.stringify(files));
+  });
+});
+
+// --- the phases record signals the retrospective reads ------------------------
+
+test('every signal anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(SIGNAL_ANCHORS.length > 0, 'SIGNAL_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of SIGNAL_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'signals'), []);
+  });
+});
+
+test('a phase that goes back to «record that it asked» is the one finding, named on that phase', async () => {
+  await withShippedCopy(async copy => {
+    const build = path.join(copy, 'phases', '5-build.md');
+    const body = await readFile(build, 'utf8');
+    const dropped = body.replace(/Refuse, and append\s+`SIG-<n> withheld-request — spec\.md — executor <taskId>` to `signals`/,
+      'Refuse, and record that it asked');
+    assert.notEqual(dropped, body);
+    await writeFile(build, dropped, 'utf8');
+
+    const violations = await checkBundle(copy);
+    assert.equal(violations.length, 1, JSON.stringify(violations));
+    assert.equal(violations[0]?.check, 'signals');
+    assert.equal(violations[0]?.file, path.join('phases', '5-build.md'));
+  });
+});
+
+test('preflight no longer seeding signals is reported on the preflight phase', async () => {
+  await withShippedCopy(async copy => {
+    const preflight = path.join(copy, 'phases', '0-preflight.md');
+    const body = await readFile(preflight, 'utf8');
+    const dropped = body.replace(/^\| `signals` \|.*\n/m, '');
+    assert.notEqual(dropped, body);
+    await writeFile(preflight, dropped, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'signals');
+    assert.deepEqual(violations.map(v => v.file), [path.join('phases', '0-preflight.md')]);
   });
 });
 

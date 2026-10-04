@@ -92,10 +92,12 @@ round. Stop, and report the difference in the отчёт as one доводка c
 close — three executors failing at the same visible thing is a fact worth
 recording, and improvising a fourth attempt hides it.
 
-**The reader asks for the манифест or the отчёт.** Refuse, and record that it
-asked. What comes back afterwards is a comparison against the требования wearing
-the shape of a comparison against the reference, and nothing downstream can tell
-the two apart.
+**The reader asks for the манифест or the отчёт.** Refuse, and append
+`SIG-<n> withheld-request — <manifest.md or report.md> — polish-reader round <k>`
+to `signals`, `n` being the list's length plus one. Log INFO `polish`
+`signal recorded` with `{ id, kind, taskId }`, `taskId` being `null`. What comes back afterwards is a
+comparison against the требования wearing the shape of a comparison against the
+reference, and nothing downstream can tell the two apart.
 
 **A difference is a credential in the reference.** `S2`. Stop, name the
 variable, advise rotation, re-run redaction over `.maestro/`.
