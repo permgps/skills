@@ -333,26 +333,40 @@ through the settings above. This record pipes the payload by hand, and
 `npm run check` proves only what the guard decides, through
 `scripts/validate/guard-git.test.ts`.
 
-## The First Run Asks One Thing
+## The First Run Asks Two Things
 
 A прогон starts only when you type `/maestro`. Claude Code does not start the
 skill on its own, however much a request sounds like a build: the frontmatter
 declares `disable-model-invocation: true`.
 
 Installing settles nothing about how a прогон behaves. The first `/maestro` in a
-project asks which mode it should start in when the arguments do not say — the
-four are shown with a line each, `semi` marked as the built-in default. If that
-first run already named a mode, the question is instead whether to pin it.
+project asks two questions, in this order:
 
-The answer goes to `<project>/.maestro/config.json`, which is **not** part of
+1. **How it should explain things** — `plain` (*по-простому*) or `normal`
+   (*обычный*), with `normal` marked as the built-in default.
+2. **Which mode it should start in** when the arguments do not say — the four
+   are shown with a line each, `semi` marked as the built-in default — asked in
+   the register you just chose.
+
+The register comes first so that the one user who most needs plain words meets
+the mode table already in them. If that first run already named a register or a
+mode, the question about it is instead whether to pin it. Both questions are
+asked in `full` too: they are about the tool, not the project, and they are
+asked once in a project's lifetime.
+
+The answers go to `<project>/.maestro/config.json`, which is **not** part of
 the bundle:
 
 ```json
 {
   "configVersion": 1,
-  "mode": "full"
+  "mode": "full",
+  "explain": "plain"
 }
 ```
+
+A `"language": "ru"` or `"en"` key may be added by hand; the skill reads it and
+never writes it. The full precedence is in [the dials specification](spec/dials.md).
 
 That location is the point. `npx skills update` overwrites every file it
 installed — verified: a stale bundle updated in place had eleven of its files
@@ -360,9 +374,9 @@ replaced — so a default stored inside the skill would be erased by the next
 update, silently, in the middle of a project. Beside the runs it survives both
 updating and reinstalling.
 
-It is asked once per project and never again; the file existing is what records
-that it was asked. `"mode": null` is a user who was asked and chose not to pin
-one. To change the answer later, edit the file — every announcement names its
+They are asked once per project and never again; the file existing is what
+records that they were asked. `"mode": null` or `"explain": null` is a user who
+was asked and chose not to pin that one. To change an answer later, edit the file — every announcement names its
 path, so there is nothing to look up.
 
 ## For Codex and Gemini CLI
@@ -499,10 +513,12 @@ npm run check     # everything below, in this order
 | `npm run doors` | every door into the repair phase is listed there and opened by some phase |
 | `npm run dials` | the mode set and its built-in default agree across spec, phase and `SKILL.md` |
 | `npm run readers` | each independent reader — every gate reader and the standards reader — declares both given and withheld inputs from `docs/spec/gates.md` |
+| `npm run report` | the отчёт's sections are the same names in the same order in the acceptance phase and the specification, and no file states their count |
 | `npm run view` | `SKILL.md` states the view boundary, every prompt carries it, and only preflight opens a page |
 | `npm run test` | the checkers' own tests |
 | `npm run parity:browser` | separate required real-browser pointer suite; unavailable exits 2 |
 | `npm run parity:workflow` | separate required independent agent evaluation; unavailable exits 2 |
+| `npm run parity:workflow:prepare` | isolated preparation for that evaluation only, no agent execution credit |
 | `npm run completion:workflow` | provider-neutral completion evaluation with explicit authorized adapter; unconfigured/unavailable exits 2 |
 | `npm run completion:workflow:prepare` | isolated target preparation only, no agent execution credit |
 

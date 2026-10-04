@@ -50,6 +50,27 @@ before.
   links, markup or windows built at run time, holds the page's one-way kinds to
   the contract, and refuses a focusable node the redraw could not find again.
 
+The README now teaches the whole product rather than only its design.
+
+- **New sections:** a quick start, every install form with updating and
+  removal, the command grammar, all five dials with their Russian and English
+  trigger words, defaults and precedence, every stop with what can be answered,
+  what can be said to a run in progress, what a run leaves in the project, the
+  dashboard's regions and commands, Scout end to end, host status and
+  degradations, limitations, every npm script, and a map of the documentation.
+- **Corrected:** the README said the dialogue language "is not a dial". It is
+  one — `ru` or `en`, set by a trigger word, a hand-written `language` key in
+  `config.json`, or the language of the бриф.
+- **Corrected:** `docs/install.md` said the first run asks one thing. It asks
+  two — the register, then the mode in that register — and `config.json` carries
+  `explain` beside `mode`. Its table of checks gains `report` and
+  `parity:workflow:prepare`.
+- **`scripts/validate/readme-references.ts`** holds the README to the
+  repository: every relative link and anchor resolves, every `npm run` names a
+  real script, every `sync.mts` flag is one the helper parses, and the sections
+  and dial values are all there. It runs inside `npm run test`, so the twelve
+  validator runs of `npm run check` are unchanged.
+
 ## v0.0.8-alpha — 2026-10-04
 
 Eleven changes from a second outside reading of the skill, each re-derived from
