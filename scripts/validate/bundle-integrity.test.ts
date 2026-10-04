@@ -17,11 +17,13 @@ import {
   checkProcedure,
   COMPLETION_PROCEDURES,
   LEAF_RULE,
+  MAESTRO_BUNDLE,
   MEMORY_ANCHORS,
   procedureSection,
   findRelativeLinks,
   TESTING_ANCHORS,
   parseFrontmatter,
+  type BundleProfile,
   type Violation,
 } from './bundle-integrity.ts';
 import { checkAnswers, parseAnswers } from '../gates/answers.ts';
@@ -77,10 +79,22 @@ async function makeBundle(overrides: Overrides = {}): Promise<{ dir: string; bun
   return { dir, bundle };
 }
 
+/**
+ * The Maestro layout without the shipped bundle's resident budget and invocation
+ * policy. A fixture is a few lines long, so an exact line ceiling would refuse
+ * every one of them; those two rules are tested on a copy of the real bundle.
+ */
+const LAYOUT_ONLY: BundleProfile = {
+  name: MAESTRO_BUNDLE.name,
+  steps: MAESTRO_BUNDLE.steps,
+  prompts: MAESTRO_BUNDLE.prompts,
+  other: MAESTRO_BUNDLE.other,
+};
+
 async function violationsFor(overrides: Overrides): Promise<Violation[]> {
   const { dir, bundle } = await makeBundle(overrides);
   try {
-    return await checkBundle(bundle);
+    return await checkBundle(bundle, LAYOUT_ONLY);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -866,4 +880,127 @@ test('the review phase losing its one-way scan is reported on the review phase',
     assert.ok(files.length > 0);
     assert.ok(files.every(file => file === path.join('phases', '6-review.md')), JSON.stringify(files));
   });
+});
+
+// --- the resident budget and who starts the skill ------------------------------
+
+test('the shipped bundle sits exactly at its resident ceilings and declares explicit-only invocation on both hosts', async () => {
+  await withShippedCopy(async copy => {
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'resident' || v.check === 'invocation');
+    assert.deepEqual(violations, []);
+  });
+});
+
+/** The shipped `SKILL.md` with one edit, and the checker's resident findings on it. */
+async function residentFindingsAfter(edit: (skill: string) => string): Promise<Violation[]> {
+  let found: Violation[] = [];
+  await withShippedCopy(async copy => {
+    const skill = path.join(copy, 'SKILL.md');
+    await writeFile(skill, edit(await readFile(skill, 'utf8')), 'utf8');
+    found = (await checkBundle(copy)).filter(v => v.check === 'resident');
+  });
+  return found;
+}
+
+function shippedDescription(skill: string): string {
+  const line = skill.split('\n').find(candidate => candidate.startsWith('description: '));
+  assert.ok(line, 'SKILL.md carries no description line');
+  return line.slice('description: '.length);
+}
+
+test('a SKILL.md one line over its ceiling is refused, and the message says raising the ceiling is not the fix', async () => {
+  const violations = await residentFindingsAfter(skill => `${skill}\n`);
+  assert.equal(violations.length, 1, JSON.stringify(violations));
+  assert.equal(violations[0]?.file, 'SKILL.md');
+  assert.match(violations[0]?.message ?? '', /over the ceiling of \d+/);
+  assert.match(violations[0]?.message ?? '', /raising the ceiling is not the fix/);
+});
+
+test('a SKILL.md shorter than its ceiling is refused until the ceiling is lowered to match', async () => {
+  const ceiling = MAESTRO_BUNDLE.resident?.skillLines;
+  assert.ok(ceiling);
+  const violations = await residentFindingsAfter(skill => skill.replace('\n\n', '\n'));
+  assert.equal(violations.length, 1, JSON.stringify(violations));
+  assert.match(violations[0]?.message ?? '', new RegExp(`lower resident\\.skillLines .* to ${ceiling - 1} `));
+  assert.match(violations[0]?.message ?? '', /only goes down/);
+});
+
+test('a description longer than its ceiling is refused, because it is resident on every turn', async () => {
+  const violations = await residentFindingsAfter(skill => {
+    const description = shippedDescription(skill);
+    return skill.replace(`description: ${description}`, `description: ${description} x`);
+  });
+  assert.equal(violations.length, 1, JSON.stringify(violations));
+  assert.equal(violations[0]?.line, 1);
+  assert.match(violations[0]?.message ?? '', /trigger conditions only/);
+  assert.match(violations[0]?.message ?? '', /raising the ceiling is not the fix/);
+});
+
+test('a description shorter than its ceiling is refused until the ceiling is lowered to match', async () => {
+  const ceiling = MAESTRO_BUNDLE.resident?.descriptionChars;
+  assert.ok(ceiling);
+  const violations = await residentFindingsAfter(skill => {
+    const description = shippedDescription(skill);
+    return skill.replace(`description: ${description}`, `description: ${description.slice(0, -1)}`);
+  });
+  assert.equal(violations.length, 1, JSON.stringify(violations));
+  assert.match(violations[0]?.message ?? '', new RegExp(`lower resident\\.descriptionChars .* to ${ceiling - 1} `));
+});
+
+test('the description is measured in characters, so an em dash counts once', async () => {
+  const violations = await residentFindingsAfter(skill => {
+    const description = shippedDescription(skill);
+    return skill.replace(`description: ${description}`, `description: ${description.slice(0, -1)}—`);
+  });
+  assert.deepEqual(violations, []);
+});
+
+test('a fixture bundle without a resident budget is not held to the shipped ceilings', async () => {
+  assert.ok(MAESTRO_BUNDLE.resident && MAESTRO_BUNDLE.invocation);
+  assert.deepEqual((await violationsFor({})).filter(v => v.check === 'resident' || v.check === 'invocation'), []);
+});
+
+/** The shipped bundle with one edit, and the checker's invocation findings on it. */
+async function invocationFindingsAfter(edit: (copy: string) => Promise<void>): Promise<Violation[]> {
+  let found: Violation[] = [];
+  await withShippedCopy(async copy => {
+    await edit(copy);
+    found = (await checkBundle(copy)).filter(v => v.check === 'invocation');
+  });
+  return found;
+}
+
+test('a SKILL.md without disable-model-invocation: true is refused on SKILL.md, naming both hosts', async () => {
+  const violations = await invocationFindingsAfter(async copy => {
+    const skill = path.join(copy, 'SKILL.md');
+    const body = await readFile(skill, 'utf8');
+    assert.ok(body.includes('disable-model-invocation: true\n'));
+    await writeFile(skill, body.replace('disable-model-invocation: true\n', ''), 'utf8');
+  });
+  assert.deepEqual(violations.map(v => [v.file, v.line]), [['SKILL.md', 1]]);
+  assert.match(violations[0]?.message ?? '', /agents\/openai\.yaml/);
+});
+
+test('a bundle without agents/openai.yaml is refused, because Codex would start the skill on its own', async () => {
+  const violations = await invocationFindingsAfter(async copy => {
+    await rm(path.join(copy, 'agents', 'openai.yaml'));
+  });
+  assert.deepEqual(violations.map(v => [v.file, v.line]), [[path.join('agents', 'openai.yaml'), 0]]);
+  assert.match(violations[0]?.message ?? '', /starts the skill on its own/);
+});
+
+test('Codex without allow_implicit_invocation: false is refused even when Claude Code declares explicit-only', async () => {
+  const violations = await invocationFindingsAfter(async copy => {
+    const yaml = path.join(copy, 'agents', 'openai.yaml');
+    const body = await readFile(yaml, 'utf8');
+    await writeFile(yaml, body.replace('allow_implicit_invocation: false', 'allow_implicit_invocation: true'), 'utf8');
+  });
+  assert.deepEqual(violations.map(v => [v.file, v.line]), [[path.join('agents', 'openai.yaml'), 2]]);
+});
+
+test('allow_implicit_invocation: false outside a policy block is not a declaration', async () => {
+  const violations = await invocationFindingsAfter(async copy => {
+    await writeFile(path.join(copy, 'agents', 'openai.yaml'), 'interface:\n  allow_implicit_invocation: false\n', 'utf8');
+  });
+  assert.deepEqual(violations.map(v => v.file), [path.join('agents', 'openai.yaml')]);
 });

@@ -2,6 +2,13 @@
 // Checks a skill bundle's structure: frontmatter, link targets, and the
 // dependency rule that keeps the context budget honest — a phase file never
 // links to another phase file.
+//
+// For a bundle whose profile carries them, it also holds the resident budget and
+// who may start the skill. `SKILL.md` and its description stay in context for a
+// whole run, so each has an exact ceiling that can only come down; and the skill
+// starts on the user's word alone, declared once per host. The cost: the ceiling
+// holds length, not quality — which sentence goes is the sentence test's
+// judgement, and no check reads it.
 
 import { readFile, readdir, stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
@@ -47,6 +54,23 @@ export interface BundleProfile {
   prompts: string;
   /** Markdown that is neither, and is opened deliberately by something else. */
   other: string[];
+  /**
+   * The size of what stays in context for a whole run: `SKILL.md`'s line count
+   * (its `\n` characters, which is `wc -l`) and the `description`'s length in
+   * code points, since the description is resident on every turn of every
+   * session. Each is an exact ceiling, not an upper bound — a file under its
+   * ceiling is refused until the constant comes down to match, so slack never
+   * builds up and the number can only fall. Absent means the bundle carries no
+   * budget.
+   */
+  resident?: { skillLines: number; descriptionChars: number };
+  /**
+   * `'explicit-only'` means only the user starts the skill, and both hosts are
+   * told so: `disable-model-invocation: true` in the frontmatter for Claude Code,
+   * `policy.allow_implicit_invocation: false` in `agents/openai.yaml` for Codex.
+   * One declaration without the other is the two hosts drifting apart.
+   */
+  invocation?: 'explicit-only';
 }
 
 export const MAESTRO_BUNDLE: BundleProfile = {
@@ -54,7 +78,16 @@ export const MAESTRO_BUNDLE: BundleProfile = {
   steps: 'phases',
   prompts: 'prompts',
   other: ['references'],
+  // Lowered with every shortening, never raised; raising one is a decision for
+  // the roadmap, not a fix.
+  resident: { skillLines: 626, descriptionChars: 515 },
+  invocation: 'explicit-only',
 };
+
+/** Where Codex reads a skill's invocation policy, relative to the bundle. */
+const CODEX_POLICY_FILE = path.join('agents', 'openai.yaml');
+
+const lineCount = (text: string): number => (text.match(/\n/g) ?? []).length;
 
 export const SCOUT_BUNDLE: BundleProfile = {
   name: 'scout',
@@ -597,6 +630,75 @@ export async function checkBundle(
         `frontmatter name "${declared}" does not match directory "${directory}"`);
     }
     log.info('frontmatter', 'frontmatter checked', { keys: frontmatter.keys.size });
+  }
+
+  // --- the resident budget --------------------------------------------------
+  if (profile.resident) {
+    const before = violations.length;
+    const { skillLines: lineCeiling, descriptionChars: descriptionCeiling } = profile.resident;
+    const lines = lineCount(skill);
+    const description = frontmatter.keys.get('description');
+    const descriptionChars = description === undefined ? undefined : [...description].length;
+    log.debug('resident', 'resident budget read', { lines, lineCeiling, descriptionChars, descriptionCeiling });
+
+    if (lines > lineCeiling) {
+      add('resident', 'SKILL.md', 0,
+        `SKILL.md has ${lines} lines, over the ceiling of ${lineCeiling}; delete a sentence that does not change the прогон's behaviour, or move its reasoning to docs/spec/ — raising the ceiling is not the fix`);
+    } else if (lines < lineCeiling) {
+      add('resident', 'SKILL.md', 0,
+        `SKILL.md has ${lines} lines and its ceiling is ${lineCeiling}; lower resident.skillLines in scripts/validate/bundle-integrity.ts to ${lines} — it only goes down`);
+    }
+
+    // A missing description is already a frontmatter finding; it is not also a budget one.
+    if (descriptionChars !== undefined && descriptionChars > descriptionCeiling) {
+      add('resident', 'SKILL.md', 1,
+        `description has ${descriptionChars} characters, over the ceiling of ${descriptionCeiling}; it is resident on every turn of every session, so it carries trigger conditions only — raising the ceiling is not the fix`);
+    } else if (descriptionChars !== undefined && descriptionChars < descriptionCeiling) {
+      add('resident', 'SKILL.md', 1,
+        `description has ${descriptionChars} characters and its ceiling is ${descriptionCeiling}; lower resident.descriptionChars in scripts/validate/bundle-integrity.ts to ${descriptionChars} — it only goes down`);
+    }
+    log.info('resident', 'resident budget checked', { violations: violations.length - before });
+  }
+
+  // --- who starts the skill -------------------------------------------------
+  if (profile.invocation === 'explicit-only') {
+    const before = violations.length;
+    const claude = frontmatter.keys.get('disable-model-invocation') ?? null;
+    let policy: string | null = null;
+    try {
+      policy = await readFile(path.join(bundleDir, CODEX_POLICY_FILE), 'utf8');
+    } catch {
+      // Absent or unreadable is the finding below, not exit 2: a missing file is
+      // exactly what this check exists to report.
+    }
+    // Read by line rather than parsed, like the frontmatter: the policy is one
+    // scalar under one key, and a YAML parser would be this repository's first
+    // dependency. The flag counts only inside the top-level `policy:` block.
+    const policyLines = policy?.split('\n') ?? [];
+    const policyStart = policyLines.findIndex(line => /^policy:\s*$/.test(line));
+    let flagLine = 0;
+    let codex: string | null = null;
+    for (let i = policyStart + 1; policyStart >= 0 && i < policyLines.length; i += 1) {
+      const line = policyLines[i] ?? '';
+      if (/^\S/.test(line)) break;
+      const match = /^\s+allow_implicit_invocation:\s*(\S*)\s*$/.exec(line);
+      if (match) {
+        flagLine = i + 1;
+        codex = match[1] ?? '';
+        break;
+      }
+    }
+    log.debug('invocation', 'invocation policy read', { claude, codex });
+
+    if (claude !== 'true') {
+      add('invocation', 'SKILL.md', 1,
+        'the skill is started by the user only: set disable-model-invocation: true, and keep agents/openai.yaml saying the same to Codex');
+    }
+    if (codex !== 'false') {
+      add('invocation', CODEX_POLICY_FILE, flagLine,
+        'Codex needs agents/openai.yaml with policy.allow_implicit_invocation: false, or it starts the skill on its own');
+    }
+    log.info('invocation', 'invocation policy checked', { violations: violations.length - before });
   }
 
   // --- no markdown directory is outside every profile ----------------------

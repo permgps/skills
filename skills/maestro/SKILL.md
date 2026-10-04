@@ -2,6 +2,7 @@
 name: maestro
 description: Turn a dictated idea into a finished, verified project in one dialogue. Use when the user describes something they want built, changed, or finished — a feature, a page, a service, a whole project — rather than asking a question or requesting a single edit. Records their words as numbered requirements, asks only about genuine forks, writes a specification, cuts it into tasks, builds them with parallel executors, reviews the result, and checks the build against the original words with the specification withheld.
 argument-hint: "[full|semi|interview|manual] [strict|normal|deep] [polish] <what you want built>"
+disable-model-invocation: true
 ---
 
 # Maestro
