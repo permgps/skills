@@ -14,7 +14,7 @@ that same snapshot. The page derives requirement results and run outcome from
 them; it does not open evidence files or treat `finishedAt`, completed tasks,
 or a finished acceptance stage as proof of conformance. An invalid candidate
 must leave an accessible error tied to its revision and suppress an older green
-success display. A historical pre-verification state remains readable with an
+success display; the last accepted state stays visible under that error. A historical pre-verification state remains readable with an
 explicit “verification not established” label, including its original G4.
 
 A **view preference** is not data about the прогон, and the rule above does not

@@ -14,6 +14,12 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **A refused write no longer blanks the dashboard.** When `sync.mts` rejected a
+  candidate, the page hid every region until the next accepted write, leaving
+  only the header and the error. The last accepted прогон now stays on screen
+  under the error tied to the refused revision; only a verified-success line it
+  no longer backs is withdrawn.
+
 ## v0.0.9-alpha — 2026-10-05
 
 The dashboard now shows what the state already carried. `CONTRACT_VERSION`

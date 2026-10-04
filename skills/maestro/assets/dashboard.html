@@ -3605,6 +3605,24 @@ globalThis.MAESTRO_LOGIC = (function () {
     return isStateShape(held) ? 'stale' : 'blank';
   }
 
+  /**
+   * What a refused write leaves on the screen; null when nothing was refused.
+   *
+   * sync.mts rejects the candidate and keeps the last accepted state, so that
+   * state is still true and stays visible under the error. The one thing it no
+   * longer backs is a claim of verified success: the прогон has moved past it,
+   * and the move was not accepted.
+   */
+  function rejectionView(envelope, held) {
+    if (!envelope || envelope.status !== 'invalid') return null;
+    var success = false;
+    if (isStateShape(held)) {
+      try { success = verificationOf(held).verificationEstablished === true; }
+      catch (error) { success = false; }
+    }
+    return { keepRegions: isStateShape(held), suppressSuccess: success };
+  }
+
   return {
     KNOWN_CONTRACT_VERSION: KNOWN_CONTRACT_VERSION,
     RUN_DIR_PATTERN: RUN_DIR_PATTERN,
@@ -3688,7 +3706,8 @@ globalThis.MAESTRO_LOGIC = (function () {
     explainStage: explainStage,
     isStopped: isStopped,
     isStateShape: isStateShape,
-    readOutcome: readOutcome
+    readOutcome: readOutcome,
+    rejectionView: rejectionView
   };
 })();
 </script>
@@ -3933,7 +3952,8 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
 
   function applyValidation() {
     var envelope = globalThis.MAESTRO_VALIDATION || globalThis.MAESTRO_VALIDATION_SNAPSHOT;
-    if (!envelope || envelope.status !== 'invalid') return;
+    var view = L.rejectionView(envelope, lastGood);
+    if (!view) return;
     var details = (envelope.violations || []).slice(0, 3).map(function (item) {
       return item.field + ': ' + item.message;
     }).join('; ');
@@ -3942,7 +3962,10 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       ? 'Candidate ' + revision + ' was rejected. ' + details
       : 'Кандидат ' + revision + ' отклонён. ' + details;
     problem(message);
-    el('regions').hidden = true;
+    // The accepted прогон stays under the error: hiding it would turn one
+    // refused write into a blank page until the next accepted one.
+    el('regions').hidden = !view.keepRegions;
+    if (view.suppressSuccess) el('notice').hidden = true;
   }
 
   function apply(state) {

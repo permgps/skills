@@ -73,6 +73,7 @@ interface Logic {
   isStopped: (state: unknown) => boolean;
   isStateShape: (value: unknown) => boolean;
   readOutcome: (held: unknown, incoming: unknown) => string;
+  rejectionView: (envelope: unknown, held: unknown) => { keepRegions: boolean; suppressSuccess: boolean } | null;
   gateFor: (state: unknown, stageId: string) => { id: string; findings: string[] } | null;
   lineOf: (value: unknown) => string;
   findingsView: (gate: unknown) => { show: boolean; folded: boolean; tone: string; count: number };
@@ -471,6 +472,47 @@ test('knowing nothing is the only outcome that reports knowing nothing', () => {
   // A held value that is not a state is not a state: a page cannot go stale
   // against something it never managed to read.
   assert.equal(L.readOutcome({ runId: 'r1' }, undefined), 'blank');
+});
+
+// --- a rejected candidate, over whatever was accepted before it -------------
+//
+// sync.mts refuses a write and leaves the last accepted state where it was.
+// The page says so, tied to the refused revision — and keeps showing the
+// прогон it already read, because that one is still true.
+
+const rejected = { status: 'invalid', candidateRevision: '2026-10-04T16:52:09Z',
+  violations: [{ field: 'tasks[T03].status', message: 'task T03 cannot run while blocker T02 is repair' }] };
+
+test('a rejected candidate leaves the accepted прогон on the screen', () => {
+  assert.deepEqual(plain(L.rejectionView(rejected, run())), { keepRegions: true, suppressSuccess: false });
+});
+
+test('a rejected candidate with nothing accepted before it has nothing to show', () => {
+  for (const held of [null, undefined, { runId: 'r1' }]) {
+    assert.equal(L.rejectionView(rejected, held)?.keepRegions, false);
+  }
+});
+
+test('a rejected candidate withdraws a verified success it no longer backs', () => {
+  assert.deepEqual(plain(L.rejectionView(rejected, verifiedState())), { keepRegions: true, suppressSuccess: true });
+});
+
+test('only a verified completion counts as the success a rejection withdraws', () => {
+  // A historical прогон never established verification, so there is no claim
+  // to take back; neither is there one in a record the page cannot read, nor
+  // in a closure that already names its exceptions.
+  const legacy = run({ contractVersion: 1, finishedAt: '2026-08-19T12:00:00.000Z' });
+  const unreadable = { ...verifiedState(), verification: { version: 2 } };
+  const excepted = { ...verifiedState(), outcome: 'closed_with_exceptions' };
+  for (const held of [legacy, unreadable, excepted]) {
+    assert.deepEqual(plain(L.rejectionView(rejected, held)), { keepRegions: true, suppressSuccess: false });
+  }
+});
+
+test('an accepted or absent candidate changes nothing', () => {
+  assert.equal(L.rejectionView({ ...rejected, status: 'valid', violations: [] }, run()), null);
+  assert.equal(L.rejectionView(undefined, run()), null);
+  assert.equal(L.rejectionView(null, null), null);
 });
 
 // --- what the cards are built from -------------------------------------------
