@@ -14,6 +14,32 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+The dashboard now shows what the state already carried. `CONTRACT_VERSION`
+stays `7`: the two new fields are optional, and a run without them renders as
+before.
+
+- **«Ваш ход»**, a new region: empty variables by name, placeholders, open
+  promised work, one-way changes grouped by kind, and assumptions. The Долг card
+  counts the same lists.
+- **Таск rows open** to the требования they serve, blockers, files, owned area,
+  short commit hashes, restarts, trips to repair, passes to a fresh субагент,
+  tests and defects. The critical path is marked, and its count on «Осталось» is
+  the number of marked rows.
+- **Требование rows open** to the user's quoted words (verification 2+), the
+  таски that name them, each check with its derived result and failure cause,
+  open findings and live defects. A требование no таск names is marked. The
+  words heard but not taken, and what was delivered beyond the ask, are folded
+  below the list.
+- **A stopped run prints its `stopReason`**; the raised silence notice names the
+  run's claim token.
+- **`awaiting { since }`**, new and optional: written before every stop on a
+  question, it turns the silence line into a calm «waiting for your reply». The
+  validator refuses it on a closed run.
+- **`requirements[].title`**, new and optional: one English line from the
+  manifest phase, shown under the quote.
+- `dashboard-integrity` holds six new value maps to the vocabulary and refuses
+  links or markup built at run time.
+
 ## v0.0.8-alpha — 2026-10-04
 
 Eleven changes from a second outside reading of the skill, each re-derived from

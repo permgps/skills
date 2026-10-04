@@ -70,7 +70,7 @@ export const REGISTERS: readonly Register[] = ['plain', 'normal'];
 /**
  * Which language the прогон speaks in — the second dial here that produces no
  * part of the build, and here for the register's reason exactly: the dashboard
- * paints its labels and its fourteen explanations in one of two languages, and
+ * paints its labels and its fifteen explanations in one of two languages, and
  * `state.js` is the only thing the dashboard reads.
  *
  * It appears in no `DialChange` for the same reason `Register` does not.

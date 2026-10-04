@@ -55,7 +55,7 @@ is recorded as having arrived later and raised nothing — an optional field tha
 widens no existing value set is exactly the case that changes no version.
 
 **`explain` is the one dial the state carries that produces no part of the
-build.** It is here because the dashboard has to render its fourteen
+build.** It is here because the dashboard has to render its fifteen
 explanations in the register the user chose, and `state.js` is the only thing
 the dashboard reads. It is **optional**: every state written before the register
 existed has no `explain`, and the page renders such a state exactly as it

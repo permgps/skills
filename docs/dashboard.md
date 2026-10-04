@@ -108,8 +108,55 @@ six: a page whose own numbers disagree has stopped being a record. The page
 never repaints such a таск into a status that does exist — guessing is the
 writer's job, and this page is the reader.
 
+**A таск row opens.** Press it, or focus it and press Enter, and it shows what
+the state holds for that таск: the требования it serves, the таски it waits for,
+its files and owned area, the commits it landed in as short hashes, restarts,
+trips to repair, passes to a fresh субагент, its tests and — under contract 6 —
+its defects. A field the state does not carry is left out, never shown as zero.
+Passes to a fresh субагент are not a defect: the таск outgrew a context.
+
+The таски on the **critical path** carry a ◆ beside their id. It is the same
+chain the «Критический путь» count under «Осталось» is measured along, so the
+number on the card is exactly the number of marked rows.
+
 Requirement coverage is counted rather than claimed: every task carries the
 requirement ids it traces to, which is what G3 checks in both directions.
+
+**A требование row opens too.** Each row leads with the user's own words it came
+from, quoted from the brief in the language they were said in (verification 2
+and later), then the state's short English title if it has one. Opened, it
+shows:
+
+| Contract | What the row adds |
+|---|---|
+| 3 or earlier | the таски that name it; «проверка не установлена» |
+| 4 | each check with its derived result, failure cause and limitation; open findings |
+| 5 | the quote |
+| 6–7 | live defects with their cause and counterexample |
+
+A требование no таск names is marked «Не покрыто тасками» — in the failure
+colour until the plan check passes, muted after it. Below the list, two folded
+records: «Услышано, но не взято», the user's words the manifest phase kept as
+context, each with its reason, and «Сверх запрошенного», what the run delivered
+that nobody asked for.
+
+An opened row stays open across the poll that redraws the page every two
+seconds.
+
+## Your move
+
+«Ваш ход» gathers what only the user can settle, in this order:
+
+| Group | From | Note |
+|---|---|---|
+| Переменные | `debt.emptyEnv` | names only — a value never reaches the state |
+| Заглушки | `debt.placeholders` | prices, addresses, texts only the user has |
+| Обещано доделать | open `verification.promisedWork` | contract 4 and later |
+| Необратимые изменения | `oneWay`, grouped by kind | deletions, renames, migrations, major upgrades; an unknown kind is kept in its own group |
+| Допущения | `debt.assumptions` | decisions made because nobody was asked |
+
+A group longer than five lines folds the rest behind a press. The Долг card
+counts the same lists through the same function, so the two cannot disagree.
 
 ## A finished run
 
@@ -125,6 +172,9 @@ show passed, failed, or incomplete results derived from current check executions
 coverage reviews, and findings. G4 passes only with current applicable evidence.
 A closed run names its outcome as `completed`, `closed_with_exceptions`, or
 `stopped_incomplete`; an accepted exception keeps the failed check visible. A
+stopped run also prints the reason it wrote, on its own line labelled «Причина
+остановки» — the outcome says the run stopped, only the reason says whether you
+have a move. A
 legacy snapshot remains readable with verification marked unestablished. An
 invalid candidate displays the helper's diagnostic and cannot replace the last
 coherent state.
@@ -260,7 +310,7 @@ explanation is built by calling the same functions the region draws itself with,
 so it cannot tell you a story the number above it disagrees with.
 
 **In which words depends on how you answered the first question of the project.**
-If you chose *по-простому*, every one of the twenty-two explanations — fourteen
+If you chose *по-простому*, every one of the twenty-three explanations — fifteen
 regions and eight стадии — is written for someone who has never built software:
 «Осталось» stops saying *медиана* and says *серединное время*, the block called
 «Гейты» opens with what the four checks actually are, and Ревью says a субагент
@@ -294,6 +344,15 @@ work may have stopped needs the move, not only the diagnosis. The threshold is
 the run's own — ten minutes of silence is unremarkable in a прогон that has
 already been quiet for eleven, and alarming in one that writes at every таск. A finished or interrupted прогон is not nagged about it:
 that silence is accounted for, and the page already says so.
+
+**A run stopped on your question is waiting, not stalled.** Before every stop
+the orchestrator writes `awaiting`, and while it is set the silence line becomes
+«Ждёт вашего ответа в чате с 21:27» — calm, and never raised however long the
+wait. A state written before the field existed falls back to the ordinary rule.
+
+The raised line also names the run's claim — «Метка прогона: k7f2 с 21:27» —
+the same token a second chat quotes when it finds the run already claimed. The
+page says nothing about whether that holder is alive; it cannot know.
 
 ## What is checked
 

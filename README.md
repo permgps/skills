@@ -191,7 +191,14 @@ how many требования are in the denominator and why. And because a пр
 its state only at transitions, the page also says how long it has been since the
 last write — raising the line once the silence is longer than any this run has
 already come through, so a session that died is no longer indistinguishable from
-one that is thinking.
+one that is thinking — and a run stopped on your question says it is waiting
+for your reply instead.
+
+**What only you can settle is in one place.** «Ваш ход» lists empty variables by
+name, placeholders, promised work, one-way changes and assumptions. Every таск
+and every требование row opens: a таск to its files, commits and blockers, with
+the critical path marked; a требование to your own words it came from, its таски,
+and how it was checked.
 
 **You do not have to go looking for it.** The tool that keeps the page current is
 what opens it, rather than a paragraph of prose asking the orchestrator to
