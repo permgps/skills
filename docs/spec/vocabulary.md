@@ -214,6 +214,7 @@ term, and a term with two homes drifts.
 | Служит требованиям | Serves | The требования one таск names |
 | Ждёт тасков | Waits for | The таски one таск is blocked by |
 | На критическом пути | On the critical path | The marker on a таск that sits on the chain the estimate is measured along |
+| Ждёт вашего ответа | Waiting for your reply | The notice that replaces the silence line while the прогон is stopped on a question |
 | G1 | G1 | The gate after брифинг, shown as a row of Гейты |
 | G2 | G2 | The gate after спецификация |
 | G3 | G3 | The gate after план |

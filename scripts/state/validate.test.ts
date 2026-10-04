@@ -1005,3 +1005,39 @@ test('closing a contract-7 run with the suffix taken off is a lawful write', () 
   next.dir = '2026-09-29-synthetic-menu';
   assert.ok(!validateStateTransition(prior, next).some(item => ['dir', 'slug', 'runId', 'startedAt', 'contractVersion'].includes(item.field)));
 });
+
+test('a state without a title or an awaiting reply validates, at contract 3 and contract 7 alike', () => {
+  assert.deepEqual(validateState(baseline()), []);
+  assert.deepEqual(validateState(activeContract7State()), []);
+  assert.equal(CONTRACT_VERSION, 7);
+});
+
+test('a requirement title is one line of text, and an empty or non-string one is reported', () => {
+  const titled = baseline();
+  titled.requirements[0] = { ...titled.requirements[0]!, title: 'The hero section names the product' };
+  assert.deepEqual(validateState(titled), []);
+
+  const empty = baseline();
+  empty.requirements[0] = { ...empty.requirements[0]!, title: '   ' };
+  assert.deepEqual(fields(validateState(empty)), ['requirements[0].title']);
+
+  const number = baseline() as unknown as { requirements: Array<Record<string, unknown>> };
+  number.requirements[0]!['title'] = 42;
+  assert.deepEqual(fields(validateState(number)), ['requirements[0].title']);
+});
+
+test('an awaiting reply carries a moment a reader can parse', () => {
+  assert.deepEqual(validateState(withPatch({ awaiting: { since: '2026-08-19T09:12:00Z' } })), []);
+  assert.deepEqual(fields(validateState(withPatch({ awaiting: { since: 'after lunch' } }))), ['awaiting.since']);
+  assert.deepEqual(fields(validateState(withPatch({ awaiting: {} }))), ['awaiting.since']);
+  assert.deepEqual(fields(validateState(withPatch({ awaiting: 'yes' }))), ['awaiting']);
+});
+
+test('a closed прогон waits for nobody, so awaiting on it is reported', () => {
+  const closed = { ...contract7State(), awaiting: { since: '2026-09-29T09:19:00Z' } };
+  const violations = validateState(closed);
+  assert.deepEqual(fields(violations), ['awaiting']);
+  assert.match(violations[0]?.message ?? '', /waits for nobody/);
+  const finished = withPatch({ finishedAt: '2026-08-19T09:20:00Z', awaiting: { since: '2026-08-19T09:12:00Z' } });
+  assert.ok(fields(validateState(finished)).includes('awaiting'));
+});

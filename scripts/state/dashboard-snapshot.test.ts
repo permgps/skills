@@ -55,3 +55,22 @@ test('a validation message holding </script> stays inside the diagnostic script 
     assert.deepEqual(evaluate(body)['MAESTRO_VALIDATION_SNAPSHOT'], envelope);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('a state carrying every field the page newly reads round-trips into the snapshot unchanged', async () => {
+  const dir = await scratch();
+  try {
+    const state = {
+      runId: 'r1', slug: 'landing-page', contractVersion: 7, lifecycle: 'active',
+      awaiting: { since: '2026-10-04T10:00:00Z' },
+      heldBy: { token: 'k7f2', since: '2026-10-04T09:00:00Z' },
+      stopReason: 'not yet',
+      requirements: [{ id: 'R01', status: 'in-spec', title: 'Hero names the product' }],
+      oneWay: ['deleted — src/old.js — 01 abc1234'],
+      additions: ['A favicon (R01)'],
+      debt: { placeholders: ['phone'], assumptions: [], emptyEnv: ['STRIPE_KEY'] },
+    };
+    assert.equal(await mirror(dir, JSON.stringify(state)), true);
+    const page = await readFile(path.join(dir, 'dashboard.html'), 'utf8');
+    assert.deepEqual(evaluate(inlineScript(page, 'snapshot'))['MAESTRO_SNAPSHOT'], state);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});

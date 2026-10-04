@@ -135,6 +135,15 @@ headings:
   user;
 - *Asking A Question* — what a stop owes its reader, because five places ask.
 
+Two reasons that used to sit beside their rules in `SKILL.md` live here now.
+A прогон that stopped is resumed and never restarted because a restart takes a
+run that is three стадии in and charges the user for all three again, over a
+directory that already holds their answers. And a stop writes `awaiting` before
+it asks because a turn that ended on a question and a прогон nobody is driving
+are equally silent: the user cannot tell them apart from outside, and without
+the field neither can the dashboard, which would raise its silence alarm over a
+run that is only waiting for its reader.
+
 `SKILL.md` states these rules and not the reason they are resident. The reason
 is maintenance knowledge, and a sentence that changes no behaviour costs context
 on every turn of every прогон. `bundle-integrity` holds the file's size; see

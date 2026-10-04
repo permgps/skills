@@ -114,9 +114,7 @@ restarted.** If the user says anything at all to a run that is not at one of its
 stops — «продолжай», a question, a correction — read `.maestro/state.js` first
 and resume at `currentStage`. Its стадия is open with a `startedAt` and no
 `finishedAt`, its artifacts say how far that стадия actually got, and both are
-truer than your memory of it. Starting the прогон over would take a run that is
-three стадии in and charge the user for all three again, over a directory that
-already holds their answers.
+truer than your memory of it.
 
 **Claim the прогон, then check the claim before every write.**
 
@@ -358,8 +356,7 @@ words they can answer. `S3` still holds.
 has done stands still behind one reply — the two dials questions on a project's
 first прогон, the манифест, the брифинг block, and the spec and plan gates in
 `manual`. A sentence into an empty box is not a question to someone who has
-never done this before. They can read it, understand every word, and still not
-know what an answer looks like or that answering is what starts the run again.
+never done this before: they cannot tell what an answer looks like.
 
 **Offer the answers, in the прогон's language.** If your host can put choices in
 front of the user, use it — that is the shortest path from a stopped прогон to a moving one. If it
@@ -367,7 +364,7 @@ cannot, number them in the sentence. The dials phase is what this looks like
 when it is done right: the four modes arrive as a table with the built-in one
 marked, and the user picks rather than composes.
 
-Four things every stop owes the reader:
+Five things every stop owes the reader:
 
 - **The answer that continues, named, and what continuing does.** «Да» — or
   «yes» — is not an answer until something has said what it starts.
@@ -381,6 +378,9 @@ Four things every stop owes the reader:
   say.
 - **One option marked as the прогон's choice, with its reason in one clause.**
   How briefing records the reply is in `phases/2-briefing.md`.
+- **A write before the words.** The state published just before the question
+  carries `awaiting: { since }` set to that moment; the first write after the
+  reply leaves it out, and the write that closes the прогон never carries it.
 
 **`R##` never travels alone.** In anything the user reads, an id carries a short
 gist of its требование: «R03 — оплата картой», never a bare «R03».
@@ -394,8 +394,7 @@ exactly two places: at one of the stops above, and at the end of the run. Nowher
 else. Announcing what you are about to do and then falling silent produces a
 stop with no question in it, and that is the worst state this system has: the
 стадия is open, its clock is running, the dashboard is telling the user that
-work is under way, and nothing is under way. The user cannot tell it from a
-прогон thinking hard, because from outside there is nothing to tell apart.
+work is under way, and nothing is under way.
 
 So an intent and the act that serves it belong to the same turn. «Сейчас я
 посмотрю» is not a turn — it is the first sentence of one whose last act is the

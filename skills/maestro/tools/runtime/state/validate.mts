@@ -260,6 +260,28 @@ export function validateState(value: unknown): StateViolation[] {
     }
   }
 
+  // --- awaiting --------------------------------------------------------------
+  // Optional at every version, like `heldBy`, and absent means the page applies
+  // its ordinary silence rule. A run that is finished waits for nobody, so a
+  // closed state carrying the field is a write that forgot to clear it — and the
+  // page would tell the user their reply is awaited by a run that has ended.
+  const awaiting = value['awaiting'];
+  if (awaiting !== undefined) {
+    if (!isRecord(awaiting)) {
+      add('awaiting', 'awaiting must be an object — { since }');
+    } else {
+      requireString('awaiting.since', awaiting['since']);
+      const since = awaiting['since'];
+      if (typeof since === 'string' && since !== '' && Number.isNaN(Date.parse(since))) {
+        add('awaiting.since', `awaiting.since is not a moment: ${JSON.stringify(since)}`);
+      }
+    }
+    if (value['lifecycle'] === 'closed' || typeof value['finishedAt'] === 'string') {
+      log.debug('validate', 'awaiting on a finished run', { lifecycle: value['lifecycle'], finishedAt: value['finishedAt'] });
+      add('awaiting', 'a closed прогон waits for nobody — remove awaiting in the write that closes the run');
+    }
+  }
+
   // --- dialChanges[] --------------------------------------------------------
   const dialChanges = value['dialChanges'];
   if (requireArray('dialChanges', dialChanges)) {
@@ -532,6 +554,10 @@ export function validateState(value: unknown): StateViolation[] {
       requireString(`${at}.id`, entry['id']);
       requireOneOf(`${at}.status`, entry['status'], REQUIREMENT_STATUSES);
       optionalString(`${at}.reason`, entry['reason']);
+      optionalString(`${at}.title`, entry['title']);
+      if (typeof entry['title'] === 'string' && entry['title'].trim() === '') {
+        add(`${at}.title`, `${at}.title is empty — write one English line or leave the field out`);
+      }
 
       const status = entry['status'];
       const reason = entry['reason'];

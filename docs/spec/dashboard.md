@@ -229,6 +229,13 @@ A fixed number would be wrong in both directions.
 Nothing is said about a finished or interrupted прогон. That silence is lawful,
 and the run notice already names it.
 
+**A прогон stopped on a question is waiting, not quiet.** While an active state
+carries `awaiting`, the silence line is replaced by «Ждёт вашего ответа в чате с
+21:27», and it is never raised, however long the wait: the reader owes the next
+move, not the run. Without the field the page cannot tell the two apart, which
+is why a stop writes it before it asks. A finished or interrupted run, or an
+`awaiting` whose `since` does not parse, falls back to the ordinary rule above.
+
 The notice is worded in the register too. Plain, it says nothing has changed for
 however long; the normal wording names the write, which is a fact about the file
 rather than about the project.
@@ -515,7 +522,9 @@ findings list is: a detail that snapped shut every two seconds could not be read
 Each row of `requirement-list` names one требование: its id, its planning
 status, its verification result, and — from verification 2 — the user's own
 words it came from, quoted from `sourceClauses` in the language they were said
-in. The page never translates the quote.
+in. The page never translates the quote. The state's English `title` follows the
+quote on a second, muted line, and stands alone only for a state that records no
+quote; it never replaces the user's words.
 
 Pressing the row opens its chain:
 

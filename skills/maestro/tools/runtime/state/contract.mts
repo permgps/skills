@@ -102,6 +102,11 @@ export interface Holder {
   since: string;
 }
 
+/** The прогон ended its turn on a question at `since`. */
+export interface Awaiting {
+  since: string;
+}
+
 export type StageStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
 export const STAGE_STATUSES: readonly StageStatus[] =
   ['pending', 'active', 'done', 'failed', 'skipped'];
@@ -706,6 +711,12 @@ export interface RequirementEntry {
   status: RequirementStatus;
   /** Required for `deferred`, `dropped`, and for `open` at G1. */
   reason?: string;
+  /**
+   * One English line naming the требование, written by the manifest phase.
+   * Optional: a state written before the field existed has none, and from
+   * verification 2 the dashboard leads with the user's quoted words instead.
+   */
+  title?: string;
 }
 
 export interface GateEntry {
@@ -828,4 +839,10 @@ export interface RunState {
   finishedAt?: string;
   /** ISO 8601, set when a phase fails or the run stops; cleared on resume. */
   interruptedAt?: string;
+  /**
+   * Set in the write that precedes a stop on a question, absent from the next
+   * write after the reply. Never on a closed run. What lets the dashboard tell
+   * a прогон waiting for its reader from one nobody is driving.
+   */
+  awaiting?: Awaiting;
 }

@@ -80,7 +80,7 @@ export const MAESTRO_BUNDLE: BundleProfile = {
   other: ['references'],
   // Lowered with every shortening, never raised; raising one is a decision for
   // the roadmap, not a fix.
-  resident: { skillLines: 552, descriptionChars: 256 },
+  resident: { skillLines: 551, descriptionChars: 256 },
   invocation: 'explicit-only',
 };
 

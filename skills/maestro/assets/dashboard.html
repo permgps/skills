@@ -243,6 +243,7 @@
   }
   .detail li { padding: .05rem 0; overflow-wrap: anywhere; }
   .row .name .quote { color: var(--ink); }
+  .row .name .title { display: block; color: var(--muted); font-size: .85rem; }
   .untraced { margin-left: .5rem; font-size: .8rem; }
   .untraced-fail { color: var(--fail); }
   .untraced-quiet { color: var(--muted); }
@@ -540,6 +541,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         serves: 'Служит требованиям',
         waitsFor: 'Ждёт тасков',
         onCriticalPath: 'На критическом пути',
+        awaiting: 'Ждёт вашего ответа',
         G1: 'G1', G2: 'G2', G3: 'G3', G4: 'G4'
       },
       UI: {
@@ -737,6 +739,10 @@ globalThis.MAESTRO_LOGIC = (function () {
             ? 'В последний раз что-то менялось ' + quiet + ' назад.'
             : 'Последняя запись — ' + quiet + ' назад.';
         },
+        awaitingNotice: function (moment) {
+          return L10N.ru.SCREEN.awaiting + ' в чате с ' + moment
+            + '. Прогон стоит на вопросе и продолжится, когда вы ответите.';
+        },
         stopReasonLine: function (reason) { return L10N.ru.SCREEN.stopReason + ': ' + reason; },
         holderLine: function (token, moment) {
           return L10N.ru.SCREEN.holder + ': ' + token + ' с ' + moment + '.';
@@ -880,6 +886,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         serves: 'Serves',
         waitsFor: 'Waits for',
         onCriticalPath: 'On the critical path',
+        awaiting: 'Waiting for your reply',
         G1: 'G1', G2: 'G2', G3: 'G3', G4: 'G4'
       },
       UI: {
@@ -1060,6 +1067,10 @@ globalThis.MAESTRO_LOGIC = (function () {
           return plain
             ? 'Something last changed ' + quiet + ' ago.'
             : 'Last write — ' + quiet + ' ago.';
+        },
+        awaitingNotice: function (moment) {
+          return L10N.en.SCREEN.awaiting + ' in the chat since ' + moment
+            + '. The run is stopped on a question and carries on once you answer.';
         },
         stopReasonLine: function (reason) { return L10N.en.SCREEN.stopReason + ': ' + reason; },
         holderLine: function (token, moment) {
@@ -2042,6 +2053,21 @@ globalThis.MAESTRO_LOGIC = (function () {
     return { token: held.token, since: held.since };
   }
 
+  /**
+   * The moment an active прогон stopped on a question, or null.
+   *
+   * A finished or interrupted run waits for nobody, whatever a stale field
+   * says, and a `since` no reader can parse is no wait at all — the ordinary
+   * silence rule then applies, exactly as for a state written before the field.
+   */
+  function awaitingOf(state) {
+    if (!state || isStopped(state) || state.lifecycle === 'closed') return null;
+    var waiting = state.awaiting;
+    if (!waiting || typeof waiting !== 'object' || typeof waiting.since !== 'string') return null;
+    if (isNaN(Date.parse(waiting.since))) return null;
+    return { since: waiting.since };
+  }
+
   /** The kinds a one-way line may carry, in the order the region lists them. */
   var ONE_WAY_ORDER = ['deleted', 'renamed', 'migration', 'dependency-major'];
 
@@ -2385,6 +2411,10 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     var say = words(language).UI;
     var plain = (register || registerOf(state)) === 'plain';
+    // A прогон stopped on a question is silent on purpose, and however long it
+    // waits it is not stalled: the reader, not the run, owes the next move.
+    var waiting = awaitingOf(state);
+    if (waiting) return { alarming: false, awaiting: true, line: say.awaitingNotice(formatMoment(waiting.since)) };
     var quiet = Math.max(0, now - last);
     var record = longestSilence(marks);
     if (record !== null && quiet > record) {
@@ -3610,6 +3640,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     closureOf: closureOf,
     stopReasonOf: stopReasonOf,
     holderOf: holderOf,
+    awaitingOf: awaitingOf,
     ONE_WAY_ORDER: ONE_WAY_ORDER,
     handoverOf: handoverOf,
     FOLD_AFTER: FOLD_AFTER,
@@ -4340,8 +4371,12 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       opener(row, 'req:' + requirement.id, T.UI.requirementAria(requirement.id), again);
       put(row, 'span', requirement.id, 'id');
       var words = put(row, 'span', null, 'name');
+      // The user's own words lead; the прогон's English title follows them, or
+      // stands alone for a state written before the words were recorded.
       if (detail && detail.quotes.length > 0) put(words, 'span', T.UI.quote(detail.quotes[0]), 'quote');
-      else if (detail && detail.title) put(words, 'span', detail.title, 'quote');
+      if (detail && detail.title) {
+        put(words, 'span', detail.title, detail.quotes.length > 0 ? 'title' : 'quote');
+      }
       if (untraced.ids.indexOf(requirement.id) !== -1) {
         put(words, 'span', T.SCREEN.untraced, 'untraced untraced-' + untraced.tone);
       }

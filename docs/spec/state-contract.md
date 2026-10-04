@@ -16,7 +16,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `dir` | string, the run directory under `.maestro/`, required from contract 7 | preflight | dashboard |
 | `startedAt` | ISO 8601 string | preflight | dashboard |
 | `updatedAt` | ISO 8601 string | preflight | dashboard |
-| `heldBy` | optional `{ token, since }` | preflight | — |
+| `heldBy` | optional `{ token, since }` | preflight | dashboard |
 | `mode` | `full` \| `semi` \| `interview` \| `manual` | preflight | dashboard |
 | `depth` | `strict` \| `normal` \| `deep` | preflight | dashboard |
 | `polish` | boolean | preflight | dashboard |
@@ -26,7 +26,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `stages[]` | list of `{ id, status, startedAt?, finishedAt?, note? }` | preflight | dashboard |
 | `currentStage` | stage id | preflight | dashboard |
 | `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
-| `requirements[]` | list of `{ id, status, reason? }` | manifest | dashboard |
+| `requirements[]` | list of `{ id, status, reason?, title? }` | manifest | dashboard |
 | `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
 | `lifecycle` | `active` \| `closed` in contracts 4–7 | preflight | dashboard |
 | `outcome` | `completed` \| `closed_with_exceptions` \| `stopped_incomplete`, only when closed | acceptance | dashboard |
@@ -34,11 +34,12 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `verification` | versioned verification index, required in contracts 4–7 | preflight | dashboard |
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
-| `oneWay` | optional list of strings, one inward one-way change each | review | acceptance |
+| `oneWay` | optional list of strings, one inward one-way change each | review | acceptance, dashboard |
 | `signals` | optional list of strings, one recorded signal each, appended by build, review, acceptance and polish | preflight | metrics |
 | `tests` | `{ passed, failed }` | build | dashboard |
 | `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–7 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
+| `awaiting` | optional `{ since }`, set while the прогон waits for the user's reply | preflight | dashboard |
 
 **`language` is the second such dial, and it is here for the same reason.** The
 dashboard has to paint its labels and its explanations in one of two languages,
@@ -68,18 +69,33 @@ seeds G1–G4 as `pending`, and the phase each gate follows fills in that gate's
 own status and findings. The column has room for one phase because there is one
 writer; a field with two creators would have no owner.
 
-**`Read by` names readers outside the orchestrator, which is why every row but
-one says `dashboard` and nothing else.** The orchestrator reads its own state
-constantly — on recovery after a compaction, and in the repair phase, which
-learns from `tasks[].status` which таск arrived and by which entrance. Listing
-itself as a reader of what it writes would turn a column about the integration
-point into a list of everywhere the state is opened, and the one thing that
-column has to say is that the dashboard is the only party outside this process
-that reads it.
+**`Read by` names readers outside the orchestrator, which is why nearly every
+row says `dashboard`.** The orchestrator reads its own state constantly — on
+recovery after a compaction, and in the repair phase, which learns from
+`tasks[].status` which таск arrived and by which entrance. Listing itself as a
+reader of what it writes would turn a column about the integration point into a
+list of everywhere the state is opened. The two exceptions name the phase or
+tool that reads the field besides the page: `oneWay` is read by acceptance for
+the отчёт, and `signals` by the metrics tool and by no screen.
 
-`heldBy` is the row that says nothing there, and a dash is the honest cell: its
-only reader is the orchestrator. Writing `dashboard` to keep the column's shape
-would make the column lie about the one thing it exists to say.
+`heldBy` was a dash here until the page began naming the claim inside its raised
+silence notice; it now says `dashboard` because that is now true, not to keep the
+column's shape.
+
+**`awaiting` says the прогон ended its turn on a question.** `since` is the
+moment that turn ended, `Date.parse`-able like every other stamp. It is written
+in the same write that precedes the stop and is absent on the next write after
+the user replies; a closed прогон never carries it, because a finished run waits
+for nobody. It exists so the page can tell a run waiting for its reader from a
+run nobody is driving — the two are equally silent. It is **optional**, and
+absent means the page applies its ordinary silence rule, exactly as for every
+state written before the field existed. `contractVersion` does not move for it.
+
+**`requirements[].title` is one English line naming a требование.** The
+manifest phase writes it beside each entry; it is English for the reason every
+file the прогон writes is. It is **optional** and never the primary text on the
+page: from verification 2 the page leads with the user's own words quoted from
+`sourceClauses`, and shows `title` beneath them, or alone for an older state.
 
 **`heldBy` says which session is driving this прогон, and it is a claim rather
 than a lock.** It carries a short random token the session mints when it opens a

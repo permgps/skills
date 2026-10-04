@@ -132,8 +132,10 @@ it:
 ### 5. Write the statuses into the run state
 
 Every требование gets an entry in `requirements[]` in the run state with status
-`open`. Statuses live in the state, not in the manifest, so the manifest stays
-immutable and the gates have one place to read.
+`open` and a `title`: its manifest line, shortened to one English line of a few
+words. Statuses live in the state, not in the manifest, so the manifest stays
+immutable and the gates have one place to read. The title is for the dashboard's
+row and nothing reads it as the требование's text — `manifest.md` stays that.
 
 A status of `open`, `deferred` or `dropped` requires a recorded reason. At this
 point every требование is `open` with the reason "not yet briefed"; G1 is what
@@ -273,7 +275,7 @@ phase created, the fresh audit and frozen agreement.
 |---|---|
 | `.maestro/<dir>/<YYYY-MM-DD>-brief.md` | the frozen English text, redacted; it grows afterwards by the additions block — the user's words quoted in their own language, each with one line of ours |
 | `.maestro/<dir>/manifest.md` | numbered требования, no statuses and no notes; new rows appended when the user adds one |
-| `.maestro/state.js` | `requirements[]` filled, every entry `open` with a reason |
+| `.maestro/state.js` | `requirements[]` filled, every entry `open` with a reason and a title |
 | verification register | declared references recorded, including unavailable ones |
 | the манифест | shown to the user in the прогон's language, with the original beside it when the two differ |
 

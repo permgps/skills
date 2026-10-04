@@ -12,6 +12,7 @@ import test from 'node:test';
 import { evaluateLogic, scriptBlock } from './dashboard-integrity.ts';
 import { correctedSourceAuditState, controlledState, repairContract6State, strategyReview, v3Attempt, sourceVerifiedState, deferredScopeState, sha256, verifiedState } from '../state/fixtures/verification.ts';
 import { projectState } from '../state/projection.ts';
+import { retrospectiveState } from '../state/fixtures/retrospective.ts';
 import { deriveVerification } from '../state/verification.ts';
 
 const ASSET = 'skills/maestro/assets/dashboard.html';
@@ -23,6 +24,7 @@ interface Logic {
   textDigest: (value: string) => string;
   KNOWN_CONTRACT_VERSION: number;
   runDateOf: (state: unknown) => string | null;
+  awaitingOf: (state: unknown) => { since: string } | null;
   STAGE_ORDER: string[];
   L10N: { ru: Words; en: Words } & Record<string, Words>;
   LANGUAGE_ORDER: string[];
@@ -1595,4 +1597,77 @@ test('an opened row is remembered by key, and toggling never edits the set it wa
   assert.deepEqual(plain(one), { 'task:01': true });
   assert.deepEqual(plain(none), {});
   assert.deepEqual(plain(L.toggled(L.toggled(one, 'req:R01'), 'task:01')), { 'req:R01': true });
+});
+
+test('a прогон stopped on a question is waiting, and the wait is never raised however long it lasts', () => {
+  const state = run({ awaiting: { since: '2026-08-19T10:30:00.000Z' } });
+  const marks = L.collectMarks(state);
+  const notice = L.silenceNotice(state, AT('2026-08-19T14:00:00.000Z'), marks);
+  assert.ok(notice);
+  assert.equal(notice.alarming, false);
+  assert.match(notice.line, /^Ждёт вашего ответа в чате с 2026-08-19 \d\d:\d\d\. /);
+  const english = L.silenceNotice(state, AT('2026-08-19T14:00:00.000Z'), marks, 'plain', 'en');
+  assert.match(english!.line, /^Waiting for your reply in the chat since 2026-08-19 \d\d:\d\d\. /);
+});
+
+test('without awaiting, or with one no reader can parse, the ordinary silence rule applies', () => {
+  const plainRun = run();
+  const raised = L.silenceNotice(plainRun, AT('2026-08-19T11:15:00.000Z'), L.collectMarks(plainRun));
+  assert.equal(raised!.alarming, true);
+  const broken = run({ awaiting: { since: 'after lunch' } });
+  assert.equal(L.awaitingOf(broken), null);
+  assert.equal(L.silenceNotice(broken, AT('2026-08-19T11:15:00.000Z'), L.collectMarks(broken))!.alarming, true);
+});
+
+test('a finished or closed run never shows the wait', () => {
+  assert.equal(L.awaitingOf(run({ awaiting: { since: '2026-08-19T10:30:00.000Z' }, finishedAt: '2026-08-19T10:40:00.000Z' })), null);
+  assert.equal(L.awaitingOf(run({ awaiting: { since: '2026-08-19T10:30:00.000Z' }, lifecycle: 'closed' })), null);
+  assert.equal(L.awaitingOf(run({ awaiting: { since: '2026-08-19T10:30:00.000Z' }, interruptedAt: '2026-08-19T10:40:00.000Z' })), null);
+});
+
+test('the title never replaces the user\'s quoted words', () => {
+  const state = sourceVerifiedState();
+  state.requirements[0] = { ...state.requirements[0]!, title: 'Keep three entries; open on hover' };
+  const detail = L.requirementDetailOf(state, 'R01')!;
+  assert.equal(detail.title, 'Keep three entries; open on hover');
+  assert.equal(detail.quotes.length, 1);
+  const older = bare({ contractVersion: 3, requirements: [{ id: 'R01', status: 'in-spec', title: 'Hero names the product' }] });
+  assert.equal(L.requirementDetailOf(older, 'R01')!.title, 'Hero names the product');
+  assert.equal(L.requirementDetailOf(bare({ requirements: [{ id: 'R01', status: 'in-spec', title: '  ' }] }), 'R01')!.title, null);
+});
+
+test('the reconstructed domtut_copy run renders through every new reader without a throw or a type name', () => {
+  // The fixture is the repository's reconstruction of the run the
+  // retrospective described: 22 таски, one upstream schema task in repair, a
+  // downstream task blocked on it, fifteen defects. It is the most crowded state
+  // this repository holds, which is why it is the end-to-end case here.
+  const state = retrospectiveState() as unknown as Record<string, unknown> & ReturnType<typeof retrospectiveState>;
+  state.lifecycle = 'closed';
+  state.outcome = 'stopped_incomplete';
+  state.stopReason = 'The schema task never closed; 20 repair attempts verified no task';
+  state.finishedAt = '2026-09-29T11:00:00Z';
+  state.debt = { placeholders: ['company phone'], assumptions: ['orders sorted newest first'], emptyEnv: ['DATABASE_URL'] };
+  state.oneWay = ['migration — orders.total renamed — 02 0a0a0a0'];
+
+  const seen: string[] = [];
+  const say = (lines: string[]): void => { seen.push(...lines); };
+  for (const language of ['ru', 'en']) {
+    say([L.runNotice(state, language) ?? '']);
+    for (const item of state.tasks) say(L.describeTask(state, item.id, language));
+    for (const requirement of state.requirements) say(L.describeRequirement(state, requirement.id, language));
+    for (const key of L.EXPLAIN_ORDER) {
+      for (const register of ['normal', 'plain']) say(L.explain(key, state, NOW, L.collectMarks(state), register, language));
+    }
+  }
+  assert.equal(L.stopReasonOf(state), 'The schema task never closed; 20 repair attempts verified no task');
+  assert.equal(L.handoverOf(state).total, 4);
+  assert.deepEqual(plain(L.criticalChain(state.tasks)), ['02', '04', '05']);
+  assert.equal(L.criticalPath(state.tasks), 3);
+  assert.equal(L.requirementDetailOf(state, 'R01')!.defects.length, 15);
+  assert.ok(seen.length > 100);
+  for (const line of seen) {
+    assert.equal(typeof line, 'string');
+    assert.ok(!line.includes('[object Object]'), `a type name reached the page: ${line}`);
+    assert.ok(!line.includes('undefined'), `an absent value reached the page: ${line}`);
+  }
 });
