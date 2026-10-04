@@ -340,26 +340,35 @@ it never had.
    task leaves `repair` for `running` only when no prerequisite named by its
    latest blocked attempt is still open.
 4. An executor returns each check result as one `maestro-execution-return/1`
-   block: invocation, actual exit code, tool and host identity, readiness ID,
-   fingerprint, assertions, captures with hashes, commit, and the failure cause
-   of a failed or unavailable result. It never assigns an execution ID; the
-   orchestrator does at import.
+   block: check ID, result, invocation, actual exit code, tool and host
+   identity, readiness ID, fingerprint, assertions, its red run, captures with
+   hashes, commit, and the failure cause of a failed or unavailable result. The
+   result is `passed`, `failed` or `unavailable`. A skipped or pending test is
+   `unavailable` with cause `setup` or `unavailable_capability`, never
+   `passed`. It never assigns an execution ID; the orchestrator does at import.
 5. A repaired task's review answers two questions separately: is the defect
    verified against its repair criteria, and which parent criteria remain. The
    task becomes `done` only when no open defect and no residual criterion
    remains. Review input lists every path the task's commits touched outside
    its owned files instead of filtering them away.
-6. A detector qualifies before its pass counts: a repair's follow-up check
-   fails on the counterexample and passes after restore; a test-framework
-   exception is never the expected domain failure; the default runner discovers
-   the file and the file holds the claimed suites; the harness forwards every
+6. A detector qualifies before its pass counts: every required check an
+   executor writes is seen failing on one of its named assertions before the
+   implementation lands, against a stub of its Test surface signature or the
+   base (its red run); a repair's follow-up check fails on the counterexample
+   at the parent commit and passes after restore; a test-framework exception
+   is never the expected domain failure; the default runner discovers the
+   file and the file holds the claimed suites; the harness forwards every
    required parameter and the capture key carries route, locale, viewport and
    state; goldens come only from the reference origin. Rules 4–6 are procedure,
    held by review and the bundle's verification procedures; the validator holds
    rules 1–3. It can check that an attempt's commit is among its task's
    commits, but not that `commits` lists every commit an executor returned:
    the state never holds the executor's return, so that comparison is the
-   orchestrator's before review dispatch.
+   orchestrator's before review dispatch. The same is why the red run lives in
+   the return and not in the state. The block's shape, the red run included,
+   is held by `scripts/gates/execution-return.ts` against the template the
+   executor brief ships. Whether the red run truly preceded the implementation,
+   and whether an assertion recomputes it, is review's to judge.
 
 Valid: a readiness record shows `bootstrap: setup_failed` because the
 verification copy denied its own root; the coordinator allows the copy's root,

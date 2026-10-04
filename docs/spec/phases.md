@@ -190,9 +190,12 @@ smallest plan is one таск rather than an exemption from the gate.
 **Each task file states its edges.** It names its Prerequisites, each with the
 таск that produces it and its row in the Seams table of `interfaces.md`. It
 names its Forbidden writes: always `.maestro/`, plus every zone another таск
-owns. It names its Completion artifacts, all inside the files it owns. The
-Seams table gives each seam its producer, consumers, integration owner and
-integration check.
+owns. It names its Completion artifacts, all inside the files it owns. It
+names its Test surface: the signatures from `interfaces.md` its tests go
+through, never an internal module. The Seams table gives each seam its
+producer, consumers, integration owner and integration check. Fewer seam rows
+are better, because each is a contract two executors must both meet. The user
+never confirms a seam: they cannot judge one.
 
 **Each domain word is named once.** Before the Seams, `interfaces.md` carries
 a Terms table. Its columns are term, meaning, words to avoid, and the user's
@@ -203,7 +206,9 @@ with another meaning, as an undefined term. The table exists because a task
 file once said «a running score» without saying what it counts, and the README
 built from it described a tally the page does not keep.
 
-Every task-file reader sees one таск. A plan-consistency reader sees all of them
+Every task-file reader sees one таск. A task file with no Test surface row is
+one of its findings, because the executor would otherwise choose what its tests
+call. A plan-consistency reader sees all of them
 with `interfaces.md` and without `spec.md` or the манифест. It reports what
 lives between таски: collisions, unowned artifacts or writers, completion
 artifacts outside allowed writes, prerequisites with no upstream producer, a
@@ -294,6 +299,33 @@ exercises the build next. An item of *done means* is phrased so that this is
 possible; one that cannot be is a finding against the task file, caught by the
 reader standing where the executor will stand, which is the last moment it is
 free.
+
+### Tests An Executor Writes
+
+A check that was never seen failing can pass by construction. On a first
+build nothing used to catch that: fail → pass was asked of repairs only. Four
+rules close it, all in the executor brief:
+
+- **Red observed.** Every required check an executor writes is seen failing on
+  one of its named assertions before the implementation lands. The red run is
+  made against a stub of the Test surface signature or against the base, so an
+  import error or a harness crash never counts. A repair's red run is the
+  counterexample at the parent commit. The run is recorded on the return
+  block's `red:` field ([`verification.md`](verification.md), Attribution and
+  Dispatch).
+- **Expected values come from the task file.** They are taken from its literal
+  or oracle, never recomputed the way the code computes them. Tests go through
+  the Test surface, not the internals. Only external services, time and
+  randomness are mocked.
+- **A skipped or pending test is not a pass.** A worktree holds only tracked
+  files, so a test that needs an ignored fixture or a credential can skip itself
+  and still exit green. Such a check is `unavailable` with its cause.
+- **Each таск names its test surface** (Task Granularity above).
+
+The reviewer counts a missing red run, an assertion that recomputes the
+implementation, and a skip counted as a pass as blocking check-quality
+findings. Whether a red run truly came first is the reviewer's to judge against
+the diff. No check can see that.
 
 ### Commits
 

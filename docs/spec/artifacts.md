@@ -94,8 +94,9 @@ measuring against it would be judging an executor by words it never saw.
 
 Each task file contains the relevant user-contract and reference excerpts, the
 observable obligation IDs and check IDs it serves, its implementation owner
-when implementation is required, the check execution owner, variants, and
-integration prerequisites. `interfaces.md` carries shared boundaries, a Terms
+when implementation is required, the check execution owner, variants,
+integration prerequisites, and its Test surface: the signatures from
+`interfaces.md` its tests go through. `interfaces.md` carries shared boundaries, a Terms
 table naming each domain word once, and the Seams table; the
 executor does not receive the unrelated full specification. A verification-only
 task can own an execution without claiming implementation files. G3's

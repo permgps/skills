@@ -14,6 +14,23 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**Executors write tests that can fail.** A required check an executor writes now
+has to be seen failing before it counts as passing. It fails on one of its named
+assertions, against a stub of the таск's Test surface signature or the base,
+before the implementation lands. The executor's `maestro-execution-return/1`
+block is now a labelled template with an explicit `result` and a `red:` run.
+`scripts/gates/execution-return.ts` reads it and refuses a block with no red run,
+a red run on no named assertion, a skipped or pending test reported as a result,
+and a passed result with a skipped assertion. A skip is `unavailable` with its
+cause. Expected values come from the task file's literal or oracle and are never
+recomputed the way the code computes them. Tests go through the Test surface,
+and only external services, time and randomness are mocked. Every task file
+names its Test surface, and the task reader reports a missing one. The reviewer
+counts a missing red run, a recomputing assertion and a skip counted as a pass
+as blocking. `npm run bundle` holds the text as `TESTING_ANCHORS` and runs the
+shipped template through the parser. The state contract is unchanged: the red
+run lives in the return.
+
 **The briefing proposes, and the user disposes.** Every question now arrives
 with one option marked as the прогон's choice, with its reason in one clause. It
 is the same answer `full` would self-brief. A reply like «как советуешь» or a
