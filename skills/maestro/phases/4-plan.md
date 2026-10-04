@@ -154,7 +154,8 @@ running at the same time agree without talking to each other.
 
 One file per таск at `.maestro/<dir>/tasks/NN-<slug>.md`, numbered in dependency
 order. **An executor is given its task file and `interfaces.md`, and nothing
-else** — it does not get `spec.md`. Anything from the spec the таск needs must
+else** — it does not get `spec.md`. A dependent таск is also handed its
+blockers' `D##` rows, which step 5 says it must never need. Anything from the spec the таск needs must
 therefore be *in* the task file.
 
 Each file carries:

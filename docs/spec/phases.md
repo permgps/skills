@@ -12,8 +12,8 @@ right thing was built.
 | manifest | Manifest | yes | бриф from the user, redacted source snapshots and independent audit return | `brief.md` — written once, then grown by its additions block — and `manifest.md` |
 | briefing | Briefing | yes | `manifest.md`, declared references, `prior.md` | `answers.md`, neutral `reference.md` |
 | spec | Specification | yes | `manifest.md`, `answers.md`, raw reference, `prior.md` | `spec.md`, obligation and source coverage map |
-| plan | Plan | yes | `spec.md`, obligations and checks | `tasks/`, `interfaces.md`, ownership map |
-| build | Build | yes | task files, relevant raw reference, `interfaces.md` | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
+| plan | Plan | yes | `spec.md`, obligations and checks, the repository's test, typecheck and lint configuration | `tasks/`, `interfaces.md`, ownership map |
+| build | Build | yes | task files, relevant raw reference, `interfaces.md`, blockers' `D##` rows | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
 | review | Review | yes | task files, obligations, evidence, `interfaces.md`, project code | `reviews/`, findings and check limits |
 | acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md` |
 | polish | Доводка | no | `reference.md`, project code after required parity | optional polished build, `tasks/` of its own |
@@ -176,6 +176,32 @@ Three rules decide the cut, and they outrank the table:
    reference evidence. A separate reader receives the same bounded inputs and
    reports missing execution dependencies before the task runs.
 
+**Four preferences shape the cut inside those rules.** Each is a preference the
+plan may decline with a stated reason, never a hard rule, and every declined one
+is named with its reason in what the user is shown at the end of the phase.
+
+- **A thin path end to end.** When zones allow, a таск owns a narrow path through
+  every layer it touches, and its *done means* is something that visibly works.
+  Strict vertical slicing fights parallel width, so a cut resting on the Seams
+  table is legitimate. A *done means* item that needs the output of a таск this
+  one does not depend on is not: it can be met only against a stand-in.
+- **A prefactor to unlock width, in existing code only.** Rule 2 serialises
+  таски that share a file or merges them into one. A behaviour-preserving
+  wave-1 таск may instead split the shared file so later таски own disjoint
+  zones. It traces to the требования of the таски it unblocks and adds no
+  behaviour, so the specification's depth limits hold. It is cut only when an
+  existing check already covers the shared file's behaviour, and that check is
+  its *done means*, passing before and after unchanged. A check the prefactor
+  wrote would pass on the old code at once and prove nothing, so with no
+  existing check the prefactor is declined and the таски are serialised.
+- **Expand, migrate, contract.** A change across many files — a rename, a
+  signature — is three таски in that order: expand adds the new form beside the
+  old, each migrate таск moves a disjoint set of callers, and contract removes
+  the old form after every migrate. Expand and contract share the defining file
+  and are ordered through the chain, which is what rule 2 asks.
+- **Project conventions written once.** `interfaces.md` opens with them, so no
+  executor rediscovers the commands.
+
 A tiny project produces **one** таск carrying the whole spec, and that is a valid
 plan. Cutting one requirement into three таски to look thorough costs three
 contexts and three reviews to build what one executor would have finished in one
@@ -197,8 +223,16 @@ producer, consumers, integration owner and integration check. Fewer seam rows
 are better, because each is a contract two executors must both meet. The user
 never confirms a seam: they cannot judge one.
 
-**Each domain word is named once.** Before the Seams, `interfaces.md` carries
-a Terms table. Its columns are term, meaning, words to avoid, and the user's
+**The project's commands are written once.** `interfaces.md` opens with a
+Project conventions table of five rows: the test, typecheck and lint commands,
+where tests live, and one existing test file as prior art. Values come from the
+repository as it is; a row with nothing to name says `none — <why>`, and in a
+new project prior art is the таск that writes the first test. Task files cite
+the section and never restate a command, so a task whose command disagrees with
+it is the plan-consistency reader's stale instruction.
+
+**Each domain word is named once.** After the conventions and before the Seams,
+`interfaces.md` carries a Terms table. Its columns are term, meaning, words to avoid, and the user's
 wording quoted from the original-language source clause. Terms that an earlier
 прогон's memory block carries are taken over unless the манифест changed their
 meaning. The task-file reader counts a word to avoid, or a listed term used
@@ -206,9 +240,14 @@ with another meaning, as an undefined term. The table exists because a task
 file once said «a running score» without saying what it counts, and the README
 built from it described a tally the page does not keep.
 
-Every task-file reader sees one таск. A task file with no Test surface row is
-one of its findings, because the executor would otherwise choose what its tests
-call. A plan-consistency reader sees all of them
+Every task-file reader sees one таск: the task file and `interfaces.md`,
+declared in its brief and held to the reader table in [`gates.md`](gates.md)
+like every other reader. A task file with no Test surface row is one of its
+findings, because the executor would otherwise choose what its tests call. So is
+a *done means* item that needs the output of a таск outside its *Depends on*,
+which only a stub could meet. A dependent таск is later also handed its
+blockers' `D##` rows; those do not exist when the reader reads, so a task file
+must be buildable without them. A plan-consistency reader sees all of them
 with `interfaces.md` and without `spec.md` or the манифест. It reports what
 lives between таски: collisions, unowned artifacts or writers, completion
 artifacts outside allowed writes, prerequisites with no upstream producer, a
@@ -355,6 +394,17 @@ what it is given. **This is the only case where one таск is handed over twic
 The handoff exists for surprises. A plan that produces one per таск cut its
 таски too large, and the granularity rules above are what to fix, not the
 handoff.
+
+### What A Dependent Таск Is Handed
+
+A таск with blockers is handed, beside its task file and `interfaces.md`, the
+`D##` rows its direct blockers recorded in `discovered-interfaces.md`. Each row
+names the таск it came from, which is how they are selected. The rows were
+written for exactly this reader and would otherwise reach no one. They are
+facts, not contract: where a row disagrees with `interfaces.md`, the executor
+builds to `interfaces.md` and names the row in its return, and the build's
+recorded-divergence door routes the disagreement. The review still judges the
+таск against its task file and `interfaces.md` alone.
 
 ### A таск That Does Not Come Back Done
 

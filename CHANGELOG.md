@@ -14,6 +14,24 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+**The plan cuts for width and for something to show.** The plan phase now states
+four preferences, and it may decline any of them with a reason it names to the
+user. The first is a thin path end to end, so a таск's *done means* is something
+that visibly works. The second is a prefactor: a wave-1 таск in existing code
+that splits a shared file so later таски can run side by side. It is cut only
+when an existing check already covers that file's behaviour. The third cuts a
+many-file rename into expand, migrate and contract. The fourth opens
+`interfaces.md` with a Project conventions table: the test, typecheck and lint
+commands, where tests live, and one test file as prior art. Task files cite it,
+and the plan-consistency reader checks commands against it. A dependent таск is
+now handed the `D##` rows its blockers recorded, each naming the таск it came
+from. The rows are facts, not contract, and `interfaces.md` still wins. The task
+reader reports a *done means* item that needs the output of a таск outside its
+*Depends on*, which only a stub could meet. It also declares its inputs in its
+brief, so `npm run readers` holds it to a new `G3 task` row. `npm run bundle`
+holds the text as `CUT_ANCHORS`. The state contract and `SKILL.md` are
+unchanged.
+
 **Executors write tests that can fail.** A required check an executor writes now
 has to be seen failing before it counts as passing. It fails on one of its named
 assertions, against a stub of the таск's Test surface signature or the base,
