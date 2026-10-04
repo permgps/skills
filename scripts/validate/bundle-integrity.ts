@@ -271,6 +271,50 @@ export const BRIEFING_ANCHORS: readonly Anchor[] = [
     why: 'a reply that did not understand leaves the stop open and re-asks with the premise' },
 ];
 
+/**
+ * The literal text that carries «executors write tests that can fail».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. The executor brief says
+ * how a test is written and that a check is seen red before it counts green;
+ * the reviewer brief makes the three ways round that blocking; the plan phase
+ * and the task reader give every таск the surface its tests go through; the
+ * verification procedures refuse the import. A file that loses its line keeps
+ * the others intact and the rule broken. What the return block itself must
+ * carry is held by `scripts/gates/execution-return.ts`, against the template the
+ * executor brief ships. Whether a red run truly came first, and whether an
+ * assertion recomputes the implementation, are the reviewer's judgement, so no
+ * anchor stands for them.
+ */
+export const TESTING_ANCHORS: readonly Anchor[] = [
+  { file: 'prompts/executor.md', literal: 'format: maestro-execution-return/1',
+    why: 'the return block is the one shape the import step and the parser read' },
+  { file: 'prompts/executor.md', literal: 'Red observed',
+    why: 'a check never seen failing can pass by construction' },
+  { file: 'prompts/executor.md', literal: 'never recomputed the way the code computes them',
+    why: 'an expected value recomputed like the code agrees with it whatever the code does' },
+  { file: 'prompts/executor.md', literal: 'only external services, time and randomness',
+    why: 'a mock of the code under test tests the mock' },
+  { file: 'prompts/executor.md', literal: 'A skipped or pending test is not a pass',
+    why: 'a worktree lacks ignored fixtures and credentials, so a test can skip itself and exit green' },
+  { file: 'prompts/reviewer.md', literal: 'no red observed',
+    why: 'a missing red run is a blocking check-quality finding' },
+  { file: 'prompts/reviewer.md', literal: 'recomputes the implementation',
+    why: 'an assertion that recomputes the implementation is a blocking check-quality finding' },
+  { file: 'prompts/reviewer.md', literal: 'a skipped or pending test counted as passed',
+    why: 'a skip counted as a pass is a blocking check-quality finding' },
+  { file: 'prompts/task-reader.md', literal: 'A missing test surface',
+    why: 'the task reader holds every task file to naming what its tests call' },
+  { file: 'phases/4-plan.md', literal: '| Test surface |',
+    why: 'every task file names the interface its tests go through' },
+  { file: 'phases/4-plan.md', literal: 'Fewer seam rows are better',
+    why: 'every seam is a contract two executors must both meet, and the user never confirms one' },
+  { file: 'references/verification-procedures.md',
+    literal: 'executor writes is seen failing on one of its named assertions',
+    why: 'detector qualification covers a first build, not only a repair' },
+  { file: 'references/verification-procedures.md', literal: 'skipped or pending test reported as `passed`',
+    why: 'the import step refuses a skip reported as a pass' },
+];
+
 /** Every anchor in `anchors` the documents fail to carry, as violations under `check`. */
 function missingAnchors(
   byFile: ReadonlyMap<string, string>,
@@ -474,6 +518,18 @@ export async function checkBundle(
   // Scout grills by its own step file.
   if (byFile.has('phases/2-briefing.md') && skill.includes('phases/2-briefing.md')) {
     for (const v of missingAnchors(byFile, BRIEFING_ANCHORS, 'briefing')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- executors write tests that can fail -----------------------------------
+  // Only a bundle with an executor brief builds anything; Scout has none. The
+  // procedures live under references/, which the link pass above never reads,
+  // so the one file this check needs from there is read for it alone.
+  if (byFile.has('prompts/executor.md')) {
+    const testing = new Map(byFile);
+    const procedures = 'references/verification-procedures.md';
+    const body = await readFile(path.join(bundleDir, procedures), 'utf8').catch(() => '');
+    testing.set(procedures, body);
+    for (const v of missingAnchors(testing, TESTING_ANCHORS, 'testing')) add(v.check, v.file, v.line, v.message);
   }
 
   if (skill.includes('<!-- maestro:delegation:native-explicit -->') || skill.includes('<!-- maestro:runtime:node -->')) {

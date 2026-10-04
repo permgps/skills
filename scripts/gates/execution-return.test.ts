@@ -88,17 +88,18 @@ test('a red run that failed on no assertion of the block is refused', () => {
   assert.match(violations[0]!.message, /not red/);
 });
 
-test('a red run against the commit that passes is refused, abbreviated or not', () => {
-  const full = '4f2c9e1d0b7a6c5e4f3a2b1c0d9e8f7a6b5c4d3e';
-  for (const against of ['4f2c9e1', full]) {
+test('a red run that names neither a stub, a base nor a parent is refused', () => {
+  for (const against of ['4f2c9e1', 'the implementation', 'base', 'stub of']) {
     const red = RED_RUN.map(line => line.startsWith('  against:') ? `  against: ${against}` : line);
-    assert.deepEqual(rules(block({ red, commit: full })), ['red-invalid'], against);
+    assert.deepEqual(rules(block({ red })), ['red-invalid'], against);
   }
 });
 
-test('a red run against the base commit is accepted', () => {
-  const red = RED_RUN.map(line => line.startsWith('  against:') ? '  against: 1a2b3c4' : line);
-  assert.deepEqual(check(block({ red })), []);
+test('a red run against the base commit, or a repair\'s parent commit, is accepted', () => {
+  for (const against of ['base 1a2b3c4', 'parent 9f8e7d6c5b4a']) {
+    const red = RED_RUN.map(line => line.startsWith('  against:') ? `  against: ${against}` : line);
+    assert.deepEqual(check(block({ red })), [], against);
+  }
 });
 
 test('a red capture without a SHA-256 is refused', () => {

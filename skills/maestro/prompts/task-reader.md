@@ -39,7 +39,7 @@ source inspection for required interaction evidence has a finding.
 
 ## What Is A Finding
 
-Five shapes, and every one of them is about these two documents rather than
+Six shapes, and every one of them is about these two documents rather than
 about the project:
 
 - **A contradiction.** The task file requires two things that cannot both hold,
@@ -63,6 +63,10 @@ about the project:
   its expected behavior, raw oracle provenance, required check/variant, or
   execution owner; or it asks for integrated evidence before its dependency
   can mount the component. Name the missing ID or prerequisite.
+- **A missing test surface.** The task file has no *Test surface* row, so the
+  executor would have to choose what its tests call. Quote the *Boundaries*
+  row instead. A row naming something `interfaces.md` does not carry is the
+  name finding above.
 
 Each finding is:
 

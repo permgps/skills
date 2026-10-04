@@ -67,6 +67,25 @@ as the one this result supersedes. Do not declare `passed` from module signature
 metadata, a synthetic event, or a screenshot whose required interaction was
 never exercised.
 
+## Tests You Write
+
+- **Red observed.** Before your implementation lands, run every required check
+  you write and see it fail on one of its named assertions. Write a stub of
+  the signature your task file's *Test surface* names first, so the run
+  reaches the assertion: an import error, a missing module or a harness crash
+  is not red. Record that run on the block's `red:` field. For a check you only
+  ran and did not write, write `red: not applicable — existing check <path>`.
+- Expected values come from your task file's literal or oracle and are
+  never recomputed the way the code computes them. A test that repeats the
+  implementation's arithmetic agrees with it by construction.
+- Tests go through your *Test surface*, not the internals.
+- Mock only external services, time and randomness.
+- **A skipped or pending test is not a pass.** A worktree holds only tracked
+  files, so a test that needs an ignored fixture or a credential can skip
+  itself and still exit green. Report that check `unavailable` with its cause,
+  `setup` for a fixture or credential the workspace lacks, and name the
+  skipped tests in its limitation.
+
 ## Your Output
 
 Text, in five parts. The orchestrator writes the run's artifacts from it, so
@@ -84,14 +103,41 @@ anything you leave out is lost.
    attention.
 5. **Check results and captures**, one record per owned check in the shape
    above, each as one fenced block that begins with the line
-   `format: maestro-execution-return/1` and carries, in this order: checkId,
-   invocation, the actual exit code, tool and host identity, the readiness ID
-   from your brief, fingerprint, assertions with their results, captures as
-   path and SHA-256, the commit that holds the code it ran against, and for a
-   failed or unavailable result its failure cause. A block missing a field is
-   an incomplete return, never a partial pass. State the explicit limitation for an unavailable check. Captures
-   remain in the task-owned location until the orchestrator verifies and imports
-   them; you never write `.maestro/`.
+   `format: maestro-execution-return/1` and carries the labels of this
+   template, in this order — the values here are an example:
+
+   ```text
+   format: maestro-execution-return/1
+   checkId: C03
+   result: passed
+   invocation: node --test tests/cart.test.ts
+   exitCode: 0
+   tool: node --test, Node 22.18.0
+   host: darwin-arm64, local workspace
+   readinessId: RD01
+   fingerprint: reference, build, data, runtime, acceptanceInput, relevantPaths and inputHashes, as your brief names them
+   assertions:
+   - total includes the delivery fee: passed
+   red:
+     against: stub of cartTotal(items: Item[]): number
+     invocation: node --test tests/cart.test.ts
+     exitCode: 1
+     failedAssertion: total includes the delivery fee
+     capture: captures/C03-red.txt sha256 2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+   captures:
+   - captures/C03.txt sha256 fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9
+   commit: 4f2c9e1
+   ```
+
+   `result` is `passed`, `failed` or `unavailable`, and nothing else. A
+   failed or unavailable result adds `failureCause:` (`product`, `test`,
+   `setup` or `unavailable_capability`). An unavailable one adds
+   `limitation:` and writes `red: not applicable — unavailable`. `against`
+   is `stub of <signature>`, `base <commit>` or, for a repair,
+   `parent <commit>`. A block missing a field is an incomplete return, never a
+   partial pass. State the explicit limitation for an unavailable check.
+   Captures remain in the task-owned location until the orchestrator verifies
+   and imports them; you never write `.maestro/`.
 
 ## If You Cannot Finish
 
@@ -153,7 +199,8 @@ diagnosis/prerequisite is unavailable; review/acceptance decides pass later.
 Under contract 6 a repair brief names one defect: its counterexample, the
 parent таск, the repair criteria as check IDs, the residual parent criteria,
 any foreign prerequisites, and the expected progress. Make the counterexample
-fail before your change and pass after it, through those checks. Do not touch
+fail before your change and pass after it, through those checks. That failure
+is each check's red run: `against: parent <commit>`. Do not touch
 the residual criteria unless the brief schedules them; do not claim the таск is
 finished while any remain. If the defect cannot be repaired because an upstream
 таск or defect is still open, stop and return `prerequisite_blocked` naming it

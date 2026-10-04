@@ -88,7 +88,9 @@ running at the same time agree without talking to each other.
 - It ends with a **Seams** table — seam, producer task, consumer tasks,
   integration owner, integration check — one row per route, DTO, migration,
   port or file that one таск produces and another consumes. A seam with no
-  row is a seam two executors will each guess at.
+  row is a seam two executors will each guess at. Fewer seam rows are better:
+  each row is a contract two executors must both meet. The user never confirms
+  a seam, because they cannot judge one.
 
 ### 4. Write the task files
 
@@ -107,6 +109,7 @@ Each file carries:
 | User contract and authority | exact redacted request/addition quotations with their SRC/CL IDs and source digest; neutral raw reference locations and conditions, and approved deviations; no unrelated spec or rationale |
 | Verification map | obligation/check IDs, observable behavior, implementation owner if needed, execution owner, integration prerequisites, and applicable variants |
 | Boundaries | which files this таск owns, and which signatures from `interfaces.md` it must meet |
+| Test surface | the signatures from `interfaces.md` this таск's tests go through — never an internal module |
 | Done means | what the executor checks before returning, in terms it can check |
 | Depends on | the таск ids that must finish first, or none; execution-only tasks may have no implementation files |
 | Prerequisites | each thing this таск consumes, named with the таск that produces it and its row in the Seams table of `interfaces.md` |

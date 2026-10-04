@@ -202,15 +202,12 @@ export function parseExecutionReturns(markdown: string): ExecutionReturnBlock[] 
   return blocks;
 }
 
-// Two commit spellings name the same commit when one abbreviates the other.
-function sameCommit(a: string, b: string): boolean {
-  const left = a.trim().toLowerCase();
-  const right = b.trim().toLowerCase();
-  if (left === '' || right === '') return false;
-  if (left === right) return true;
-  const shorter = left.length < right.length ? left : right;
-  return shorter.length >= 7 && /^[0-9a-f]+$/.test(shorter) && (left.startsWith(right) || right.startsWith(left));
-}
+// What a red run may have run against: a stub of the Test surface signature,
+// the base the change starts from, or a repair's parent commit. Comparing it
+// with the block's `commit` was the alternative, and it fails: an executor does
+// not commit, so that field can name the very base a legitimate red ran on.
+// Whether the run truly came first is the reviewer's, against the diff.
+const RED_AGAINST = /^(?:stub of\s+\S|base\s+[0-9a-f]{7,40}\b|parent\s+[0-9a-f]{7,40}\b)/i;
 
 type Finding = { rule: string; message: string };
 
@@ -257,11 +254,10 @@ function redFindings(block: ExecutionReturnBlock, result: string): Finding[] {
       + 'a missing module or a harness crash is not red; name the assertion the check failed on' });
   }
 
-  const commit = block.labels.get('commit') ?? '';
-  if (run.against !== null && sameCommit(run.against, commit)) {
+  if (run.against !== null && run.against !== '' && !RED_AGAINST.test(run.against)) {
     findings.push({ rule: 'red-invalid', message:
-      `the "red:" run is against ${run.against}, the commit that passes — red is seen before the implementation `
-      + 'lands, against a stub of the Test surface signature or the base commit' });
+      `the "red:" run is against "${run.against}" — red is seen before the implementation lands; write `
+      + '"stub of <signature from interfaces.md>", "base <commit>" or, for a repair, "parent <commit>"' });
   }
 
   if (run.capture !== null && !SHA256.test(run.capture.sha256)) {

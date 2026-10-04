@@ -102,8 +102,9 @@ runtime/acceptanceInput/relevantPaths/inputHashes), invocation, tool, host,
 executor, executedAt, assertions [{name,result,evidenceIds}], evidenceIds,
 task-local captures [{id,path,sha256,mediaType,capturedAt}], optional limitation.
 The executor returns these as one `format: maestro-execution-return/1` block
-per check, adding the actual exit code, readinessId, commit and, for a failed or
-unavailable result, failureCause; it never invents an execution ID. The
+per check, adding the actual exit code, readinessId, its `red:` run, commit and,
+for a failed or unavailable result, failureCause; the executor brief's template
+is the one shape. It never invents an execution ID. The
 orchestrator assigns execution IDs and seals captures before publication.
 
 Valid: save → stop owned server/process → start by documented command → reopen
@@ -149,9 +150,13 @@ every test by default. A selected control cannot be silently skipped.
    finding; fix the check via its owner, then run new controls. Unavailable →
    limitation and incomplete. Never append control runs to normal executions.
 
-Detector qualification, for every repair's follow-up checks and every check a
-control selects: the check fails on the counterexample, then passes once the
-repair is restored (fail → restore → pass). A test-framework exception —
+Detector qualification, for every required check an executor writes, every
+repair's follow-up checks and every check a control selects. A check an
+executor writes is seen failing on one of its named assertions before the
+implementation lands, against a stub of its Test surface signature or the base:
+its red run. A repair's red run is the counterexample at the parent commit; the
+check fails on the counterexample, then passes once the repair is restored
+(fail → restore → pass). A test-framework exception —
 assertion error, timeout, harness crash — is never caught as the expected domain
 failure. Confirm the default runner discovers the file and that the file holds
 the suites the result claims. Confirm the harness forwards every required
@@ -174,6 +179,8 @@ main identity or invalid evidence. DEBUG: safe fixture/digest/command identity,
 never credentials or raw user text. No summary you author substitutes for an
 actual independent/executor return. Missing return stays incomplete. A return
 that is not one `maestro-execution-return/1` block per check, or whose commit
-is not among the таск's commits, is not imported. INFO the review verdict of a
+is not among the таск's commits, is not imported. Nor is a block with no red
+run and no allowed `red: not applicable`, or a skipped or pending test reported
+as `passed`: that test is `unavailable` with its cause. INFO the review verdict of a
 repaired таск with `{ defectVerified, residualCount }`; WARN a detector that
 fails qualification.

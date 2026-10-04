@@ -16,10 +16,12 @@ import {
   MEMORY_ANCHORS,
   procedureSection,
   findRelativeLinks,
+  TESTING_ANCHORS,
   parseFrontmatter,
   type Violation,
 } from './bundle-integrity.ts';
 import { checkAnswers, parseAnswers } from '../gates/answers.ts';
+import { checkExecutionReturns, parseExecutionReturns } from '../gates/execution-return.ts';
 
 const FRONTMATTER = `---
 name: maestro
@@ -599,4 +601,77 @@ test('the shipped template without its Chosen line is exactly one G1 finding', a
   const findings = checkAnswers(parseAnswers(withoutChosen));
   assert.equal(findings.length, 1);
   assert.equal(findings[0]?.requirementId, 'R03');
+});
+
+// --- executors write tests that can fail --------------------------------------
+
+const SHIPPED_EXECUTOR = fileURLToPath(new URL('../../skills/maestro/prompts/executor.md', import.meta.url));
+
+test('every testing anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  await withShippedCopy(async copy => {
+    for (const anchor of TESTING_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'testing'), []);
+  });
+});
+
+test('the executor brief losing its skip line is the one finding, named on the executor brief', async () => {
+  await withShippedCopy(async copy => {
+    const executor = path.join(copy, 'prompts', 'executor.md');
+    const body = await readFile(executor, 'utf8');
+    await writeFile(executor, body.replace('A skipped or pending test is not a pass', 'Skipped tests are fine'), 'utf8');
+
+    const violations = await checkBundle(copy);
+    assert.equal(violations.length, 1, JSON.stringify(violations));
+    assert.equal(violations[0]?.check, 'testing');
+    assert.equal(violations[0]?.file, path.join('prompts', 'executor.md'));
+    assert.match(violations[0]?.message ?? '', /skip itself and exit green/);
+  });
+});
+
+test('the plan phase losing its Test surface row is reported on the plan phase', async () => {
+  await withShippedCopy(async copy => {
+    const plan = path.join(copy, 'phases', '4-plan.md');
+    const body = await readFile(plan, 'utf8');
+    const row = body.split('\n').find(line => line.startsWith('| Test surface |'));
+    assert.ok(row);
+    await writeFile(plan, body.replace(`${row}\n`, ''), 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'testing');
+    assert.deepEqual(violations.map(v => v.file), [path.join('phases', '4-plan.md')]);
+  });
+});
+
+test('the verification procedures losing the first-build red rule are reported, though no link pass reads them', async () => {
+  await withShippedCopy(async copy => {
+    const procedures = path.join(copy, 'references', 'verification-procedures.md');
+    const body = (await readFile(procedures, 'utf8')).replace(/\s+/g, ' ');
+    await writeFile(procedures, body.replace('executor writes is seen failing on one of its named assertions', 'executor writes passes'), 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'testing');
+    assert.deepEqual(violations.map(v => v.file), [path.join('references', 'verification-procedures.md')]);
+  });
+});
+
+/** The fenced return block part 5 of the shipped executor brief prescribes. */
+async function shippedReturnTemplate(): Promise<string> {
+  return readFile(SHIPPED_EXECUTOR, 'utf8');
+}
+
+test('the return template the executor brief ships passes the return-block parser', async () => {
+  const blocks = parseExecutionReturns(await shippedReturnTemplate());
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0]?.red?.kind, 'run');
+  assert.deepEqual(checkExecutionReturns(blocks, 'prompts/executor.md'), []);
+});
+
+test('the shipped return template without its red run is exactly one red-missing violation', async () => {
+  const lines = (await shippedReturnTemplate()).split('\n');
+  const start = lines.findIndex(line => line.trim() === 'red:');
+  assert.ok(start > 0, 'prompts/executor.md carries no red: block in its template');
+  let end = start + 1;
+  while (/^\s{5,}\S/.test(lines[end] ?? '')) end += 1;
+  lines.splice(start, end - start);
+  const violations = checkExecutionReturns(parseExecutionReturns(lines.join('\n')), 'prompts/executor.md');
+  assert.deepEqual(violations.map(v => v.check), ['red-missing']);
 });

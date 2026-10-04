@@ -128,7 +128,17 @@ assertion because unit checks pass. Orchestrator routes findings; you edit nothi
 ## Detector Qualification
 
 A passing check proves something only if it could have failed. For each
-repair-criteria or required check whose evidence you review, a finding when:
+repair-criteria or required check whose evidence you review, a blocking
+check-quality finding when:
+- a required check the executor wrote has no red observed: no `red:` run, a
+  red run that failed on no named assertion, or a red run against the
+  implementation itself; or a `red: not applicable — existing check <path>`
+  whose path the таск's diff added;
+- an assertion recomputes the implementation: its expected value is derived
+  the way the code derives it, not taken from the task file's literal or
+  oracle;
+- a skipped or pending test counted as passed, where it should be
+  `unavailable` with its cause;
 - a repair's follow-up check has no fail → restore → pass control: failing on
   the counterexample, passing once the repair is restored;
 - a test catches a test-framework exception (assertion error, timeout, harness

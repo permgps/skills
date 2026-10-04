@@ -135,7 +135,9 @@ For each таск that returns done, in this order:
     seal them, and add the execution/evidence records to the same state
     candidate. Publish through `sync.mts --publish` only after validation.
     Preserve an unavailable or failed result as such; missing capture or hash
-    rejects a passing claim. Keep earlier executions immutable after replay.
+    rejects a passing claim. A block the verification procedures refuse to
+    import goes back to the executor as incomplete, never in as a pass. Keep
+    earlier executions immutable after replay.
 2. **Merge its worktree back**, if it had one.
 3. **Commit**, one commit per finished таск. A прогон survives a compaction and
    a crash by what is committed, and the review phase judges each таск against
