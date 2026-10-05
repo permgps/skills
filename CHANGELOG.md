@@ -14,6 +14,11 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+## v0.0.13-alpha — 2026-10-05
+
+The second прогон in one project. `CONTRACT_VERSION` stays `7`; a closed run's
+last state now also lives in its own folder.
+
 - **A second прогон can start in a project whose last run closed.** `state.js`
   is one per project, and `--publish` judged any state on disk as the same
   run: the closed run's holder token, its fixed `runId`, `slug` and
