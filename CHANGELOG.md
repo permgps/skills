@@ -14,6 +14,12 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+## v0.0.12-alpha — 2026-10-05
+
+The second fix found by the прогон that could not close: a rule added after its
+history was published no longer refuses that history. `CONTRACT_VERSION` stays
+`7`; no published state changes shape.
+
 - **A repeat repair published before the diagnosis shape stays valid.** The
   ranked-hypotheses rule was checked over the whole state, so a run whose
   repeat attempt was accepted by an earlier runtime with a prose diagnosis was
