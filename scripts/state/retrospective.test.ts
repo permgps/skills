@@ -163,7 +163,9 @@ function schemaRepeat(diagnosis: { hypothesis: string; diagnosis: string }): Ret
 test('refused: a repeated repair whose diagnosis names a single hypothesis is sent back', () => {
   const state = schemaRepeat({ hypothesis: 'The DTO still carries the old total field',
     diagnosis: 'H1: The DTO still carries the old total field — falsified by: the renamed field in the generated DTO' });
-  assert.match(messages(state), /repairAttempts\[RA-2\]: a repeat repair's diagnosis names 1 hypothesis; send it back to the diagnostician for three to five ranked hypotheses/);
+  const prior = structuredClone(state);
+  prior.verification!.repairAttempts = prior.verification!.repairAttempts.filter(item => item.id === 'RA-1');
+  assert.match(transition(prior, state), /repairAttempts\[RA-2\]: a repeat repair's diagnosis names 1 hypothesis; send it back to the diagnostician for three to five ranked hypotheses/);
 });
 
 test('accepted: the same repair diagnosed by three ranked hypotheses, a probe and a minimised reproduction', () => {

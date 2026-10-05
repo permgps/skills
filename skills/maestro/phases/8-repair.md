@@ -147,7 +147,8 @@ remaining budgets. This protocol runs before every repeated repair dispatch.
    unavailable: keep incomplete, no retry. A send-back spends no repair
    attempt. WARN `repair` `diagnosis sent back` with
    `{ rootFindingId, hypotheses, missing }`, where `missing` names labels,
-   never text. The run state refuses an attempt carrying such a diagnosis.
+   never text. The publish that appends an attempt carrying such a diagnosis
+   is refused; an attempt published before is never judged again.
 5. Use accepted diagnosis in next executor brief: its `hypothesis`, its
    reproduction, and its `Probe:` line when the probe runs first there.
    Hypotheses never reach the user — not in a status line, a question or the

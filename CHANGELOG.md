@@ -14,6 +14,13 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **A repeat repair published before the diagnosis shape stays valid.** The
+  ranked-hypotheses rule was checked over the whole state, so a run whose
+  repeat attempt was accepted by an earlier runtime with a prose diagnosis was
+  refused on every read and publish after the update — and the attempt, being
+  published, could never be rewritten. The rule now judges an attempt once, at
+  the publish that appends it.
+
 ## v0.0.11-alpha — 2026-10-05
 
 A fix found by a прогон that reached G4 and could not close. `CONTRACT_VERSION`

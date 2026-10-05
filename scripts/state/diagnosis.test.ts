@@ -3,18 +3,26 @@
 // The diagnostician used to propose "one grounded next approach", and nothing
 // asked it what else could explain the failure. A repeated repair now carries
 // three to five ranked hypotheses inside the existing `diagnosis` text, and the
-// closure rules refuse one that does not — so a single-hypothesis diagnosis is
-// sent back instead of being acted on. The text's shape is all that is held:
-// whether the probe is the cheapest, or the reproduction minimal, is judgement.
+// publish that appends one that does not is refused — so a single-hypothesis
+// diagnosis is sent back instead of being acted on. An attempt already published
+// is never judged again: it cannot be rewritten. The text's shape is all that is
+// held: whether the probe is the cheapest, or the reproduction minimal, is judgement.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DIAGNOSIS_HYPOTHESES, readDiagnosis } from './closure.ts';
+import { DIAGNOSIS_HYPOTHESES, readDiagnosis, validateStateTransition } from './closure.ts';
 import { rankedDiagnosis, repairContract6State, v3Attempt } from './fixtures/verification.ts';
 import { validateState } from './validate.ts';
 
-const messages = (state: unknown): string => validateState(state).map(item => `${item.field}: ${item.message}`).join('\n');
+/** What the publish that appends the state's repeat would refuse, after a prior with only RA-1. */
+const messages = (next: ReturnType<typeof repairContract6State>): string => {
+  const prior = structuredClone(next);
+  prior.verification!.repairAttempts = prior.verification!.repairAttempts.filter(item => item.id === 'RA-1');
+  prior.updatedAt = minute(30);
+  return validateStateTransition(prior, { ...next, updatedAt: minute(40) })
+    .map(item => `${item.field}: ${item.message}`).join('\n');
+};
 const minute = (value: number): string => `2026-09-29T10:${String(value).padStart(2, '0')}:00Z`;
 const lines = (...rows: string[]): string => rows.join('\n');
 const hypothesis = (rank: number, cause = `Cause ${rank}`): string => `H${rank}: ${cause} — falsified by: observation ${rank}`;
@@ -121,4 +129,30 @@ test('a repeated repair inherited from contract 5 keeps its prose diagnosis', ()
   assert.match(messages(state), /repairAttempts\[RA-2\]: a repeat repair's diagnosis names 0 hypotheses/);
   state.verification!.inheritedAttemptIds = ['RA-1', 'RA-2'];
   assert.doesNotMatch(messages(state), /diagnosis/);
+  assert.deepEqual(validateState(state), []);
+});
+
+/** The same repair one publish later: nothing rewritten, only the stamp moved. */
+function republished(state: ReturnType<typeof repairContract6State>): ReturnType<typeof repairContract6State> {
+  return { ...structuredClone(state), updatedAt: minute(40) };
+}
+
+test('a repeated repair published before the diagnosis shape existed stays valid, because it can never be rewritten', () => {
+  // Published by an older runtime that accepted a prose diagnosis; history is immutable.
+  const published = repeated({ hypothesis: 'Wrong import', diagnosis: 'Launch error' });
+  assert.deepEqual(validateState(published), []);
+  assert.deepEqual(validateStateTransition(published, republished(published)), []);
+});
+
+test('an attempt appended with a malformed diagnosis is refused at the transition that adds it', () => {
+  const prior = repairContract6State();
+  prior.verification!.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', minute(10))];
+  const next = repeated({ hypothesis: 'Wrong import', diagnosis: 'Launch error' });
+  next.updatedAt = minute(40);
+  const refused = validateStateTransition(prior, next).map(item => `${item.field}: ${item.message}`).join('\n');
+  assert.match(refused, /repairAttempts\[RA-2\]: a repeat repair's diagnosis names 0 hypotheses/);
+  assert.match(refused, /repairAttempts\[RA-2\]: the attempt's hypothesis is not one of its diagnosis's H causes/);
+  const accepted = repeated(rankedDiagnosis());
+  accepted.updatedAt = minute(40);
+  assert.deepEqual(validateStateTransition(prior, accepted), []);
 });

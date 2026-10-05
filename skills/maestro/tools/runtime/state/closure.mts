@@ -136,6 +136,26 @@ export function readDiagnosis(text: string): DiagnosisReading {
   return reading;
 }
 
+/**
+ * What a repeated attempt's diagnosis lacks, as sentences; empty for a first
+ * attempt. Held at the transition that appends the attempt, never over the
+ * whole state: attempts are immutable once published, and a run whose repeat
+ * was accepted before this shape existed could otherwise never publish again.
+ */
+function diagnosisProblems(attempt: RepairAttemptV3): string[] {
+  if (attempt.predecessorId === undefined) return [];
+  const reading = readDiagnosis(attempt.diagnosis);
+  log.debug('diagnosis', 'diagnosis read', { attemptId: attempt.id, hypotheses: reading.hypotheses.length,
+    probe: reading.probe !== undefined, reproduction: reading.reproduction !== undefined,
+    seam: reading.seam !== undefined ? 'seam' : reading.noCorrectSeam !== undefined ? 'noCorrectSeam' : 'missing',
+    problems: reading.problems.length });
+  const problems = [...reading.problems];
+  if (!reading.hypotheses.some(item => item.cause === attempt.hypothesis.trim())) {
+    problems.push('the attempt\'s hypothesis is not one of its diagnosis\'s H causes; name as hypothesis the cause the probe left standing, exactly as its H line writes it');
+  }
+  return problems;
+}
+
 /** Shape of the verification-3 additions, checked before any typed traversal. */
 function validateClosureShape(value: Record<string, unknown>): VerificationViolation[] {
   const errors: VerificationViolation[] = [];
@@ -420,17 +440,6 @@ export function validateClosureRecord(state: RunState): VerificationViolation[] 
     if ((attempt.repeatKind === 'first') !== (attempt.predecessorId === undefined)) {
       fail('repeat', 'repeatKind is first exactly when the attempt has no predecessor');
     }
-    if (attempt.predecessorId !== undefined) {
-      const reading = readDiagnosis(attempt.diagnosis);
-      log.debug('diagnosis', 'diagnosis read', { attemptId: attempt.id, hypotheses: reading.hypotheses.length,
-        probe: reading.probe !== undefined, reproduction: reading.reproduction !== undefined,
-        seam: reading.seam !== undefined ? 'seam' : reading.noCorrectSeam !== undefined ? 'noCorrectSeam' : 'missing',
-        problems: reading.problems.length });
-      for (const problem of reading.problems) fail('diagnosis', problem);
-      if (!reading.hypotheses.some(item => item.cause === attempt.hypothesis.trim())) {
-        fail('diagnosis', 'the attempt\'s hypothesis is not one of its diagnosis\'s H causes; name as hypothesis the cause the probe left standing, exactly as its H line writes it');
-      }
-    }
     if (attempt.outcome === 'defect_verified' && !attempt.commit) fail('commit', 'a verified repair names the commit that made it');
     if (attempt.commit && !tasks.get(attempt.taskId)?.commits?.includes(attempt.commit)) {
       fail('commit', `repair commit ${attempt.commit} is missing from task ${attempt.taskId} commits; review would not see it`);
@@ -595,6 +604,7 @@ export function validateClosureTransition(previous: RunState, next: RunState): V
     const at = `verification.repairAttempts[${attempt.id}]`;
     const earlier = prior.version === 3 ? prior.defects.find(item => item.id === attempt.defectId) : undefined;
     if (earlier && earlier.status !== 'open') add(at, `defect ${earlier.id} is ${earlier.status}; repair an open defect`, { attemptId: attempt.id, rule: 'defect-open' });
+    for (const problem of diagnosisProblems(attempt)) add(at, problem, { attemptId: attempt.id, rule: 'diagnosis' });
     for (const id of attempt.readyUpstreamTaskIds) {
       if (!FINISHED.includes(tasks.get(id)?.status ?? '')) add(at, `upstream task ${id} is not ready`, { attemptId: attempt.id, rule: 'upstream' });
     }

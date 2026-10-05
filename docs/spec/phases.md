@@ -1021,8 +1021,10 @@ All of it lives inside the existing `diagnosis` text as labelled lines (see
 [verification.md](verification.md)), so the state contract does not move. A
 diagnosis that breaks the shape is sent back to a fresh diagnostician once; a
 send-back spends no repair attempt, and a second malformed return is
-`unavailable`. The run state is the floor: it refuses a repeated attempt
-carrying such a diagnosis. **Hypotheses never reach the user** — not in a status
+`unavailable`. The run state is the floor: the publish that appends a repeated
+attempt carrying such a diagnosis is refused. The rule judges an attempt once,
+when it is appended — a published attempt is immutable, so one accepted before
+the rule existed stays valid rather than leaving the run unable to publish. **Hypotheses never reach the user** — not in a status
 line, a question or the отчёт. Whether the probe was the cheapest, the
 reproduction minimal or a `noCorrectSeam` reason true is the diagnostician's
 judgement, and nothing mechanical holds it.
