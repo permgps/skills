@@ -14,6 +14,11 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+## v0.0.11-alpha — 2026-10-05
+
+A fix found by a прогон that reached G4 and could not close. `CONTRACT_VERSION`
+stays `7`; no published state changes shape.
+
 - **A run whose checks cite its own task files can close.** A fingerprint
   keeps the path its input had when it was hashed, so every check that named
   `.maestro/<dir>--wip/tasks/…` made the closing publish fail its evidence
