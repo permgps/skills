@@ -1,6 +1,6 @@
 // Strict publication is a separate boundary from the optional-expect repository writer.
 // The viewer is injected so read-only actions cannot accidentally launch it.
-import { readFile, stat } from 'node:fs/promises';
+import { lstat, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { languageViolations } from './legacy.mts';
@@ -13,7 +13,7 @@ import { projectState } from './state/projection.mts';
 import { validateStateTransition } from './state/closure.mts';
 import { deriveVerification } from './state/verification.mts';
 import { atomicText, serializeState } from './state/write.mts';
-import { WIP_SUFFIX, parseRunDir, runDirName } from './state/paths.mts';
+import { STATE_FILE, WIP_SUFFIX, parseRunDir, runDirName } from './state/paths.mts';
 import { relocateRunDir, restoreRunDir, type Relocation } from './relocation.mts';
 import { upsertRegister } from './register.mts';
 
@@ -89,14 +89,43 @@ function option(args: string[], name: string): string | undefined {
   return index < 0 ? undefined : args[index + 1];
 }
 function checkStamp(previous: RunState | null, expected: string | undefined,
-  holder: string | undefined): StateViolation[] {
+  holder: string | undefined, succession = false): StateViolation[] {
   const errors: StateViolation[] = [];
   if (previous) {
     if (expected === undefined || previous.updatedAt !== expected) errors.push({ field: 'updatedAt', message: 'stale or missing expected revision' });
-    if (previous.heldBy && previous.heldBy.token !== holder) errors.push({ field: 'heldBy', message: 'holder token does not match prior snapshot' });
+    // A closed run's claim ended with it; the stamp above still guards the start.
+    if (previous.heldBy && previous.heldBy.token !== holder && !succession) errors.push({ field: 'heldBy', message: 'holder token does not match prior snapshot' });
   } else if (expected !== undefined) errors.push({ field: 'updatedAt', message: 'expected revision has no state to match' });
   return errors;
 }
+/**
+ * The first publish of a new прогон over a closed one. `state.js` is one per
+ * project, so the next run must replace the last; without this the transition
+ * rules would judge it as the closed run rewritten, and the only way forward
+ * was deleting the file by hand. Only a closed run is succeeded: an active one
+ * with another id is somebody's live run, and stays refused by its holder.
+ */
+export function succeedsClosedRun(previous: RunState, candidate: RunState): boolean {
+  return previous.lifecycle === 'closed' && candidate.contractVersion >= 7
+    && candidate.lifecycle === 'active' && candidate.runId !== previous.runId;
+}
+
+/** Where the succeeded run's last state is kept: its own folder, beside its record. */
+async function keepClosedState(dir: string, previous: RunState, source: string): Promise<{ path: string } | StateViolation> {
+  const folder = runDirName(previous);
+  const kept = path.join(dir, folder, STATE_FILE);
+  try { if (!(await lstat(path.join(dir, folder))).isDirectory()) throw new Error('not a directory'); }
+  catch { return { field: 'state.js', message: `.maestro/${folder} is missing, so the closed run's state cannot be kept beside its record; restore the folder before starting a new run` }; }
+  try {
+    if (await readFile(kept, 'utf8') === source) return { path: kept };
+    return { field: 'state.js', message: `.maestro/${folder}/${STATE_FILE} already holds a different state; nothing was replaced` };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return { field: 'state.js', message: `.maestro/${folder}/${STATE_FILE} cannot be read; nothing was replaced` };
+  }
+  await atomicText(kept, source);
+  return { path: kept };
+}
+
 async function readPrevious(file: string): Promise<RunState | null> {
   try {
     const value = await loadCandidate(file);
@@ -152,13 +181,22 @@ export async function candidateMode(args: string[], dir: string,
   } catch { errors.push({ field: 'state.js', message: 'existing state cannot be read; recover explicitly' }); }
   const expected = option(args, '--expect');
   const holder = option(args, '--holder');
-  errors.push(...checkStamp(previous, expected, holder));
+  const succession = errors.length === 0 && previous !== null && succeedsClosedRun(previous, state);
+  if (succession && previous) {
+    log.info('succession', 'a new run starts over a closed one', { closedRunId: previous.runId, runId: state.runId });
+    const before = previous.contractVersion >= 7 ? parseRunDir(runDirName(previous)) : null;
+    const after = parseRunDir(runDirName(state));
+    if (before && after && before.date === after.date && before.slug === after.slug) {
+      errors.push({ field: 'dir', message: `.maestro/${runDirName(previous)} is the closed run's folder under its other name; a new run takes its own — add a numeric suffix to the slug` });
+    }
+  }
+  errors.push(...checkStamp(previous, expected, holder, succession));
   if (isRecord(candidate) && isRecord(candidate['heldBy']) && candidate['heldBy']['token'] !== holder) {
     errors.push({ field: 'heldBy', message: 'holder token does not match candidate' });
   }
-  if (errors.length === 0 && previous) errors.push(...validateStateTransition(previous, state));
+  if (errors.length === 0 && previous && !succession) errors.push(...validateStateTransition(previous, state));
   let relocation: Relocation | null = null;
-  if (errors.length === 0 && previous && previous.contractVersion >= 7 && state.contractVersion >= 7) {
+  if (errors.length === 0 && previous && !succession && previous.contractVersion >= 7 && state.contractVersion >= 7) {
     const from = runDirName(previous);
     const to = runDirName(state);
     if (from !== to) {
@@ -171,12 +209,26 @@ export async function candidateMode(args: string[], dir: string,
     }
   }
   if (errors.length === 0) errors.push(...await validateEvidence(state, path.dirname(dir), dir));
+  let kept: string | null = null;
+  if (errors.length === 0 && succession && previous) {
+    try {
+      const outcome = await keepClosedState(dir, previous, await readFile(target, 'utf8'));
+      if ('path' in outcome) {
+        kept = outcome.path;
+        log.info('succession', 'closed run state kept in its folder', { closedRunId: previous.runId, path: kept });
+      } else errors.push(outcome);
+    } catch (error) {
+      log.error('succession', 'closed run state could not be kept', { closedRunId: previous.runId,
+        reason: error instanceof Error ? error.message : String(error) });
+      errors.push({ field: 'state.js', message: 'the closed run\'s state could not be kept in its folder; nothing was replaced' });
+    }
+  }
   if (errors.length === 0) {
     try {
       log.debug('publish', 'candidate checked; replacing state', { revision: state.updatedAt });
       await atomicText(target, serializeState(state), async () => {
         const current = await readPrevious(target);
-        const stale = checkStamp(current, expected, holder);
+        const stale = checkStamp(current, expected, holder, succession);
         if ((previous === null) !== (current === null) || stale.length) throw new Error('revision or holder changed before replacement');
       });
     } catch {
@@ -217,5 +269,6 @@ export async function candidateMode(args: string[], dir: string,
   }
   log.info('publish', 'candidate published', { runId: state.runId, revision: state.updatedAt });
   return { code: 0, result: { status: 'published', revision: state.updatedAt, path: target, url, projection: summary,
-    ...(relocation ? { relocated: relocation } : {}), ...(register ? { register } : {}) } };
+    ...(relocation ? { relocated: relocation } : {}), ...(register ? { register } : {}),
+    ...(succession && previous ? { succeeded: { runId: previous.runId, kept: path.relative(dir, kept ?? '') } } : {}) } };
 }

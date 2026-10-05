@@ -587,6 +587,18 @@ change record identity; array order remains significant. Digest algorithms do
 not change. The compatibility `writeState` API retains its documented optional
 expect behavior; it is not the strict publication boundary.
 
+**A new run succeeds a closed one.** When the prior state is `closed` and the
+candidate is an active contract-7 run with another `runId`, the publish is the
+new run's first write rather than a transition of the old one: the transition
+rules, the relocation and the prior holder are not applied, because the closed
+run's claim and records ended with it. `--expect` with the closed revision is
+still required, so two sessions cannot both start a run over it. The new run's
+directory must not share the closed run's date and slug — that name is the
+closed run's own under its other suffix, and only a reopening takes it. Before
+replacing, publication keeps the closed state in `.maestro/<dir>/state.js` (see
+[`artifacts.md`](artifacts.md)) and the result names it under `succeeded`. A
+prior state that is still active, under any `runId`, is never replaced this way.
+
 Each replacement uses an exclusive temporary file in the destination directory,
 write, fsync, close and rename, removing temporary files on failure. Immediately
 before replacing state, publication re-reads the prior revision and holder.

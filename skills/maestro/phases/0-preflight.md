@@ -202,7 +202,12 @@ timestamps. Only fields explicitly defined as nullable (such as `tests`) use
 `null`.
 
 Use `node .maestro/sync.mts --publish .maestro/.candidate.json` for this
-first write, adding `--holder '<token>'` when the run has a holder. The helper
+first write, adding `--holder '<token>'` when the run has a holder. When
+`state.js` already holds an earlier run that is `closed`, add
+`--expect '<its updatedAt>'`: publication keeps that state in its own folder
+and starts this run over it, whatever holder it carried. Never delete
+`state.js` and never borrow the closed run's token. A state that is still
+`active` belongs to another прогон — ask the user, as for a foreign token. The helper
 validates and atomically publishes `state.js`; delete the temporary candidate
 afterwards. Never edit `state.js` in place or write it on a timer — the state
 changes at phase boundaries and task transitions only. On a rejected candidate,

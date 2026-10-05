@@ -14,6 +14,16 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **A second прогон can start in a project whose last run closed.** `state.js`
+  is one per project, and `--publish` judged any state on disk as the same
+  run: the closed run's holder token, its fixed `runId`, `slug` and
+  `startedAt` and its immutable records all refused the new run's first write,
+  leaving deleting the file by hand as the only way on. A closed prior state is
+  now succeeded by an active contract-7 run with another id: `--expect` still
+  names the closed revision, the closed state is kept byte for byte as
+  `.maestro/<dir>/state.js` before it is replaced, and an active prior run is
+  never replaced by another.
+
 ## v0.0.12-alpha — 2026-10-05
 
 The second fix found by the прогон that could not close: a rule added after its

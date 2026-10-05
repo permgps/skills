@@ -21,7 +21,8 @@ project that was built, not with Maestro.
 │   ├── evidence/<execution-id>/...
 │   ├── report.md
 │   ├── decisions.md
-│   └── amendments.md
+│   ├── amendments.md
+│   └── state.js                 (the run's last state, kept when the next run starts)
 ├── README.md                    (the register: one row per contract-7 run)
 ├── config.json
 ├── state.js
@@ -81,6 +82,7 @@ actually built.
 | `config.json` | preflight | preflight | yes |
 | `README.md` | preflight | the user, a later прогон | yes, its owned rows rewritten by publication |
 | `state.js` | preflight | dashboard, gates, metrics | yes |
+| `<dir>/state.js` | preflight | the user | no |
 | `dashboard.html` | preflight | the user | no |
 
 The single-writer rule is the reason two artifacts exist where one would read
@@ -259,6 +261,11 @@ comparison of them has two answers to choose from.
 - Nothing under `.maestro/` is deleted by a later прогон. A second прогон gets
   a second directory under its own start date; when `<YYYY-MM-DD>-<slug>`
   already exists, with or without `--wip`, the slug takes a numeric suffix.
+- `.maestro/state.js` is one per project, so the next прогон's first publish
+  replaces a closed run's state. That publish first keeps the closed state,
+  byte for byte, as `state.js` inside the closed run's own directory; a
+  missing directory or a different file already there refuses the publish and
+  replaces nothing. An active run is never replaced by another.
 - The run directory is renamed only by publication, and only to take `--wip`
   off when the run closes or to put it back when a closed contract-7 run is
   explicitly reopened. The date and the slug never change. The rename is

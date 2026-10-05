@@ -29,7 +29,7 @@ type Outcome = Record<string, unknown> & { code: number; stderr: string };
 interface Project {
   root: string;
   maestro: string;
-  publish(state: RunState, expect?: string, env?: Record<string, string>): Outcome;
+  publish(state: RunState, expect?: string, env?: Record<string, string>, holder?: string): Outcome;
   validate(state: RunState): Outcome;
   project(state: RunState): Outcome;
   git(...args: string[]): string;
@@ -58,10 +58,10 @@ async function project(options: { git: boolean }): Promise<Project> {
     git('config', 'user.email', 'test@example.invalid');
     git('config', 'user.name', 'Relocation Test');
   }
-  const action = (verb: string, state: RunState, expect?: string, env: Record<string, string> = {}): Outcome => {
+  const action = (verb: string, state: RunState, expect?: string, env: Record<string, string> = {}, holder?: string): Outcome => {
     const candidate = path.join(root, 'candidate.json');
     writeFileSync(candidate, JSON.stringify(state));
-    const args = [path.join(maestro, 'sync.mts'), verb, candidate, '--no-open', ...(expect ? ['--expect', expect] : [])];
+    const args = [path.join(maestro, 'sync.mts'), verb, candidate, '--no-open', ...(expect ? ['--expect', expect] : []), ...(holder ? ['--holder', holder] : [])];
     const done = spawnSync(process.execPath, args, { encoding: 'utf8', env: { ...process.env, MAESTRO_SYNC_NO_OPEN: '1', ...env } });
     try {
       const serve = JSON.parse(readFileSync(path.join(maestro, 'serve.json'), 'utf8')) as { pid: number };
@@ -72,7 +72,7 @@ async function project(options: { git: boolean }): Promise<Project> {
   };
   return {
     root, maestro, git,
-    publish: (state, expect, env) => action('--publish', state, expect, env),
+    publish: (state, expect, env, holder) => action('--publish', state, expect, env, holder),
     validate: state => action('--validate', state),
     project: state => action('--project', state),
     async dispose() {
@@ -297,5 +297,79 @@ test('a run whose fingerprints cite a file inside its own --wip folder still clo
     const result = target.publish(reopened, closing().updatedAt);
     assert.equal(result.code, 0, JSON.stringify(result));
     assert.deepEqual(result['relocated'], { from: LANDED, to: WIP, method: 'rename' });
+  } finally { await target.dispose(); }
+});
+
+/** The next прогон in the same project: its own id, slug, day, folder and claim. */
+const NEXT_WIP = '2026-10-05-dev-seeders--wip';
+function nextRun(): RunState {
+  return { ...activeContract7State(), runId: 'run-dev-seeders-1', slug: 'dev-seeders', startedAt: '2026-10-05T09:00:00Z',
+    updatedAt: '2026-10-05T09:00:00Z', dir: NEXT_WIP, heldBy: { token: 'ab12c', since: '2026-10-05T09:00:00Z' } };
+}
+const claimedClosing = (): RunState => ({ ...closing(), heldBy: { token: 'q3m7x', since: '2026-09-29T09:00:00Z' } });
+
+test('a new run replaces a closed one, which keeps its own state in its folder and its register row', async () => {
+  const target = await project({ git: false });
+  try {
+    await seed(target.maestro, WIP);
+    const claimed = { ...activeContract7State(), heldBy: { token: 'q3m7x', since: '2026-09-29T09:00:00Z' } };
+    assert.equal(target.publish(claimed, undefined, {}, 'q3m7x').code, 0);
+    assert.equal(target.publish(claimedClosing(), claimed.updatedAt, {}, 'q3m7x').code, 0);
+    const closedSnapshot = await readFile(path.join(target.maestro, 'state.js'), 'utf8');
+    await seed(target.maestro, NEXT_WIP);
+
+    // The closed run's claim ended with it: the new run publishes under its own token.
+    const started = target.publish(nextRun(), closing().updatedAt, {}, 'ab12c');
+    assert.equal(started.code, 0, JSON.stringify(started));
+    assert.equal(started['relocated'], undefined);
+    assert.match(await readFile(path.join(target.maestro, 'state.js'), 'utf8'), /"runId":\s*"run-dev-seeders-1"/);
+    assert.equal(await readFile(path.join(target.maestro, LANDED, 'state.js'), 'utf8'), closedSnapshot);
+    assert.equal(await isDirectory(path.join(target.maestro, LANDED)), true);
+    const register = await readFile(path.join(target.maestro, 'README.md'), 'utf8');
+    assert.match(register, new RegExp(`\\[${LANDED}\\]\\(${LANDED}/\\) \\| completed`));
+    assert.match(register, new RegExp(`\\[${NEXT_WIP}\\]\\(${NEXT_WIP}/\\) \\| in progress`));
+  } finally { await target.dispose(); }
+});
+
+test('a new run still names the closed revision it replaces, so two sessions cannot both start one', async () => {
+  const target = await project({ git: false });
+  try {
+    await seed(target.maestro, WIP);
+    target.publish(activeContract7State());
+    target.publish(closing(), activeContract7State().updatedAt);
+    await seed(target.maestro, NEXT_WIP);
+    const refused = target.publish(nextRun(), undefined, {}, 'ab12c');
+    assert.equal(refused.code, 1, JSON.stringify(refused));
+    assert.match(JSON.stringify(refused['violations']), /stale or missing expected revision/);
+    await assert.rejects(() => readFile(path.join(target.maestro, LANDED, 'state.js'), 'utf8'));
+  } finally { await target.dispose(); }
+});
+
+test('a different run never replaces an active one, whoever holds it', async () => {
+  const target = await project({ git: false });
+  try {
+    await seed(target.maestro, WIP);
+    const claimed = { ...activeContract7State(), heldBy: { token: 'q3m7x', since: '2026-09-29T09:00:00Z' } };
+    target.publish(claimed, undefined, {}, 'q3m7x');
+    await seed(target.maestro, NEXT_WIP);
+    const refused = target.publish(nextRun(), claimed.updatedAt, {}, 'ab12c');
+    assert.equal(refused.code, 1, JSON.stringify(refused));
+    assert.match(JSON.stringify(refused['violations']), /holder token does not match prior snapshot/);
+  } finally { await target.dispose(); }
+});
+
+test('a new run cannot take the closed run\'s folder under its --wip name', async () => {
+  const target = await project({ git: false });
+  try {
+    await seed(target.maestro, WIP);
+    target.publish(activeContract7State());
+    target.publish(closing(), activeContract7State().updatedAt);
+    // Same day and slug: the folder would be the closed run's twin, which only a reopening may take.
+    const twin: RunState = { ...activeContract7State(), runId: 'run-synthetic-2', updatedAt: '2026-09-29T11:00:00Z' };
+    await seed(target.maestro, WIP);
+    const refused = target.publish(twin, closing().updatedAt);
+    assert.equal(refused.code, 1, JSON.stringify(refused));
+    assert.match(JSON.stringify(refused['violations']), /a new run takes its own — add a numeric suffix to the slug/);
+    assert.match(await readFile(path.join(target.maestro, 'state.js'), 'utf8'), /"runId":\s*"run-synthetic-1"/);
   } finally { await target.dispose(); }
 });

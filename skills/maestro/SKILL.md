@@ -168,8 +168,8 @@ status is a claim about the clock. `active` means a `startedAt` and no
 
 Raised in preflight and never opened a second time. For every state transition,
 write the complete JSON candidate to a temporary file, then publish it through
-the bundled validator. On the first write omit `--expect`; afterwards pass the
-`updatedAt` you last read. Pass the current holder token when one is claimed:
+the bundled validator. Pass the `updatedAt` you last read as `--expect`, omitted only on a first write over no state (over a closed
+run, preflight step 4). Pass the current holder token when one is claimed:
 
 ```bash
 node .maestro/sync.mts --publish .maestro/.candidate.json --expect '<last-updatedAt>' --holder '<token>'
