@@ -14,6 +14,14 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **A run whose checks cite its own task files can close.** A fingerprint
+  keeps the path its input had when it was hashed, so every check that named
+  `.maestro/<dir>--wip/tasks/…` made the closing publish fail its evidence
+  check once the folder lost `--wip`, and published records could not be
+  rewritten to follow it. An input under the run folder's other spelling is now
+  read under the name the folder has now, with its hash still compared, in both
+  directions — closing and reopening.
+
 ## v0.0.10-alpha — 2026-10-05
 
 Fixes from a whole-project review. `CONTRACT_VERSION` stays `7`, but the

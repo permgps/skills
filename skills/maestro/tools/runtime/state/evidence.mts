@@ -13,7 +13,7 @@ import { createLogger } from '../shared/log.mts';
 import type { EvidenceFingerprint, RunState } from './contract.mts';
 import type { StateViolation } from './validate.mts';
 import { sameFingerprint } from './verification.mts';
-import { parseRunDir, runDirName } from './paths.mts';
+import { WIP_SUFFIX, parseRunDir, runDirName } from './paths.mts';
 
 const log = createLogger('state');
 const HASH = /^[a-f0-9]{64}$/;
@@ -61,11 +61,39 @@ async function checkedFile(
   return actual;
 }
 
+/** Where a declared project-relative input is read from; the identity, unless the run folder was renamed. */
+type InputLocator = (relative: string) => string;
+
+/**
+ * A contract-7 run folder takes `--wip` off at closure and puts it back at a
+ * reopening, but a fingerprint is immutable once published and keeps the name
+ * its input had when it was hashed. An input under the folder's other spelling
+ * is therefore read under the name the folder has now. Rewriting published
+ * paths at closure was rejected: it would open an exception in immutability for
+ * every record that cites the run, and the hash comparison already proves the
+ * file is the same one. The twin is always this run — a second прогон on the
+ * same day and slug takes a numeric suffix, with or without `--wip`.
+ */
+function runInputLocator(state: RunState, projectRoot: string, runRoot: string, runName: string): InputLocator {
+  const parsed = state.contractVersion >= 7 ? parseRunDir(runName) : null;
+  const root = path.relative(path.resolve(projectRoot), path.resolve(runRoot)).split(path.sep).join('/');
+  if (!parsed || root === '' || root.startsWith('..')) return relative => relative;
+  const twin = `${root}/${parsed.date}-${parsed.slug}${parsed.wip ? '' : WIP_SUFFIX}/`;
+  const current = `${root}/${runName}/`;
+  return relative => {
+    if (!relative.startsWith(twin)) return relative;
+    const located = `${current}${relative.slice(twin.length)}`;
+    log.debug('fingerprint', 'run input read under the folder\'s current name', { runId: state.runId, relative, located });
+    return located;
+  };
+}
+
 async function checkFingerprint(
   fingerprint: EvidenceFingerprint,
   projectRoot: string,
   at: string,
   violations: StateViolation[],
+  locate: InputLocator,
 ): Promise<void> {
   for (const relative of fingerprint.relevantPaths) {
     const field = `${at}.inputHashes[${JSON.stringify(relative)}]`;
@@ -74,7 +102,7 @@ async function checkFingerprint(
       violations.push({ field, message: 'declared SHA-256 is missing or malformed' });
       continue;
     }
-    const file = await checkedFile(projectRoot, relative, field, violations);
+    const file = await checkedFile(projectRoot, locate(relative), field, violations);
     if (!file) continue;
     let actual: string;
     try { actual = await fileHash(file); }
@@ -99,6 +127,7 @@ export async function validateEvidence(
   try { runName = runDirName(state); }
   catch { return [{ field: state.contractVersion >= 7 ? 'dir' : 'slug', message: 'run directory name is not a safe path segment' }]; }
   const runDir = path.join(runRoot, runName);
+  const locate = runInputLocator(state, projectRoot, runRoot, runName);
   if (record.evidence.length > 0) {
     try {
       if (!inside(await realpath(projectRoot), await realpath(runDir))
@@ -144,7 +173,7 @@ export async function validateEvidence(
   }
   for (const [index, check] of record.checks.entries()) {
     await checkFingerprint(check.currentFingerprint, projectRoot,
-      `verification.checks[${index}].currentFingerprint`, violations);
+      `verification.checks[${index}].currentFingerprint`, violations, locate);
   }
   for (const [index, execution] of record.executions.entries()) {
     // Historical executions are preserved, so their former inputs may no
@@ -153,7 +182,7 @@ export async function validateEvidence(
     if (!record.checks.some(check => check.id === execution.checkId
       && sameFingerprint(check.currentFingerprint, execution.fingerprint))) continue;
     await checkFingerprint(execution.fingerprint, projectRoot,
-      `verification.executions[${index}].fingerprint`, violations);
+      `verification.executions[${index}].fingerprint`, violations, locate);
   }
   if (violations.length > 0) log.error('evidence', 'candidate evidence failed integrity', {
     runId: state.runId, violations: violations.length,

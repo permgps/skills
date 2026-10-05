@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
-  CAPTURES, SOURCE_MANIFEST, activeContract6State, activeContract7State, contract6State, contract7State,
+  CAPTURES, SOURCE_MANIFEST, activeContract6State, activeContract7State, contract6State, contract7State, sha256,
 } from '../state/fixtures/verification.ts';
 import type { RunState } from '../state/contract.ts';
 
@@ -249,5 +249,53 @@ test('a contract-6 publish never relocates and writes no register', async () => 
     assert.equal(closed['register'], undefined);
     assert.equal(await isDirectory(path.join(target.maestro, 'synthetic-menu')), true);
     await assert.rejects(() => readFile(path.join(target.maestro, 'README.md'), 'utf8'));
+  } finally { await target.dispose(); }
+});
+
+/** A task file inside the run folder, cited by every fingerprint under the name it had while active. */
+const TASK_FILE = 'tasks/01-implement-menu.md';
+const TASK_BODY = '# 01 Implement menu\n\nOracle: the menu opens on hover.\n';
+
+function citingRunFile(state: RunState): RunState {
+  const cited = `.maestro/${WIP}/${TASK_FILE}`;
+  const record = state.verification as NonNullable<ReturnType<typeof contract7State>['verification']>;
+  const cite = <T extends { relevantPaths: string[]; inputHashes: Record<string, string> }>(fingerprint: T): T =>
+    ({ ...fingerprint, relevantPaths: [cited], inputHashes: { [cited]: sha256(TASK_BODY) } });
+  return { ...state, verification: {
+    ...record,
+    checks: record.checks.map(check => ({ ...check, currentFingerprint: cite(check.currentFingerprint) })),
+    executions: record.executions.map(execution => ({ ...execution, fingerprint: cite(execution.fingerprint) })),
+    readiness: record.readiness.map(item => ({ ...item, targetFingerprint: cite(item.targetFingerprint) })),
+  } } as RunState;
+}
+
+test('a run whose fingerprints cite a file inside its own --wip folder still closes and reopens', async () => {
+  const target = await project({ git: false });
+  try {
+    await seed(target.maestro, WIP);
+    await mkdir(path.join(target.maestro, WIP, 'tasks'), { recursive: true });
+    await writeFile(path.join(target.maestro, WIP, TASK_FILE), TASK_BODY);
+    const opened = target.publish(citingRunFile(activeContract7State()));
+    assert.equal(opened.code, 0, JSON.stringify(opened));
+
+    // Published records are immutable, so the closing candidate keeps the --wip spelling.
+    const closed = target.publish(citingRunFile(closing()), activeContract7State().updatedAt);
+    assert.equal(closed.code, 0, JSON.stringify(closed));
+    assert.deepEqual(closed['relocated'], { from: WIP, to: LANDED, method: 'rename' });
+    // A later read of the closed run still finds the input where the folder is now.
+    assert.equal(target.validate(citingRunFile(closing())).code, 0);
+
+    // The input is still hashed: a changed task file makes the closed run's evidence stale.
+    await writeFile(path.join(target.maestro, LANDED, TASK_FILE), `${TASK_BODY}changed\n`);
+    const stale = target.validate(citingRunFile(closing()));
+    assert.equal(stale.code, 1);
+    assert.match(JSON.stringify(stale['violations']), /relevant input changed/);
+    await writeFile(path.join(target.maestro, LANDED, TASK_FILE), TASK_BODY);
+
+    const reopened: RunState = { ...citingRunFile(closing()), lifecycle: 'active', dir: WIP, updatedAt: '2026-09-29T10:00:00Z' };
+    delete reopened.outcome; delete reopened.finishedAt;
+    const result = target.publish(reopened, closing().updatedAt);
+    assert.equal(result.code, 0, JSON.stringify(result));
+    assert.deepEqual(result['relocated'], { from: LANDED, to: WIP, method: 'rename' });
   } finally { await target.dispose(); }
 });

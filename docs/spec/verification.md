@@ -419,7 +419,12 @@ nor a screenshot alone asserts correctness.
 `relevantPaths` and `inputHashes` pair each declared project-relative input
 with its SHA-256. The filesystem validator recomputes these hashes when the
 candidate is read or published. The current fingerprint lives on each check;
-the execution carries the fingerprint it actually used.
+the execution carries the fingerprint it actually used. From contract 7 an
+input inside the run's own directory keeps the spelling it was hashed under:
+a path under the directory's other name — `--wip` on where it is now off, or
+off where it is now on — is read under the name the directory has now, and its
+hash is still compared. Closing or reopening a run therefore never rewrites a
+published fingerprint and never makes one unreadable.
 
 A changed oracle or widened ignore mask creates a new check ID with
 `supersedes` and an explicit `oracleChangeBasis` or `basisDecisionId`; the prior check remains in history. An
