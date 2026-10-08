@@ -16,6 +16,7 @@ import { builtinModules } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 import { checkCodexRuntime } from './host-degradation.ts';
+import { GLOSSARY_NAMING_MESSAGE, bareGlossaryLines } from './spec-integrity.ts';
 
 import { createLogger } from '../shared/log.ts';
 import { formatViolation, type Violation } from '../shared/violation.ts';
@@ -269,7 +270,26 @@ export const MEMORY_ANCHORS: readonly Anchor[] = [
     why: 'interfaces.md names each domain word once, so two таски cannot name one thing two ways' },
   { file: 'prompts/task-reader.md', literal: 'Words to avoid',
     why: 'the task reader is what holds a task file to the Terms table' },
+  { file: 'phases/0-preflight.md', literal: 'project glossary not read:',
+    why: 'a project glossary past the limit is a decision taken for the user, and it reaches the отчёт through debt.assumptions' },
+  { file: 'phases/4-plan.md', literal: 'contradicts project glossary, because',
+    why: 'a Terms row that departs from the user\'s own word has to say so' },
+  { file: 'phases/4-plan.md', literal: 'fix the project glossary or the бриф',
+    why: 'the user, not the прогон, settles which of the two files is wrong' },
+  { file: 'phases/9-memory.md', literal: 'term — meaning (not: x, y)',
+    why: 'the words to avoid survive the carry, so the next прогон does not give one thing a second name' },
+  { file: 'phases/9-memory.md', literal: 'Leave out a term the project glossary already defines',
+    why: 'each word has one source of truth, and the block stays short' },
 ];
+
+/**
+ * The project glossary's file names. A brief that names one hands its субагент
+ * the user's words directly, past `prior.md`, which every blind reader
+ * withholds. The runtime's copy is `GLOSSARY_MAPS` and `GLOSSARY_FILES` in
+ * `skills/maestro/tools/runtime/memory.mts`; a name added there and not here
+ * is a door this check does not watch.
+ */
+export const PROJECT_GLOSSARY_FILES: readonly string[] = ['GLOSSARY-MAP.md', 'CONTEXT-MAP.md', 'GLOSSARY.md', 'CONTEXT.md'];
 
 /**
  * The literal text that carries «briefing proposes, the user disposes».
@@ -907,9 +927,35 @@ export async function checkBundle(
           `brief mentions ${PRIOR_MEMORY_FILE} outside "## ${NOT_GIVEN_HEADING}" — no субагент is handed `
           + 'what earlier runs decided; only withhold it');
       }
+      const named = PROJECT_GLOSSARY_FILES.filter(name => new RegExp(`(?<![\\w-])${name.replace('.', '\\.')}`).test(outside));
+      if (named.length > 0) {
+        add('memory', file, 0,
+          `brief names ${named.join(', ')} outside "## ${NOT_GIVEN_HEADING}" — the project glossary reaches a `
+          + `run only through ${PRIOR_MEMORY_FILE}, which no субагент is handed; its terms reach executors through `
+          + 'the Terms table of interfaces.md');
+      }
     }
     log.info('memory', 'memory read path checked', { anchors: MEMORY_ANCHORS.length });
   }
+
+  // --- the user's file of words is called the project glossary -------------
+  // Every profile: Scout borrows Maestro's words, and a bare «glossary» there
+  // would blur the same three things. References are read for it alone, as the
+  // link pass never opens them.
+  const naming = [...documents];
+  for (const directory of profile.other) {
+    for (const file of await listMarkdown(bundleDir, directory)) {
+      naming.push({ file, body: await readFile(path.join(bundleDir, file), 'utf8') });
+    }
+  }
+  let namingHits = 0;
+  for (const { file, body } of naming) {
+    for (const line of bareGlossaryLines(body)) {
+      namingHits += 1;
+      add('naming', file, line, GLOSSARY_NAMING_MESSAGE);
+    }
+  }
+  log.info('naming', 'bundle scanned for a bare glossary', { files: naming.length, hits: namingHits });
 
   // --- briefing proposes, the user disposes ---------------------------------
   // Only a брифинг phase SKILL.md actually opens routes questions this way. An

@@ -190,6 +190,70 @@ export function carries(label: string, term: string, wordwise: boolean): boolean
   return new RegExp(`\\b${escapeForRegExp(term)}\\b`).test(label);
 }
 
+/**
+ * Markdown with fenced blocks and inline code spans blanked, newlines kept so
+ * a line number found in the result is the line in the source. What is left is
+ * the prose a reader takes as wording; a field name, a file name or a quoted
+ * template inside backticks is not wording.
+ */
+export function proseOf(markdown: string): string {
+  const lines = markdown.split('\n');
+  let fence: string | null = null;
+  const unfenced = lines.map(line => {
+    const opener = /^ {0,3}(`{3,}|~{3,})/.exec(line);
+    if (fence === null && opener) { fence = opener[1]!; return ''; }
+    if (fence !== null) {
+      if (line.trim().startsWith(fence) && line.trim().replace(/[`~]/g, '') === '') fence = null;
+      return '';
+    }
+    return line;
+  }).join('\n');
+
+  // A span opens on a run of backticks and closes on the next run of exactly
+  // the same length; a run with no partner is literal text.
+  let out = '';
+  let at = 0;
+  while (at < unfenced.length) {
+    const open = unfenced.indexOf('`', at);
+    if (open === -1) { out += unfenced.slice(at); break; }
+    let width = 1;
+    while (unfenced[open + width] === '`') width += 1;
+    const run = '`'.repeat(width);
+    let close = unfenced.indexOf(run, open + width);
+    while (close !== -1 && (unfenced[close - 1] === '`' || unfenced[close + width] === '`')) {
+      let end = close;
+      while (unfenced[end] === '`') end += 1;
+      close = unfenced.indexOf(run, end);
+    }
+    if (close === -1) { out += unfenced.slice(at, open + width); at = open + width; continue; }
+    out += unfenced.slice(at, open) + unfenced.slice(open, close + width).replace(/[^\n]/g, ' ');
+    at = close + width;
+  }
+  return out;
+}
+
+/**
+ * The word for the user's own file of terms is «project glossary», in full. A
+ * bare «glossary» blurs it with the two things that already have names: the
+ * словарь (`vocabulary.md`, Maestro's own user-facing words) and the Terms
+ * table (one прогон's domain words).
+ */
+export const BARE_GLOSSARY = /(?<!\b[Pp]roject\s+)\b[Gg]lossar(?:y|ies)\b/g;
+
+export const GLOSSARY_NAMING_MESSAGE = 'say "project glossary" for the user\'s file; Maestro\'s own user-facing '
+  + 'words are the словарь, and one прогон\'s words are the Terms table';
+
+/** 1-based lines of `markdown` whose prose says «glossary» without «project» before it. */
+export function bareGlossaryLines(markdown: string): number[] {
+  const prose = proseOf(markdown);
+  const lines: number[] = [];
+  for (const match of prose.matchAll(BARE_GLOSSARY)) {
+    const line = prose.slice(0, match.index).split('\n').length;
+    if (!lines.includes(line)) lines.push(line);
+  }
+  return lines;
+}
+
 export async function checkSpec(
   specDir: string,
   profile: SpecProfile = MAESTRO_PROFILE,
@@ -510,6 +574,18 @@ export async function checkSpec(
     log.info('banned', 'labels scanned for banned terms',
       { column: surface.column, terms: banned.length });
   }
+
+  // --- the user's file of words is called the project glossary -------------
+  let namingHits = 0;
+  for (const name of [...present].sort()) {
+    const lines = bareGlossaryLines(await readFile(path.join(specDir, name), 'utf8'));
+    log.debug('naming', 'document scanned', { file: name, hits: lines.length });
+    for (const line of lines) {
+      namingHits += 1;
+      add('naming', name, line, GLOSSARY_NAMING_MESSAGE);
+    }
+  }
+  log.info('naming', 'documents scanned for a bare glossary', { files: present.size, hits: namingHits });
 
   // --- a language is never half-supported ----------------------------------
   //

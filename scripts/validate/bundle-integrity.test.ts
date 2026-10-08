@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cp, mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { cp, mkdtemp, mkdir, readFile, readdir, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -22,6 +22,7 @@ import {
   LEAF_RULE,
   MAESTRO_BUNDLE,
   MEMORY_ANCHORS,
+  PROJECT_GLOSSARY_FILES,
   procedureSection,
   findRelativeLinks,
   TESTING_ANCHORS,
@@ -557,6 +558,76 @@ test('a brief that hands its субагент prior.md is reported, while withho
     const violations = (await checkBundle(copy)).filter(v => v.check === 'memory');
     assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'executor.md')]);
     assert.match(violations[0]?.message ?? '', /only withhold it/);
+  });
+});
+
+// --- the project glossary is read, never written ------------------------------
+
+const GLOSSARY_ANCHORS = MEMORY_ANCHORS.filter(anchor => /glossary|\(not: x, y\)/.test(anchor.literal));
+
+test('the project glossary has its five anchors in the memory path', () => {
+  assert.equal(GLOSSARY_ANCHORS.length, 5);
+});
+
+for (const anchor of GLOSSARY_ANCHORS) {
+  test(`${anchor.file} losing "${anchor.literal}" is the one memory finding, named on that file`, async () => {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, anchor.file);
+      const body = await readFile(target, 'utf8');
+      // The literal may wrap in the shipped text; collapse it the way the check reads it.
+      const flat = body.replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal), `${anchor.file} carries no "${anchor.literal}"`);
+      await writeFile(target, flat.split(anchor.literal).join('removed'), 'utf8');
+      const violations = (await checkBundle(copy)).filter(v => v.check === 'memory');
+      assert.deepEqual(violations.map(v => v.file), [anchor.file.split('/').join(path.sep)]);
+      assert.ok((violations[0]?.message ?? '').includes(anchor.literal), violations[0]?.message);
+    });
+  });
+}
+
+test('a brief that names a project glossary file is reported, while withholding it is not', async () => {
+  await withShippedCopy(async copy => {
+    const executor = path.join(copy, 'prompts', 'executor.md');
+    const body = await readFile(executor, 'utf8');
+    await writeFile(executor, body.replace('# ', '# Read GLOSSARY.md at the project root first.\n\n# '), 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'memory');
+    assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'executor.md')]);
+    assert.match(violations[0]?.message ?? '', /brief names GLOSSARY\.md .*only through prior\.md/);
+
+    const acceptance = path.join(copy, 'prompts', 'acceptance-reader.md');
+    const reader = await readFile(acceptance, 'utf8');
+    assert.ok(reader.includes('## What You Are Not Given'));
+    await writeFile(executor, body, 'utf8');
+    await writeFile(acceptance, reader.replace('## What You Are Not Given\n',
+      '## What You Are Not Given\n\nThe project glossary (`GLOSSARY-MAP.md`, `CONTEXT.md`) is withheld.\n'), 'utf8');
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'memory'), []);
+  });
+});
+
+test('every project glossary file name the runtime reads is one the brief check watches', async () => {
+  const { GLOSSARY_FILES, GLOSSARY_MAPS } = await import('../../skills/maestro/tools/runtime/memory.mts');
+  assert.deepEqual([...PROJECT_GLOSSARY_FILES].sort(), [...GLOSSARY_MAPS, ...GLOSSARY_FILES].sort());
+});
+
+test('a phase file that says a bare glossary is reported on its line, and the full name, a file name and a code span are not', async () => {
+  await withShippedCopy(async copy => {
+    const plan = path.join(copy, 'phases', '4-plan.md');
+    const body = await readFile(plan, 'utf8');
+    const line = body.split('\n').length + 3;
+    await writeFile(plan, `${body}\nA project\nglossary wraps; GLOSSARY-MAP.md is a name; \`glossary\` is a field.\nThe glossary is blurred.\n`, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'naming');
+    assert.deepEqual(violations.map(v => [v.file, v.line]), [[path.join('phases', '4-plan.md'), line]]);
+    assert.match(violations[0]?.message ?? '', /say "project glossary"/);
+  });
+});
+
+test('a bare glossary in a reference file is reported too', async () => {
+  await withShippedCopy(async copy => {
+    const references = (await readdir(path.join(copy, 'references'))).filter(name => name.endsWith('.md'));
+    const target = path.join(copy, 'references', references[0]!);
+    await writeFile(target, `${await readFile(target, 'utf8')}\nSee the glossary.\n`, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'naming');
+    assert.deepEqual(violations.map(v => v.file), [path.join('references', references[0]!)]);
   });
 });
 

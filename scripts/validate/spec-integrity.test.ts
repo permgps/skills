@@ -5,8 +5,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
+  bareGlossaryLines,
   carries,
   checkSpec,
+  proseOf,
   MAESTRO_PROFILE,
   parseTables,
   profileFor,
@@ -598,4 +600,35 @@ test('a link into the sibling specification is followed, not assumed', async () 
   });
   assert.equal(violations.length, 1);
   assert.equal(violations[0]?.check, 'links');
+});
+
+// --- the user's file of words is called the project glossary ---------------
+
+test('a bare glossary in a specification document is reported on its line, and the project glossary is not', async () => {
+  const violations = (await violationsFor({
+    'notes.md': '# Notes\n\nThe project glossary is the user\'s.\nThe glossary is blurred.\n',
+  })).filter(v => v.check === 'naming');
+  assert.deepEqual(violations.map(v => [v.file, v.line]), [['notes.md', 4]]);
+  assert.match(violations[0]?.message ?? '', /say "project glossary"/);
+});
+
+test('the naming rule reads prose only: a code span, a fenced block and a file name are not wording', () => {
+  assert.deepEqual(bareGlossaryLines([
+    'The JSON line reports `glossary`, and ``a `glossary` span`` too.',
+    '```text',
+    'glossary inside a fence',
+    '```',
+    'GLOSSARY-MAP.md and CONTEXT.md are names.',
+    'A Project',
+    'Glossary heading wraps, and project glossaries are plural.',
+    'Glossaries are blurred.',
+  ].join('\n')), [8]);
+});
+
+test('prose keeps every newline, so a line found in it is the line in the source', () => {
+  const source = 'a `one\ntwo` b\n```\nfenced\n```\nend `unclosed\n';
+  const prose = proseOf(source);
+  assert.equal(prose.split('\n').length, source.split('\n').length);
+  assert.doesNotMatch(prose, /one|two|fenced/);
+  assert.match(prose, /end `unclosed/);
 });
