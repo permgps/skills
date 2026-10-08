@@ -36,7 +36,9 @@ contradicts — and by then the бриф is the one document nobody is re-readin
   requests arrive as требования, and nowhere else.
 - **S5 has one boundary, not a judgement call.** The orchestrator's writes are
   limited to run artifacts, the project memory file, and version control. Every
-  other path in the repository belongs to an executor.
+  other path in the repository belongs to an executor. The project glossary is
+  the user's file, not the project memory file: a прогон reads it at preflight
+  and writes into it nowhere.
 - **S4 asks even in the no-questions mode.** That mode buys the user freedom from
   questions about preference, never from questions about consequence.
 - **S4 has one optional mechanical raise, and only on Claude Code.** The bundle

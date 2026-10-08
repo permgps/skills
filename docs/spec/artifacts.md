@@ -65,7 +65,7 @@ actually built.
 |---|---|---|---|
 | `brief.md` | manifest | manifest, G2, acceptance (the manifest plus the additions) | append-only |
 | `manifest.md` | manifest | briefing, spec, plan, acceptance, G1, G2, G3, G4 | append-only |
-| `prior.md` | preflight | briefing, spec, memory | no |
+| `prior.md` | preflight | briefing, spec, plan, memory | no |
 | `answers.md` | briefing | spec, G1 | append-only |
 | `reference.md` | briefing | G2 reference reader, acceptance reference reader, polish | append-only |
 | `spec.md` | spec | plan, build, review | yes, by amendment only |
@@ -233,10 +233,12 @@ single writer is named where the write permission is granted rather than here:
 file, and version control, and [`phases.md`](phases.md) says what goes in it and
 which region of it the прогон owns.
 
-`prior.md` is how a прогон reads what earlier ones left. Preflight writes it
-once through the helper, from the memory block and the `decisions.md` of every
-earlier run in the register. Briefing and the specification consult it, and
-every blind reader withholds it.
+`prior.md` is how a прогон reads what earlier ones left, and what the user
+keeps as their own words. Preflight writes it once through the helper, from the
+memory block, the project glossary and the `decisions.md` of every earlier run
+in the register. Briefing, the specification and the plan consult it, and every
+blind reader withholds it. The project glossary is copied into it under a size
+limit and is never written by the прогон.
 
 Requirement **statuses are not in `manifest.md`.** The manifest holds requirement
 text and nothing else, growing by rows; the statuses live in the run state, whose

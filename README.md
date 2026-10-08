@@ -506,7 +506,7 @@ your-project/.maestro/
 ├── 2026-10-04-notes-page--wip/     one directory per run; --wip comes off when it closes
 │   ├── 2026-10-04-brief.md         your words, redacted, plus the dated additions block
 │   ├── manifest.md                 the numbered requirements
-│   ├── prior.md                    what earlier runs decided, read at preflight
+│   ├── prior.md                    what earlier runs decided and your project glossary, read at preflight
 │   ├── answers.md, reference.md    briefing answers and the recorded reference
 │   ├── spec.md, interfaces.md      the specification and the contracts between таски
 │   ├── discovered-interfaces.md    what the build found it needed
@@ -553,6 +553,15 @@ your-project/.maestro/
   hosts. It never writes `CLAUDE.local.md` or `AGENTS.override.md`. The same
   block in two files, or broken markers, stop the memory phase instead of
   guessing. Details in [the hosts specification](docs/spec/hosts.md).
+- **Your project glossary is read, never written.** If the project root has a
+  `GLOSSARY.md` or `CONTEXT.md`, or a `GLOSSARY-MAP.md` or `CONTEXT-MAP.md`
+  linking to one such file per context, preflight reads it into `prior.md`. The
+  plan names things with your words and your words to avoid. Where the
+  манифест uses one of your terms in another meaning, the манифест wins for
+  that run, and the отчёт asks you under Assumptions to fix the project
+  glossary or the бриф. All of it together is read up to 32 KiB; past that,
+  none of it is read, and the run says so. Terms your project glossary already
+  defines are not repeated in the memory block.
 
 ## The Dashboard
 
@@ -750,8 +759,8 @@ exactly where the contract was not written in your own words.
 The skill uses Russian names for the things you see on screen in `ru`. The
 stages read *Подготовка, Требования, Брифинг, Спецификация, План, Разработка,
 Ревью, Приёмка*; a run is a *прогон*, a unit of work is a *таск*, and your
-numbered words are the *манифест*. Each term has exactly one name — the glossary
-is [`docs/spec/vocabulary.md`](docs/spec/vocabulary.md).
+numbered words are the *манифест*. Each term has exactly one name — the
+словарь is [`docs/spec/vocabulary.md`](docs/spec/vocabulary.md).
 
 **Three fields of the state carry the прогон's language, and the boundary is
 who is speaking.** `gates[].findings`, `tasks[].title` and `stages[].note` are the

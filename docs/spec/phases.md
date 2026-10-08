@@ -8,11 +8,11 @@ right thing was built.
 
 | Id | Name | Stage | Reads | Produces |
 |---|---|---|---|---|
-| preflight | Preflight | yes | user arguments, repository state, the memory file, the register and earlier runs' `decisions.md` | resolved dials, run state created, dashboard raised, `prior.md` |
+| preflight | Preflight | yes | user arguments, repository state, the memory file, the project glossary, the register and earlier runs' `decisions.md` | resolved dials, run state created, dashboard raised, `prior.md` |
 | manifest | Manifest | yes | бриф from the user, redacted source snapshots and independent audit return | `brief.md` — written once, then grown by its additions block — and `manifest.md` |
 | briefing | Briefing | yes | `manifest.md`, declared references, `prior.md` | `answers.md`, neutral `reference.md` |
 | spec | Specification | yes | `manifest.md`, `answers.md`, raw reference, `prior.md` | `spec.md`, obligation and source coverage map |
-| plan | Plan | yes | `spec.md`, obligations and checks, the repository's test, typecheck and lint configuration | `tasks/`, `interfaces.md`, ownership map |
+| plan | Plan | yes | `spec.md`, obligations and checks, the repository's test, typecheck and lint configuration, `prior.md` | `tasks/`, `interfaces.md`, ownership map |
 | build | Build | yes | task files, relevant raw reference, `interfaces.md`, blockers' `D##` rows | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
 | review | Review | yes | task files, obligations, evidence, `interfaces.md`, project code, the project's documented standards | `reviews/` including `reviews/standards.md` once per прогон, findings and check limits |
 | acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md` |
@@ -279,9 +279,18 @@ it is the plan-consistency reader's stale instruction.
 
 **Each domain word is named once.** After the conventions and before the Seams,
 `interfaces.md` carries a Terms table. Its columns are term, meaning, words to avoid, and the user's
-wording quoted from the original-language source clause. Terms that an earlier
+wording quoted from the original-language source clause. A word can arrive
+with a meaning already, and for one word the манифест outranks the project
+glossary, which outranks the memory block. A term the project glossary defines
+is taken as it stands, its avoid words included. Terms that an earlier
 прогон's memory block carries are taken over unless the манифест changed their
-meaning. The task-file reader counts a word to avoid, or a listed term used
+meaning, and a row that departs from one says `contradicts <date> decision,
+because …`. When the манифест uses a word the project glossary defines in
+another meaning, the манифест wins for this прогон, because it is the agreed
+contract. The row says `contradicts project glossary, because …`, and the plan
+appends one `debt.assumptions` line that asks the user to fix the project
+glossary or the бриф; the отчёт prints it under Assumptions. No stop is added.
+Nothing in a прогон writes into the project glossary. The task-file reader counts a word to avoid, or a listed term used
 with another meaning, as an undefined term. The table exists because a task
 file once said «a running score» without saying what it counts, and the README
 built from it described a tally the page does not keep.
@@ -844,27 +853,46 @@ was.
 Preflight reads what earlier прогоны left, once, after its first publish:
 `node .maestro/sync.mts --memory-read --run-dir <dir>` writes
 `.maestro/<dir>/prior.md`. That file holds the maestro block from every known
-memory file and the `decisions.md` of every earlier run listed in the register,
-excluding the current run. Runs from before contract 7 have no register row and
+memory file, the project glossary, and the `decisions.md` of every earlier run
+listed in the register, excluding the current run. Runs from before contract 7 have no register row and
 are not read. A second call keeps the first `prior.md`. A memory file with
 malformed markers is listed as not read and does not stop the run.
 
-Two phases use it, at the moment they decide:
+**The project glossary** is the user's own file of words: `GLOSSARY.md` or
+`CONTEXT.md` at the project root, or a `GLOSSARY-MAP.md` or `CONTEXT-MAP.md`
+together with every Markdown file its inline links name inside the project. A
+map is followed one level deep, and each file is read once whatever name
+reached it. A link that names a missing file or leads outside the project is
+listed as not read. One limit, 32 KiB, covers every file the project glossary
+adds, because `prior.md` is read into briefing, the spec and the plan. Past
+it, preflight reads none of the project glossary rather than a part chosen by
+order. It says so in the announcement and appends one `debt.assumptions`
+line, so the отчёт carries it under Assumptions. The project glossary is read
+and never written: the memory block stays the one region of the user's files a
+прогон owns.
+
+Three phases use it, at the moment they decide:
 
 - **Briefing**, for a fork the прогон settles itself.
 - **The specification**, for an entry that settles what an earlier прогон
   settled.
+- **The plan**, for the Terms table of `interfaces.md`, which takes words from
+  the project glossary and the memory block.
 
 Following an earlier decision is cited. Going against it is written
 `contradicts <date> decision, because …` and is never a silent override.
 `prior.md` is S6 content: it may prompt a question or ground a self-briefed
 answer, and it never adds or removes a требование. The memory phase starts its
 new block from the one `prior.md` carried, and carries the durable rows of the
-plan's Terms table forward, so the next plan names things the same way.
+plan's Terms table forward as `term — meaning (not: x, y)`, so the next plan names
+things the same way and does not give one thing a second name. A term the
+project glossary already defines is not carried: each word keeps one source of
+truth, and the block stays short.
 
 Every blind reader withholds `prior.md` (see [`gates.md`](gates.md)). A reader
 holding earlier decisions would confirm the past instead of checking this
-run's words.
+run's words, and the project glossary reaches a blind reader through nothing
+else.
 
 ### What Qualifies
 

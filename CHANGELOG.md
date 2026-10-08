@@ -30,6 +30,23 @@ number that claimed more than that would be claiming it falsely.
   The spec's blocking row also regains the file-ownership clause the prompt
   already had. `npm run bundle` holds four new literals in `REVIEW_ANCHORS`;
   1250 tests pass.
+- **The project's own glossary is read, never written.** Preflight's
+  `--memory-read` also reads `GLOSSARY.md` or `CONTEXT.md` at the project root,
+  and a `GLOSSARY-MAP.md` or `CONTEXT-MAP.md` with every file it links to inside
+  the project, into a fenced `## Project Glossary` section of `prior.md`. One
+  32 KiB limit covers all of it. Past it, none is read, the announcement says
+  so, and a `debt.assumptions` line carries it to the отчёт. The plan's Terms
+  table takes a project-glossary term as it stands. Where the манифест means
+  the word differently, the манифест wins for the прогон, the row says
+  `contradicts project glossary, because …`, and Assumptions asks the user to
+  fix the project glossary or the бриф. Phase 9 carries terms as
+  `term — meaning (not: x, y)` and drops any the project glossary defines.
+  Nothing writes into the user's file. `npm run bundle` holds five new
+  memory anchors, keeps the project glossary's file names out of every brief,
+  and, with `npm run spec`, refuses a bare «glossary» in prose: the user's file
+  is the project glossary, Maestro's words are the словарь, and one прогон's
+  words are the Terms table. The spec now lists the plan among `prior.md`'s
+  readers, as the plan phase already was.
 
 ## v0.0.13-alpha — 2026-10-05
 

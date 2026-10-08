@@ -564,9 +564,13 @@ historical gates with verification explicitly not established.
 exit codes.
 
 - `--memory-read --run-dir <dir>` writes `.maestro/<dir>/prior.md` from the
-  maestro block of every known memory file and the `decisions.md` of each
-  register row except `<dir>`. It reports `action: "written"`, `blockFiles`,
-  `runs` and `notRead`. An existing `prior.md` is kept, with `action: "kept"`.
+  maestro block of every known memory file, the project glossary and the
+  `decisions.md` of each register row except `<dir>`. It reports
+  `action: "written"`, `blockFiles`, `runs`, `glossary` and `notRead`.
+  `glossary` is `{ state, files, bytes, limit }`: `state` is `absent`,
+  `read` or `over-limit`, `files` names every file found in read order,
+  and `bytes` is their sum against the `limit`. Past the limit none of them
+  is read; that is still exit 0. An existing `prior.md` is kept, with `action: "kept"`.
   Malformed markers are reported under `notRead` and still exit 0. A missing,
   malformed or absent run directory exits 2.
 - `--memory-write --host <claude-code|codex|gemini-cli>` reads the block body
