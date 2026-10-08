@@ -158,7 +158,7 @@ sections under its own date rather than replacing what is there:
 | Assumptions | `debt.assumptions` and `debt.emptyEnv` as the прогон recorded them — every decision taken on the user's behalf, every unfilled variable by name — plus any wording whose translation was uncertain |
 | Questions to forward | `debt.placeholders`, as a questionnaire the user can send on as it is — every placeholder standing in for a fact nobody supplied |
 | Hard to undo | `oneWay`, one plain sentence per change the прогон made that is hard to take back |
-| Observations | the non-blocking findings carried out of `reviews/`, each `unrequested` one with its tag; then, under their own sub-heading, the standards pass's observations from `reviews/standards.md` — or one line saying the pass did not run; then each `noCorrectSeam:` line of a repeated repair's diagnosis, as a defect repaired without a regression check, with its таск and the reason as written — never the hypotheses |
+| Observations | the non-blocking findings carried out of `reviews/`, each `unrequested` or `risk:` one with its tag; then, under their own sub-heading, the standards pass's observations from `reviews/standards.md` — or one line saying the pass did not run; then each `noCorrectSeam:` line of a repeated repair's diagnosis, as a defect repaired without a regression check, with its таск and the reason as written — never the hypotheses |
 | What is left | deferred and dropped требования, each with the reason recorded against it |
 
 Build the acceptance table and closure summary from the same derived

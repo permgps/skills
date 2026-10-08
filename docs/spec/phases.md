@@ -497,7 +497,7 @@ Two kinds, and no third:
 
 | Kind | Means | Consequence |
 |---|---|---|
-| blocking | contradicts an item of the task file's *done means*, or a signature in `interfaces.md` | the таск does not become done |
+| blocking | contradicts an item of the task file's *done means*, touches a file the таск does not own, departs from a signature in `interfaces.md`, or is a risk with a concrete counterexample | the таск does not become done |
 | observation | anything else worth recording | carried into `report.md` |
 
 A middle grade is where a defect goes to be politely ignored: everything
@@ -528,6 +528,33 @@ the `strict` row. An observation it keeps gets one line naming the требов�
 serves. Under `normal` and `deep` it stays an observation and reaches the отчёт.
 This is the only cell of the review phase a dial changes, and it changes what the
 orchestrator does after the measurement, never the measurement.
+
+**Risk is checked from the diff, against five categories.** These are sign-in
+and permissions, money, deleting data, secrets, and messages sent to third
+parties. Four of them use the words `S4` and `S2` already use
+([`safety.md`](safety.md)). Sign-in and permissions has no S-rule of its own.
+
+- **Who decides.** The reviewer decides from the diff whether a category applies.
+  The plan does not mark таски as risky, so the plan phase and G3 do not change.
+- **When it blocks.** A risk finding blocks only with a concrete counterexample:
+  an input, a request or a caller the diff lets through to the harm. Without
+  one it is an observation. Suspicion is an observation by rule, not by
+  hesitation, so the two kinds stay two.
+- **The one exception to «absence is not a finding».** The usual hole is a
+  protection that is not there, and here that absence is the defect. When the
+  task file or `interfaces.md` names who provides the protection, its absence
+  from this diff is not a finding.
+- **The tag.** The finding is tagged `risk:<category>` the way `unrequested` is
+  tagged, and it is not a third kind. It quotes no line, because the task file
+  never mentioned the risk. It names the category and the counterexample
+  instead.
+
+**What it does not cover:** a gap that spans two таски. An endpoint from one
+таск may rely on a permission check another таск never wrote, and no per-таск
+reviewer sees both. When nothing names the provider, the reviewer records an
+unsettled `risk:` observation that reaches the отчёт, and G4 is what can catch
+the gap. The depth does not change any of this: the reviewer is still not told
+it.
 
 **Debug output a repair left behind is blocking.** A repair tags temporary
 diagnostics `[maestro-debug:DF-N]` and removes them before return. Before any
@@ -671,7 +698,7 @@ and passing it quietly are the same mistake made in opposite directions.
 | Assumptions | every decision taken on the user's behalf, every unfilled variable by name, and every wording whose translation was uncertain |
 | Questions to forward | every placeholder standing in for a fact nobody supplied, as a questionnaire the user can send on to whoever knows |
 | Hard to undo | every inward change the прогон made that is hard to take back — migrations, deleted or renamed user files, major dependency upgrades — in plain words |
-| Observations | the non-blocking findings the reviews carried forward, each `unrequested` one with its tag; then, under their own sub-heading, the standards pass's observations, or one line saying it did not run; then each `noCorrectSeam:` line of a repeated repair's diagnosis, as a defect repaired without a regression check, with its таск and reason — never the hypotheses |
+| Observations | the non-blocking findings the reviews carried forward, each `unrequested` or `risk:` one with its tag; then, under their own sub-heading, the standards pass's observations, or one line saying it did not run; then each `noCorrectSeam:` line of a repeated repair's diagnosis, as a defect repaired without a regression check, with its таск and reason — never the hypotheses |
 | What is left | deferred and dropped требования, unresolved work, closure outcome, and accepted exceptions without hiding technical failures |
 
 Fixed, because a отчёт whose shape is decided per прогон is a отчёт two прогона

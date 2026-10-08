@@ -137,6 +137,8 @@ rewritten in your words is a review whose original nobody can check.
 
 An observation is recorded and stops nothing; the отчёт reads these files later.
 An `unrequested` observation is written with its tag, as it came back.
+A `risk:` finding is written with its tag, as it came back, and a blocking one
+is imported like any other blocking finding.
 Import every substantiated finding into `verification.findings` with a stable ID,
 origin, affected requirement/obligation/check IDs, and evidence links. Route an
 upstream omitted obligation to coverage repair and an integration-evidence gap

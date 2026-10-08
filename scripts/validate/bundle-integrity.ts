@@ -412,6 +412,10 @@ export const CUT_ANCHORS: readonly Anchor[] = [
  * standards pass. Whether a reviewer recognises unrequested behaviour, whether a
  * promotion under `strict` was right, and whether a smell judgement is fair are
  * the readers' and the orchestrator's judgement, so no anchor stands for them.
+ * The reviewer also checks five risk categories from the diff, blocking only on
+ * a concrete counterexample. Whether a category applies and whether a
+ * counterexample is real are the reviewer's judgement, so the anchors hold the
+ * rule, the one exception for absence and the tag, never the verdict.
  * The debug-tag condition itself is also held executably, by
  * `scripts/gates/debug-tags.ts`.
  */
@@ -451,6 +455,14 @@ export const REVIEW_ANCHORS: readonly Anchor[] = [
     why: 'a smell called a violation turns a judgement into a blocking finding' },
   { file: 'prompts/standards-reader.md', literal: '`scope: seam`',
     why: 'the memory phase reads only the seam-level items' },
+  { file: 'prompts/reviewer.md', literal: 'the one place an absence is a finding',
+    why: 'without it a missing permission check reads as something the task file never asked for' },
+  { file: 'prompts/reviewer.md', literal: 'a concrete counterexample',
+    why: 'a risk blocked on suspicion is the middle grade again, and a counterexample is what repair can test' },
+  { file: 'prompts/reviewer.md', literal: 'marked `blocking · risk:<category>`',
+    why: 'the review file and the отчёт find risk findings by their tag' },
+  { file: 'phases/6-review.md', literal: 'A `risk:` finding is written with its tag',
+    why: 'a risk finding rewritten without its tag is lost to the отчёт' },
 ];
 
 /**

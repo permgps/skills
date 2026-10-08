@@ -790,6 +790,31 @@ test('the reviewer losing its fifth part is reported on the reviewer brief', asy
   });
 });
 
+test('the reviewer losing the one exception for absence is reported on the reviewer brief', async () => {
+  await withShippedCopy(async copy => {
+    const reviewer = path.join(copy, 'prompts', 'reviewer.md');
+    const body = await readFile(reviewer, 'utf8');
+    const dropped = body.replace(/the\s+one\s+place\s+an\s+absence\s+is\s+a\s+finding/, 'a note');
+    assert.notEqual(dropped, body);
+    await writeFile(reviewer, dropped, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'review');
+    assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'reviewer.md')]);
+    assert.match(violations[0]?.message ?? '', /missing permission check/);
+  });
+});
+
+test('a review phase that drops the risk tag is reported on the review phase', async () => {
+  await withShippedCopy(async copy => {
+    const review = path.join(copy, 'phases', '6-review.md');
+    const body = await readFile(review, 'utf8');
+    const dropped = body.replace(/A `risk:` finding is written\s+with its tag/, 'A finding is written');
+    assert.notEqual(dropped, body);
+    await writeFile(review, dropped, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'review');
+    assert.deepEqual(violations.map(v => v.file), [path.join('phases', '6-review.md')]);
+  });
+});
+
 test('the standards reader calling a smell a violation is reported on its brief', async () => {
   await withShippedCopy(async copy => {
     const reader = path.join(copy, 'prompts', 'standards-reader.md');

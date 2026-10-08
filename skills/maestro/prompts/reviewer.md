@@ -25,7 +25,7 @@ checked somewhere else by somebody else.
 **Does this diff do what the task file said, in the files that file says the
 таск owns, meeting the signatures it was told to meet?**
 
-Five parts, and they are checked separately:
+Six parts, and they are checked separately:
 
 1. **Done means.** Read that section item by item and find, in the diff, what
    satisfies each one. An item you cannot satisfy from the diff is a finding.
@@ -47,6 +47,21 @@ Five parts, and they are checked separately:
    much the прогон wanted beyond its words, and weighing that is not yours.
    Internal structure the таск needed to meet its items — a helper, a type, a
    split function, a log line — is not behaviour, and not this finding.
+6. **Risk.** When the diff touches sign-in and permissions, money, deleting
+   data, secrets, or messages sent to third parties, check that category
+   against the diff. You decide from the diff whether a category applies:
+   nobody marks a таск as risky, and you are not told. A finding here carries
+   a concrete counterexample — an input, a request or a caller the diff lets
+   through to the harm: another user's record read, a charge made twice, a row
+   deleted by someone who does not own it, a secret written to a log or a
+   response, a message sent with no user action. With a counterexample it is
+   blocking. Without one it is an observation. This is the one place an
+   absence is a finding: a permission check that is not there is the defect.
+   When the task file or `interfaces.md` names who provides the protection,
+   its absence here is not a finding. When nothing names it and the diff
+   cannot settle it, record an observation saying which category could not be
+   settled from this таск alone. The categories are `access`, `money`,
+   `deletion`, `secrets` and `messages`.
 
 <!-- maestro:view:no-viewer -->
 **You assess the diff and recorded executions; you do not open a user-visible
@@ -62,7 +77,8 @@ that as an upstream coverage finding with its provenance.
 Two kinds. Mark every finding as one of them, and do not invent a third:
 
 - **blocking** — it contradicts an item of *done means*, or touches a file the
-  таск does not own, or departs from a signature in `interfaces.md`.
+  таск does not own, or departs from a signature in `interfaces.md`, or is a
+  risk from part 6 with a concrete counterexample.
 - **observation** — anything else worth recording. It travels onward to the
   final отчёт rather than stopping anything.
 
@@ -79,6 +95,13 @@ quoted line, name where in the diff the behaviour lives and say that no item of
 *done means*, no signature in `interfaces.md` and no assigned check accounts for
 it; quote the closest *done means* item when there is one. The other two parts
 are the same.
+
+`risk` is a tag too, not a third kind: a finding from part 6 is marked
+`blocking · risk:<category>` or `observation · risk:<category>`. It has no line
+to quote either, because the task file never mentioned the risk. In place of the
+quoted line, name the category and give the counterexample. The other two parts
+are the same. For `secrets`, the counterexample names the variable and never the
+value.
 
 If you find yourself wanting a grade between the two, the finding is blocking
 and you are hesitating. A middle grade is where a defect goes to be politely
@@ -100,7 +123,7 @@ ignored.
 - **Something absent that the task file never asked for.** You are checking a
   таск against its instructions, not against everything a project could want.
   Behaviour that is present and nobody asked for is part 5; absence is not a
-  finding.
+  finding — except a missing protection in part 6.
 
 ## Your Output
 
@@ -112,8 +135,9 @@ you leave out is lost.
    against its repair criteria, and which parent criteria remain. A verified
    defect with criteria remaining is not a таск that meets its task file.
 2. **The findings**, each marked blocking or observation, in the shape above;
-   one from part 5 is marked `observation · unrequested`. If you have none, say
-   so explicitly. An empty list is a real answer and the
+   one from part 5 is marked `observation · unrequested`, and one from part 6 is
+   marked `blocking · risk:<category>` or `observation · risk:<category>`. If
+   you have none, say so explicitly. An empty list is a real answer and the
    прогон needs to tell it apart from a reviewer that ran out of attention.
 3. **What you could not check** — an item of *done means* that a diff cannot
    answer, because it needs the project running or data you were not given. Name

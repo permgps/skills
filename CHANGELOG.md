@@ -14,6 +14,23 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+`CONTRACT_VERSION` stays `7`.
+
+- **Review checks what is risky to get wrong.** The reviewer has a sixth part:
+  sign-in and permissions, money, deleting data, secrets, and messages sent to
+  third parties. The reviewer decides from the diff whether a category
+  applies; nothing in the plan marks a таск as risky. A finding blocks only
+  with a concrete counterexample, and without one it stays an observation.
+  This is the one place an absence counts as a finding: a permission check that
+  is not there is the defect, unless the task file or `interfaces.md` names who
+  provides it. Risk findings are tagged `risk:<category>` and quote no line,
+  just as `unrequested` ones are, and they reach the отчёт's Observations
+  through that tag. A gap that spans two таски is out of any per-таск
+  reviewer's sight. It is recorded as an unsettled observation and left to G4.
+  The spec's blocking row also regains the file-ownership clause the prompt
+  already had. `npm run bundle` holds four new literals in `REVIEW_ANCHORS`;
+  1250 tests pass.
+
 ## v0.0.13-alpha — 2026-10-05
 
 The second прогон in one project. `CONTRACT_VERSION` stays `7`; a closed run's
