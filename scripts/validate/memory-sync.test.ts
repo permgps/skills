@@ -137,6 +137,48 @@ test('malformed markers in a memory file are named in prior.md and do not fail t
   } finally { await project.dispose(); }
 });
 
+test('preflight\'s read carries a map and the glossaries it links to, and reports them in its JSON line', async () => {
+  const project = await target();
+  try {
+    const files: Record<string, string> = {
+      'GLOSSARY-MAP.md': '# Glossary Map\n\n## Contexts\n\n- [Ordering](./src/ordering/GLOSSARY.md): orders\n- [Billing](./src/billing/GLOSSARY.md): invoices\n',
+      'src/ordering/GLOSSARY.md': '# Ordering\n\n**Order**:\nA customer\'s request for goods.\n_Avoid_: Purchase\n',
+      'src/billing/GLOSSARY.md': '# Billing\n\n**Invoice**:\nA request for payment.\n_Avoid_: Bill\n',
+    };
+    for (const [file, body] of Object.entries(files)) {
+      await mkdir(path.dirname(path.join(project.root, file)), { recursive: true });
+      await writeFile(path.join(project.root, file), body, 'utf8');
+    }
+    await mkdir(path.join(project.maestro, CURRENT));
+
+    const read = project.sync(['--memory-read', '--run-dir', CURRENT]);
+    assert.equal(read.code, 0, read.stdout);
+    assert.deepEqual(read['glossary'], {
+      state: 'read',
+      files: ['GLOSSARY-MAP.md', 'src/ordering/GLOSSARY.md', 'src/billing/GLOSSARY.md'],
+      bytes: Buffer.byteLength(Object.values(files).join('')),
+      limit: 32 * 1024,
+    });
+    const prior = await readFile(path.join(project.maestro, CURRENT, 'prior.md'), 'utf8');
+    assert.match(prior, /### `src\/ordering\/GLOSSARY.md`\n\n```markdown\n# Ordering\n/);
+  } finally { await project.dispose(); }
+});
+
+test('a project glossary over the limit is reported by name and size, and not one line of it reaches prior.md', async () => {
+  const project = await target();
+  try {
+    await writeFile(path.join(project.root, 'GLOSSARY.md'), '**Term**:\n' + 'z'.repeat(32 * 1024), 'utf8');
+    await mkdir(path.join(project.maestro, CURRENT));
+
+    const read = project.sync(['--memory-read', '--run-dir', CURRENT]);
+    assert.equal(read.code, 0, read.stdout);
+    assert.deepEqual(read['glossary'], { state: 'over-limit', files: ['GLOSSARY.md'], bytes: 32 * 1024 + 10, limit: 32 * 1024 });
+    const prior = await readFile(path.join(project.maestro, CURRENT, 'prior.md'), 'utf8');
+    assert.match(prior, /Not read: 1 file, 32778 bytes, over the 32768-byte limit\./);
+    assert.doesNotMatch(prior, /\*\*Term\*\*/);
+  } finally { await project.dispose(); }
+});
+
 test('phase 9\'s write splices the block from stdin into the file the host loads', async () => {
   const project = await target();
   try {
