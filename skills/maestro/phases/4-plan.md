@@ -28,6 +28,10 @@ final return before importing results. The recipe is coordinator-only.
 It is the contract. Every таск you cut comes out of it, and a таск that cannot
 point at a part of it is work nobody asked for.
 
+Read `.maestro/<dir>/prior.md` as well, when preflight wrote one. The Terms
+table of `interfaces.md` takes words from its project glossary and its memory
+block, and it decides nothing else here.
+
 ### 2. Size the work
 
 | Project size | Signal | Таски | Wave width |
@@ -138,11 +142,39 @@ running at the same time agree without talking to each other.
   can build from. *Words to avoid* lists the near-synonyms that would make two
   таски name one thing two ways. *User's wording* quotes the original-language
   span from the run state's `verification.sourceClauses` when the term came
-  from the user, and `—` when the прогон coined it. Terms the memory block in
-  `prior.md` carries are taken over as they are, unless the манифест changed
-  their meaning. If it did, the row says `contradicts <date> decision,
-  because …`. This table exists because of the incident step 5 tells: a task
-  file used «a running score» and never said what it counts.
+  from the user, and `—` when the прогон coined it. This table exists because
+  of the incident step 5 tells: a task file used «a running score» and never
+  said what it counts.
+
+  A word can already have a meaning before this прогон. Two places in
+  `prior.md` carry one, and for a single word the манифест outranks the project
+  glossary, which outranks the memory block:
+  - **The project glossary** is the user's own file of words, and it is
+    authority. A term it defines is taken as it stands: its meaning, and its
+    avoid words into *Words to avoid*. *User's wording* stays `—` unless the
+    user also said the word. A term the memory block carries as well is taken
+    from the project glossary.
+  - **The memory block** is what earlier прогоны carried. Its terms are taken
+    over as they are, unless the манифест changed their meaning. If it did, the
+    row says `contradicts <date> decision, because …`.
+  - **When the манифест uses a word the project glossary defines, in another
+    meaning**, the манифест wins for this прогон, because it is the agreed
+    contract. The row's *Meaning* is the манифест's, followed by
+    `contradicts project glossary, because …`. Then append one line per such
+    term to `debt.assumptions`, which the отчёт prints under Assumptions:
+
+    ```text
+    project glossary: «<term>» means <its meaning there> in <file>, and <манифест meaning> in R## — this прогон used the манифест's meaning; fix the project glossary or the бриф
+    ```
+
+    No stop is added: the user settles it after the прогон, in whichever of the
+    two files is wrong.
+
+  The project glossary is the user's file. No phase and no таск of this прогон
+  writes into it. A таск whose work seems to need it changed says so in its
+  return and leaves the file as it is. When `prior.md` says the project
+  glossary was not read, the table is built without it; preflight has already
+  recorded that.
 - It ends with a **Seams** table — seam, producer task, consumer tasks,
   integration owner, integration check — one row per route, DTO, migration,
   port or file that one таск produces and another consumes. A seam with no

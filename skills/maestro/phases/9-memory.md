@@ -95,6 +95,9 @@ each host. The JSON line names the file.
 above the begin marker and below the end marker belongs to the user. It is not
 edited, not reformatted, not reordered, not summarised — not even where it says
 something you believe is wrong, and not even where it is obviously stale.
+The same holds, whole, for the project glossary: this phase reads it through
+`prior.md` and writes nothing into it, not even a term this прогон proved it
+lacks. That term goes into the block.
 
 That is not politeness. A user who finds their own paragraph rewritten once will
 never again write anything there that they would mind losing, and the file stops
@@ -106,10 +109,17 @@ A fact an earlier прогон wrote down and this one silently left out gets
 rediscovered by the next one.
 
 **Carry the durable terms.** The Terms rows of `interfaces.md` that name
-something the project keeps go into the block as `term — meaning`, so the
-next прогон's plan names things the same way. Leave out the user's
+something the project keeps go into the block as `term — meaning (not: x, y)`,
+the words in brackets being the row's *Words to avoid*, so the next прогон's
+plan names things the same way and does not give one thing a second name. A
+row with no words to avoid is `term — meaning`. Leave out the user's
 original-language quote, and leave out terms that only named this прогон's
 таски.
+
+Leave out a term the project glossary already defines, as `prior.md` carried
+it. Each word then has one source of truth, the user's, and the block stays
+short. When `prior.md` says the project glossary was not read, nothing is known
+to be defined there, so carry the terms as usual.
 
 Keep the block short. It is read by whoever opens the project next, before they
 have decided what they are doing, and length is what makes it skipped.

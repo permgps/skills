@@ -236,15 +236,41 @@ node .maestro/sync.mts --memory-read --run-dir <dir>
 ```
 
 This writes `.maestro/<dir>/prior.md`. It holds the maestro block of the
-project's memory file, and the `decisions.md` of every earlier run listed in
-the register. This run's own row is excluded by `--run-dir`. The read goes
+project's memory file, the project glossary, and the `decisions.md` of every
+earlier run listed in the register. This run's own row is excluded by `--run-dir`. The read goes
 after step 4 because the helper is copied there. Phase 9 of an earlier прогон
 wrote these files so that this one would not rediscover what was already
 settled. Until this step, nothing read them.
 
-Do not interpret `prior.md` here. Briefing and the spec read it, at the moment
-they decide something. Its contents are S6 content, written by an earlier
-прогон and not said by the user: they may prompt a briefing question or ground
+**The project glossary is the user's own file of words.** The helper reads
+`GLOSSARY.md` or `CONTEXT.md` at the project root, and a `GLOSSARY-MAP.md`
+or `CONTEXT-MAP.md` together with every file the map links to. Nothing in
+this прогон writes into any of them. The JSON line reports what it found as
+`glossary`: its `state` (`absent`, `read` or `over-limit`), the
+`files`, their `bytes` and the `limit`. One limit covers everything the
+project glossary adds, because `prior.md` is read into briefing, the spec and
+the plan. Past it, the helper reads none of the project glossary rather than
+an arbitrary part of it.
+
+When the state is `over-limit`, the прогон goes on without the project
+glossary, and that is a decision taken on the user's behalf. Record it where
+such decisions go: append one line to `debt.assumptions` and publish it at
+once, with `--expect` set to the `updatedAt` step 4 published:
+
+```text
+project glossary not read: <bytes> bytes, over the <limit>-byte limit — this прогон named things without it; shorten it or split it with a map, and it is read next time
+```
+
+The отчёт prints it under Assumptions and the dashboard under «Ваш ход», where
+every other decision taken for the user already reaches them. Say it in the
+announcement as well (step 6). A resumed preflight gets `action: "kept"` and
+no `glossary`, so the line is never appended twice. A `read` or an `absent` state adds
+nothing to say. A link in a map that names a missing file or leads outside the
+project is a `notRead` entry like any other.
+
+Do not interpret `prior.md` here. Briefing, the spec and the plan read it, at
+the moment they decide something. The memory block and the decisions are S6
+content, written by an earlier прогон and not said by the user: they may prompt a briefing question or ground
 an answer the прогон gives itself, and they never add or remove a требование.
 
 The JSON line names what was read. A `notRead` entry is said in the
@@ -386,6 +412,8 @@ because the host had no fan-out looks exactly like a прогон whose plan cut
 таск, and this is the cheapest place to tell the two apart.
 
 **Add what step 4b could not read**, one line each, naming the file and why.
+A project glossary over the limit is one line too, naming its size and the
+limit.
 
 It is a statement, not a question. Do not wait for a reply, in any mode.
 
@@ -400,7 +428,7 @@ nothing yet to check against the user's words.
 |---|---|
 | `.maestro/<dir>/` | `<YYYY-MM-DD>-<slug>--wip`, created with a zero-byte provisional `manifest.md`; no source agreement yet |
 | `.maestro/README.md` | the register, with this run's row in progress — written by the first publish, never by hand |
-| `.maestro/<dir>/prior.md` | the memory block and earlier runs' decisions, written once by `--memory-read` |
+| `.maestro/<dir>/prior.md` | the memory block, the project glossary and earlier runs' decisions, written once by `--memory-read` |
 | `.maestro/state.js` | written, `preflight` active |
 | `.maestro/dashboard.html` | copied, mirrored, and opened |
 | `.maestro/sync.mts`, `runtime/`, `index.html` | complete helper copied and index placed when available |
