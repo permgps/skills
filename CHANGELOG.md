@@ -16,6 +16,17 @@ number that claimed more than that would be claiming it falsely.
 
 `CONTRACT_VERSION` moves to `8`.
 
+- **A bare «да» in Scout's grill takes the recommendations.** Step 3 now words
+  every question so that «да» accepts its recommendation; a yes/no question
+  recommending «нет» is reworded. A bare «да» or «как советуешь» to the block is
+  resolved per `Q##` and printed back in the same turn, one line per question
+  with the chosen answer in full, as step 4 already does for «yes to all». A
+  mixed reply resolves only what it delegated. A fact only the user has (a
+  price, a name, a number) carries no recommendation, so it stays open. A
+  resolved answer is recorded as the chosen text, which is what a proposal
+  quotes. `scripts/scout/contract.ts` holds the shape of a question and the
+  print-back, and Scout's contract tests hold both rules in `steps/3-grill.md`
+  and `docs/spec/scout/steps.md`.
 - **The standards reader finds the standards itself.** Phase 6 handed the
   standards reader the memory file, `CONTRIBUTING*` and only the documents they
   or the README named, so a `CODING_STANDARDS.md` or a `STYLEGUIDE.md` that

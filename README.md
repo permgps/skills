@@ -713,7 +713,7 @@ so an agent may also offer it when you ask for help completing a ТЗ.
 |---|---|---|---|
 | 1 | Ground | two or three lines on what it understood, how many gaps it found with one example | read; correct it if it misunderstood |
 | 2 | Search | the search plan first — the angles, one example query each, the budget — then progress as sources come back | let it run, or say you do not want the sweep |
-| 3 | Grill | one numbered block of `Q##` forks, each with candidate answers, a recommendation, and its source marked as fact or **заявление** (a product's own claim); roughly seven to ten per round | answer by choosing, in your words, or «не знаю» |
+| 3 | Grill | one numbered block of `Q##` forks, each with candidate answers, a recommendation, and its source marked as fact or **заявление** (a product's own claim); roughly seven to ten per round | answer by choosing, in your words, or «не знаю»; a bare «да» takes every recommendation and prints each one back |
 | 4 | Reconcile | proposed edits to your ТЗ — add, fix, remove — one at a time | accept or reject each; silence is not acceptance, and "yes to all" prints what it accepted |
 | 5 | Compose | the бриф, written to a file **and** printed as one block; the open questions after the block, each with why it stayed open; a short cost summary | copy the block |
 
