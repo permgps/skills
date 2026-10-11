@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { metadataVersion } from '../../skills/maestro/tools/runtime/update-check.mts';
+
 import {
   BRIEFING_ANCHORS,
   CUT_ANCHORS,
@@ -25,6 +27,7 @@ import {
   MAESTRO_BUNDLE,
   MEMORY_ANCHORS,
   MODEL_ANCHORS,
+  UPDATE_ANCHORS,
   PROJECT_GLOSSARY_FILES,
   procedureSection,
   findRelativeLinks,
@@ -1026,6 +1029,76 @@ test('preflight no longer seeding signals is reported on the preflight phase', a
 });
 
 // --- the resident budget and who starts the skill ------------------------------
+
+// --- the version the прогон compares against the published one -------------
+
+const packageVersion = async (): Promise<string> =>
+  (JSON.parse(await readFile(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8')) as { version: string }).version;
+
+/** The shipped bundle with one edit to `SKILL.md`, and the checker's version findings against `version`. */
+async function versionFindingsAfter(edit: (skill: string) => string, version?: string): Promise<Violation[]> {
+  let found: Violation[] = [];
+  await withShippedCopy(async copy => {
+    const skill = path.join(copy, 'SKILL.md');
+    await writeFile(skill, edit(await readFile(skill, 'utf8')), 'utf8');
+    found = (await checkBundle(copy, MAESTRO_BUNDLE, version)).filter(v => v.check === 'version');
+  });
+  return found;
+}
+
+test('the shipped SKILL.md carries metadata.version equal to package.json, read by the helper\'s own parser', async () => {
+  const skill = await readFile(fileURLToPath(new URL('../../skills/maestro/SKILL.md', import.meta.url)), 'utf8');
+  assert.equal(metadataVersion(skill), await packageVersion());
+  assert.deepEqual(await versionFindingsAfter(text => text, await packageVersion()), []);
+});
+
+test('a SKILL.md version that differs from package.json is refused, and the message says to bump both together', async () => {
+  const violations = await versionFindingsAfter(text => text, '9.9.9-alpha');
+  assert.equal(violations.length, 1, JSON.stringify(violations));
+  assert.equal(violations[0]?.file, 'SKILL.md');
+  assert.match(violations[0]?.message ?? '', /package\.json says 9\.9\.9-alpha/);
+  assert.match(violations[0]?.message ?? '', /bump both in the same commit/);
+});
+
+test('a SKILL.md with no metadata.version is refused even when no package version is passed', async () => {
+  const strip = (text: string): string => text.replace(/\nmetadata:\n {2}version: "[^"]*"/, '');
+  for (const version of [undefined, '0.0.13-alpha']) {
+    const violations = await versionFindingsAfter(strip, version);
+    assert.equal(violations.length, 1, JSON.stringify(violations));
+    assert.match(violations[0]?.message ?? '', /has no metadata\.version/);
+  }
+});
+
+test('every update anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.equal(UPDATE_ANCHORS.length, 2);
+  await withShippedCopy(async copy => {
+    for (const anchor of UPDATE_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'update'), []);
+  });
+});
+
+for (const anchor of UPDATE_ANCHORS) {
+  test(`${anchor.file} losing "${anchor.literal}" is the one update finding, named on that file`, async () => {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, anchor.file);
+      const flat = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal), `${anchor.file} carries no "${anchor.literal}"`);
+      await writeFile(target, flat.split(anchor.literal).join('removed'), 'utf8');
+      const violations = (await checkBundle(copy)).filter(v => v.check === 'update');
+      assert.deepEqual(violations.map(v => v.file), [anchor.file.split('/').join(path.sep)]);
+      assert.ok((violations[0]?.message ?? '').includes(anchor.literal), violations[0]?.message);
+    });
+  });
+}
+
+test('Scout carries no version and is never asked for one', async () => {
+  const scout = fileURLToPath(new URL('../../skills/scout', import.meta.url));
+  assert.equal(bundleProfileFor(scout).versioned, undefined);
+  assert.deepEqual((await checkBundle(scout, bundleProfileFor(scout), '9.9.9')).filter(v => v.check === 'version'), []);
+});
 
 test('the shipped bundle sits exactly at its resident ceilings and declares explicit-only invocation on both hosts', async () => {
   await withShippedCopy(async copy => {

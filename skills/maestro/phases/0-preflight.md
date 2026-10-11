@@ -324,6 +324,23 @@ preflight reads what this one read. A run resumed from before contract 7 has no
 `dir` and skips this step. The phases that read `prior.md` then find none and
 go on without it.
 
+### 4c. Ask whether a newer Maestro is out
+
+```text
+node .maestro/sync.mts --update-check --skill <installed skill directory>
+```
+
+Pass the directory step 4 copied the helper from. The helper reads that
+directory's `SKILL.md` for the installed version and makes one GET of the
+published `SKILL.md`, with a 2-second timeout. It is a public file, and the
+request sends nothing about the user, the project or the прогон.
+`MAESTRO_NO_UPDATE_CHECK=1` in the environment turns it off.
+
+Only `result: "newer"` matters: keep its `line` for step 6. Every other result
+(`current`, `disabled`, `unknown`) adds nothing, and so does a command that
+fails to run. Offline is the ordinary case, not a failure. Do not retry, and do
+not tell the user a check happened.
+
 ### 5. Raise the dashboard
 
 <!-- maestro:view:opens-panel -->
@@ -462,6 +479,9 @@ line each.
 A project glossary over the limit is one line too, naming its size and the
 limit.
 
+**Add the update line** from step 4c when there is one, as it came. The helper
+wrote it in the прогон's language, so do not translate it.
+
 It is a statement, not a question. Do not wait for a reply, in any mode.
 
 ## Gates
@@ -482,6 +502,7 @@ nothing yet to check against the user's words.
 | `.maestro/sync.mts`, `runtime/`, `index.html` | complete helper copied and index placed when available |
 | the dashboard address | said in the chat, with the tool's folded-pane line beside it |
 | the announcement | shown, with any missing host capability named |
+| the update line | in the announcement only when step 4c returned `newer` |
 
 ## Source Audit Capability
 

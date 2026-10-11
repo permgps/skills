@@ -13,13 +13,16 @@
 import { readFile, readdir, stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { builtinModules } from 'node:module';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { checkCodexRuntime } from './host-degradation.ts';
 import { GLOSSARY_NAMING_MESSAGE, bareGlossaryLines } from './spec-integrity.ts';
 
 import { createLogger } from '../shared/log.ts';
 import { formatViolation, type Violation } from '../shared/violation.ts';
+// The helper's own reader, so the field held equal to `package.json` here is
+// exactly the field the прогон reads to say a newer Maestro is out.
+import { metadataVersion } from '../../skills/maestro/tools/runtime/update-check.mts';
 
 export type { Violation };
 
@@ -72,6 +75,13 @@ export interface BundleProfile {
    * One declaration without the other is the two hosts drifting apart.
    */
   invocation?: 'explicit-only';
+  /**
+   * `SKILL.md` carries `metadata.version`, equal to `package.json`'s. The
+   * helper reads it to tell the user a newer Maestro is out, and no release
+   * script exists to bump both, so this check is what keeps them together.
+   * Absent means the bundle carries no version.
+   */
+  versioned?: boolean;
 }
 
 export const MAESTRO_BUNDLE: BundleProfile = {
@@ -83,6 +93,7 @@ export const MAESTRO_BUNDLE: BundleProfile = {
   // the roadmap, not a fix.
   resident: { skillLines: 547, descriptionChars: 256 },
   invocation: 'explicit-only',
+  versioned: true,
 };
 
 /** Where Codex reads a skill's invocation policy, relative to the bundle. */
@@ -630,6 +641,21 @@ export const CODEBASE_ANCHORS: readonly Anchor[] = [
 ];
 
 /**
+ * The literal text that carries «the прогон says when a newer Maestro is out».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. The comparison lives in
+ * the helper and is held by its tests; the version it reads is held equal to
+ * `package.json` by the `version` check. What only prose can carry is that
+ * preflight calls the helper at all, and that the announcement shows its line.
+ */
+export const UPDATE_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/0-preflight.md', literal: 'sync.mts --update-check',
+    why: 'preflight is the one place the прогон asks; without the call nothing ever tells the user an update is out' },
+  { file: 'phases/0-preflight.md', literal: '**Add the update line**',
+    why: 'the helper composes the line, and the announcement is where the user reads it' },
+];
+
+/**
  * The literal text that carries «each субагент runs on its tier's model».
  *
  * Matched literally for the reason `MEMORY_ANCHORS` is. The plan marks each
@@ -847,6 +873,8 @@ export function procedureSection(body: string, heading: string): string {
 export async function checkBundle(
   bundleDir: string,
   profile: BundleProfile = MAESTRO_BUNDLE,
+  /** `package.json`'s version; absent, a versioned bundle is checked for carrying one at all. */
+  packageVersion?: string,
 ): Promise<Violation[]> {
   const PHASES_DIR = profile.steps;
   const PROMPTS_DIR = profile.prompts;
@@ -885,6 +913,21 @@ export async function checkBundle(
         `frontmatter name "${declared}" does not match directory "${directory}"`);
     }
     log.info('frontmatter', 'frontmatter checked', { keys: frontmatter.keys.size });
+  }
+
+  // --- the version the прогон compares against the published one -----------
+  if (profile.versioned) {
+    const before = violations.length;
+    const skillVersion = metadataVersion(skill);
+    log.debug('version', 'version read', { skillVersion, packageVersion: packageVersion ?? null });
+    if (skillVersion === null) {
+      add('version', 'SKILL.md', 1,
+        'SKILL.md frontmatter has no metadata.version; add it equal to package.json\'s version — the helper reads it to tell the user a newer Maestro is out');
+    } else if (packageVersion !== undefined && skillVersion !== packageVersion) {
+      add('version', 'SKILL.md', 1,
+        `metadata.version is ${skillVersion} and package.json says ${packageVersion}; bump both in the same commit — there is no release script`);
+    }
+    log.info('version', 'version checked', { violations: violations.length - before });
   }
 
   // --- the resident budget --------------------------------------------------
@@ -1149,6 +1192,12 @@ export async function checkBundle(
     for (const v of missingAnchors(byFile, CODEBASE_ANCHORS, 'codebase')) add(v.check, v.file, v.line, v.message);
   }
 
+  // --- the прогон says when a newer Maestro is out ----------------------------
+  // Only a versioned bundle has a version to compare; Scout has none.
+  if (profile.versioned && byFile.has('phases/0-preflight.md')) {
+    for (const v of missingAnchors(byFile, UPDATE_ANCHORS, 'update')) add(v.check, v.file, v.line, v.message);
+  }
+
   // --- each субагент runs on its tier's model ---------------------------------
   // Only a bundle with a plan phase marks tiers; Scout has none.
   if (byFile.has('phases/4-plan.md')) {
@@ -1293,9 +1342,24 @@ async function main(): Promise<number> {
   const profile = bundleProfileFor(bundleDir);
   log.info('run', 'checking bundle', { bundleDir, profile: profile.name });
 
+  // Resolved from this file, never from cwd: the version belongs to this
+  // repository's package, whichever directory the check is run from.
+  const packageFile = fileURLToPath(new URL('../../package.json', import.meta.url));
+  let packageVersion: string;
+  try {
+    const parsed = JSON.parse(await readFile(packageFile, 'utf8')) as { version?: unknown };
+    if (typeof parsed.version !== 'string') throw new Error('package.json has no string "version"');
+    packageVersion = parsed.version;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    log.error('run', 'package.json could not be read', { packageFile, reason });
+    process.stdout.write(`bundle-integrity: cannot read ${packageFile}\n`);
+    return 2;
+  }
+
   let violations: Violation[];
   try {
-    violations = await checkBundle(bundleDir, profile);
+    violations = await checkBundle(bundleDir, profile, packageVersion);
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     log.error('run', 'bundle could not be read', { bundleDir, reason });

@@ -3,6 +3,8 @@ name: maestro
 description: Turn a dictated idea into a finished, verified project in one dialogue. Use when the user describes something they want built, changed, or finished — a feature, a page, a service, a whole project — rather than asking a question or requesting a single edit.
 argument-hint: "[full|semi|interview|manual] [strict|normal|deep] <what you want built>"
 disable-model-invocation: true
+metadata:
+  version: "0.0.13-alpha"
 ---
 
 # Maestro
@@ -154,8 +156,6 @@ a lock; the re-read is still a step you perform.
 opening the one that begins is a **single write**, performed the moment the
 previous phase's output is complete — before this phase's rules are loaded,
 before its diffs are gathered, before a subagent is briefed.
-
-That preparation is the beginning of the new стадия, and it is not small.
 
 So `finishedAt` of one стадия and `startedAt` of the next are the same instant.
 
