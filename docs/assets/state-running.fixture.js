@@ -341,9 +341,5 @@ globalThis.MAESTRO_STATE = {
   },
   "additions": [
     "Скелет загрузки для блока цен — ради R05"
-  ],
-  "tests": {
-    "passed": 41,
-    "failed": 0
-  }
+  ]
 };
