@@ -15,6 +15,7 @@ import {
   GATE_STATUSES,
   LANGUAGES,
   LIFECYCLES,
+  MODEL_TIERS,
   MODES,
   ONE_WAY_KINDS,
   REGISTERS,
@@ -239,6 +240,17 @@ export function validateState(value: unknown): StateViolation[] {
    */
   const atLeastV3 = typeof version === 'number' && version >= 3;
   const atLeastV4 = typeof version === 'number' && version >= 4 && version <= CONTRACT_VERSION;
+  /**
+   * Whether this state promises the models dial. Below it a field from 8 is
+   * refused rather than ignored: a contract-7 прогон runs every таск on the
+   * session's model, and a tier it carried would claim a choice nothing made.
+   */
+  const atLeastV8 = typeof version === 'number' && version >= 8 && version <= CONTRACT_VERSION;
+  const refuseBelowV8 = (field: string, raw: unknown): void => {
+    if (raw === undefined) return;
+    log.debug('version-gate', 'field refused for its contract version', { version, field });
+    add(field, `${field} arrives with contract 8 — a contract-7 run keeps running on the session's model; remove it`);
+  };
 
   /**
    * Whether a stamp is a moment, under the rule its contract is read by.
@@ -605,6 +617,15 @@ export function validateState(value: unknown): StateViolation[] {
         requireCount(`${at}.repairs`, entry['repairs']);
         requireCount(`${at}.handoffs`, entry['handoffs']);
       }
+
+      const model = entry['model'];
+      if (!atLeastV8) {
+        refuseBelowV8(`${at}.model`, model);
+      } else if (model === undefined) {
+        add(`${at}.model`, `contract 8 requires ${at}.model — write strong or standard, as the plan marked the таск`);
+      } else {
+        requireOneOf(`${at}.model`, model, MODEL_TIERS);
+      }
     });
     requireUniqueIds('tasks', tasks);
   }
@@ -737,6 +758,23 @@ export function validateState(value: unknown): StateViolation[] {
     }
   }
   checkRunDir(value, add);
+
+  // The models each tier runs on. Each half is `session` or a name the host
+  // reported; which names the host reports is the dials phase's question, never
+  // this file's, so only the shape is held here.
+  const models = value['models'];
+  if (!atLeastV8) {
+    refuseBelowV8('models', models);
+  } else if (!isRecord(models)) {
+    add('models', 'contract 8 requires models — write { strong, standard }, each "session" or a model name the host reports');
+  } else {
+    for (const half of MODEL_TIERS) {
+      const name = models[half];
+      if (typeof name !== 'string' || name.trim() === '') {
+        add(`models.${half}`, `models.${half} must be a non-empty string — write "session" to pass no model, or a model name the host reports`);
+      }
+    }
+  }
 
   if (atLeastV4) {
     requireOneOf('lifecycle', value['lifecycle'], LIFECYCLES);

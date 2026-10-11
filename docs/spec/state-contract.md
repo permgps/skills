@@ -14,6 +14,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `runId` | string | preflight | dashboard |
 | `slug` | string | preflight | dashboard |
 | `dir` | string, the run directory under `.maestro/`, required from contract 7 | preflight | dashboard |
+| `models` | `{ strong, standard }`, each `session` or a model name the host reports, required from contract 8 | preflight | every dispatching phase |
 | `startedAt` | ISO 8601 string | preflight | dashboard |
 | `updatedAt` | ISO 8601 string | preflight | dashboard |
 | `heldBy` | optional `{ token, since }` | preflight | dashboard |
@@ -25,20 +26,20 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `dialChanges[]` | list of `{ dial, from, to, atPhase }` | preflight | dashboard |
 | `stages[]` | list of `{ id, status, startedAt?, finishedAt?, note? }` | preflight | dashboard |
 | `currentStage` | stage id | preflight | dashboard |
-| `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
+| `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], model, retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason?, title? }` | manifest | dashboard |
 | `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
-| `lifecycle` | `active` \| `closed` in contracts 4–7 | preflight | dashboard |
+| `lifecycle` | `active` \| `closed` in contracts 4–8 | preflight | dashboard |
 | `outcome` | `completed` \| `closed_with_exceptions` \| `stopped_incomplete`, only when closed | acceptance | dashboard |
 | `stopReason` | string, required for `stopped_incomplete` | acceptance | dashboard |
-| `verification` | versioned verification index, required in contracts 4–7 | preflight | dashboard |
+| `verification` | versioned verification index, required in contracts 4–8 | preflight | dashboard |
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
 | `oneWay` | optional list of strings, one inward one-way change each | review | acceptance, dashboard |
 | `signals` | optional list of strings, one recorded signal each, appended by build, review, acceptance and polish | preflight | metrics |
 | `existingCode` | optional boolean, whether the project held code at preflight | preflight | spec |
 | `tests` | `{ passed, failed }` | build | dashboard |
-| `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–7 | acceptance | dashboard |
+| `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–8 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
 | `awaiting` | optional `{ kind: 'answer', since }`, set by every stop on a question from the манифест on | manifest | dashboard |
 
@@ -75,10 +76,11 @@ row says `dashboard`.** The orchestrator reads its own state constantly — on
 recovery after a compaction, and in the repair phase, which learns from
 `tasks[].status` which таск arrived and by which entrance. Listing itself as a
 reader of what it writes would turn a column about the integration point into a
-list of everywhere the state is opened. The three exceptions name the phase or
+list of everywhere the state is opened. The four exceptions name the phase or
 tool that reads the field besides the page: `oneWay` is read by acceptance for
-the отчёт, `signals` by the metrics tool and by no screen, and `existingCode`
-by the spec phase alone.
+the отчёт, `signals` by the metrics tool and by no screen, `existingCode`
+by the spec phase alone, and `models` by every phase that dispatches a
+субагент.
 
 `heldBy` was a dash here until the page began naming the claim inside its raised
 silence notice; it now says `dashboard` because that is now true, not to keep the
@@ -238,6 +240,7 @@ cannot.
 |---|---|
 | `stages[].status` | `pending`, `active`, `done`, `failed`, `skipped` |
 | `tasks[].status` | `queued`, `running`, `review`, `repair`, `done`, `failed` |
+| `tasks[].model` | `strong`, `standard` |
 | `requirements[].status` | `open`, `in-spec`, `deferred`, `dropped`, `placeholder` |
 | `gates[].status` | `pending`, `passed`, `failed` |
 | `lifecycle` | `active`, `closed` |
@@ -464,6 +467,26 @@ the legacy resume conversion still targets contracts 4–6. A `dir` on a state
 below contract 7 is refused, because the field would carry a meaning that
 contract does not have.
 
+## Version 8 Extension
+
+Contract 8 keeps verification version 3 and every contract-7 rule, and adds the
+models dial ([`dials.md`](dials.md) › *Models*):
+
+- **`models`** is `{ strong, standard }`: the model each tier runs on. Each
+  half is a non-empty string, either `session` — pass no model, so the субагент
+  inherits the session's — or a model name the host reported when the dials
+  were resolved. The dials phase resolves it and preflight seeds it; it does not
+  change for the life of the прогон. It lives in the state because a recovering
+  session re-reads the dials from the state, never from the phase rules.
+- **`tasks[].model`** is `strong` or `standard`: which tier builds the таск.
+  The plan phase writes it at the cut and nothing changes it afterwards. A
+  producer of a seam and the skeleton are `strong`; G3 holds that rule
+  ([`gates.md`](gates.md)).
+
+Both are required from contract 8 and refused below it, as `dir` is below 7: a
+contract-7 run carries neither, runs every таск on the session's model, and is
+never migrated. A tier on a contract-7 state would claim a choice nothing made.
+
 ## Versioning
 
 - `contractVersion` starts at `1` and is stored in every state file.
@@ -476,6 +499,13 @@ contract does not have.
 - The contract is changed in `scripts/state/` before it is changed on either
   side. That is what makes the single integration point real rather than
   aspirational.
+
+**Version 8** requires two new fields, `models` and `tasks[].model`, and
+adds the value set `tasks[].model`. A required field is what raises it: an
+optional tier would raise nothing, and a прогон that left it out would build
+every таск on one model while the plan said otherwise. The dashboard's
+`KNOWN_CONTRACT_VERSION` moves with it and renders nothing new; a contract-7
+state renders as it did.
 
 **Version 7** requires a new field, `dir`, and gives the run directory a
 meaning it did not have: a dated name whose suffix tracks the lifecycle. The
@@ -550,8 +580,8 @@ The sole installed command is `node .maestro/sync.mts`; its relative
 exports are compatibility facades. The installed helper imports only its own
 modules and `node:*` built-ins. It resolves the run directory from the copied
 entrypoint and the project root from that directory's parent, irrespective of
-cwd or the target's package type. It publishes contracts 4, 5, 6 and 7; each keeps its own verification version,
-and contract 7 shares verification 3 with contract 6. The contract version of a
+cwd or the target's package type. It publishes contracts 4, 5, 6, 7 and 8; each keeps its own verification version,
+and contracts 7 and 8 share verification 3 with contract 6. The contract version of a
 run does not change between two published states except through the legacy
 resume conversion.
 

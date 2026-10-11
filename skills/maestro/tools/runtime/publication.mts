@@ -54,8 +54,8 @@ export async function candidateViolations(candidate: unknown, dir: string,
   options: { evidence?: boolean } = {}): Promise<StateViolation[]> {
   try {
     const errors = [...validateState(candidate), ...languageViolations(candidate)];
-    if (!isRecord(candidate) || ![4, 5, 6, 7].includes(candidate['contractVersion'] as number)) {
-      errors.push({ field: 'contractVersion', message: 'publication requires contract version 4, 5, 6 or 7' });
+    if (!isRecord(candidate) || ![4, 5, 6, 7, 8].includes(candidate['contractVersion'] as number)) {
+      errors.push({ field: 'contractVersion', message: 'publication requires contract version 4, 5, 6, 7 or 8' });
     }
     if (errors.length === 0 && options.evidence !== false) {
       const state = candidate as RunState;

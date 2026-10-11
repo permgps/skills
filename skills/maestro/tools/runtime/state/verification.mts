@@ -726,7 +726,7 @@ export function validateVerificationTransition(
   if (prior.version !== 1) {
     // A contract-5 run may resume as contract 6; nothing moves the other way.
     const lawful = current.version === 2 ? prior.version === 2 && next.contractVersion === 5
-      : current.version === 3 && (next.contractVersion === 6 || next.contractVersion === 7);
+      : current.version === 3 && next.contractVersion >= 6;
     if (!lawful || current.version === 1) {
       errors.push({ field: 'verification.version', message: 'published safeguards cannot be downgraded' });
     } else {

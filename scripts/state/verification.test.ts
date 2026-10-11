@@ -9,7 +9,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { CAPTURES, SOURCE_MANIFEST, activeContract6State, activeContract7State, contract7State, fingerprint, planningOwnershipState, repairContract6State, repairContract7State, sha256, v3Attempt, verifiedState } from './fixtures/verification.ts';
+import { CAPTURES, SOURCE_MANIFEST, activeContract6State, activeContract7State, asContract8, contract7State, fingerprint, planningOwnershipState, repairContract6State, repairContract7State, sha256, v3Attempt, verifiedState } from './fixtures/verification.ts';
 import { validateStateTransition } from './closure.ts';
 import { deriveVerification, effectiveExecution, validateVerificationTransition } from './verification.ts';
 import { validateState, InvalidStateError } from './validate.ts';
@@ -573,4 +573,12 @@ test('a verification stamp that is not an ISO 8601 moment with a zone is refused
   const repair = repairContract7State();
   repair.verification!.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T13:20:00.250+03:00')];
   assert.deepEqual(validateState(repair), []);
+});
+
+test('a published contract-7 run cannot be republished as contract 8, so it keeps running on the session model', () => {
+  const prior = activeContract7State();
+  const next = asContract8(structuredClone(prior));
+  assert.equal(next.contractVersion, 8);
+  assert.ok(validateStateTransition(prior, next).some(item => item.field === 'contractVersion'
+    && /keeps its contract from 7 on/.test(item.message)));
 });

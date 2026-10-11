@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { validateState, isValidState, type StateViolation } from './validate.ts';
 import { CONTRACT_VERSION, type RunState, type VerificationRecordV3 } from './contract.ts';
-import { activeContract7State, contract6State, contract7State, sourceVerifiedState } from './fixtures/verification.ts';
+import { activeContract7State, activeContract8State, contract6State, contract7State, contract8State, sourceVerifiedState } from './fixtures/verification.ts';
 import { validateStateTransition } from './closure.ts';
 import { prepareLegacyResume } from './projection.ts';
 
@@ -1009,6 +1009,47 @@ test('a contract-6 state carrying dir is refused, because the field means nothin
   assert.deepEqual(validateState(contract6State()), []);
 });
 
+const modelMessages = (state: unknown): string[] => validateState(state)
+  .filter(item => item.field === 'models' || item.field.startsWith('models.') || /\.model$/.test(item.field))
+  .map(item => `${item.field}: ${item.message}`);
+
+test('a contract-8 run in progress and a closed one each validate with their models and tiers', () => {
+  assert.deepEqual(validateState(activeContract8State()), []);
+  assert.deepEqual(validateState(contract8State()), []);
+});
+
+test('contract 8 refuses a таск with no tier, naming the field and the two values to write', () => {
+  const state = contract8State();
+  delete state.tasks[0]!.model;
+  assert.deepEqual(modelMessages(state), ['tasks[0].model: contract 8 requires tasks[0].model — write strong or standard, as the plan marked the таск']);
+});
+
+test('a tier outside strong and standard is refused', () => {
+  const state = contract8State();
+  (state.tasks[0] as unknown as Record<string, unknown>)['model'] = 'cheap';
+  assert.deepEqual(modelMessages(state), ['tasks[0].model: tasks[0].model must be one of strong, standard — got "cheap"']);
+});
+
+test('a contract-7 state carrying a tier or models is refused, because it ran every таск on the session model', () => {
+  const tiered = contract7State();
+  tiered.tasks[0] = { ...tiered.tasks[0]!, model: 'strong' };
+  assert.match(modelMessages(tiered)[0]!, /^tasks\[0\]\.model: tasks\[0\]\.model arrives with contract 8 — a contract-7 run keeps running on the session's model/);
+  const pinned = { ...contract7State(), models: { strong: 'session', standard: 'sonnet' } };
+  assert.match(modelMessages(pinned)[0]!, /^models: models arrives with contract 8/);
+});
+
+test('contract 8 refuses a state with no models, and says what each half may hold', () => {
+  const { models: _models, ...state } = contract8State();
+  assert.deepEqual(modelMessages(state), ['models: contract 8 requires models — write { strong, standard }, each "session" or a model name the host reports']);
+});
+
+test('an empty or missing half of models is refused by its own name', () => {
+  const empty = contract8State(); empty.models = { strong: 'session', standard: '  ' };
+  assert.deepEqual(modelMessages(empty), ['models.standard: models.standard must be a non-empty string — write "session" to pass no model, or a model name the host reports']);
+  const half = { ...contract8State(), models: { standard: 'sonnet' } };
+  assert.deepEqual(modelMessages(half), ['models.strong: models.strong must be a non-empty string — write "session" to pass no model, or a model name the host reports']);
+});
+
 test('a contract-7 write cannot change slug, runId or startedAt', () => {
   const prior = activeContract7State();
   for (const [field, value] of [['slug', 'other-menu'], ['runId', 'run-synthetic-2'], ['startedAt', '2026-09-28T09:00:00Z']] as const) {
@@ -1025,10 +1066,11 @@ test('closing a contract-7 run with the suffix taken off is a lawful write', () 
   assert.ok(!validateStateTransition(prior, next).some(item => ['dir', 'slug', 'runId', 'startedAt', 'contractVersion'].includes(item.field)));
 });
 
-test('a state without a title or an awaiting reply validates, at contract 3 and contract 7 alike', () => {
+test('a state without a title or an awaiting reply validates, at contract 3, 7 and 8 alike', () => {
   assert.deepEqual(validateState(baseline()), []);
   assert.deepEqual(validateState(activeContract7State()), []);
-  assert.equal(CONTRACT_VERSION, 7);
+  assert.deepEqual(validateState(activeContract8State()), []);
+  assert.equal(CONTRACT_VERSION, 8);
 });
 
 test('a requirement title is one line of text, and an empty or non-string one is reported', () => {

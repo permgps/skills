@@ -344,3 +344,24 @@ export const activeContract7State = (): ReturnType<typeof contract6State> => asC
 
 /** The contract-7 run in repair, with the same open defect as its contract-6 twin. */
 export const repairContract7State = (): ReturnType<typeof contract6State> => asContract7(repairContract6State());
+
+/**
+ * Contract 8 is contract 7 plus the models dial: every таск on `standard` and
+ * both tiers on `session`, which is what a прогон on a host that cannot pick a
+ * model per субагент writes.
+ */
+export function asContract8<T extends RunState>(state: T): T {
+  const seven = state.contractVersion >= 7 ? state : asContract7(state);
+  return {
+    ...seven,
+    contractVersion: 8,
+    models: { strong: 'session', standard: 'session' },
+    tasks: seven.tasks.map(task => ({ ...task, model: 'standard' as const })),
+  };
+}
+
+/** The closed contract-8 delivery. */
+export const contract8State = (): ReturnType<typeof contract6State> => asContract8(contract7State());
+
+/** The contract-8 run while it is still building. */
+export const activeContract8State = (): ReturnType<typeof contract6State> => asContract8(activeContract7State());

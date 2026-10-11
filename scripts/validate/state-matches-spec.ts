@@ -31,6 +31,7 @@ const VALUE_SET_CONSTANTS: Record<string, string> = {
   'language': 'LANGUAGES',
   'stages[].status': 'STAGE_STATUSES',
   'tasks[].status': 'TASK_STATUSES',
+  'tasks[].model': 'MODEL_TIERS',
   'requirements[].status': 'REQUIREMENT_STATUSES',
   'gates[].status': 'GATE_STATUSES',
   'lifecycle': 'LIFECYCLES',

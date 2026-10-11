@@ -21,6 +21,7 @@
  * against. The dashboard has no handling to add because it never read the field
  * under either name, but it does carry its own copy of this number, and
  * `scripts/validate/state-matches-spec.ts` holds the two together.
+ * Version 8 requires `models` and `tasks[].model`. It keeps verification 3.
  * Version 7 requires `dir`, the run directory named by its start date with a
  * `--wip` suffix exactly while the run is active. It keeps verification 3.
  * Version 6 requires verification 3: readiness, defects closing apart from
@@ -32,7 +33,7 @@
  * readable without inferred verification; validateState enforces the version
  * boundary rather than narrowing this reader-facing interface.
  */
-export const CONTRACT_VERSION = 7;
+export const CONTRACT_VERSION = 8;
 
 /** The stage ids from docs/spec/phases.md, in run order. */
 export type StageId =
@@ -132,6 +133,23 @@ export const GATE_STATUSES: readonly GateStatus[] = ['pending', 'passed', 'faile
 
 export type GateId = 'G1' | 'G2' | 'G3' | 'G4';
 export const GATE_IDS: readonly GateId[] = ['G1', 'G2', 'G3', 'G4'];
+
+/**
+ * The two tiers a субагент runs on. `strong` builds what other таски rest on
+ * and judges everything; `standard` builds the ordinary таски. Which model each
+ * tier names is the run's `models`, resolved once by the dials phase.
+ */
+export const MODEL_TIERS = ['strong', 'standard'] as const;
+export type ModelTier = typeof MODEL_TIERS[number];
+
+/**
+ * The model each tier runs on: a name the host reported, or `session` for
+ * "pass no model, inherit the session's". Fixed for the whole прогон.
+ */
+export interface ModelPair {
+  strong: string;
+  standard: string;
+}
 
 export type Lifecycle = 'active' | 'closed';
 export const LIFECYCLES: readonly Lifecycle[] = ['active', 'closed'];
@@ -713,6 +731,13 @@ export interface TaskEntry {
    * **Not a defect count**: nothing was found wrong, the таск was long.
    */
   handoffs?: number;
+  /**
+   * Which tier builds this таск, written once by the plan phase and never
+   * changed: a producer of a seam and the skeleton are `strong`. Required from
+   * contract 8; optional in the type because an older state has none and runs
+   * every таск on the session's model.
+   */
+  model?: ModelTier;
   /** What the таск delivered, as paths. */
   files?: string[];
   startedAt?: string;
@@ -805,6 +830,13 @@ export interface RunState {
    * because an older state has none and resolves its directory from `slug`.
    */
   dir?: string;
+  /**
+   * The model each tier runs on, resolved by the dials phase and seeded by
+   * preflight; every dispatching phase reads it. Required from contract 8.
+   * Optional in the type because an older state has none, and a recovering
+   * session re-reads the dials from here, never from the phase rules.
+   */
+  models?: ModelPair;
   /** ISO 8601, written once. */
   startedAt: string;
   /** ISO 8601, restamped at every write — what lets the page say how old it is. */
