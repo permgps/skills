@@ -758,8 +758,8 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     if (keys.join(',') !== conditionOrder.join(',')) {
       add('conditions', 0,
         `vocabulary.md lists the conditions [${keys.join(', ')}] and the page's CONDITION_ORDER `
-        + `is [${conditionOrder.join(', ')}] — keep the Run Condition rows in the order the page `
-        + 'decides them, and no condition the page cannot return');
+        + `is [${conditionOrder.join(', ')}] — keep the Run Condition rows in the order CONDITION_ORDER `
+        + 'lists them, and no condition the page cannot return');
     }
     log.info('conditions', 'conditions checked', { language, conditions: keys.length, missing: missing.length });
   }
