@@ -36,12 +36,15 @@ number that claimed more than that would be claiming it falsely.
   location, an id the register does not hold, and an available
   `visual_reference` or `contextual_example` no таск cites are findings;
   authoritative, `other` and unavailable references may stay uncited, which is
-  what domtut's run needed for its superseded REF-3 and its missing
-  screenshot. `npm run bundle` holds six new literals in
+  what domtut's run needed for its missing screenshot. A reference the user
+  replaced, as REF-8 replaced REF-3 there, is kept by briefing with role
+  `other` and `superseded by REF-n; was <its former role>`, so neither G2 nor
+  G3 asks for it and no executor is sent to the replaced look. `npm run
+  bundle` holds seven new literals in
   `REFERENCE_ANCHORS` and refuses any mention of `7-polish`, `polish-reader`
   or доводка in a shipped file; `npm run readers` holds `reference.md` out of
   the executor's and the reviewer's briefs. `SKILL.md` comes down to 547
-  lines; 1432 tests pass.
+  lines; 1435 tests pass.
 - **A models dial: judges strong, таски by tier.** Two tiers: `strong` runs
   every judge (the gate readers, the reviewer, the standards, diagnosis,
   strategy and acceptance readers), every repair and retry, and every таск

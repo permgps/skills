@@ -145,7 +145,8 @@ plan-consistency reader's verdict, recorded against G3. Headless rendered criter
 takeover is not.
 
 `reference.md` is a neutral projection of declared source identity, role,
-availability, and conditions. The independent G2 and G4 reference passes may
+availability, and conditions. A reference the user replaced stays in it with
+role `other` and the description `superseded by REF-n; was <its former role>`. The independent G2 and G4 reference passes may
 open it and inspect the raw reference. It carries no check verdicts, accepted
 exceptions, or implementation rationale. A contextual example cannot silently
 become authoritative behavior. The verification index in `state.js` is the

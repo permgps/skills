@@ -469,9 +469,10 @@ test('a Model row with prose after its tier, «strong — hard: …», passes', 
 
 // --- the reference reaches the executor first, from contract 8 -----------------
 
-function reference(id: string, role: ReferenceRole, available: boolean, location: string): VerificationReference {
-  return { id, statement: `${id} as the user named it`, role, location, accessMethod: 'browser',
-    available, revision: 'r1', conditions: [], approvedDeviationIds: [] };
+function reference(id: string, role: ReferenceRole, available: boolean, location: string,
+  roleDescription?: string): VerificationReference {
+  return { id, statement: `${id} as the user named it`, role, ...(roleDescription ? { roleDescription } : {}), location,
+    accessMethod: 'browser', available, revision: 'r1', conditions: [], approvedDeviationIds: [] };
 }
 
 /** A contract-8 plan whose state carries `references` as its register, and nothing else of verification. */
@@ -586,19 +587,23 @@ test('a таск with no task file is left to the models half, not reported twic
   assert.deepEqual(await refsFor(withRegister(TWO, []), { '01': cites('none'), '02': null }), []);
 });
 
-/** The register of the domtut прогон of 2026-10-01: REF-3 and REF-7 superseded by REF-8, REF-5 never found. */
+/**
+ * The register of the domtut прогон of 2026-10-01 as briefing now records it: REF-3 and REF-7,
+ * superseded by REF-8, are kept with role `other`, and REF-5 was never found.
+ */
 const DOMTUT_REGISTER = [
   reference('REF-1', 'authoritative_behavior', true, 'old/ (resources/themes/real_estate, cabinet, data/app.min.phar)'),
   reference('REF-2', 'authoritative_behavior', true, 'mysql://127.0.0.1:3307/domtut_old'),
-  reference('REF-3', 'visual_reference', false, 'https://domtut2-old.test'),
+  reference('REF-3', 'other', true, 'https://domtut2-old.test', 'superseded by REF-8; was visual reference'),
   reference('REF-4', 'other', true, 'import.md (part I)'),
   reference('REF-5', 'visual_reference', false, 'owner screenshot of the new-build mega menu (not located in the repository)'),
   reference('REF-6', 'authoritative_behavior', true, 'https://developer.help.paycom.uz (Paycom Merchant API)'),
-  reference('REF-7', 'visual_reference', false, 'https://domtut2-old.test served from an isolated copy outside old/'),
+  reference('REF-7', 'other', true, 'https://domtut2-old.test served from an isolated copy outside old/',
+    'superseded by REF-8; was visual reference'),
   reference('REF-8', 'visual_reference', true, 'https://domtut2-old.test served from an isolated copy outside old/ (own cache/tmp)'),
 ];
 
-test('in the domtut register only REF-8 must be cited: REF-5 is a visual reference nobody can open', async () => {
+test('in the domtut register only REF-8 must be cited: REF-3 and REF-7 were replaced, REF-5 nobody can open', async () => {
   const state = withRegister(TWO, DOMTUT_REGISTER);
   assert.deepEqual(await refsFor(state, {
     '01': cites('`REF-8` — visual reference: https://domtut2-old.test, 1440 and 390; `REF-1` — authoritative behavior: old/'),
@@ -608,6 +613,16 @@ test('in the domtut register only REF-8 must be cited: REF-5 is a visual referen
   assert.deepEqual(uncited.map(item => item.message), [
     'no таск cites REF-8 (visual reference: https://domtut2-old.test served from an isolated copy outsid) — add it to the References row of each таск that builds what it shows',
   ]);
+});
+
+test('a replaced look still reachable is no longer required once briefing records it as other', async () => {
+  const replaced = reference('REF-3', 'visual_reference', true, 'https://domtut2-old.test');
+  const current = reference('REF-8', 'visual_reference', true, 'an isolated copy outside old/');
+  const files = { '01': cites('`REF-8` — visual reference: an isolated copy outside old/'), '02': cites('none') };
+  assert.deepEqual((await refsFor(withRegister(TWO, [replaced, current]), files)).map(item => item.message.slice(0, 22)),
+    ['no таск cites REF-3 (v']);
+  const recorded = reference('REF-3', 'other', true, 'https://domtut2-old.test', 'superseded by REF-8; was visual reference');
+  assert.deepEqual(await refsFor(withRegister(TWO, [recorded, current]), files), []);
 });
 
 test('findings come in task order, then in register order', async () => {

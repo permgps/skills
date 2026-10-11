@@ -142,6 +142,17 @@ test('V16: unavailable declared authority remains a G2 coverage gap', () => {
   assert.ok(checkG2(state).some(item => /REF-1 is unavailable/.test(item.message)));
 });
 
+test('a replaced look recorded as other with its supersession is no G2 coverage gap, reachable or not', () => {
+  for (const available of [true, false]) {
+    const state = verifiedState();
+    state.verification!.references.push({ id: 'REF-2', statement: 'the old site, before the user replaced it',
+      role: 'other', roleDescription: 'superseded by REF-1; was visual reference', location: 'https://old.example.test',
+      accessMethod: 'browser', available, ...(available ? {} : { limitation: 'host gone' }), revision: 'r1',
+      conditions: [], approvedDeviationIds: [] });
+    assert.deepEqual(checkG2(state).filter(item => /REF-2/.test(item.message)), []);
+  }
+});
+
 test('V24: a non-UI request with no declared authority needs no UI surface map', () => {
   const state = stateWith([{ id: 'R01', status: 'in-spec' }]);
   state.contractVersion = 4;

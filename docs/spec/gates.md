@@ -52,7 +52,9 @@ a row that is neither form, a cited id with no location, and a cited id the
 register does not hold. It reports, once each, every reference that is
 available and whose role is `visual_reference` or `contextual_example` and that
 no таск cites. An authoritative behaviour, a reference of role `other`, and an
-unavailable reference may stay uncited, and citing one is allowed. Findings come
+unavailable reference may stay uncited, and citing one is allowed. A reference
+the user replaced is recorded by briefing as `other`, so only its replacement
+is required. Findings come
 in task order, then in register order; a таск with no task file is reported by
 the `Model` half alone.
 

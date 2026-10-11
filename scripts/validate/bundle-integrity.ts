@@ -687,6 +687,9 @@ export const REFERENCE_ANCHORS: readonly Anchor[] = [
     why: 'an example followed as a ruler overrides the task file it was meant to serve' },
   { file: 'prompts/reviewer.md', literal: 'A difference from a `contextual_example` is not a defect unless',
     why: 'a reviewer that measures against an example sends a таск to repair for a look nobody required' },
+  { file: 'phases/2-briefing.md',
+    literal: 'set its role to `other` and its `roleDescription` to `superseded by REF-n; was <its former role>`',
+    why: 'a replaced look left as a visual reference is one G2 maps and G3 makes the plan cite, and the executor follows the look the user replaced' },
 ];
 
 /**

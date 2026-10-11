@@ -339,8 +339,10 @@ quotations and the approved deviations. Every available `visual_reference` and
 `contextual_example` is cited by at least one таск, and G3 refuses a plan where
 one is not; an authoritative behaviour reaches its таски through
 `verification.obligations[].implementationTaskIds` instead, and an unavailable
-reference cannot be followed, so neither must be cited. A superseded reference
-is not cited in place of the one that superseded it. This is how a comparable
+reference cannot be followed, so neither must be cited. A reference the user
+replaced keeps its record, but briefing sets its role to `other` with
+`superseded by REF-n; was <its former role>` as its description, so neither G2
+nor G3 asks for it, and the plan cites the reference that replaced it. This is how a comparable
 reaches the таски that build what it shows: «like X» is a требование that G4
 checks, and the comparable itself is inspiration the executor opens. Nothing
 compares the build against it after приёмка.

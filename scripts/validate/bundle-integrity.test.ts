@@ -1258,7 +1258,7 @@ for (const anchor of MODEL_ANCHORS) {
 }
 
 test('the shipped bundle carries every reference anchor, and the check finds none missing', async () => {
-  assert.equal(REFERENCE_ANCHORS.length, 6);
+  assert.equal(REFERENCE_ANCHORS.length, 7);
   await withShippedCopy(async copy => {
     assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'references'), []);
   });
