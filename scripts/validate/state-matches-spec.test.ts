@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
+  checkConfigKeys,
   checkStateMatchesSpec,
   parseRunStateFields,
   parseInterfaceFields,
@@ -280,4 +281,39 @@ test('a contract that declares no version says nothing about the page', async ()
 
 test('completion interface fields exclude nested members and include optional declarations', () => {
   assert.deepEqual(parseInterfaceFields('export interface A extends B {\n  id: string;\n  optional?: string;\n  nested: Array<{ inner: string }>;\n}', 'A'), ['id', 'optional', 'nested']);
+});
+
+// --- the config's shape ------------------------------------------------------
+
+async function configKeysFor(rows: string[], keys: string[]): Promise<Violation[]> {
+  const root = await mkdtemp(path.join(tmpdir(), 'config-keys-'));
+  try {
+    await writeFile(path.join(root, 'dials.md'), `# Dials\n\n| Key | Values | Written by |\n|---|---|---|\n${rows.map(key => `| \`${key}\` | something | someone |`).join('\n')}\n`);
+    await writeFile(path.join(root, 'config.mts'), `export const CONFIG_KEYS = [${keys.map(key => `'${key}'`).join(', ')}] as const;\n`);
+    return await checkConfigKeys(root, path.join(root, 'config.mts'));
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+test('a config key table that lists exactly CONFIG_KEYS passes', async () => {
+  assert.deepEqual(await configKeysFor(['configVersion', 'mode', 'models'], ['configVersion', 'mode', 'models']), []);
+});
+
+test('a key the code keeps and the table does not list is reported on the config module', async () => {
+  const found = await configKeysFor(['configVersion', 'mode'], ['configVersion', 'mode', 'models']);
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.file, /config\.mts$/);
+  assert.match(found[0]!.message, /CONFIG_KEYS carries "models", which the key table .* does not — add its row/);
+});
+
+test('a key the table lists and the code does not keep is reported on the specification', async () => {
+  const found = await configKeysFor(['configVersion', 'mode', 'depth'], ['configVersion', 'mode']);
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.file, /dials\.md$/);
+  assert.match(found[0]!.message, /config key "depth" is specified and absent from CONFIG_KEYS/);
+});
+
+test('the shipped key table and CONFIG_KEYS agree', async () => {
+  assert.deepEqual(await checkConfigKeys('docs/spec', 'skills/maestro/tools/runtime/config.mts'), []);
 });

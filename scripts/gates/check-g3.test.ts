@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
-import { checkG3, type GateFinding } from './check-g3.ts';
+import { SEAMS_HEADER, checkG3, checkG3Models, parseProducerIds, type GateFinding } from './check-g3.ts';
 import { verifiedState } from '../state/fixtures/verification.ts';
 import {
   CONTRACT_VERSION,
@@ -274,4 +277,121 @@ test('G3 failed while carrying a done means only a stub can meet is honest, not 
   assert.deepEqual(checkG3(stateWith(OK, [task('01', ['R01']), task('02', ['R01'])], [
     { id: 'G3', status: 'failed', findings: [STUB_FINDING] },
   ])), []);
+});
+
+// --- who builds each таск, from contract 8 ------------------------------------
+
+/** The Seams header and the `02–13` row of the domtut audit прогон's interfaces.md, verbatim. */
+const DOMTUT_SEAMS = `## Seams
+
+| Seam | Producer task | Consumer tasks | Integration owner | Integration check |
+|---|---|---|---|---|
+| verdict file \`docs/acceptance/data/verdicts/<name>.json\` | 02–13, one file each (names below) | 01 (reads the format), 14 (builds with real files) | 14 | C-1, C-3, C-4, C-6 |
+`;
+
+const DIR = '2026-08-19-landing-page--wip';
+
+function tiered(id: string, wave: number, model: 'strong' | 'standard'): TaskEntry {
+  return { ...task(id, ['R01']), wave, model };
+}
+
+function contract8(tasks: TaskEntry[]): RunState {
+  return { ...stateWith([{ id: 'R01', status: 'in-spec' }], tasks), contractVersion: 8, dir: DIR,
+    models: { strong: 'session', standard: 'session' } };
+}
+
+/**
+ * Run the models half over a real `.maestro/<dir>/`: `interfaces` is written
+ * unless it is `null`, and each таск gets a task file whose Model row says
+ * what `rows` says, or what the state says when `rows` is silent.
+ */
+async function modelsFor(state: RunState, interfaces: string | null, rows: Record<string, string> = {}): Promise<GateFinding[]> {
+  const root = await mkdtemp(path.join(tmpdir(), 'check-g3-models-'));
+  try {
+    const run = path.join(root, DIR);
+    await mkdir(path.join(run, 'tasks'), { recursive: true });
+    if (interfaces !== null) await writeFile(path.join(run, 'interfaces.md'), `# Interfaces\n\n${interfaces}`);
+    for (const entry of state.tasks) {
+      await writeFile(path.join(run, 'tasks', `${entry.id}-work.md`),
+        `# ${entry.id}\n\n| | |\n|---|---|\n| Depends on | none |\n| Model | \`${rows[entry.id] ?? entry.model}\` |\n`);
+    }
+    return await checkG3Models(state, root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+/** таски 01–14, all in wave 1 but 14, so no таск is the skeleton; 02–13 marked as `strongIds` says. */
+const domtutPlan = (strongIds: string[]): RunState => contract8(Array.from({ length: 14 }, (_, index) => {
+  const id = String(index + 1).padStart(2, '0');
+  return tiered(id, id === '14' ? 2 : 1, strongIds.includes(id) ? 'strong' : 'standard');
+}));
+const TWO_TO_THIRTEEN = Array.from({ length: 12 }, (_, index) => String(index + 2).padStart(2, '0'));
+
+test('a producer cell is read for its ids: one, a list, a range at its own width, and the prose after them', () => {
+  assert.deepEqual(parseProducerIds('02'), ['02']);
+  assert.deepEqual(parseProducerIds('02, 05'), ['02', '05']);
+  assert.deepEqual(parseProducerIds('02–13, one file each (names below)'), TWO_TO_THIRTEEN);
+  assert.deepEqual(parseProducerIds('`08-10`'), ['08', '09', '10']);
+  assert.equal(parseProducerIds('the shell task'), null);
+  assert.equal(parseProducerIds('—'), null);
+});
+
+test('a contract-7 plan carries no tiers, so the models half reads nothing and finds nothing', async () => {
+  const state = { ...contract8([tiered('01', 1, 'standard')]), contractVersion: 7 };
+  assert.deepEqual(await checkG3Models(state, '/definitely/absent'), []);
+});
+
+test('the domtut seam row with every producer from 02 to 13 marked strong passes', async () => {
+  assert.deepEqual(await modelsFor(domtutPlan(TWO_TO_THIRTEEN), DOMTUT_SEAMS), []);
+});
+
+test('one standard таск inside the domtut range is the one finding, on that таск', async () => {
+  const found = await modelsFor(domtutPlan(TWO_TO_THIRTEEN.filter(id => id !== '07')), DOMTUT_SEAMS);
+  assert.deepEqual(found.map(item => item.requirementId), ['07']);
+  assert.match(found[0]!.message, /^mark таск 07 `strong`: it produces the seam «verdict file docs\/acceptance/);
+});
+
+test('a producer id that is no таск of the plan is reported', async () => {
+  const found = await modelsFor(contract8([tiered('01', 1, 'strong'), tiered('02', 1, 'standard')]),
+    `${SEAMS_HEADER}\n|---|---|---|---|---|\n| route \`/api\` | 99 | 02 | 02 | C-1 |\n`);
+  assert.deepEqual(found.map(item => item.message), ['the seam «route /api» names producer 99, which is not a таск of this plan — name the таск that produces it']);
+});
+
+test('a producer named only in words is reported, because no machine can find it', async () => {
+  const found = await modelsFor(contract8([tiered('01', 1, 'strong'), tiered('02', 1, 'standard')]),
+    `${SEAMS_HEADER}\n|---|---|---|---|---|\n| route \`/api\` | the shell task | 02 | 02 | C-1 |\n`);
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.message, /name the producer by its таск id/);
+});
+
+test('the sole таск of wave 1 marked standard is the skeleton finding', async () => {
+  const found = await modelsFor(contract8([tiered('01', 1, 'standard'), tiered('02', 2, 'standard')]), '');
+  assert.deepEqual(found.map(item => [item.requirementId, item.message]),
+    [['01', 'mark таск 01 `strong`: it is the skeleton, the sole таск of wave 1']]);
+});
+
+test('two таски in wave 1, both standard and producing no seam, pass: there is no skeleton', async () => {
+  assert.deepEqual(await modelsFor(contract8([tiered('01', 1, 'standard'), tiered('02', 1, 'standard')]), ''), []);
+});
+
+test('a one-таск plan is the skeleton, so a standard one is reported', async () => {
+  const found = await modelsFor(contract8([tiered('01', 1, 'standard')]), '');
+  assert.deepEqual(found.map(item => item.requirementId), ['01']);
+  assert.match(found[0]!.message, /it is the skeleton/);
+});
+
+test('a task file whose Model row disagrees with the run state is reported', async () => {
+  const found = await modelsFor(contract8([tiered('01', 1, 'strong'), tiered('02', 1, 'strong')]), '', { '02': 'standard' });
+  assert.deepEqual(found.map(item => [item.requirementId, item.message]),
+    [['02', 'task file 02-work.md says Model standard, and the run state says strong — write the same tier in both']]);
+});
+
+test('a run with no interfaces.md is unreadable, not passed', async () => {
+  await assert.rejects(modelsFor(contract8([tiered('01', 1, 'strong')]), null), { code: 'ENOENT' });
+});
+
+test('an interfaces.md with no Seams table names no producers, and only the skeleton rule applies', async () => {
+  const found = await modelsFor(contract8([tiered('01', 1, 'strong'), tiered('02', 2, 'standard')]), '## Terms\n\n| Term | Meaning |\n|---|---|\n| order | a purchase |\n');
+  assert.deepEqual(found, []);
 });

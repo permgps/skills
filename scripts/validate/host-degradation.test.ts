@@ -8,6 +8,7 @@ import {
   checkHostDegradation,
   checkCodexRuntime,
   checkMemoryFiles,
+  checkModelLists,
   findMarkers,
   parseLoadGroups,
   readsAsStop,
@@ -296,4 +297,47 @@ test('a specification with no session-start table is reported once the runtime h
 test('the real hosts table matches the memory module the bundle ships', async () => {
   const violations = await checkHostDegradation({ specDir: 'docs/spec', bundleDir: 'skills/maestro' });
   assert.deepEqual(violations.filter(v => v.check === 'memory-file'), []);
+});
+
+test('the Codex recipe must pass the tier model and the session effort, and never agent_type', async () => {
+  for (const [before, after, rule] of [
+    ["| model | per tier, from the run state's models; session passes none |", '| model | session |', 'model'],
+    ["| reasoning_effort | the session's |", '| reasoning_effort | low |', 'reasoning_effort'],
+    ['| agent_type | never |', '| agent_type | worker |', 'agent_type'],
+  ] as const) {
+    const findings = await codexViolations('references/codex.md', before, after);
+    assert.equal(findings.length, 1, rule);
+    assert.match(findings[0]!.message, new RegExp(`^declare exactly one runtime rule ${rule} with value `));
+  }
+});
+
+const MODEL_LIST = (ids: string[]): string => `| Host id | Model list | Effort | Never pass |\n|---|---|---|---|\n${ids.map(id => `| \`${id}\` | somewhere | — | — |`).join('\n')}\n`;
+const HOSTS = ['claude-code', 'codex', 'gemini-cli'];
+
+test('a model-list table naming exactly the runtime hosts passes, in hosts.md and the dials phase alike', () => {
+  assert.deepEqual(checkModelLists([{ file: 'hosts.md', markdown: MODEL_LIST(HOSTS) }, { file: '0-dials.md', markdown: MODEL_LIST(HOSTS) }], HOSTS), []);
+});
+
+test('a host missing from the dials phase mirror is reported on that file', () => {
+  const found = checkModelLists([{ file: 'hosts.md', markdown: MODEL_LIST(HOSTS) }, { file: '0-dials.md', markdown: MODEL_LIST(['claude-code', 'codex']) }], HOSTS);
+  assert.deepEqual(found.map(v => [v.file, v.message]), [['0-dials.md', 'the model-list table has no row for gemini-cli — say where that host lists its models, or that it has none']]);
+});
+
+test('a host the runtime does not know is reported, and so is a file with no model-list table', () => {
+  const found = checkModelLists([{ file: 'hosts.md', markdown: MODEL_LIST([...HOSTS, 'cursor']) }, { file: '0-dials.md', markdown: '# Dials\n' }], HOSTS);
+  assert.deepEqual(found.map(v => v.file), ['hosts.md', '0-dials.md']);
+  assert.match(found[0]!.message, /names cursor, which HOST_IDS does not/);
+  assert.match(found[1]!.message, /no table with columns Host id, Model list and Effort/);
+});
+
+test('losing the model-per-subagent probe from preflight is the one finding', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'model-probe-'));
+  try {
+    await cp('skills/maestro', path.join(root, 'bundle'), { recursive: true });
+    const file = path.join(root, 'bundle', 'phases', '0-preflight.md');
+    await writeFile(file, (await readFile(file, 'utf8')).replace('<!-- maestro:probes:model-per-subagent -->\n', ''));
+    const found = await checkHostDegradation({ specDir: 'docs/spec', bundleDir: path.join(root, 'bundle') });
+    assert.deepEqual(found.map(v => v.check), ['probes']);
+    assert.match(found[0]!.message, /"model per subagent" degrades, but no phase file establishes it/);
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

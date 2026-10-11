@@ -23,6 +23,7 @@ import {
   LEAF_RULE,
   MAESTRO_BUNDLE,
   MEMORY_ANCHORS,
+  MODEL_ANCHORS,
   PROJECT_GLOSSARY_FILES,
   procedureSection,
   findRelativeLinks,
@@ -1230,5 +1231,34 @@ test('the existing-code reader losing the leaf sentence is the one leaf finding,
     await writeFile(reader, dropped, 'utf8');
     const violations = (await checkBundle(copy)).filter(v => v.check === 'leaf');
     assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'existing-code-reader.md')]);
+  });
+});
+
+test('the shipped bundle carries every models anchor, and the check finds none missing', async () => {
+  assert.equal(MODEL_ANCHORS.length, 11);
+  await withShippedCopy(async copy => {
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'models'), []);
+  });
+});
+
+for (const anchor of MODEL_ANCHORS) {
+  test(`${anchor.file} losing "${anchor.literal}" is the one models finding, named on that file`, async () => {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, anchor.file);
+      // The literal may wrap in the shipped text; collapse it the way the check reads it.
+      const flat = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal), `${anchor.file} carries no "${anchor.literal}"`);
+      await writeFile(target, flat.split(anchor.literal).join('removed'), 'utf8');
+      const violations = (await checkBundle(copy)).filter(v => v.check === 'models');
+      assert.deepEqual(violations.map(v => v.file), [anchor.file.split('/').join(path.sep)]);
+      assert.ok((violations[0]?.message ?? '').includes(anchor.literal), violations[0]?.message);
+    });
+  });
+}
+
+test('the runtime confinement check accepts the config module beside the memory module', async () => {
+  await withShippedCopy(async copy => {
+    assert.ok((await readFile(path.join(copy, 'tools', 'runtime', 'config.mts'), 'utf8')).includes("from './memory.mts'"));
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'runtime'), []);
   });
 });

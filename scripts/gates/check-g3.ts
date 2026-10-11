@@ -19,11 +19,21 @@
 // end-to-end прогон is why it exists: four of five task files contradicted
 // themselves or left something undefined, every one of them passed the map, and
 // the one whose executor had nothing to fall back on shipped wrong.
+//
+// From contract 8 it also holds who builds each таск. A producer of a seam and
+// the skeleton are `strong` by rule, so a machine can check them: the Seams
+// table of `interfaces.md` names the producers, the waves name the skeleton, and
+// each task file's `Model` row must agree with `tasks[].model`. That is all it
+// reads of either file — whether the task files agree with each other is still
+// the plan-consistency reader's verdict.
 
+import { readFile, readdir } from 'node:fs/promises';
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { createLogger } from '../shared/log.ts';
 import type { RunState } from '../state/contract.ts';
+import { forState, ROOT } from '../state/paths.ts';
 import { validateCompletionRecords } from '../state/verification.ts';
 import { runGate, targetFromArgv, type GateFinding } from './cli.ts';
 
@@ -242,6 +252,123 @@ export function checkG3(state: RunState): GateFinding[] {
   return findings;
 }
 
+/** The Seams table's header, exactly as `4-plan.md` fixes it. */
+export const SEAMS_HEADER = '| Seam | Producer task | Consumer tasks | Integration owner | Integration check |';
+
+/** One id, or a range written with an en dash or a hyphen. */
+const PRODUCER_TOKEN = /^(\d{2,})(?:\s*[–-]\s*(\d{2,}))?/;
+
+/**
+ * The таск ids a Producer task cell starts with: `02`, `02, 05`, `02–13`, and
+ * any prose after them (`02–13, one file each`). A range is expanded at its
+ * first endpoint's width. `null` when the cell starts with no id, because a
+ * producer named only in words is a producer no machine can find.
+ */
+export function parseProducerIds(cell: string): string[] | null {
+  let rest = cell.replace(/[`*]/g, '').trim();
+  const ids: string[] = [];
+  for (;;) {
+    const match = PRODUCER_TOKEN.exec(rest);
+    if (!match) break;
+    const [first, last] = [match[1]!, match[2] ?? match[1]!];
+    const [from, to] = [Number(first), Number(last)].sort((a, b) => a - b) as [number, number];
+    for (let id = from; id <= to; id += 1) ids.push(String(id).padStart(first.length, '0'));
+    rest = rest.slice(match[0].length);
+    const separator = /^\s*,\s*(?=\d{2,})/.exec(rest);
+    if (!separator) break;
+    rest = rest.slice(separator[0].length);
+  }
+  return ids.length === 0 ? null : ids;
+}
+
+/** Each row under {@link SEAMS_HEADER}: the seam's name and its Producer task cell. */
+function seamRows(markdown: string): Array<{ seam: string; producer: string }> {
+  const lines = markdown.split('\n');
+  const start = lines.findIndex(line => line.trim().replace(/\s+/g, ' ') === SEAMS_HEADER);
+  if (start === -1) return [];
+  const rows: Array<{ seam: string; producer: string }> = [];
+  for (const line of lines.slice(start + 2)) {
+    if (!line.trim().startsWith('|')) break;
+    const cells = line.trim().replace(/^\||\|$/g, '').split('|').map(cell => cell.trim());
+    rows.push({ seam: cells[0] ?? '', producer: cells[1] ?? '' });
+  }
+  return rows;
+}
+
+/** The first word of a task file's `| Model |` row, backticked or bare, or `null` when there is no row. */
+function modelRow(markdown: string): string | null {
+  const row = /^\|\s*Model\s*\|([^|\n]*)\|/m.exec(markdown);
+  if (!row) return null;
+  return /`?([a-z]+)`?/.exec(row[1] ?? '')?.[1] ?? '';
+}
+
+/**
+ * The models half of G3, from contract 8: every producer and the skeleton are
+ * `strong`, and every task file's `Model` row says what `tasks[].model` says.
+ * A missing `interfaces.md` or tasks directory throws — the gate exits `2`,
+ * because nothing was checked.
+ */
+export async function checkG3Models(state: RunState, target: string): Promise<GateFinding[]> {
+  if (state.contractVersion < 8) return [];
+  const paths = forState(state);
+  const underTarget = (file: string): string => path.join(target, path.relative(ROOT, file));
+  const interfaces = await readFile(underTarget(paths.interfaces()), 'utf8');
+  const tasksDir = underTarget(paths.tasksDir());
+  const taskFiles = (await readdir(tasksDir)).filter(name => name.endsWith('.md') && !name.endsWith('-handoff.md'));
+
+  const findings: GateFinding[] = [];
+  const tasks = new Map(state.tasks.map(task => [task.id, task]));
+  const name = (seam: string): string => seam.replace(/[`*]/g, '').slice(0, 60);
+
+  const producers = new Map<string, string>();
+  const rows = seamRows(interfaces);
+  for (const row of rows) {
+    const ids = parseProducerIds(row.producer);
+    if (ids === null) {
+      findings.push({ requirementId: '',
+        message: `the seam «${name(row.seam)}» names its producer as "${row.producer}" — name the producer by its таск id, first in the Producer task cell` });
+      continue;
+    }
+    for (const id of ids) {
+      if (!tasks.has(id)) {
+        findings.push({ requirementId: '',
+          message: `the seam «${name(row.seam)}» names producer ${id}, which is not a таск of this plan — name the таск that produces it` });
+      } else if (!producers.has(id)) {
+        producers.set(id, row.seam);
+      }
+    }
+  }
+  log.debug('seams', 'seams read', { rows: rows.length, producers: [...producers.keys()] });
+
+  for (const [id, seam] of producers) {
+    if (tasks.get(id)?.model !== 'strong') {
+      findings.push({ requirementId: id, message: `mark таск ${id} \`strong\`: it produces the seam «${name(seam)}»` });
+    }
+  }
+
+  const firstWave = state.tasks.filter(task => task.wave === 1);
+  const skeleton = firstWave.length === 1 ? firstWave[0]! : undefined;
+  log.debug('skeleton', 'skeleton found', { id: skeleton?.id ?? null });
+  if (skeleton && skeleton.model !== 'strong' && !producers.has(skeleton.id)) {
+    findings.push({ requirementId: skeleton.id,
+      message: `mark таск ${skeleton.id} \`strong\`: it is the skeleton, the sole таск of wave 1` });
+  }
+
+  for (const task of state.tasks) {
+    const file = taskFiles.find(entry => entry.startsWith(`${task.id}-`));
+    const written = file === undefined ? null : modelRow(await readFile(path.join(tasksDir, file), 'utf8'));
+    if (written === null) {
+      findings.push({ requirementId: task.id,
+        message: `task file for таск ${task.id} has no Model row — add \`| Model | ${task.model ?? 'strong or standard'} |\` between Depends on and Prerequisites` });
+    } else if (written !== task.model) {
+      findings.push({ requirementId: task.id,
+        message: `task file ${file} says Model ${written || '(empty)'}, and the run state says ${task.model ?? 'nothing'} — write the same tier in both` });
+    }
+  }
+  log.info('models', 'producers, skeleton and model rows checked', { findings: findings.length });
+  return findings;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exit(await runGate('check-g3', checkG3, targetFromArgv()));
+  process.exit(await runGate('check-g3', checkG3, targetFromArgv(), checkG3Models));
 }

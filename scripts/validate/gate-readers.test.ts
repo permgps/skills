@@ -10,6 +10,8 @@ import {
   CODEBASE_HANDED,
   CODEBASE_INPUT,
   checkGateReaders,
+  checkModelTiers,
+  JUDGE_BRIEFS,
   declaredInputs,
   normalizeName,
   PRIOR_MEMORY_INPUT,
@@ -504,4 +506,74 @@ test('codebase.md is given to exactly the rows the list names, and the list name
   assert.deepEqual([...CODEBASE_GIVEN_ROWS], ['G3 consistency']);
   assert.deepEqual([...CODEBASE_HANDED], ['executor.md']);
   assert.deepEqual([...CODEBASE_DENIED], ['reviewer.md']);
+});
+
+// --- who runs on which model tier -------------------------------------------
+
+const TIER_ROWS = [
+  '| preflight probe | — | `standard` |',
+  '| existing-code reader | `existing-code-reader.md` | `standard` |',
+  '| build executor | `executor.md` | the таск\'s |',
+  '| repair executor | `executor.md` | `strong` |',
+  '| reviewer | `reviewer.md` | `strong` |',
+];
+
+async function tiersFor(rows: string[], briefs = ['existing-code-reader.md', 'executor.md', 'reviewer.md']): Promise<Violation[]> {
+  const root = await mkdtemp(path.join(tmpdir(), 'gate-tiers-'));
+  try {
+    const specDir = path.join(root, 'spec');
+    const bundleDir = path.join(root, 'bundle');
+    await mkdir(specDir, { recursive: true });
+    await mkdir(path.join(bundleDir, 'prompts'), { recursive: true });
+    await writeFile(path.join(specDir, 'dials.md'), `# Dials\n\n| Role | Brief | Tier |\n|---|---|---|\n${rows.join('\n')}\n`);
+    for (const brief of briefs) await writeFile(path.join(bundleDir, 'prompts', brief), `# ${brief}\n`);
+    return await checkModelTiers(specDir, bundleDir);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+test('a tier table that runs every shipped brief, judges on strong, passes', async () => {
+  assert.deepEqual(await tiersFor(TIER_ROWS), []);
+});
+
+test('a brief the bundle ships and no tier row runs is reported', async () => {
+  const found = await tiersFor(TIER_ROWS.filter(row => !row.includes('reviewer')));
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.message, /^reviewer\.md ships in .* and no row of the tier table runs it — add its role and tier$/);
+});
+
+test('a tier outside strong, standard and the таск\'s is reported on its row', async () => {
+  const found = await tiersFor([...TIER_ROWS.slice(0, 4), '| reviewer | `reviewer.md` | `cheap` |']);
+  assert.ok(found.some(v => /role "reviewer" runs on "cheap" — write strong, standard or the таск's/.test(v.message)), JSON.stringify(found));
+});
+
+test('a judge on a standard row is reported, wherever the row is', async () => {
+  const found = await tiersFor([...TIER_ROWS, '| second look | `reviewer.md` | `standard` |']);
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.message, /reviewer\.md is a judge and role "second look" runs it on standard — a judge never runs below what it judges/);
+});
+
+test('the таск\'s tier on a brief that builds no таск is reported', async () => {
+  const found = await tiersFor([...TIER_ROWS.slice(0, 4), '| reviewer | `reviewer.md` | the таск\'s |']);
+  assert.ok(found.some(v => /role "reviewer" takes the таск's tier, but reviewer\.md builds no таск/.test(v.message)), JSON.stringify(found));
+});
+
+test('a row naming a brief the bundle does not ship is reported', async () => {
+  const found = await tiersFor([...TIER_ROWS, '| ghost | `ghost-reader.md` | `strong` |']);
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.message, /role "ghost" names ghost-reader\.md, which .* does not ship/);
+});
+
+test('a shipped brief no list classifies is reported on the brief itself', async () => {
+  const found = await tiersFor([...TIER_ROWS, '| scout | `scout.md` | `strong` |'], ['existing-code-reader.md', 'executor.md', 'reviewer.md', 'scout.md']);
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.file, /prompts[\\/]scout\.md$/);
+  assert.match(found[0]!.message, /in none of JUDGE_BRIEFS, STANDARD_BRIEFS or TIERED_BRIEFS/);
+});
+
+test('the shipped tier table runs every shipped brief, and the eleven judges on strong', async () => {
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  assert.equal(JUDGE_BRIEFS.length, 11);
+  assert.deepEqual(await checkModelTiers(path.join(root, 'docs', 'spec'), path.join(root, 'skills', 'maestro')), []);
 });
