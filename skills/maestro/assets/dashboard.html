@@ -554,7 +554,8 @@ globalThis.MAESTRO_LOGIC = (function () {
         },
         snapshotOnly: function (file) {
           return 'Показан снимок внутри страницы: ' + file
-            + ' рядом не читается, поэтому часы остановлены.';
+            + ' рядом не читается, поэтому часы остановлены.'
+            + ' Если прогон ещё идёт, попросите в чате вернуть дашборд.';
         },
         minutes: function (ms) {
           if (typeof ms !== 'number' || !isFinite(ms) || ms < 0) return '—';
@@ -900,7 +901,8 @@ globalThis.MAESTRO_LOGIC = (function () {
         },
         snapshotOnly: function (file) {
           return 'Showing the snapshot inside this page: ' + file
-            + ' beside it cannot be read, so the clocks have stopped.';
+            + ' beside it cannot be read, so the clocks have stopped.'
+            + ' If the run is still going, ask in the chat to bring the dashboard back.';
         },
         minutes: function (ms) {
           if (typeof ms !== 'number' || !isFinite(ms) || ms < 0) return '—';

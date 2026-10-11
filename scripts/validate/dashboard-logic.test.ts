@@ -1433,6 +1433,19 @@ test('C04: a contract-5 page has no defects, budget or readiness to render', () 
   assert.equal(L.closureOf(sourceVerifiedState()), null);
 });
 
+test('a frozen page says the clocks stopped and what to ask for, in both languages', () => {
+  // Naming the cause alone leaves the reader unable to tell waiting from
+  // acting. The request it names is the one --reopen already answers, and it
+  // points at the chat rather than an «агент», a word the glossary keeps off
+  // the page.
+  assert.equal(ui('ru')['snapshotOnly']!('state.js'),
+    'Показан снимок внутри страницы: state.js рядом не читается, поэтому часы остановлены.'
+    + ' Если прогон ещё идёт, попросите в чате вернуть дашборд.');
+  assert.equal(ui('en')['snapshotOnly']!('state.js'),
+    'Showing the snapshot inside this page: state.js beside it cannot be read, so the clocks have stopped.'
+    + ' If the run is still going, ask in the chat to bring the dashboard back.');
+});
+
 type Title = (slug: string, date: string | null) => string;
 const titleIn = (language: string): Title => L.words(language)['UI']!['title'] as unknown as Title;
 
