@@ -321,7 +321,7 @@ reads the work back rather than naming a role nobody introduced. The figures are
 because an explanation that recomputed its own numbers could disagree with the
 one beside it, and the plain reader is the last person able to notice.
 
-The row of dials shows a fourth chip when the run recorded an answer —
+The row of dials shows a third chip when the run recorded an answer —
 «Объяснения: Простые» — and shows nothing there when it did not. A прогон from
 before this question existed renders exactly as it always did; the page does not
 report a choice nobody made.

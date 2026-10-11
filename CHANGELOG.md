@@ -16,10 +16,36 @@ number that claimed more than that would be claiming it falsely.
 
 `CONTRACT_VERSION` moves to `8`.
 
+- **Доводка is retired; the reference reaches the executor first.** The finish
+  dial is gone, with `phases/7-polish.md`, the polish reader, its tier rows, the
+  dashboard's доводка chip and every branch that read it. `polish`, «доведи до
+  эталона» and «сравни с образцом» are бриф text now, and no notice says the
+  dial left; a `polish` key in `.maestro/config.json` is ignored like any
+  unknown key. Contract 8 refuses a `polish` field and a `dialChanges[]` entry
+  for it; below 8 `polish` stays a required boolean that nothing reads, so a
+  reopened contract-7 run keeps its value as written. In its place the plan
+  writes a `References` row into every task file: each `REF-*` id the таск
+  follows, in backticks, with its role and location, or `none`. The executor
+  opens what its row names, read-only, and never receives `reference.md`; a
+  `contextual_example` is inspiration it follows where its task file does not
+  decide. The reviewer may open the same references and does not count a
+  difference from an example as a defect unless the task file does. «Like X»
+  is a требование that G4 checks, and required fidelity in G4 is unchanged.
+  From contract 8 `check-g3` reads the `References` rows against
+  `state.verification.references`: a missing or unreadable row, an id with no
+  location, an id the register does not hold, and an available
+  `visual_reference` or `contextual_example` no таск cites are findings;
+  authoritative, `other` and unavailable references may stay uncited, which is
+  what domtut's run needed for its superseded REF-3 and its missing
+  screenshot. `npm run bundle` holds six new literals in
+  `REFERENCE_ANCHORS` and refuses any mention of `7-polish`, `polish-reader`
+  or доводка in a shipped file; `npm run readers` holds `reference.md` out of
+  the executor's and the reviewer's briefs. `SKILL.md` comes down to 547
+  lines; 1432 tests pass.
 - **A models dial: judges strong, таски by tier.** Two tiers: `strong` runs
   every judge (the gate readers, the reviewer, the standards, diagnosis,
-  strategy, acceptance and polish readers), every repair and retry, every
-  доводка executor and every таск the plan marks `strong`; `standard` runs
+  strategy and acceptance readers), every repair and retry, and every таск
+  the plan marks `strong`; `standard` runs
   the other таски, the existing-code reader and the preflight probe. The
   orchestrator stays on the session's model. The dial is one bare
   `<strong>/<standard>` token, a dial only when both halves are model names
@@ -39,12 +65,11 @@ number that claimed more than that would be claiming it falsely.
   every diff whatever the row says. A Producer task cell is read only as ids
   and forward ranges of one width, at most 999 ids, so a date is never
   expanded; a bold or capitalised `Model` row counts, and a таск with no task
-  file is reported as such. A доводка таск is written into `tasks[]` as
-  `strong`, outside the plan's tier rule. The отчёт's *What was asked* ends with a
+  file is reported as such. The отчёт's *What was asked* ends with a
   `Models:` line, and `npm run metrics` counts таски, retries and repairs per
   tier. `npm run dials`, `readers`, `hosts`, `state` and `bundle` hold the
-  dial, the tier table, the host model lists, the config keys and thirteen
-  anchors; `SKILL.md` stays at 551 lines; 1399 tests pass. `CONTRACT_VERSION`
+  dial, the tier table, the host model lists, the config keys and eleven
+  anchors; 1399 tests pass. `CONTRACT_VERSION`
   is `8`; a contract-7 run, reopened too, keeps running on the session's model
   and writes no `models` and no `model`.
 - **Existing code is read once, before the spec.** Preflight's `--memory-read`

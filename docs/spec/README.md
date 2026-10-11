@@ -25,7 +25,7 @@ conditional on the other skill existing.
 |---|---|---|
 | 1 | `vocabulary.md` | Every user-facing term, the stage labels, and the banned synonyms |
 | 2 | `safety.md` | The rules that hold at every setting, and what happens when one breaks |
-| 3 | `dials.md` | Modes, depths, the polish finish, their triggers and resolution |
+| 3 | `dials.md` | Registers, languages, modes, depths and models, their triggers and resolution |
 | 4 | `phases.md` | The phase order, what each reads and produces, the per-mode matrix |
 | 5 | `gates.md` | G1–G4: when each runs, what passes it, what a failure does |
 | 6 | `artifacts.md` | Every file a run writes, its single writer, its lifecycle |
@@ -318,7 +318,7 @@ retrospective an opinion.
 ```bash
 node scripts/gates/check-g1.ts <run-dir>   # after брифинг: every требование has a status, every answer its chosen option
 node scripts/gates/check-g2.ts <run-dir>   # after the spec: none left open
-node scripts/gates/check-g3.ts <run-dir>   # after the plan: the map holds both ways, and producers and the skeleton are strong
+node scripts/gates/check-g3.ts <run-dir>   # after the plan: the map holds both ways, producers and the skeleton are strong, and every comparable is cited
 node scripts/gates/check-g4.ts <run-dir>   # after приёмка: current checks and coverage establish G4
 node scripts/gates/debug-tags.ts <run-dir> [repo-dir]   # in review: no таск leaves a [maestro-debug:…] line behind
 node scripts/gates/one-way.ts <run-dir> [repo-dir]      # in review: oneWay records every mechanical one-way change

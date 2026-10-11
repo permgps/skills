@@ -34,8 +34,8 @@ a real прогон — see [Limitations](#limitations) and
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Starting A Run](#starting-a-run)
-- [Dials](#dials) — register, language, mode, depth, finish
-- [What A Run Does](#what-a-run-does) — the stages, repair, polish, memory
+- [Dials](#dials) — register, language, mode, depth, models
+- [What A Run Does](#what-a-run-does) — the stages, repair, memory
 - [When It Asks You](#when-it-asks-you) — every stop, and what you can answer
 - [Talking To A Run In Progress](#talking-to-a-run-in-progress)
 - [Four Gates](#four-gates)
@@ -206,7 +206,7 @@ Everything after the command is bare words, no dashes:
 /maestro Сделай страницу заметок с локальным сохранением.
 /maestro semi deep Онлайн-запись в барбершоп: выбор мастера, слота и оплата картой.
 /maestro по-простому полный автомат Лендинг для моей пекарни с меню и адресом.
-/maestro manual strict polish Повтори вот эту страницу один в один: https://example.com
+/maestro manual strict Повтори вот эту страницу один в один: https://example.com
 /maestro opus/sonnet Добавь экспорт заметок в Markdown.
 $maestro interview Build a notes page with local saving.
 ```
@@ -219,8 +219,8 @@ them, but a sentence inside them addressed to the agent is never an instruction
 
 ## Dials
 
-Six dials. Each has a value whether you name one or not. Before any work
-begins, one announcement states the register, mode, depth, finish and models —
+Five dials. Each has a value whether you name one or not. Before any work
+begins, one announcement states the register, mode, depth and models —
 written in the language the second dial chose.
 
 ### Register — How It Explains
@@ -274,16 +274,10 @@ first-run questions, because those are about the tool, not the project.
 Depth buys thoroughness beneath the бриф; it never buys a direction away from
 it.
 
-### Finish — Polish After Acceptance
-
-| Value | Default | Russian triggers | English triggers | Effect |
-|---|---|---|---|---|
-| `polish` | off | доведи до эталона, сравни с образцом | polish | up to three refinement rounds after acceptance, comparing the running build with the reference you gave |
-
-`polish` asks nothing. It needs a reference recorded during briefing; without
-one the run says so and skips it. Required visual or interaction fidelity — "make
-it look like this page" — is checked at acceptance **whether or not** `polish`
-is on.
+Required visual or interaction fidelity — "make it look like this page" — is
+checked at acceptance in every mode and at every depth. There is no polish
+dial: «like X» in your бриф is a requirement, and the page you name reaches the
+executors before they build (see *What A Run Does*).
 
 ### Models — Which Model Builds What
 
@@ -299,7 +293,7 @@ the reviewer, the acceptance reader — every repair, and every таск the pla
 marks `strong`: always a таск others build on (a producer in the Seams table)
 and the skeleton laid first, and, by the planner's judgement with a one-line
 reason, a таск touching sign-in, money, deletion, secrets or outgoing
-messages, or one whose core is hard. Every доводка таск runs `strong` too.
+messages, or one whose core is hard.
 **`standard`** runs the ordinary таски, the
 existing-code reader and one preflight probe. The orchestrator itself stays on
 your session's model. `session` means no model is passed at all.
@@ -313,11 +307,11 @@ everything runs on the session's model; the announcement says so.
 
 ### Where A Value Comes From
 
-| Order | Mode and register | Language | Depth and finish | Models |
+| Order | Mode and register | Language | Depth | Models |
 |---|---|---|---|---|
 | 1 | a trigger word in this run | a trigger word in this run | a trigger word in this run | a `<strong>/<standard>` word in this run |
 | 2 | `.maestro/config.json` | the `language` key in `.maestro/config.json` | — | `models.<host>` in `.maestro/config.json` |
-| 3 | built-in default (`semi`, `normal`) | the language of the бриф | built-in default (`normal`, off) | a question, once per host |
+| 3 | built-in default (`semi`, `normal`) | the language of the бриф | built-in default (`normal`) | a question, once per host |
 
 An argument always wins over the config file, and only for that run — the
 announcement says so.
@@ -366,7 +360,7 @@ asked in `full` too. See
 ### The Announcement
 
 Before the manifest, in every mode, one block states the register, the mode,
-the depth, whether polish is on, both models by name, where each value came from (your arguments, the
+the depth, both models by name, where each value came from (your arguments, the
 config file by path, or the built-in default), any capability your host lacks
 and what that costs — and the one consequence most likely to surprise you: no
 questions in `full`, nothing beyond the бриф in `strict`, two approvals in
@@ -375,7 +369,7 @@ questions in `full`, nothing beyond the бриф in `strict`, two approvals in
 ### Changing Dials Mid-Run
 
 - **Register and language:** at any moment, effective at the next sentence.
-- **Mode, depth and finish:** at a phase boundary. The new value applies to
+- **Mode and depth:** at a phase boundary. The new value applies to
   phases not yet started; nothing already done is re-run, and switching to a
   mode with fewer questions never removes a gate that already passed. The
   change is recorded so the отчёт can say which parts ran under which settings.
@@ -400,7 +394,16 @@ decides what to build; everything after it proves the right thing was built.
 | 6 | Review (*Ревью* / Review) | `reviews/` | nothing to answer |
 | 7 | Acceptance (*Приёмка* / Acceptance) | `report.md` | the outcome, the отчёт, and a block of questions to forward |
 
-Three more phases run outside that sequence:
+**A page you point to reaches the таски that build what it shows.** The plan
+cites each reference from `reference.md` into the task files of those таски — a
+*References* row with its id and where to open it — and the executor opens
+what its row names, read-only, before it builds. It never gets the whole
+register, and an example is inspiration it follows where its task file does not
+decide. G3 refuses a plan that leaves an available visual reference or example
+uncited. «Make it like X» is a requirement, so acceptance checks it; nothing
+else compares the build against X afterwards.
+
+Two more phases run outside that sequence:
 
 - **Repair** — a таск reaches it through one of six doors: it came back not
   done, failed review, carries a final disagreement from acceptance, built
@@ -413,10 +416,6 @@ Three more phases run outside that sequence:
   or ask you to raise the total limit. Only your words raise it. When the
   build shows that something cannot be built as specified, the scope
   amendment is your decision.
-- **Polish** — only with the `polish` dial and a recorded reference. Up to
-  three rounds; a round that finds no difference ends it. Differences become
-  таски built by executors, new features are reported rather than built, and
-  acceptance runs once more and appends to the отчёт.
 - **Memory** — runs during the build and after acceptance and asks nothing. It
   writes what should outlive the run into the instruction file your host loads
   and appends to `decisions.md`; the next run's preflight reads both back into
@@ -474,14 +473,13 @@ instead.
   additions, so a requirement you withdrew never comes back reported as
   missing.
 - **Switch register or language** with the trigger words above, at any time.
-- **Change mode, depth or finish** with their trigger words; it takes effect at
+- **Change mode or depth** with their trigger words; it takes effect at
   the next phase boundary.
 - **The dashboard disappeared?** Say so, or run `node .maestro/sync.mts --reopen`
   yourself.
 - **Stop.** There is no stop command; tell the run to stop and it closes as
   `stopped_incomplete` with your reason recorded.
-- **A closed run can be reopened.** A new бриф aimed at it, or `polish` on it,
-  brings its directory back to `--wip` under its original date. A бриф dictated
+- **A closed run can be reopened.** A new бриф aimed at it brings its directory back to `--wip` under its original date. A бриф dictated
   on a later day goes into a new `<date>-brief.md` under that day's date rather
   than being appended to the old one. A second run started the same day with the
   same name gets a numeric suffix. Nothing earlier is deleted.
@@ -517,7 +515,7 @@ and acceptance runs again once the build has changed.
 
 ## Six Rules Nothing Turns Off
 
-No mode, depth or finish removes any of them.
+No mode or depth removes any of them.
 
 1. **S1** — A requirement is removed only by you, in your own words. Change your
    mind while a run is going and what you said is quoted verbatim, in the
@@ -946,7 +944,7 @@ The parity and completion runs need tools `check` does not; see
 | [`docs/spec/README.md`](docs/spec/README.md) | reading order for the specification, and how to run the checks |
 | [`docs/spec/vocabulary.md`](docs/spec/vocabulary.md) | every term, its one name, and the on-screen labels in both languages |
 | [`docs/spec/safety.md`](docs/spec/safety.md) | the six rules |
-| [`docs/spec/dials.md`](docs/spec/dials.md) | register, language, mode, depth, finish, and how each resolves |
+| [`docs/spec/dials.md`](docs/spec/dials.md) | register, language, mode, depth, models, and how each resolves |
 | [`docs/spec/phases.md`](docs/spec/phases.md) | what each phase must do |
 | [`docs/spec/gates.md`](docs/spec/gates.md) | the four gates and what each reader is given and withheld |
 | [`docs/spec/artifacts.md`](docs/spec/artifacts.md) | every file a run writes |

@@ -13,15 +13,13 @@ right thing was built.
 | briefing | Briefing | yes | `manifest.md`, declared references, `prior.md` | `answers.md`, neutral `reference.md` |
 | spec | Specification | yes | `manifest.md`, `answers.md`, raw reference, `prior.md`, the repository (through the existing-code reader, once) | `codebase.md`, `spec.md`, obligation and source coverage map |
 | plan | Plan | yes | `spec.md`, obligations and checks, the repository's test, typecheck and lint configuration, `prior.md`, `codebase.md` | `tasks/`, `interfaces.md`, ownership map |
-| build | Build | yes | task files, relevant raw reference, `interfaces.md`, `codebase.md`, blockers' `D##` rows | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
+| build | Build | yes | task files and the references their *References* rows name, `interfaces.md`, `codebase.md`, blockers' `D##` rows | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
 | review | Review | yes | task files, obligations, evidence, `interfaces.md`, project code, the project's documented standards | `reviews/` including `reviews/standards.md` once per прогон, findings and check limits |
 | acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md` |
-| polish | Доводка | no | `reference.md`, project code after required parity | optional polished build, `tasks/` of its own |
 | memory | Memory | no | `discovered-interfaces.md`, `spec.md`, the Terms table of `interfaces.md`, the seam-level items of `reviews/standards.md`, the `noCorrectSeam:` lines of repeated repairs' diagnoses, `prior.md`, project code, run state | the memory block in the host's memory file, `decisions.md` |
 | repair | Repair | no | whatever one of its six doors provides | retried таск, `amendments.md` |
 
-`polish` runs only when the finish dial asked for it, inside the acceptance
-stage and after приёмка. `memory` runs twice — once during `build`, when the
+`memory` runs twice — once during `build`, when the
 build discovers something worth outliving the run, and once after `acceptance`,
 when the finished code can be described. `repair` runs on demand, through the six doors its own section lists.
 
@@ -332,6 +330,21 @@ same word into `tasks[].model` and nothing changes it: a repair and a retry run
 `model` and no `Model` row, and each of its субагенты runs on the session's
 model.
 
+**Each task file names the references it follows.** Its `References` row,
+between *User contract and authority* and *Verification map*, cites each
+`REF-*` id from the register whose surface, behaviour or look the таск builds,
+in backticks and followed by its role and location — or reads `none`. A
+location lives in this row only; *User contract and authority* keeps the
+quotations and the approved deviations. Every available `visual_reference` and
+`contextual_example` is cited by at least one таск, and G3 refuses a plan where
+one is not; an authoritative behaviour reaches its таски through
+`verification.obligations[].implementationTaskIds` instead, and an unavailable
+reference cannot be followed, so neither must be cited. A superseded reference
+is not cited in place of the one that superseded it. This is how a comparable
+reaches the таски that build what it shows: «like X» is a требование that G4
+checks, and the comparable itself is inspiration the executor opens. Nothing
+compares the build against it after приёмка.
+
 **The project's commands are written once.** `interfaces.md` opens with a
 Project conventions table of five rows: the test, typecheck and lint commands,
 where tests live, and one existing test file as prior art. Values come from the
@@ -521,6 +534,14 @@ The handoff exists for surprises. A plan that produces one per таск cut its
 таски too large, and the granularity rules above are what to fix, not the
 handoff.
 
+### What An Executor Opens Of The References
+
+An executor is never handed `reference.md`. It opens, read-only, the references
+its task file's *References* row names, each at its location, and no other. It
+never writes, moves, reformats or regenerates one. A `contextual_example` is
+inspiration, not a ruler: the executor follows it where the task file does not
+decide, and where the two disagree the task file wins.
+
 ### What A Dependent Таск Is Handed
 
 A таск with blockers is handed, beside its task file and `interfaces.md`, the
@@ -560,6 +581,11 @@ told to meet.
 A reviewer holding `spec.md` would report the distance between the specification
 and one таск's slice of it as a defect in the таск. It is not one. It is a
 defect in the cut, and the cut is what G3 checks.
+
+The reviewer is not given `reference.md` either. It may open, read-only, the
+references the task file's *References* row names, and a difference from a
+`contextual_example` is not a defect unless the task file's *Done means* or
+*Verification map* makes it one.
 
 ### Scope And Width
 
@@ -734,6 +760,14 @@ the бриф's original text. [`gates.md`](gates.md) owns the exact input bounda
 The initial pass can find behavior absent from the generated inventory. The
 orchestrator subsequently reconciles that discovery with scheduled checks and
 all other findings. See [`verification.md`](verification.md).
+
+When the user required visual or behavior parity with an authoritative
+reference, that fidelity is checked here, at every mode and depth. A
+`contextual_example` is measured only where a требование says so: the
+executors followed it as inspiration, through their task files. A reference
+can show spacing, tone, density, or error-message behavior; whether each is
+mandatory depends on the user's original request and the role the register
+recorded, not on this phase.
 
 ### Startup And Scheduled Verification
 
@@ -1012,54 +1046,6 @@ No gate follows memory, in either of its two runs. There is no question about
 the user's words for it to answer — it records what the прогон learned, and a
 run that recorded nothing worth keeping is a run that learned nothing worth
 keeping rather than a failed one.
-
-## Доводка
-
-Off unless the finish dial asked for it. When it is on, it runs inside the
-acceptance stage, after приёмка, for **up to three rounds**.
-
-Доводка addresses optional refinement after required acceptance checks. When
-the user required visual or behavior parity with an authoritative reference,
-that fidelity is checked during приёмка for every dial setting. `reference.md`
-also carries contextual examples for optional polish. A reference can show
-spacing, tone, density, or error-message behavior; whether each is mandatory
-depends on the user's original request and recorded role, not on this phase.
-
-### A Round
-
-One reader is given the running build and `reference.md`, and returns the
-differences it can see. Each difference becomes a таск, cut and handed to an
-executor exactly as a build таск is: one commit, one review, `done` written by
-the review phase. **Доводка changes what is worked on, never how**; a polish
-change that skipped review would be the one change in the прогон nobody checked.
-A доводка таск runs `strong`, as a repair does. From contract 8 it is written
-into `tasks[]` with `model: strong` and a task file whose `Model` row reads
-`strong` — доводка; the plan's tier rule does not apply to it, and a
-contract-7 run writes neither.
-
-A round that returns nothing ends доводка, whether it was the first or the
-third. Three is a ceiling, not a quota, and a second round run to use up the
-budget produces differences invented to fill it.
-
-### What Доводка May Not Do
-
-**It never adds a требование.** `S1` in [`safety.md`](safety.md) says a
-требование is removed only by the user; this is the same boundary from the other
-side. A difference that would need something the манифест never asked for is
-reported in the отчёт and not built — doing it anyway would put work into the
-build that no gate is measuring, arriving after the last gate has run.
-
-It also does not touch `manifest.md`, `spec.md` or the requirement statuses.
-Nothing about what was promised changes because the result was polished.
-
-### After The Last Round
-
-**Приёмка runs once more**, and appends its round to `report.md`.
-
-The build the last отчёт describes no longer exists — доводка changed it — and
-the rule that a changed build gets a fresh reading is the same one a repaired
-прогон follows. One re-reading after доводка finishes, not one per round: what
-is being checked is the build the user will keep.
 
 ## Repair
 

@@ -7,7 +7,7 @@ that fails is not a warning: the phase is redone.
 |---|---|---|
 | G1 | briefing | Every требование has a status and no unexplained open entry; every `answers.md` entry that offered options marks exactly one recommended and records the chosen option in full; contract 5 also requires a fresh returned independent source audit and frozen initial agreement |
 | G2 | spec | Every live требование is dispositioned; independent intent and raw-reference passes find no unresolved mandatory coverage gap |
-| G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner that transitively depends on each integration dependency; no two таски share a file unless one transitively blocks the other; a task reader finds each task executable, and a plan-consistency reader given every task file finds no coordination defect between them; from contract 8, every producer in the Seams table and the skeleton (the sole таск of wave 1) are `strong`, and each task file's `Model` row agrees with `tasks[].model` |
+| G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner that transitively depends on each integration dependency; no two таски share a file unless one transitively blocks the other; a task reader finds each task executable, and a plan-consistency reader given every task file finds no coordination defect between them; from contract 8, every producer in the Seams table and the skeleton (the sole таск of wave 1) are `strong`, each task file's `Model` row agrees with `tasks[].model`, and each task file's `References` row cites only ids the register holds, each with a location, while every available visual reference and contextual example is cited by some таск |
 | G4 | acceptance | Current, applicable evidence and independent discovery cover the current contract; failures and incomplete checks are reconciled under [`verification.md`](verification.md); contract 6 also closes `completed` with no open defect, and stops after an exhausted budget only with a `budget_exhausted` strategy review |
 
 ## Evidence
@@ -16,7 +16,7 @@ that fails is not a warning: the phase is redone.
 |---|---|
 | G1 | The status map has no unexplained open entries; each `answers.md` entry with options carries a gist, one recommendation, an `Answer:` and a `Chosen:` that names an offered option or `own answer`; v5 has a current source/manifest audit and initial agreement baseline |
 | G2 | Status map, obligation/source coverage map, independent intent and raw-reference discovery findings |
-| G3 | Requirement → obligation → implementation task and obligation → check → execution task mappings, including verification-only tasks; from contract 8, the Seams table's Producer task ids and each task file's `Model` row against `tasks[].model` |
+| G3 | Requirement → obligation → implementation task and obligation → check → execution task mappings, including verification-only tasks; from contract 8, the Seams table's Producer task ids, and the `Model` and `References` rows of each task file, and nothing else of it, against `tasks[].model` and `verification.references` |
 | G4 | Current check executions, complete coverage reviews, union of substantiated findings, and a fresh acceptance round |
 
 The requirement id is what makes a finding evidence rather than an opinion. A
@@ -40,6 +40,25 @@ unchecked, never passed.
 Nothing checks whether the recommendation was the right one, whether the
 question was worth asking, or whether the chosen text was shown back to the
 user. Those stay the phase file's discipline.
+
+### What G3 Reads In The Task Files
+
+From contract 8, and never below it, G3 reads two rows of each task file: `Model`
+and `References`. The register is `state.verification.references`;
+`reference.md` is only its projection. A `References` cell reads `none`, or
+holds one or more `REF-*` ids in backticks, each followed by its location; an
+id not in backticks is prose. G3 reports a task file with no `References` row,
+a row that is neither form, a cited id with no location, and a cited id the
+register does not hold. It reports, once each, every reference that is
+available and whose role is `visual_reference` or `contextual_example` and that
+no таск cites. An authoritative behaviour, a reference of role `other`, and an
+unavailable reference may stay uncited, and citing one is allowed. Findings come
+in task order, then in register order; a таск with no task file is reported by
+the `Model` half alone.
+
+Nothing checks that a location matches the register's wording, or that a таск
+cites the right reference rather than some reference. Those stay the plan
+phase's discipline and the plan-consistency reader's.
 
 ## Why The Manifest Is Checked Twice
 
@@ -110,8 +129,8 @@ inventory. The orchestrator then reconciles its findings with all other
 origins and executes the scheduled checks. A source signature or matching
 digest cannot satisfy a browser behavior check. A browser capability limit
 makes affected checks incomplete, with G4 `pending` unless an established
-failure already makes it `failed`. Required parity is checked even when polish
-is disabled. A completed acceptance stage says the phase ran; it does not
+failure already makes it `failed`. Required parity is checked at every mode and
+depth. A completed acceptance stage says the phase ran; it does not
 imply G4 passed or the product is verified.
 
 A name in `Given` is something the reader's brief must declare it has; a name in
@@ -169,7 +188,7 @@ required external prerequisites are missing. A startup code defect opens
 `startup-defect`; a service/tool/value limitation records unavailable checks.
 A coverage omission opens `coverage-omission` and adds check/task ownership,
 invalidating affected passes. Repair never passes G4 itself. All mode/depth
-combinations and polish off keep these rules. Exact records and transitions
+combinations keep these rules. Exact records and transitions
 live in [verification.md](verification.md).
 
 Under contract 6, a failed readiness probe opens no repair door at all: it is

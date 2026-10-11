@@ -17,8 +17,11 @@ outcome. A migration, clone, rewrite, or refactor that preserves an observable
 interface needs a reference inventory and behavior checks. A backend or document
 change without such an interface needs proportionate non-UI checks; it does not
 need screenshots or pointer tests. Required fidelity remains part of acceptance
-for every mode and depth, including `polish=false`. Optional refinement may run
-in polish after required fidelity has passed.
+for every mode and depth. A `contextual_example` is inspiration: the plan cites
+it into the task files of the таски that build what it shows, the executor
+follows it where its task file does not decide, and G4 measures it only through
+a требование that asks for it. Nothing compares the build against a comparable
+after приёмка.
 
 The user may name an existing application, repository, deployment, screenshot,
 archive, or URL without saying “reference.” Preservation intent registers that

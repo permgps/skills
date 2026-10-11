@@ -1,6 +1,6 @@
 # Safety Rules
 
-Six rules. No mode, depth, or finish removes any of them, and no argument about
+Six rules. No mode or depth removes any of them, and no argument about
 what the user "obviously meant" outranks one. Everything else in this
 specification is calibration; this document is not.
 

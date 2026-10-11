@@ -89,9 +89,8 @@ condition that produced it is still true.
 ## The step is bounded at three rounds
 
 Accepted edits open new questions: an added line has forks of its own. The loop
-`grill` → `reconcile` → `grill` therefore runs **at most three rounds** — the same
-bound доводка carries in Maestro — and then reports what is still open rather than
-continuing.
+`grill` → `reconcile` → `grill` therefore runs **at most three rounds** and then
+reports what is still open rather than continuing.
 
 Three is not a discovered number. It is the same one used elsewhere in this
 repository for the same reason: a loop that can always find one more thing needs a

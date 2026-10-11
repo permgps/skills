@@ -72,7 +72,7 @@ actually built.
 | `prior.md` | preflight | briefing, spec, plan, memory | no |
 | `codebase.md` | spec | spec, plan, build, repair, G3 | no |
 | `answers.md` | briefing | spec, G1 | append-only |
-| `reference.md` | briefing | G2 reference reader, acceptance reference reader, polish | append-only |
+| `reference.md` | briefing | G2 reference reader, acceptance reference reader; the plan cites its ids into task files | append-only |
 | `spec.md` | spec | plan, build, review | yes, by amendment only |
 | `interfaces.md` | plan | build, review, G3, memory | no |
 | `discovered-interfaces.md` | build | build, memory | append-only |
@@ -116,8 +116,9 @@ instead of the work. Where `codebase.md` and `interfaces.md` disagree on a
 name, `interfaces.md` wins, and a deliberate rename is a `renames <old>` row in
 the Terms table.
 
-Each task file contains the relevant user-contract and reference excerpts, the
-observable obligation IDs and check IDs it serves, its implementation owner
+Each task file contains the relevant user-contract excerpts, a `References` row
+citing each `REF-*` id the таск follows with its role and location (or `none`),
+the observable obligation IDs and check IDs it serves, its implementation owner
 when implementation is required, the check execution owner, variants,
 integration prerequisites, and its Test surface: the signatures from
 `interfaces.md` its tests go through. `interfaces.md` carries shared boundaries, a Project conventions table (test, typecheck and lint commands, where tests live, prior art), a Terms
@@ -132,8 +133,13 @@ check's execution owner transitively depends on each integration dependency,
 that two таски sharing a path in `files` or `zone` are ordered by `blockedBy`,
 and that the task graph has no cycle or missing prerequisite. From contract 8
 it also reads the Seams table of `interfaces.md` and each task file's `Model`
-row, and nothing else of either: every producer and the skeleton are `strong`,
-and each row agrees with `tasks[].model`. Whether a declared prerequisite, seam
+and `References` rows, and nothing else of either: every producer and the
+skeleton are `strong`, each `Model` row agrees with `tasks[].model`, and each
+`References` row cites only register ids, each with a location, while every
+available visual reference and contextual example is cited by some таск
+([`gates.md`](gates.md) › *What G3 Reads In The Task Files*). An executor and a
+reviewer are never handed `reference.md`; they open, read-only, the references
+their task file's row names. Whether a declared prerequisite, seam
 or completion artifact is consistent across task files is still the
 plan-consistency reader's verdict, recorded against G3. Headless rendered criteria are valid task checks; a visible viewer
 takeover is not.

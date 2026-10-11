@@ -33,7 +33,7 @@ like to look at it.
 
 | Key | Region | Shows | Source |
 |---|---|---|---|
-| `dials` | Dials | Mode, depth, доводка on/off, the register when the state names one, and any mid-run change | `mode`, `depth`, `polish`, `explain`, `dialChanges[]` |
+| `dials` | Dials | Mode, depth, the register when the state names one, and any mid-run change | `mode`, `depth`, `explain`, `dialChanges[]` |
 | `progress` | Прогресс проекта | The whole road as one percentage and one bar | `stages[]`, `tasks[]` |
 | `coverage` | Покрытие брифа | The share of live требования that reached the specification | `requirements[]` |
 | `stage` | Этап сейчас | The stage, its position in the eight, and its own clock | `currentStage`, `stages[]` |
