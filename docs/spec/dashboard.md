@@ -34,11 +34,10 @@ like to look at it.
 | Key | Region | Shows | Source |
 |---|---|---|---|
 | `dials` | Dials | Mode, depth, the register when the state names one, and any mid-run change | `mode`, `depth`, `explain`, `dialChanges[]` |
-| `progress` | Прогресс проекта | The whole road as one percentage and one bar | `stages[]`, `tasks[]` |
+| `header` | Что происходит | The run's condition as a colour and a word, the share of the road, one sentence about the таски, the таски in flight by title, and the eight stages as a strip with their clocks | `stages[]`, `tasks[]`, `currentStage`, `awaiting`, `lifecycle`, `outcome`, `interruptedAt` |
 | `coverage` | Покрытие брифа | The share of live требования that reached the specification | `requirements[]` |
-| `stage` | Этап сейчас | The stage, its position in the eight, and its own clock | `currentStage`, `stages[]` |
 | `elapsed` | Прошло времени | Working time since `startedAt`, the median таск beneath it, and the calendar span when the two differ | every timestamp in the state |
-| `estimate` | Осталось | The estimate as a range, and the critical path it was measured along | `tasks[]` |
+| `estimate` | Осталось | The estimate as a range, and the critical path it was measured along; shown at the right of the header band | `tasks[]` |
 | `tasks` | Таски | Finished out of cut, with what is in motion and what was retried | `tasks[]` |
 | `debt` | Долг | Заглушки, допущения and переменные as one number and three | `debt` |
 | `tests` | Тесты | The last full suite | `tests`, or the last таск's own |
@@ -82,6 +81,89 @@ with the runtime's by `npm run dashboard`.
 the page would show — an active run, a `since` that parses — the browser tab's
 title is «● Ждём вас» / «● Waiting for you», so a tab in the background says so;
 otherwise it is the static `Maestro`. This applies at every contract version.
+
+## The Header Says What Is Happening
+
+The page opens with a band under the title and the controls, above the notices.
+It holds two regions side by side: `header` on the left and `estimate` on the
+right. The band itself is a container, not a region, because a region nested in
+another would have its `i` hung on the inner heading.
+
+**The condition is one of four words, read from fields every contract already
+carries.** The page adds no field for it. The rows are checked in order, and the
+first match wins:
+
+| # | State | Condition | Word |
+|---|---|---|---|
+| C1 | `lifecycle: closed`, `outcome: stopped_incomplete` | failed | Сбой / Failed |
+| C2 | `lifecycle: closed`, any other outcome; or below contract 4 with `finishedAt` | finished | Завершён / Finished |
+| C3 | not closed, `interruptedAt` set | failed | Сбой / Failed |
+| C4 | not stopped, `awaiting` holds a wait the page would show | waiting | Ждёт вас / Waiting for you |
+| C5 | not stopped, no wait, some `stages[].status` is `failed` | failed | Сбой / Failed |
+| C6 | anything else, including a state with no stages | working | Идёт работа / Working |
+
+**A wait outranks a failed стадия (C4 before C5).** The reader holds the next
+move either way. «Сбой» over a question would send them looking for a fault
+instead of answering it. The tab reads the same wait, so the band and the tab
+cannot disagree. Nothing writes a failed стадия yet ([`state-contract.md`](state-contract.md)),
+so C5 is defensive.
+
+**Finished says closed, never verified.** `closed_with_exceptions` is finished.
+Whether the work was verified is said by the run notice beside the band, in the
+wording of [`vocabulary.md`](vocabulary.md) › *Verification and Closure
+Wording*. The `header` explanation quotes that notice and does not restate it.
+
+**A frozen chat still reads as working.** The page cannot tell a dead chat
+from a busy one. The silence notice under the band says so in words.
+
+**The colour is never the only signal.** The condition sets the band's left
+border and the colour of its word: working `--info`, waiting `--warn`, finished
+`--accent`, failed `--fail`. The background stays the panel's, so the four
+tokens keep the contrast they already have in both themes. The script sets a
+class and the stylesheet owns the colour.
+
+**The bar and its caption** carry the share of the road from the rule in *The
+Numbers Are Computed, Never Stored*. The percent is printed once, in the
+caption «Прогресс проекта — N%».
+
+**One sentence about the таски**, the same in both registers:
+
+| # | Таски | ru | en |
+|---|---|---|---|
+| S1 | none | Тасков пока нет | No tasks yet |
+| S2 | 2 done of 6, 3 active | 2 из 6 тасков готовы, ещё 3 в работе | 2 of 6 tasks done, 3 more in progress |
+| S3 | 1 done of 21, none active | 1 из 21 таска готов | 1 of 21 tasks done |
+| S4 | 5 done of 5 | 5 из 5 тасков готовы | 5 of 5 tasks done |
+| S5 | 0 done of 1, 1 active | 0 из 1 таска готовы, ещё 1 в работе | 0 of 1 task done, 1 more in progress |
+| S6 | 1 off-contract among 4 | … · вне контракта 1 | … · off-contract 1 |
+
+"Done" counts accepted таски, the figure the Таски card shows. "Active" counts
+`running`, `review` and `repair` together. In Russian, the noun after «из N» is
+the genitive of N — «таска» for one, «тасков» otherwise — and the verb is
+«готов» when the count of done таски takes the singular form, «готовы»
+otherwise. A failed таск is counted in the total and named by the build block;
+the sentence gives it no clause of its own.
+
+**The in-flight line** names the таски in work, in review and in repair, in
+that order. Each group starts with its status label. Titles are quoted «…» in
+Russian and “…” in English, and a таск without a title is named by its id. At
+most three titles per group are shown, then «и ещё N» / "and N more". Groups
+are joined by « · ». The line is hidden when nothing is in flight.
+
+**The strip** shows the eight stages in road order, a stage the state never
+wrote drawn as pending. Each cell carries the stage label and its own working
+clock, the same clock as the timeline row. A skipped or failed cell shows its
+status label («Пропущен», «Сбой») instead of a clock. A pending cell shows a
+dash. The current stage carries `aria-current="step"` and a heavier weight.
+The strip is eight columns where there is room and four otherwise, and never
+scrolls sideways.
+
+**The `stages` region stays.** The strip is a summary. The timeline below keeps
+each stage's note, the findings of a failed check, and its own `i`.
+
+**The band replaced two regions.** `progress` became the bar, and `stage`
+became the strip and the `header` explanation. The `estimate` region moved
+into the band whole, with the same key, `i` and explanation.
 
 ## The Reader's Own Two Controls
 
@@ -280,7 +362,7 @@ render time cannot.
 Two of them are worth stating outright, because both are places where a page
 could flatter its прогон:
 
-- **Прогресс weights the stages by how long they take** — разработка six,
+- **Прогресс, the bar in the header band, weights the stages by how long they take** — разработка six,
   спецификация and ревью two, the rest one — and subdivides разработка by how
   far its таски have got. Equal weights make the bar stand still through the
   longest stage and then jump, which reads as a stuck прогон.

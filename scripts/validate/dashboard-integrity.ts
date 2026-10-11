@@ -31,8 +31,8 @@ const log = createLogger('dashboard-integrity');
  * regions themselves are checked against that table below.
  */
 const REQUIRED_REGIONS = [
-  'run-clock', 'stage-clock', 'dials',
-  'progress', 'cards',
+  'run-clock', 'dials',
+  'band', 'strip', 'cards',
   'stages', 'tasks', 'requirements', 'gates', 'handover',
   'requirement-rows', 'requirement-folds',
 ];
@@ -731,6 +731,38 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
   }
   log.info('labels', 'labels compared with the vocabulary',
     { maps: (VALUE_MAPS.length + 1) * LANGUAGES.length });
+
+  // --- the band's four condition words are the vocabulary's -----------------
+  //
+  // No field holds a condition: the page derives it, so VALUE_MAPS cannot see
+  // the map. It is still a word the user reads at the top of every screen, and
+  // a word the page coins is the drift this checker exists for. The keys are
+  // held to CONDITION_ORDER as well, because `conditionOf` can only return what
+  // that list names and a vocabulary row it never returns is a word no screen
+  // will ever show.
+  const conditionOrder = Array.isArray(logic['CONDITION_ORDER'])
+    ? (logic['CONDITION_ORDER'] as unknown[]).map(String) : [];
+  for (const { language, label } of LANGUAGES) {
+    const conditions = findTable(vocabularyTables, ['Condition', label]);
+    if (!conditions) {
+      add('conditions', 0, `vocabulary.md has no table with columns Condition and ${label}`);
+      continue;
+    }
+    const owned = new Map(conditions.rows.map(row =>
+      [cleanCell(row['Condition']).replace(/`/g, '').trim(), cleanCell(row[label])] as const));
+    const held = branchMap(language, 'CONDITION');
+    const missing = [...owned.keys()].filter(key => !(key in held));
+    log.debug('conditions', 'condition map compared', { map: `CONDITION (${language})`, missing });
+    compare('conditions', `condition (${language})`, owned, held);
+    const keys = [...owned.keys()];
+    if (keys.join(',') !== conditionOrder.join(',')) {
+      add('conditions', 0,
+        `vocabulary.md lists the conditions [${keys.join(', ')}] and the page's CONDITION_ORDER `
+        + `is [${conditionOrder.join(', ')}] — keep the Run Condition rows in the order the page `
+        + 'decides them, and no condition the page cannot return');
+    }
+    log.info('conditions', 'conditions checked', { language, conditions: keys.length, missing: missing.length });
+  }
 
   // --- the plain register says nothing only the trade understands -----------
   //

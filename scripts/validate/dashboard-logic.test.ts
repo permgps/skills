@@ -15,6 +15,7 @@ import { projectState } from '../state/projection.ts';
 import { AWAITING_KINDS } from '../state/contract.ts';
 import { retrospectiveState } from '../state/fixtures/retrospective.ts';
 import { deriveVerification } from '../state/verification.ts';
+import { cleanCell, parseTables } from './spec-integrity.ts';
 
 const ASSET = 'skills/maestro/assets/dashboard.html';
 
@@ -27,6 +28,12 @@ interface Logic {
   runDateOf: (state: unknown) => string | null;
   awaitingOf: (state: unknown) => { since: string; kind: string; note: string | null } | null;
   tabTitle: (state: unknown, language?: string) => string;
+  CONDITION_ORDER: string[];
+  conditionOf: (state: unknown) => { condition: string; reason: string; stageId: string | null };
+  stripOf: (state: unknown) => Array<{
+    id: string; status: string; current: boolean; from: string | null; until: string | null;
+  }>;
+  inFlightOf: (state: unknown) => Record<'running' | 'review' | 'repair', Array<{ id: string; title: string | null }>>;
   AWAITING_KINDS: string[];
   STAGE_ORDER: string[];
   L10N: { ru: Words; en: Words } & Record<string, Words>;
@@ -721,7 +728,7 @@ test('both registers of both languages name the share they were built from', () 
 
   for (const language of ['ru', 'en']) {
     for (const register of ['normal', 'plain']) {
-      for (const key of ['progress', 'tasks']) {
+      for (const key of ['header', 'tasks']) {
         const said = L.explain(key, state, now, marks, register, language).join(' ');
         assert.match(said, new RegExp(share + '%'),
           `${language}/${register}/${key} must name the share the region shows`);
@@ -740,7 +747,7 @@ test('an off-contract таск is named in every explanation that counts it', ()
 
   for (const language of ['ru', 'en']) {
     for (const register of ['normal', 'plain']) {
-      for (const key of ['progress', 'tasks']) {
+      for (const key of ['header', 'tasks']) {
         const said = L.explain(key, state, now, marks, register, language).join(' ');
         const quiet = L.explain(key, clean, now, marks, register, language).join(' ');
         assert.ok(said.length > quiet.length,
@@ -1028,7 +1035,7 @@ const busy = (): Record<string, unknown> => run({
 const NOW = AT('2026-08-19T10:35:00.000Z');
 
 test('the page can explain every region it renders', () => {
-  assert.equal(L.EXPLAIN_ORDER.length, 15);
+  assert.equal(L.EXPLAIN_ORDER.length, 14);
   for (const key of L.EXPLAIN_ORDER) {
     const state = busy();
     const lines = L.explain(key, state, NOW, L.collectMarks(state));
@@ -1927,4 +1934,212 @@ test('the page names exactly the kinds the contract defines', () => {
   // Two copies of one value set, written by different code: this holds them together.
   assert.deepEqual(plain(L.AWAITING_KINDS), [...AWAITING_KINDS]);
   for (const kind of AWAITING_KINDS) assert.equal(L.awaitingOf(asked({ kind }))!.kind, kind);
+});
+
+// --- the header band: what is happening, in one word and one sentence ------
+
+const band = (extra: Record<string, unknown> = {}): Record<string, unknown> =>
+  run({ contractVersion: 9, lifecycle: 'active', ...extra });
+
+const condition = (state: unknown): Record<string, unknown> => plain(L.conditionOf(state)) as Record<string, unknown>;
+
+test('C1: a closed run that stopped incomplete reads as failed, by its outcome', () => {
+  const state = band({ lifecycle: 'closed', outcome: 'stopped_incomplete', finishedAt: '2026-08-19T11:00:00.000Z', stopReason: 'нет доступа к базе' });
+  assert.deepEqual(condition(state), { condition: 'failed', reason: 'outcome', stageId: null });
+});
+
+test('C2: a closed run with any other outcome reads as finished, and so does an old run that wrote finishedAt', () => {
+  for (const outcome of ['completed', 'closed_with_exceptions']) {
+    const state = band({ lifecycle: 'closed', outcome, finishedAt: '2026-08-19T11:00:00.000Z' });
+    assert.deepEqual(condition(state), { condition: 'finished', reason: 'outcome', stageId: null }, outcome);
+  }
+  assert.deepEqual(condition(run({ finishedAt: '2026-08-19T11:00:00.000Z' })),
+    { condition: 'finished', reason: 'outcome', stageId: null });
+});
+
+test('C3: a run interrupted without closing reads as failed, and a stale wait does not outrank it', () => {
+  const state = band({
+    interruptedAt: '2026-08-19T10:50:00.000Z',
+    awaiting: { kind: 'answer', since: '2026-08-19T10:40:00.000Z' },
+  });
+  assert.deepEqual(condition(state), { condition: 'failed', reason: 'interrupted', stageId: null });
+});
+
+test('C4: a run stopped on a question reads as waiting, even under a failed стадия, because the reader holds the next move', () => {
+  const state = band({
+    awaiting: { kind: 'plan-gate', since: '2026-08-19T10:40:00.000Z' },
+    stages: [
+      { id: 'preflight', status: 'done', startedAt: STARTED },
+      { id: 'plan', status: 'failed', startedAt: '2026-08-19T10:30:00.000Z' },
+    ],
+  });
+  assert.deepEqual(condition(state), { condition: 'waiting', reason: 'awaiting', stageId: null });
+});
+
+test('C5: a failed стадия with nobody asked reads as failed and names that стадия', () => {
+  const state = band({
+    stages: [
+      { id: 'preflight', status: 'done', startedAt: STARTED },
+      { id: 'plan', status: 'failed', startedAt: '2026-08-19T10:30:00.000Z' },
+    ],
+  });
+  assert.deepEqual(condition(state), { condition: 'failed', reason: 'stage', stageId: 'plan' });
+});
+
+test('C6: anything else reads as working, named by its current стадия, including a state with no stages', () => {
+  assert.deepEqual(condition(band()), { condition: 'working', reason: 'none', stageId: 'plan' });
+  assert.deepEqual(condition(run({ stages: [], currentStage: undefined })),
+    { condition: 'working', reason: 'none', stageId: null });
+});
+
+test('every condition has a word in both languages, and no word the order does not hold', () => {
+  assert.deepEqual(plain(L.CONDITION_ORDER), ['working', 'waiting', 'finished', 'failed']);
+  for (const language of L.LANGUAGE_ORDER) {
+    const said = L.L10N[language]!['CONDITION'];
+    assert.ok(said, `L10N.${language}.CONDITION`);
+    assert.deepEqual(Object.keys(said), [...L.CONDITION_ORDER], language);
+    for (const word of Object.values(said)) assert.ok(word.trim() !== '', language);
+  }
+  assert.equal(L.L10N.ru['CONDITION']!['waiting'], 'Ждёт вас');
+  assert.equal(L.L10N.en['CONDITION']!['finished'], 'Finished');
+});
+
+const tasksOf = (statuses: string[], titles: Array<string | null> = []): Array<Record<string, unknown>> =>
+  statuses.map((status, i) => ({
+    id: String(i + 1).padStart(2, '0'),
+    title: titles[i] === undefined ? `Таск ${i + 1}` : titles[i],
+    requirementIds: ['R01'], blockedBy: [], status,
+  }));
+
+type Say = (...args: unknown[]) => string;
+const said = (language: string, name: string): Say =>
+  (L.L10N[language]!['UI'] as unknown as Record<string, Say>)[name]!;
+const headline = (language: string, statuses: string[]): string =>
+  said(language, 'headline')(L.countTasks(tasksOf(statuses)));
+
+const SENTENCES: Array<{ row: string; statuses: string[]; ru: string; en: string }> = [
+  { row: 'S1', statuses: [], ru: 'Тасков пока нет', en: 'No tasks yet' },
+  { row: 'S2', statuses: ['done', 'done', 'running', 'review', 'repair', 'queued'],
+    ru: '2 из 6 тасков готовы, ещё 3 в работе', en: '2 of 6 tasks done, 3 more in progress' },
+  { row: 'S3', statuses: ['done', ...Array<string>(20).fill('queued')],
+    ru: '1 из 21 таска готов', en: '1 of 21 tasks done' },
+  { row: 'S4', statuses: ['done', 'done', 'done', 'done', 'done'],
+    ru: '5 из 5 тасков готовы', en: '5 of 5 tasks done' },
+  { row: 'S5', statuses: ['running'], ru: '0 из 1 таска готовы, ещё 1 в работе', en: '0 of 1 task done, 1 more in progress' },
+  { row: 'S6', statuses: ['done', 'running', 'queued', 'paused'],
+    ru: '1 из 4 тасков готов, ещё 1 в работе · вне контракта 1',
+    en: '1 of 4 tasks done, 1 more in progress · off-contract 1' },
+];
+
+for (const { row, statuses, ru, en } of SENTENCES) {
+  test(`${row}: the band's sentence about the таски agrees in number in both languages`, () => {
+    assert.equal(headline('ru', statuses), ru);
+    assert.equal(headline('en', statuses), en);
+  });
+}
+
+test('the in-flight line names the таски at work by title, three to a group, then counts the rest', () => {
+  const state = band({
+    tasks: [
+      ...tasksOf(['running', 'running', 'running', 'running'], ['Шапка', 'Подвал', 'Меню', 'Форма']),
+      { id: '05', title: 'Каталог', requirementIds: ['R01'], blockedBy: [], status: 'review' },
+      { id: '07', title: '  ', requirementIds: ['R01'], blockedBy: [], status: 'repair' },
+      { id: '08', title: 'Готовое', requirementIds: ['R01'], blockedBy: [], status: 'done' },
+    ],
+  });
+  const groups = L.inFlightOf(state);
+  assert.deepEqual(plain(groups.repair), [{ id: '07', title: null }]);
+  assert.equal(groups.running.length, 4);
+  assert.equal(said('ru', 'inFlightLine')(groups),
+    'В работе: «Шапка», «Подвал», «Меню» и ещё 1 · На ревью: «Каталог» · На исправлении: 07');
+  assert.equal(said('en', 'inFlightLine')(groups),
+    'In progress: “Шапка”, “Подвал”, “Меню” and 1 more · In review: “Каталог” · In repair: 07');
+});
+
+test('the in-flight line is empty when nothing is in flight', () => {
+  const groups = L.inFlightOf(band({ tasks: tasksOf(['done', 'queued', 'failed']) }));
+  assert.equal(said('ru', 'inFlightLine')(groups), '');
+  assert.equal(said('en', 'inFlightLine')(groups), '');
+});
+
+test('the strip holds all eight stages in order, fills the missing ones as pending, and marks only the current one', () => {
+  const strip = plain(L.stripOf(band({
+    stages: [
+      { id: 'preflight', status: 'done', startedAt: STARTED, finishedAt: '2026-08-19T10:05:00.000Z' },
+      { id: 'briefing', status: 'skipped', note: 'вопросов нет' },
+      { id: 'plan', status: 'active', startedAt: '2026-08-19T10:30:00.000Z' },
+    ],
+  }))) as ReturnType<Logic['stripOf']>;
+  assert.deepEqual(strip.map(cell => cell.id), [...L.STAGE_ORDER]);
+  assert.deepEqual(strip[0], { id: 'preflight', status: 'done', current: false, from: STARTED, until: '2026-08-19T10:05:00.000Z' });
+  assert.deepEqual(strip[1], { id: 'manifest', status: 'pending', current: false, from: null, until: null });
+  assert.equal(strip[2]!.status, 'skipped');
+  assert.deepEqual(strip.filter(cell => cell.current).map(cell => cell.id), ['plan']);
+});
+
+test('the band\'s composed sentences carry no shorthand vocabulary.md forbids the plain reader', async () => {
+  const vocabulary = parseTables(await readFile('docs/spec/vocabulary.md', 'utf8'));
+  const groups = L.inFlightOf(band({ tasks: tasksOf(['running', 'review', 'repair'], ['a', 'b', null]) }));
+  for (const [language, column, wordwise] of [['ru', 'Shorthand', false], ['en', 'Shorthand (en)', true]] as const) {
+    const table = vocabulary.find(item => item.columns.includes(column));
+    assert.ok(table, column);
+    const banned = table.rows.flatMap(row => cleanCell(row[column]).split(',')).map(word => word.trim().toLowerCase()).filter(Boolean);
+    const lines = [...SENTENCES.map(item => headline(language, item.statuses)), said(language, 'inFlightLine')(groups),
+      said(language, 'bandCaption')(38)];
+    for (const line of lines) {
+      const naked = String(line).toLowerCase();
+      for (const word of banned) {
+        const says = wordwise ? new RegExp(`\\b${word}\\b`).test(naked) : naked.includes(word);
+        assert.equal(says, false, `${language}: «${line}» says ${word}`);
+      }
+    }
+  }
+});
+
+const CONDITION_STATES: Array<{ row: string; state: Record<string, unknown>; says: { ru: RegExp; en: RegExp } }> = [
+  { row: 'C1', state: band({ lifecycle: 'closed', outcome: 'stopped_incomplete', finishedAt: '2026-08-19T11:00:00.000Z', stopReason: 'нет доступа к базе' }),
+    says: { ru: /^Сбой: .*нет доступа к базе/, en: /^Failed: .*нет доступа к базе/ } },
+  { row: 'C2', state: band({ lifecycle: 'closed', outcome: 'closed_with_exceptions', finishedAt: '2026-08-19T11:00:00.000Z' }),
+    says: { ru: /^Завершён: /, en: /^Finished: / } },
+  { row: 'C3', state: band({ interruptedAt: '2026-08-19T10:50:00.000Z' }), says: { ru: /^Сбой: /, en: /^Failed: / } },
+  { row: 'C4', state: band({ awaiting: { kind: 'plan-gate', since: '2026-08-19T10:40:00.000Z' } }),
+    says: { ru: /^Ждёт вашего одобрения плана в чате с /, en: /^Waiting for your approval of the plan in the chat since / } },
+  { row: 'C5', state: band({ stages: [{ id: 'preflight', status: 'done', startedAt: STARTED }, { id: 'plan', status: 'failed', startedAt: '2026-08-19T10:30:00.000Z' }] }),
+    says: { ru: /«План»/, en: /«Plan»/ } },
+  { row: 'C6', state: band(), says: { ru: /^Идёт работа: .*«План»/, en: /^Working: .*«Plan»/ } },
+];
+
+for (const { row, state, says } of CONDITION_STATES) {
+  test(`${row}: the header's explanation says why the band reads as it does, in every register and language`, () => {
+    const marks = L.collectMarks(state);
+    for (const language of ['ru', 'en'] as const) {
+      for (const register of ['normal', 'plain']) {
+        const lines = L.explain('header', state, AT('2026-08-19T11:30:00.000Z'), marks, register, language);
+        assert.equal(lines.length, 4, `${language}/${register}`);
+        for (const line of lines) assert.ok(typeof line === 'string' && line.trim() !== '', `${language}/${register} left a blank line`);
+        assert.match(lines[1]!, says[language], `${language}/${register}`);
+      }
+    }
+  });
+}
+
+test('a finished прогон\'s header says closed and never claims it was verified', () => {
+  const state = band({ lifecycle: 'closed', outcome: 'closed_with_exceptions', finishedAt: '2026-08-19T11:00:00.000Z' });
+  for (const language of ['ru', 'en']) {
+    for (const register of ['normal', 'plain']) {
+      const why = L.explain('header', state, AT('2026-08-19T11:30:00.000Z'), L.collectMarks(state), register, language)[1]!;
+      assert.doesNotMatch(why, /Подтверждено выполнено|Verified completed/, `${language}/${register}`);
+      assert.match(why, /не значит «проверен»|«закрыта», а не «проверена»|does not mean verified|closed, not checked/, `${language}/${register}`);
+    }
+  }
+});
+
+test('the retired progress and stage regions explain nothing any more', () => {
+  for (const language of ['ru', 'en']) {
+    for (const register of ['normal', 'plain']) {
+      for (const key of ['progress', 'stage']) {
+        assert.deepEqual(plain(L.explain(key, band(), NOW, [], register, language)), [], `${language}/${register}/${key}`);
+      }
+    }
+  }
 });

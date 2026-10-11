@@ -166,9 +166,9 @@ term, and a term with two homes drifts.
 
 | Label | Label (en) | What it names |
 |---|---|---|
-| Прогресс проекта | Project progress | The share of the whole прогон travelled — stages weighted by how long they take, the build subdivided by how far its таски have got |
+| Что происходит | What is happening | The band at the top of the page: the прогон's condition, the bar, one sentence about the таски, the таски in flight and the strip of stages |
+| Прогресс проекта | Project progress | The bar in the header band: the share of the whole прогон travelled — stages weighted by how long they take, the build subdivided by how far its таски have got |
 | Покрытие брифа | Brief coverage | The share of live требования that reached the specification. A different number from прогресс on purpose: one measures the road, the other the value |
-| Этап сейчас | Current stage | The stage the прогон is in, with its own clock |
 | Прошло времени | Time worked | Time the прогон has been worked on |
 | Осталось | Remaining | The estimate, always a range, and only once enough таски have finished to build it from |
 | Таски | Tasks | How many таски are accepted out of how many were cut, with the work in flight shown behind them |
@@ -236,6 +236,21 @@ the stage rather than after the activity.
 `Осталось` is a range and says so. A single wall-clock number would be a
 fabrication dressed as a measurement; a range built from таски that already
 finished is neither.
+
+## Run Condition
+
+The word the header band says about the прогон. No field holds it: the page
+derives it from `lifecycle`, `outcome`, `interruptedAt`, `awaiting` and
+`stages[]`, by the rule in [`dashboard.md`](dashboard.md) › *The Header Says
+What Is Happening*. The rows are in the order the page lists them, and
+`npm run dashboard` holds the page's words and that order to this table.
+
+| Condition | Label | Label (en) | When |
+|---|---|---|---|
+| `working` | Идёт работа | Working | Anything not below — including a chat that has gone silent, which the page cannot tell from a busy one |
+| `waiting` | Ждёт вас | Waiting for you | The прогон is stopped on a question to the user; this outranks a failed стадия |
+| `finished` | Завершён | Finished | The прогон closed with `completed` or `closed_with_exceptions`, or an old one wrote `finishedAt`. It says closed and never verified: whether the work was verified is the run notice's sentence |
+| `failed` | Сбой | Failed | The прогон closed as `stopped_incomplete`, was interrupted, or a стадия failed with nobody asked |
 
 ## Plain Words
 

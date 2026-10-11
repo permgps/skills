@@ -47,6 +47,13 @@ const VOCABULARY = `# Vocabulary
 |---|---|---|
 | Ход разработки | Development progress | The таски as they are being built |
 
+## Run Condition
+
+| Condition | Label | Label (en) | When |
+|---|---|---|---|
+| \`working\` | Идёт работа | Working | anything else |
+| \`waiting\` | Ждёт вас | Waiting for you | a stop on a question |
+
 ## Plain Words
 
 | Shorthand | Say instead |
@@ -112,6 +119,7 @@ const LOGIC = {
   STAGE_ORDER: "['preflight', 'build']",
   GATE_AFTER: "{ G1: 'preflight' }",
   EXPLAIN_ORDER: "['progress', 'gates']",
+  CONDITION_ORDER: "['working', 'waiting']",
   explain: "function (key) { return key === 'nothing' ? [] : ['what it is', 'what it holds']; }",
   explainStage: "function (id) { return id === 'nothing' ? [] : ['what it does', 'where it is']; }",
   findingsLine: "function (count, register) { return register === 'plain'"
@@ -136,6 +144,7 @@ const RU = {
   DEFECT_CAUSE: "{ test: 'Тест' }",
   DEFECT_STATUS: "{ open: 'Открыт' }",
   REQUIREMENT_RESULT: "{ incomplete: 'Не проверено до конца' }",
+  CONDITION: "{ working: 'Идёт работа', waiting: 'Ждёт вас' }",
   EXPLAIN: "{ progress: function () { return ['что это', 'что показывает']; } }",
   STAGE_EXPLAIN: "{ preflight: function () { return ['подготовка заводит прогон']; },"
     + " build: function () { return ['разработка пишет код']; } }",
@@ -161,6 +170,7 @@ const EN = {
   DEFECT_CAUSE: "{ test: 'Test' }",
   DEFECT_STATUS: "{ open: 'Open' }",
   REQUIREMENT_RESULT: "{ incomplete: 'Not fully checked' }",
+  CONDITION: "{ working: 'Working', waiting: 'Waiting for you' }",
   EXPLAIN: "{ progress: function () { return ['what it is', 'what it holds']; } }",
   STAGE_EXPLAIN: "{ preflight: function () { return ['setup opens the run']; },"
     + " build: function () { return ['development writes the code']; } }",
@@ -185,7 +195,7 @@ const RENDER = `<script>
 const EXPLAINED = ['progress', 'gates'];
 
 const REGIONS = [
-  'run-clock', 'stage-clock', 'dials', 'progress', 'cards',
+  'run-clock', 'dials', 'band', 'strip', 'cards',
   'stages', 'tasks', 'requirements', 'gates', 'handover',
   'requirement-rows', 'requirement-folds',
 ];
@@ -867,4 +877,34 @@ test('a node the view makes focusable without a focus key is reported, because t
 test('the shipped page passes against the shipped specification', async () => {
   const found = await checkDashboardFile('skills/maestro/assets/dashboard.html', 'docs/spec');
   assert.deepEqual(found, []);
+});
+
+test('a condition the page words differently from the vocabulary is reported with both wordings', () => {
+  const found = messages(page({ ru: { CONDITION: "{ working: 'Работаем', waiting: 'Ждёт вас' }" } }));
+  assert.match(found, /condition \(ru\) "working" is labelled "Работаем" in the page and "Идёт работа" in the specification/);
+});
+
+test('a condition the vocabulary names and the page lacks is reported', () => {
+  const found = messages(page({ en: { CONDITION: "{ working: 'Working' }" } }));
+  assert.match(found, /condition \(en\) "waiting" has a label in the specification and none in the page/);
+});
+
+test('a condition the page words and the vocabulary does not define is reported', () => {
+  const found = messages(page({
+    ru: { CONDITION: "{ working: 'Идёт работа', waiting: 'Ждёт вас', paused: 'Пауза' }" },
+    logic: { CONDITION_ORDER: "['working', 'waiting', 'paused']" },
+  }));
+  assert.match(found, /condition \(ru\) "paused" is labelled in the page and defined nowhere in the specification/);
+  assert.match(found, /vocabulary\.md lists the conditions \[working, waiting\] and the page's CONDITION_ORDER is \[working, waiting, paused\]/);
+});
+
+test('a vocabulary with no Run Condition table is reported rather than skipped', () => {
+  const found = messages(page(), { ...SPEC, 'vocabulary.md': VOCABULARY.replace(/## Run Condition[\s\S]*?(?=## Plain Words)/, '') });
+  assert.match(found, /vocabulary\.md has no table with columns Condition and Label\b/);
+  assert.match(found, /vocabulary\.md has no table with columns Condition and Label \(en\)/);
+});
+
+test('a page with no band to render the header into is reported', () => {
+  const found = messages(page({ regions: REGIONS.filter(id => id !== 'band') }));
+  assert.match(found, /no element with id "band"/);
 });

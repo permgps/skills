@@ -147,9 +147,52 @@
     background: var(--panel);
   }
 
-  /* --- the whole road, in one bar --- */
-  #progress .head { display: flex; justify-content: space-between; align-items: baseline; }
-  #progress-percent { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* --- the band: what is happening, at the top --- */
+  #band {
+    display: grid; gap: 1rem 1.5rem; margin: .75rem 0 0;
+    grid-template-columns: minmax(0, 1fr);
+    border-left: 4px solid var(--line);
+  }
+  @media (min-width: 48rem) {
+    #band { grid-template-columns: minmax(0, 1fr) minmax(10rem, 15rem); }
+  }
+  /* The colour is the stylesheet's decision: the script sets a class and reads
+     nothing back. It is never the only signal — the word beside it says the
+     same thing, and the background stays the panel's, so the four tokens keep
+     the contrast they already have in both themes. */
+  #band.band-working { border-left-color: var(--info); }
+  #band.band-waiting { border-left-color: var(--warn); }
+  #band.band-finished { border-left-color: var(--accent); }
+  #band.band-failed { border-left-color: var(--fail); }
+  .band-working #band-condition { color: var(--info); }
+  .band-waiting #band-condition { color: var(--warn); }
+  .band-finished #band-condition { color: var(--accent); }
+  .band-failed #band-condition { color: var(--fail); }
+  .band-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem 1rem; }
+  .band-head h2 { margin: 0; }
+  #band-condition { font-size: 1.35rem; font-weight: 700; }
+  #band-caption { margin-top: .5rem; font-variant-numeric: tabular-nums; }
+  #band-headline { margin: .1rem 0 0; font-size: 1rem; }
+  #band-flight { margin-top: .15rem; overflow-wrap: anywhere; }
+  /* A range is two numbers and a gap; at the card headline size it wraps mid-phrase. */
+  .band-side .value { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* Eight stages in a row where there is room for eight, four otherwise —
+     never a sideways scroll. The dense narrow layout is a later item. */
+  .strip {
+    list-style: none; margin: .75rem 0 0; padding: 0;
+    display: grid; gap: .35rem; grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  @media (min-width: 62rem) { .strip { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
+  .strip li {
+    min-width: 0; padding: .25rem .45rem; font-size: .78rem;
+    border: 1px solid var(--line); border-radius: 6px;
+  }
+  .strip .name { display: block; overflow-wrap: anywhere; }
+  .strip .clock { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .strip .cell-skipped { border-style: dashed; color: var(--muted); }
+  .strip .cell-failed { border-color: var(--fail); }
+  .strip .cell-failed .name, .strip .cell-failed .clock { color: var(--fail); }
+  .strip [aria-current] { border-color: var(--ink); font-weight: 700; }
   .bar { display: flex; background: var(--ghost); border-radius: 999px; height: .5rem; overflow: hidden; margin: .5rem 0 .4rem; }
   /* The rounded ends belong to the track, which clips them, so a bar of two
      segments meets in a flat seam instead of two facing bulges. */
@@ -159,22 +202,19 @@
   .bar > i.flight { background: var(--muted); }
   .sub { color: var(--muted); font-size: .85rem; margin: 0; }
 
-  /* --- the eight cards --- */
+  /* --- the six cards --- */
   #cards {
     display: grid; gap: 1rem; padding: 0; border: 0; background: none;
     grid-template-columns: repeat(2, 1fr);
   }
-  /* Two rows of four on anything wide enough; two columns on a phone. */
-  @media (min-width: 62rem) { #cards { grid-template-columns: repeat(4, 1fr); } }
+  /* Two rows of three on anything wide enough; two columns on a phone. */
+  @media (min-width: 62rem) { #cards { grid-template-columns: repeat(3, 1fr); } }
   .card {
     background: var(--panel); border: 1px solid var(--line);
     border-radius: 8px; padding: .9rem 1rem; min-height: 7.5rem;
   }
   .card .value { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-  /* A range is two numbers and a gap; at the headline size it wraps mid-phrase. */
-  #estimate { font-size: 1.25rem; }
   .card .value small { font-size: .95rem; font-weight: 400; color: var(--muted); }
-  .card .stage-name { font-size: 1.25rem; font-weight: 600; }
   .ring { display: block; margin: .2rem 0; }
   .ring circle { fill: none; stroke-width: 9; }
 
@@ -291,21 +331,33 @@
       <button type="button" data-language-choice="en">EN</button>
     </div>
   </div>
+  <!-- A container, not a region: it holds two sibling regions, because
+       mountExplainers hangs a region's i on the first h2 inside it, and an
+       outer region would take the inner one's heading. -->
+  <section id="band" class="band" hidden>
+    <div class="band-main" data-region="header">
+      <div class="band-head">
+        <h2 data-label="header"></h2>
+        <b id="band-condition">—</b>
+      </div>
+      <p class="sub" id="band-caption"></p>
+      <div class="bar"><i id="progress-fill" style="width:0%"></i></div>
+      <p id="band-headline"></p>
+      <p class="sub" id="band-flight" hidden></p>
+      <ol class="strip" id="strip"></ol>
+    </div>
+    <div class="band-side" data-region="estimate">
+      <h2 data-label="estimate"></h2>
+      <div class="value" id="estimate">—</div>
+      <p class="sub" id="estimate-sub"></p>
+    </div>
+  </section>
   <p id="notice" hidden></p>
 </header>
 
 <p id="problem" hidden></p>
 
 <main id="regions">
-
-  <section id="progress" data-region="progress">
-    <div class="head">
-      <h2 data-label="progress"></h2>
-      <b id="progress-percent">—</b>
-    </div>
-    <div class="bar"><i id="progress-fill" style="width:0%"></i></div>
-    <p class="sub" id="progress-sub"></p>
-  </section>
 
   <section id="cards">
     <div class="card" data-region="coverage">
@@ -320,23 +372,11 @@
       <p class="sub" id="coverage-sub"></p>
     </div>
 
-    <div class="card" data-region="stage">
-      <h2 data-label="stage"></h2>
-      <div class="stage-name" id="stage-name">—</div>
-      <p class="sub"><span id="stage-position"></span> · <span id="stage-clock">—</span></p>
-    </div>
-
     <div class="card" data-region="elapsed">
       <h2 data-label="elapsed"></h2>
       <div class="value" id="run-clock">—</div>
       <p class="sub" id="run-median"></p>
       <p class="sub" id="run-calendar"></p>
-    </div>
-
-    <div class="card" data-region="estimate">
-      <h2 data-label="estimate"></h2>
-      <div class="value" id="estimate">—</div>
-      <p class="sub" id="estimate-sub"></p>
     </div>
 
     <div class="card" data-region="tasks">
@@ -493,12 +533,23 @@ globalThis.MAESTRO_LOGIC = (function () {
       REQUIREMENT_RESULT: {
         passed: 'Прошло проверку', failed: 'Не прошло проверку', incomplete: 'Не проверено до конца'
       },
+      /**
+       * The run's condition, as the band at the top says it.
+       *
+       * A value map like the ones above, although no field holds it: the page
+       * derives it in `conditionOf`, and vocabulary.md › Run Condition owns the
+       * words. «Завершён» says the прогон closed and nothing more — whether
+       * the work was verified is the run notice's sentence, never this word's.
+       */
+      CONDITION: {
+        working: 'Идёт работа', waiting: 'Ждёт вас', finished: 'Завершён', failed: 'Сбой'
+      },
       /** The words on screen that are the value of no field. */
       SCREEN: {
         dials: 'Тумблеры прогона',
+        header: 'Что происходит',
         progress: 'Прогресс проекта',
         coverage: 'Покрытие брифа',
-        stage: 'Этап сейчас',
         elapsed: 'Прошло времени',
         estimate: 'Осталось',
         tasks: 'Таски',
@@ -569,28 +620,31 @@ globalThis.MAESTRO_LOGIC = (function () {
           return L10N.ru.UI.minutes(ms);
         },
         tasksWord: function (n) { return plural(n, 'таск', 'таска', 'тасков'); },
-        progressSub: function (p) {
-          var line = p.stagesDone + ' из ' + p.stagesTotal + ' этапов пройдено';
-          if (p.tasksTotal > 0) {
-            // Not «0 из 6 тасков»: `done` is written by the review phase, so
-            // that figure stands at zero through the whole of разработки while
-            // five таски are visibly in motion just below it.
-            line += ' · ' + p.tasksTotal + ' ' + L10N.ru.UI.tasksWord(p.tasksTotal)
-              + ', ' + Math.round(p.tasksShare * 100) + '% пути';
-            if (p.tasksActive > 0) line += ' · в работе ' + p.tasksActive;
-            if (p.tasksOffContract > 0) {
-              line += ' · ' + L10N.ru.SCREEN.offContract + ' ' + p.tasksOffContract;
-            }
+        // The band's one sentence. «Готовы» counts accepted таски, the figure
+        // the Таски card shows, and «в работе» counts every таск in motion —
+        // written, under review or in repair — so the sentence never says
+        // «0 из 6» over five таски visibly moving without saying so.
+        headline: function (counts) {
+          if (counts.total === 0) return 'Тасков пока нет';
+          var line = counts.done + ' из ' + counts.total + ' '
+            + plural(counts.total, 'таска', 'тасков', 'тасков') + ' '
+            + plural(counts.done, 'готов', 'готовы', 'готовы');
+          if (counts.active > 0) line += ', ещё ' + counts.active + ' в работе';
+          if (counts.offContract > 0) {
+            line += ' · ' + L10N.ru.SCREEN.offContract.toLowerCase() + ' ' + counts.offContract;
           }
           return line;
         },
+        inFlightLine: function (groups) {
+          return inFlightText(groups, L10N.ru.TASK_STATUS,
+            function (title) { return '«' + title + '»'; },
+            function (rest) { return ' и ещё ' + rest; });
+        },
+        bandCaption: function (percent) { return L10N.ru.SCREEN.progress + ' — ' + percent + '%'; },
         coverageSub: function (cover) {
           return cover.live > 0
             ? cover.inSpec + ' из ' + cover.live + ' требований'
             : 'Требования ещё не записаны';
-        },
-        stagePosition: function (place) {
-          return place.position + ' из ' + place.total + ' этапов';
         },
         // One wording, not two. `UI` is read as source by the checker, so a
         // `plain ? … : …` here would ship «Медиана» to the scan whichever
@@ -851,11 +905,14 @@ globalThis.MAESTRO_LOGIC = (function () {
       REQUIREMENT_RESULT: {
         passed: 'Passed the check', failed: 'Did not pass the check', incomplete: 'Not fully checked'
       },
+      CONDITION: {
+        working: 'Working', waiting: 'Waiting for you', finished: 'Finished', failed: 'Failed'
+      },
       SCREEN: {
         dials: 'Dials',
+        header: 'What is happening',
         progress: 'Project progress',
         coverage: 'Brief coverage',
-        stage: 'Current stage',
         elapsed: 'Time worked',
         estimate: 'Remaining',
         tasks: 'Tasks',
@@ -926,27 +983,26 @@ globalThis.MAESTRO_LOGIC = (function () {
           return L10N.en.UI.minutes(ms);
         },
         tasksWord: function (n) { return n === 1 ? 'task' : 'tasks'; },
-        progressSub: function (p) {
-          var line = p.stagesDone + ' of ' + p.stagesTotal + ' stages done';
-          if (p.tasksTotal > 0) {
-            // See the Russian note: `done` arrives with the review phase, so
-            // counting only it froze this half of the line for hours.
-            line += ' · ' + p.tasksTotal + ' ' + L10N.en.UI.tasksWord(p.tasksTotal)
-              + ', ' + Math.round(p.tasksShare * 100) + '% of the way';
-            if (p.tasksActive > 0) line += ' · in flight ' + p.tasksActive;
-            if (p.tasksOffContract > 0) {
-              line += ' · ' + L10N.en.SCREEN.offContract + ' ' + p.tasksOffContract;
-            }
+        headline: function (counts) {
+          if (counts.total === 0) return 'No tasks yet';
+          var line = counts.done + ' of ' + counts.total + ' '
+            + L10N.en.UI.tasksWord(counts.total) + ' done';
+          if (counts.active > 0) line += ', ' + counts.active + ' more in progress';
+          if (counts.offContract > 0) {
+            line += ' · ' + L10N.en.SCREEN.offContract.toLowerCase() + ' ' + counts.offContract;
           }
           return line;
         },
+        inFlightLine: function (groups) {
+          return inFlightText(groups, L10N.en.TASK_STATUS,
+            function (title) { return '“' + title + '”'; },
+            function (rest) { return ' and ' + rest + ' more'; });
+        },
+        bandCaption: function (percent) { return L10N.en.SCREEN.progress + ' — ' + percent + '%'; },
         coverageSub: function (cover) {
           return cover.live > 0
             ? cover.inSpec + ' of ' + cover.live + ' requirements'
             : 'No requirements written down yet';
-        },
-        stagePosition: function (place) {
-          return place.position + ' of ' + place.total + ' stages';
         },
         medianSub: function (ms) {
           // No register split here: English already owns the plain words for
@@ -2165,6 +2221,112 @@ globalThis.MAESTRO_LOGIC = (function () {
     return awaitingOf(state) ? words(language).UI.tabAwaiting : 'Maestro';
   }
 
+  /** The four conditions the band can say, in the order vocabulary.md lists them. */
+  var CONDITION_ORDER = ['working', 'waiting', 'finished', 'failed'];
+
+  /**
+   * What the прогон is doing, in one of four words: `{ condition, reason,
+   * stageId }`, where `reason` names the field the word was read from.
+   *
+   * Read from fields every contract already carries and from nothing else —
+   * the page reads the state, it does not keep a second one. The order is the
+   * rule, and the first match wins:
+   *
+   * - A closed run is decided by its outcome. `stopped_incomplete` is a
+   *   failure; every other outcome is finished, which says the run closed and
+   *   never that it was verified. A run older than contract 4 has no
+   *   lifecycle, so its `finishedAt` stands in for one.
+   * - An interrupted run is a failure even when a stale `awaiting` survived
+   *   it: `awaitingOf` already refuses a stopped run, and so does this.
+   * - A wait outranks a failed стадия. The reader holds the next move either
+   *   way, and «Сбой» over a question would send them looking for a fault
+   *   instead of answering it — the tab says «Ждём вас» from the same
+   *   `awaitingOf`, so the band and the tab cannot disagree.
+   * - A failed стадия with nobody asked is a failure. Nothing writes one yet,
+   *   so this branch is defensive, and it names the стадия it found.
+   * - Anything else is work, named by its current стадия when there is one —
+   *   including a frozen session, which the page cannot tell from a busy one.
+   *   The silence notice says so in words.
+   */
+  function conditionOf(state) {
+    var found = function (condition, reason, stageId) {
+      return { condition: condition, reason: reason, stageId: stageId || null };
+    };
+    if (state && state.lifecycle === 'closed') {
+      return found(state.outcome === 'stopped_incomplete' ? 'failed' : 'finished', 'outcome');
+    }
+    if (state && !(state.contractVersion >= 4) && state.finishedAt) return found('finished', 'outcome');
+    if (state && state.interruptedAt) return found('failed', 'interrupted');
+    if (awaitingOf(state)) return found('waiting', 'awaiting');
+    var failed = orderedStages(state).filter(function (stage) { return stage.status === 'failed'; })[0];
+    if (failed) return found('failed', 'stage', failed.id);
+    var current = currentStage(state);
+    return found('working', 'none', current ? current.id : null);
+  }
+
+  /**
+   * The eight стадии as the band's strip draws them: `{ id, status, current,
+   * from, until }` in road order, a стадия the state never wrote filled in as
+   * pending. `from` and `until` are what the view hands to `tick()`, so a cell's
+   * clock is the same clock the timeline row below it runs.
+   */
+  function stripOf(state) {
+    var current = currentStage(state);
+    return orderedStages(state).map(function (stage) {
+      return {
+        id: stage.id,
+        status: stage.status || 'pending',
+        current: !!current && current.id === stage.id,
+        from: typeof stage.startedAt === 'string' ? stage.startedAt : null,
+        until: typeof stage.finishedAt === 'string' ? stage.finishedAt : null
+      };
+    });
+  }
+
+  /** The таск statuses the in-flight line names, in the order it names them. */
+  var IN_FLIGHT_ORDER = ['running', 'review', 'repair'];
+
+  /**
+   * At most this many titles per group, then a count. Three titles fit one
+   * line beside the status word on a wide wave; the build block below lists
+   * every one of them anyway.
+   */
+  var IN_FLIGHT_CAP = 3;
+
+  /**
+   * The таски in motion, grouped by status: `{ running, review, repair }`, each
+   * a list of `{ id, title }`. A title that is blank is null, and the line
+   * names that таск by its id instead — a pair of empty quotes says nothing.
+   */
+  function inFlightOf(state) {
+    var out = { running: [], review: [], repair: [] };
+    ((state && state.tasks) || []).forEach(function (task) {
+      if (!task || IN_FLIGHT_ORDER.indexOf(task.status) === -1) return;
+      var title = typeof task.title === 'string' && task.title.trim() !== '' ? task.title.trim() : null;
+      out[task.status].push({ id: String(task.id), title: title });
+    });
+    return out;
+  }
+
+  /**
+   * The mechanics of the in-flight line, shared by both languages; the words —
+   * the status labels, the quotation marks, «и ещё» — are each language's own
+   * and are handed in by its `UI.inFlightLine`. Empty when nothing is in flight.
+   */
+  function inFlightText(groups, statusWords, quote, more) {
+    return IN_FLIGHT_ORDER
+      .filter(function (status) { return groups && groups[status] && groups[status].length > 0; })
+      .map(function (status) {
+        var list = groups[status];
+        var names = list.slice(0, IN_FLIGHT_CAP).map(function (task) {
+          return task.title === null ? task.id : quote(task.title);
+        });
+        var rest = list.length - IN_FLIGHT_CAP;
+        return label(statusWords, status) + ': ' + names.join(', ') + (rest > 0 ? more(rest) : '');
+      })
+      .join(' · ');
+  }
+
   /** The kinds a one-way line may carry, in the order the region lists them. */
   var ONE_WAY_ORDER = ['deleted', 'renamed', 'migration', 'dependency-major'];
 
@@ -2564,19 +2726,43 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
-    progress: function (state) {
+    // Four paragraphs: what the band is, why it says the word it says, the
+    // road behind the bar, and where the strip stands. The second and the
+    // last carry what the retired `progress` and `stage` regions explained.
+    header: function (state) {
+      var condition = conditionOf(state);
+      var word = label(L10N.ru.CONDITION, condition.condition);
       var p = overallProgress(state);
+      var stage = currentStage(state);
+      var place = stagePosition(state);
+      var waiting = awaitingOf(state);
+      var reason = stopReasonOf(state);
+      var why = {
+        outcome: condition.condition === 'failed'
+          ? word + ': прогон закрыт без полного подтверждения' + (reason ? ' — причина: ' + reason : '') + '.'
+          : word + ': прогон закрыт. «Завершён» не значит «проверен» — что подтверждено, говорит строка под полосой: '
+            + (runNotice(state, 'ru') || 'проверка не установлена.'),
+        interrupted: word + ': прогон прерван ' + formatMoment(state.interruptedAt) + ' и не закрыт.',
+        awaiting: waiting ? L10N.ru.UI.awaitingNotice(waiting.kind, formatMoment(waiting.since), waiting.note) : '',
+        stage: word + ': этап «' + label(L10N.ru.STAGE_LABEL, condition.stageId) + '» записан как сбой, и вас ни о чём не спросили.',
+        none: word + (stage ? ': идёт этап «' + label(L10N.ru.STAGE_LABEL, stage.id) + '».' : ': текущий этап ещё не записан.')
+          + ' Страница не отличает зависшую сессию от занятой; если прогон молчит дольше обычного, это скажет строка под полосой.'
+      }[condition.reason];
       return [
-        'Весь прогон одной цифрой: этапы, а внутри разработки — таски.',
-        p.stagesTotal === 0
-          ? 'Этапы ещё не заведены, поэтому считать нечего.'
-          : 'Пройдено этапов ' + p.stagesDone + ' из ' + p.stagesTotal + ', таски прошли '
-            + Math.round(p.tasksShare * 100) + '% пути (принято ' + p.tasksDone + ' из '
-            + p.tasksTotal + ') — вместе ' + p.percent + '%.',
-        'Этапы весят не поровну, и начатый этап никогда не считается нулём. Разработка растёт не по принятым таскам, а по пройденному пути: на ревью — 0,8 таска, в ремонте и в работе — 0,5, в очереди — ноль. Это та же шкала, по которой «Осталось» считает остаток, только с другого конца, поэтому две цифры на экране не спорят.'
+        'Полоса наверху: в каком состоянии прогон — цветом и словом, сколько пути пройдено, одно предложение о тасках, таски в работе по названиям и восемь этапов со своими часами. Справа — «Осталось».',
+        why,
+        'Пройдено этапов ' + p.stagesDone + ' из ' + p.stagesTotal + ', таски прошли '
+          + Math.round(p.tasksShare * 100) + '% пути (принято ' + p.tasksDone + ' из '
+          + p.tasksTotal + ') — вместе ' + p.percent + '%. Этапы весят не поровну, и начатый этап никогда не считается нулём. Разработка растёт не по принятым таскам, а по пройденному пути: на ревью — 0,8 таска, в ремонте и в работе — 0,5, в очереди — ноль. Это та же шкала, по которой «Осталось» считает остаток, только с другого конца, поэтому две цифры на экране не спорят.'
           + (p.tasksOffContract > 0
             ? ' Тасков вне контракта ' + p.tasksOffContract + ': они в счёте, но пути не прошли.'
-            : '')
+            : ''),
+        (stage
+          ? 'Текущий этап — «' + label(L10N.ru.STAGE_LABEL, stage.id) + '», ' + place.position + '-й из ' + place.total + '. '
+          : 'Текущий этап ещё не записан в состояние. ')
+          + 'Часы этапа идут от его начала и встают, когда он закрыт; этап открывается той же записью, которой закрылся предыдущий. Пропущенный этап подписан «' + L10N.ru.STAGE_STATUS.skipped
+          + '», упавший — «' + L10N.ru.STAGE_STATUS.failed + '», не начатый — прочерком. Строка над этапами называет таски в работе, на ревью и на исправлении — до '
+          + IN_FLIGHT_CAP + ' в группе, остальные числом; весь список — в «Ход разработки».'
       ];
     },
 
@@ -2589,19 +2775,6 @@ globalThis.MAESTRO_LOGIC = (function () {
           ? 'Требования ещё не записаны — манифест пишется в первой фазе, до неё круг пуст.'
           : share.inSpec + ' из ' + share.live + ' живых требований в спеке, это ' + share.percent + '%.',
         'Снятых требований ' + counts.dropped + ', и в знаменатель они не входят: снятое требование — не пробел в покрытии, его больше нет.'
-      ];
-    },
-
-    stage: function (state) {
-      var stage = currentStage(state);
-      var place = stagePosition(state);
-      return [
-        'Этап, на котором прогон стоит сейчас, и его место в дороге из восьми.',
-        stage
-          ? 'Идёт «' + label(L10N.ru.STAGE_LABEL, stage.id) + '», ' + place.position + '-й из ' + place.total
-            + ', состояние — ' + label(L10N.ru.STAGE_STATUS, stage.status).toLowerCase() + '.'
-          : 'Текущий этап ещё не записан в состояние.',
-        'Часы идут от начала этапа и встают, когда он закрыт. Этап открывается той же записью, которой закрылся предыдущий, поэтому между ними не остаётся времени, не принадлежащего никакому этапу.'
       ];
     },
 
@@ -2766,7 +2939,7 @@ globalThis.MAESTRO_LOGIC = (function () {
   };
 
   /**
-   * The same fifteen regions, for a reader who has never built software.
+   * The same fourteen regions, for a reader who has never built software.
    *
    * Built from the same functions as the entries above, for the same reason:
    * an explanation that recomputed its own numbers could disagree with the one
@@ -2800,22 +2973,44 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
-    progress: function (state) {
+    header: function (state) {
+      var condition = conditionOf(state);
+      var word = label(L10N.ru.CONDITION, condition.condition);
       var p = overallProgress(state);
+      var stage = currentStage(state);
+      var place = stagePosition(state);
+      var waiting = awaitingOf(state);
+      var reason = stopReasonOf(state);
+      var why = {
+        outcome: condition.condition === 'failed'
+          ? word + ': работа остановлена, и до конца её не проверили' + (reason ? ' — причина: ' + reason : '') + '.'
+          : word + ': работа закрыта. Это значит «закрыта», а не «проверена»: что показала последняя проверка, написано в строке под полосой.',
+        interrupted: word + ': работа прервалась ' + formatMoment(state.interruptedAt) + ' и не была закрыта.',
+        awaiting: waiting ? L10N.ru.UI.awaitingNotice(waiting.kind, formatMoment(waiting.since), waiting.note) : '',
+        stage: word + ': шаг «' + label(L10N.ru.STAGE_LABEL, condition.stageId) + '» закончился сбоем.',
+        none: word + (stage ? ': сейчас идёт шаг «' + label(L10N.ru.STAGE_LABEL, stage.id) + '».' : ': какой шаг идёт сейчас, ещё не записано.')
+          + ' Если давно ничего не меняется, страница скажет об этом отдельной строкой под полосой.'
+      }[condition.reason];
       return [
-        'Сколько всего пути пройдено — одной цифрой.',
-        p.stagesTotal === 0
-          ? 'Этапы ещё не заведены, поэтому считать пока нечего.'
-          : 'Этапов пройдено ' + p.stagesDone + ' из ' + p.stagesTotal + ', таски прошли '
-            + Math.round(p.tasksShare * 100) + '% пути (полностью принято ' + p.tasksDone
-            + ' из ' + p.tasksTotal + ') — вместе ' + p.percent + '%.',
-        'Таск — это один кусок работы, который целиком делает один субагент — отдельный помощник, которому прогон отдаёт этот кусок и ждёт ответа. Полоска считает не только доделанные таски, а весь пройденный путь: начатый таск — это уже половина, проверяемый — почти весь. Поэтому она движется, пока идёт работа, а не стоит и потом прыгает. Этапы весят по-разному: разработка длинная, подготовка короткая.'
+        'Полоса наверху одним словом говорит, что с работой сейчас: идёт, ждёт вас, закончена или сломалась. Под словом — сколько пути пройдено, что с тасками и восемь шагов работы.',
+        why,
+        'Этапов пройдено ' + p.stagesDone + ' из ' + p.stagesTotal + ', таски прошли '
+          + Math.round(p.tasksShare * 100) + '% пути (полностью принято ' + p.tasksDone
+          + ' из ' + p.tasksTotal + ') — вместе ' + p.percent + '%. '
+          + 'Таск — это один кусок работы, который целиком делает один субагент — отдельный помощник, которому прогон отдаёт этот кусок и ждёт ответа. Полоска считает не только доделанные таски, а весь пройденный путь: начатый таск — это уже половина, проверяемый — почти весь. Поэтому она движется, пока идёт работа, а не стоит и потом прыгает. Этапы весят по-разному: разработка длинная, подготовка короткая.'
           + (p.tasksOffContract > 0
             ? ' ' + p.tasksOffContract + ' ' + plural(p.tasksOffContract, 'таск', 'таска', 'тасков')
               + ' ' + plural(p.tasksOffContract, 'записан', 'записаны', 'записаны')
               + ' словом, которого страница не знает: ' + plural(p.tasksOffContract, 'он', 'они', 'они')
               + ' на виду, но в пройденный путь не ' + plural(p.tasksOffContract, 'идёт', 'идут', 'идут') + '.'
-            : '')
+            : ''),
+        (stage
+          ? 'Сейчас идёт шаг «' + label(L10N.ru.STAGE_LABEL, stage.id) + '», ' + place.position + '-й из ' + place.total + '. '
+          : 'Какой шаг идёт сейчас, ещё не записано. ')
+          + 'Под полосой — восемь шагов, у каждого свои часы: они идут от начала шага и встают, когда он закрыт. Пропущенный шаг подписан «'
+          + L10N.ru.STAGE_STATUS.skipped + '», сломавшийся — «' + L10N.ru.STAGE_STATUS.failed
+          + '». Строка над шагами называет таски, которые сейчас в работе, на ревью или на исправлении, — не больше '
+          + IN_FLIGHT_CAP + ' в каждой группе.'
       ];
     },
 
@@ -2829,19 +3024,6 @@ globalThis.MAESTRO_LOGIC = (function () {
           : share.inSpec + ' из ' + share.live + ' — это ' + share.percent + '%.',
         'Требование — это один пункт вашей просьбы под своим номером. Снятых требований '
           + counts.dropped + ', и в счёт они не идут: снятое вы отменили сами, это не пробел.'
-      ];
-    },
-
-    stage: function (state) {
-      var stage = currentStage(state);
-      var place = stagePosition(state);
-      return [
-        'Шаг, на котором работа стоит прямо сейчас.',
-        stage
-          ? 'Идёт «' + label(L10N.ru.STAGE_LABEL, stage.id) + '», ' + place.position + '-й из '
-            + place.total + ', состояние — ' + label(L10N.ru.STAGE_STATUS, stage.status).toLowerCase() + '.'
-          : 'Какой этап идёт сейчас, ещё не записано.',
-        'Часы идут от начала этапа и встают, когда он закрыт. Новый этап начинается ровно в тот момент, когда закончился предыдущий, поэтому времени «между этапами» не бывает.'
       ];
     },
 
@@ -3011,7 +3193,7 @@ globalThis.MAESTRO_LOGIC = (function () {
   };
 
   /**
-   * The same fifteen regions in English, in the normal register.
+   * The same fourteen regions in English, in the normal register.
    *
    * Built from the same functions as the Russian entries above and returning
    * the same shape: a first paragraph saying what the region is, then what it
@@ -3035,19 +3217,41 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
-    progress: function (state) {
+    header: function (state) {
+      var condition = conditionOf(state);
+      var word = label(L10N.en.CONDITION, condition.condition);
       var p = overallProgress(state);
+      var stage = currentStage(state);
+      var place = stagePosition(state);
+      var waiting = awaitingOf(state);
+      var reason = stopReasonOf(state);
+      var why = {
+        outcome: condition.condition === 'failed'
+          ? word + ': the run closed without full verification' + (reason ? ' — the reason given: ' + reason : '') + '.'
+          : word + ': the run is closed. Finished does not mean verified — the line under the band says what was: '
+            + (runNotice(state, 'en') || 'verification not established.'),
+        interrupted: word + ': the run was interrupted ' + formatMoment(state.interruptedAt) + ' and never closed.',
+        awaiting: waiting ? L10N.en.UI.awaitingNotice(waiting.kind, formatMoment(waiting.since), waiting.note) : '',
+        stage: word + ': the stage «' + label(L10N.en.STAGE_LABEL, condition.stageId) + '» is recorded as failed, and nothing has been asked of you.',
+        none: word + (stage ? ': the stage now is «' + label(L10N.en.STAGE_LABEL, stage.id) + '».' : ': the current stage has not been written down yet.')
+          + ' The page cannot tell a stalled chat from a busy one; when the run has been quiet for longer than usual, the line under the band says so.'
+      }[condition.reason];
       return [
-        'The whole run as one number: stages, and inside development, tasks.',
-        p.stagesTotal === 0
-          ? 'No stages have been set up yet, so there is nothing to count.'
-          : 'Stages done ' + p.stagesDone + ' of ' + p.stagesTotal + ', tasks '
-            + Math.round(p.tasksShare * 100) + '% of the way (accepted ' + p.tasksDone
-            + ' of ' + p.tasksTotal + ') — ' + p.percent + '% together.',
-        'The stages do not weigh the same, and a stage that has started never counts as zero. Development grows with the distance its tasks have covered rather than with the accepted ones: in review is 0.8 of a task, in repair and in progress 0.5, queued nothing. That is the same scale Remaining measures the rest by, read from the other end, so the two figures on this screen cannot disagree.'
+        'The band at the top: the run\'s condition as a colour and a word, how much of the road is behind it, one sentence about the tasks, the tasks in flight by title, and the eight stages with their clocks. Remaining stands at its right.',
+        why,
+        'Stages done ' + p.stagesDone + ' of ' + p.stagesTotal + ', tasks '
+          + Math.round(p.tasksShare * 100) + '% of the way (accepted ' + p.tasksDone
+          + ' of ' + p.tasksTotal + ') — ' + p.percent + '% together. The stages do not weigh the same, and a stage that has started never counts as zero. Development grows with the distance its tasks have covered rather than with the accepted ones: in review is 0.8 of a task, in repair and in progress 0.5, queued nothing. That is the same scale Remaining measures the rest by, read from the other end, so the two figures on this screen cannot disagree.'
           + (p.tasksOffContract > 0
             ? ' Off-contract tasks: ' + p.tasksOffContract + '. They are counted in the total and have covered no distance.'
-            : '')
+            : ''),
+        (stage
+          ? 'The current stage is «' + label(L10N.en.STAGE_LABEL, stage.id) + '», number ' + place.position + ' of ' + place.total + '. '
+          : 'The current stage has not been written down yet. ')
+          + 'A stage\'s clock runs from its start and stops when it closes; a stage opens on the same write that closed the one before it. A skipped stage is marked «'
+          + L10N.en.STAGE_STATUS.skipped + '», a failed one «' + L10N.en.STAGE_STATUS.failed
+          + '», one not yet begun with a dash. The line above the stages names the tasks in progress, in review and in repair — up to '
+          + IN_FLIGHT_CAP + ' a group, the rest as a number; the whole list is in Development progress.'
       ];
     },
 
@@ -3062,20 +3266,6 @@ globalThis.MAESTRO_LOGIC = (function () {
             + share.percent + '%.',
         'Dropped requirements: ' + counts.dropped
           + ', and they are not in the denominator — a dropped requirement is not a hole in the coverage, it is gone.'
-      ];
-    },
-
-    stage: function (state) {
-      var stage = currentStage(state);
-      var place = stagePosition(state);
-      return [
-        'The stage the run is standing on now, and its place in the road of eight.',
-        stage
-          ? '«' + label(L10N.en.STAGE_LABEL, stage.id) + '» is running, number '
-            + place.position + ' of ' + place.total + ', and its status is '
-            + label(L10N.en.STAGE_STATUS, stage.status).toLowerCase() + '.'
-          : 'The current stage has not been written down yet.',
-        'The clock runs from the start of the stage and stops when it closes. A stage opens on the same write that closed the one before it, so no time is left belonging to no stage at all.'
       ];
     },
 
@@ -3243,7 +3433,7 @@ globalThis.MAESTRO_LOGIC = (function () {
   };
 
   /**
-   * The same fifteen regions in English, for a reader who has never built
+   * The same fourteen regions in English, for a reader who has never built
    * software.
    *
    * The two rules of docs/spec/vocabulary.md apply here as they do to the
@@ -3276,21 +3466,43 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
-    progress: function (state) {
+    header: function (state) {
+      var condition = conditionOf(state);
+      var word = label(L10N.en.CONDITION, condition.condition);
       var p = overallProgress(state);
+      var stage = currentStage(state);
+      var place = stagePosition(state);
+      var waiting = awaitingOf(state);
+      var reason = stopReasonOf(state);
+      var why = {
+        outcome: condition.condition === 'failed'
+          ? word + ': the work was stopped before it could all be checked' + (reason ? ' — the reason given: ' + reason : '') + '.'
+          : word + ': the work is closed. That means closed, not checked: what the last check found is written in the line under the band.',
+        interrupted: word + ': the work broke off ' + formatMoment(state.interruptedAt) + ' and was never closed.',
+        awaiting: waiting ? L10N.en.UI.awaitingNotice(waiting.kind, formatMoment(waiting.since), waiting.note) : '',
+        stage: word + ': the step «' + label(L10N.en.STAGE_LABEL, condition.stageId) + '» ended in a failure.',
+        none: word + (stage ? ': the step going now is «' + label(L10N.en.STAGE_LABEL, stage.id) + '».' : ': which step is going now has not been written down yet.')
+          + ' If nothing changes for a long while, the page says so in a line of its own under the band.'
+      }[condition.reason];
       return [
-        'How much of the road has been travelled — in one number.',
-        p.stagesTotal === 0
-          ? 'The steps are not set up yet, so there is nothing to count.'
-          : 'Steps done ' + p.stagesDone + ' of ' + p.stagesTotal + ', tasks '
-            + Math.round(p.tasksShare * 100) + '% of the way (fully accepted ' + p.tasksDone
-            + ' of ' + p.tasksTotal + ') — ' + p.percent + '% together.',
-        'A task is one piece of work done by one worker. The bar counts more than the finished tasks: it counts the whole distance covered, so a task that has been started is already halfway and one being checked is nearly all the way. That is why it moves while the work is going on instead of standing still and then jumping. The steps are not the same size either: development is long and setup is short.'
+        'The band at the top says in one word how the work is doing: going, waiting for you, finished or broken. Under the word: how much of the road is behind it, what the tasks are doing, and the eight steps of the work.',
+        why,
+        'Steps done ' + p.stagesDone + ' of ' + p.stagesTotal + ', tasks '
+          + Math.round(p.tasksShare * 100) + '% of the way (fully accepted ' + p.tasksDone
+          + ' of ' + p.tasksTotal + ') — ' + p.percent + '% together. '
+          + 'A task is one piece of work done by one worker. The bar counts more than the finished tasks: it counts the whole distance covered, so a task that has been started is already halfway and one being checked is nearly all the way. That is why it moves while the work is going on instead of standing still and then jumping. The steps are not the same size either: development is long and setup is short.'
           + (p.tasksOffContract > 0
             ? (p.tasksOffContract === 1
                 ? ' One task was written down with a word this page does not know: it is shown as it is, and it counts towards no distance.'
                 : ' ' + p.tasksOffContract + ' tasks were written down with a word this page does not know: they are shown as they are, and they count towards no distance.')
-            : '')
+            : ''),
+        (stage
+          ? 'The step going now is «' + label(L10N.en.STAGE_LABEL, stage.id) + '», number ' + place.position + ' of ' + place.total + '. '
+          : 'Which step is going now has not been written down yet. ')
+          + 'Under the band are the eight steps, each with its own clock: it runs from the start of the step and stops when the step is closed. A skipped step is marked «'
+          + L10N.en.STAGE_STATUS.skipped + '», a broken one «' + L10N.en.STAGE_STATUS.failed
+          + '». The line above the steps names the tasks being worked on, being checked or being fixed — no more than '
+          + IN_FLIGHT_CAP + ' in each group.'
       ];
     },
 
@@ -3304,20 +3516,6 @@ globalThis.MAESTRO_LOGIC = (function () {
           : share.inSpec + ' of ' + share.live + ' — that is ' + share.percent + '%.',
         'A requirement is one point of what you asked for, under its own number. '
           + counts.dropped + ' of them were dropped, and those do not count: you cancelled them yourself, so they are not a hole.'
-      ];
-    },
-
-    stage: function (state) {
-      var stage = currentStage(state);
-      var place = stagePosition(state);
-      return [
-        'The step the work is standing on right now.',
-        stage
-          ? '«' + label(L10N.en.STAGE_LABEL, stage.id) + '» is going, number '
-            + place.position + ' of ' + place.total + ', and it is '
-            + label(L10N.en.STAGE_STATUS, stage.status).toLowerCase() + '.'
-          : 'Which step is going right now has not been written down yet.',
-        'The clock runs from the start of the step and stops when it is closed. A new step begins at the exact moment the one before it ended, so there is never any time «between steps».'
       ];
     },
 
@@ -3587,7 +3785,7 @@ globalThis.MAESTRO_LOGIC = (function () {
 
   /** The regions the page must be able to explain, in the order they appear. */
   var EXPLAIN_ORDER = [
-    'dials', 'progress', 'coverage', 'stage', 'elapsed', 'estimate', 'tasks', 'debt',
+    'dials', 'header', 'estimate', 'coverage', 'elapsed', 'tasks', 'debt',
     'tests', 'requirements', 'handover', 'stages', 'build', 'requirement-list', 'gates'
   ];
 
@@ -3767,6 +3965,11 @@ globalThis.MAESTRO_LOGIC = (function () {
     AWAITING_KINDS: AWAITING_KINDS,
     awaitingOf: awaitingOf,
     tabTitle: tabTitle,
+    CONDITION_ORDER: CONDITION_ORDER,
+    conditionOf: conditionOf,
+    stripOf: stripOf,
+    IN_FLIGHT_CAP: IN_FLIGHT_CAP,
+    inFlightOf: inFlightOf,
     waitSpans: waitSpans,
     ONE_WAY_ORDER: ONE_WAY_ORDER,
     handoverOf: handoverOf,
@@ -4051,7 +4254,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     problem(message);
     // The accepted прогон stays under the error: hiding it would turn one
     // refused write into a blank page until the next accepted one.
-    el('regions').hidden = !view.keepRegions;
+    showRegions(view.keepRegions);
     if (view.suppressSuccess) el('notice').hidden = true;
   }
 
@@ -4089,12 +4292,22 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     box.textContent = message;
     box.hidden = false;
     // With nothing ever read, an empty page would say less than the message.
-    el('regions').hidden = lastGood === null;
+    showRegions(lastGood !== null);
   }
 
   function clearProblem() {
     el('problem').hidden = true;
-    el('regions').hidden = false;
+    showRegions(true);
+  }
+
+  /**
+   * The band sits in the header, outside <main>, so it is shown and hidden
+   * with the regions explicitly: a band of dashes over "cannot read" would
+   * be a condition word for a прогон nobody has read.
+   */
+  function showRegions(shown) {
+    el('regions').hidden = !shown;
+    el('band').hidden = !shown;
   }
 
   /**
@@ -4191,7 +4404,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       put(dials, 'span', T.UI.registerChip(L.label(T.REGISTER, state.explain)), 'chip');
     }
 
-    renderProgress(state);
+    renderBand(state);
     renderCards(state);
     renderStages(state);
     renderBuild(state);
@@ -4202,12 +4415,44 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     tick();
   }
 
-  function renderProgress(state) {
-    var progress = L.overallProgress(state);
-    text('progress-percent', progress.percent + '%');
-    el('progress-fill').style.width = progress.percent + '%';
+  /**
+   * The band: the condition, the road, the sentence, the таски in flight and
+   * the strip. Every decision is made in the logic block by a function a test
+   * calls; this only applies them. The percent is printed once, in the
+   * caption — two renderings of one live number are a defect even while they
+   * agree.
+   */
+  function renderBand(state) {
+    var condition = L.conditionOf(state);
+    el('band').className = 'band band-' + condition.condition;
+    text('band-condition', L.label(T.CONDITION, condition.condition));
 
-    text('progress-sub', T.UI.progressSub(progress));
+    var progress = L.overallProgress(state);
+    text('band-caption', T.UI.bandCaption(progress.percent));
+    el('progress-fill').style.width = progress.percent + '%';
+    text('band-headline', T.UI.headline(L.countTasks(state.tasks)));
+    var flight = T.UI.inFlightLine(L.inFlightOf(state));
+    text('band-flight', flight);
+    el('band-flight').hidden = flight === '';
+
+    // A skipped or failed стадия says so in words where its clock would be,
+    // so a status is never carried by a border alone. The clocks themselves
+    // are filled by tick(), the same as the timeline's.
+    var strip = clear(el('strip'));
+    L.stripOf(state).forEach(function (cell) {
+      var item = put(strip, 'li', null, 'cell-' + cell.status);
+      if (cell.current) item.setAttribute('aria-current', 'step');
+      put(item, 'span', L.label(T.STAGE_LABEL, cell.id), 'name');
+      var clock = put(item, 'span', null, 'clock');
+      if (cell.status === 'skipped' || cell.status === 'failed') {
+        clock.textContent = L.label(T.STAGE_STATUS, cell.status);
+      } else if (cell.from) {
+        clock.dataset.from = cell.from;
+        clock.dataset.until = cell.until || '';
+      } else {
+        clock.textContent = '—';
+      }
+    });
   }
 
   function renderCards(state) {
@@ -4221,15 +4466,6 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     text('coverage-percent', cover.percent);
     text('coverage-sub', T.UI.coverageSub(cover));
 
-    // --- этап сейчас ----------------------------------------------------
-    var stage = L.currentStage(state);
-    var place = L.stagePosition(state);
-    text('stage-name', stage ? L.label(T.STAGE_LABEL, stage.id) : '—');
-    text('stage-position', T.UI.stagePosition(place));
-    var stageClock = el('stage-clock');
-    stageClock.dataset.from = (stage && stage.startedAt) || '';
-    stageClock.dataset.until = (stage && stage.finishedAt) || '';
-
     // --- прошло времени -------------------------------------------------
     var runClock = el('run-clock');
     runClock.dataset.from = state.startedAt || '';
@@ -4237,7 +4473,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     var median = L.medianTaskMs(state, now, marks);
     text('run-median', T.UI.medianSub(median));
 
-    // --- осталось -------------------------------------------------------
+    // --- осталось, at the right of the band -----------------------------
     var estimate = L.estimateMs(state, now, marks);
     var chain = L.criticalPath(state.tasks);
     if (state.finishedAt) {
@@ -4641,9 +4877,9 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
   }
 
   /**
-   * The i beside each region, and the single popover all fifteen fill.
+   * The i beside each region, and the single popover all fourteen fill.
    *
-   * One node rather than fifteen. Moving it is what closes the previous
+   * One node rather than fourteen. Moving it is what closes the previous
    * explanation, so "at most one open" needs no state to keep it true, and the
    * cards never shift: a reader stays looking at the number while reading about
    * it. Filling it through `put` keeps the textContent rule by construction,
