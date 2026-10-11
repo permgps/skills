@@ -39,6 +39,20 @@ number that claimed more than that would be claiming it falsely.
   the `estimate` region moved to its right. `npm run dashboard` holds the four
   condition words to the new *Run Condition* table in `vocabulary.md`. No
   contract change.
+- **The dashboard's cards go from six to four**: Требования, Таски, Тесты and
+  Рабочее время. Требования counts live требования built — every таск naming
+  one is done — with «в работе» and «отложено» beneath, and says «Прошло
+  проверку» only once the current G4 has passed; a state older than contract 4
+  never does. Таски loses its bar and «% пути» for one square per таск in its
+  status colour, the statuses also counted in words. Тесты shows the failed
+  count beside the passed one and names its source: the full suite at
+  acceptance, or the таск that finished last — by `finishedAt`, where the page
+  used to take the last таск in the list. Brief coverage moved to a line under
+  G2 in Гейты, and Долг became the total line of «Ваш ход», which also counts
+  promised work and one-way changes; each `i` explanation moved with its
+  number. «Прошло времени» is now «Рабочее время». `npm run dashboard` holds
+  the three progress words to the new *Requirement Progress* table in
+  `vocabulary.md`. No contract change.
 - **A wait for the user stops the clocks.** From contract 9 the dashboard cuts
   every closed wait and the open one out of working time, the stage clocks, the
   таск durations, the median and the estimate before the 45-minute ceiling

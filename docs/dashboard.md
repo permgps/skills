@@ -83,19 +83,28 @@ cannot disagree about the same таск — and it means the bar can fall, which
 should: a таск sent from ревью back to ремонт lost work, and a bar that only
 ever rises would hide exactly that.
 
-Beneath the band are six cards: покрытие брифа, прошло времени, таски, долг,
-тесты, требования. Every one of those numbers is computed from the run state at
-render time; none is stored.
+Beneath the band are four cards. **Требования** counts the live требования
+built — every таск naming one is accepted — with «в работе» and «отложено»
+beneath, and switches to «Прошло проверку» only once the finished-work check
+has passed; it never says *done* on the strength of activity alone. **Таски**
+counts accepted of cut, with one square per таск. **Тесты** shows the last
+suite's passed and failed counts and where it came from: the таск that finished
+last, or the full suite at acceptance. **Рабочее время** is working time with
+the pauses and the waits taken out, and the median таск beneath it. Every one of
+those numbers is computed from the run state at render time; none is stored.
+The brief's coverage is a line under G2 in Гейты, and the total of what waits on
+you heads «Ваш ход».
 
 **Осталось is a range and refuses to be sharper.** It is the median of finished
 таски measured along the remaining critical path, and below two finished таски
 it says *рано считать* rather than guessing.
 
-The `Таски` card keeps the two apart on purpose: the big figure is the count of
-**accepted** таски and the bar behind it runs further, in a second, muted
-segment, for the work in flight. Before that, the card read «0 / 6» above a bar
-filled to 38% and the words «38% готово» — three numbers about one thing, two of
-them disagreeing.
+The `Таски` card keeps two things apart on purpose: the big figure is the
+count of **accepted** таски, and the squares beneath it show every таск at once
+in its status colour — a queued one hollow, an off-contract one dashed. A colour
+never speaks alone: each square names its таск and status, and the line under
+the squares counts what is moving, failed or retried in words. The card carries
+no percentage: the bar in the band is the one share of the road.
 
 The stage timeline is the run in full: eight stages in order, the current one
 marked, each with the one-phrase note the phase left, its own duration, and the
@@ -133,7 +142,7 @@ Passes to a fresh субагент are not a defect: the таск outgrew a cont
 
 The таски on the **critical path** carry a ◆ beside their id. It is the same
 chain the «Критический путь» count under «Осталось» is measured along, so the
-number on the card is exactly the number of marked rows.
+number in the band is exactly the number of marked rows.
 
 Requirement coverage is counted rather than claimed: every task carries the
 requirement ids it traces to, which is what G3 checks in both directions.
@@ -171,8 +180,10 @@ seconds, and keyboard focus stays on the row or toggle that had it.
 | Необратимые изменения | `oneWay`, grouped by kind | deletions, renames, migrations, major upgrades; an unknown kind is kept in its own group |
 | Допущения | `debt.assumptions` | decisions made because nobody was asked |
 
-A group longer than five lines folds the rest behind a press. The Долг card
-counts the same lists through the same function, so the two cannot disagree.
+A group longer than five lines folds the rest behind a press. The region opens
+with one total line — «Всего 6 пунктов» — counted from the same lists, so the
+line and the groups cannot disagree. It took the place of the old Долг card,
+and counts promised work and one-way changes too.
 
 ## A finished run
 
