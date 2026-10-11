@@ -496,6 +496,25 @@ test('a signals id used twice is reported at the second line', () => {
   assert.match(violations[0]?.message ?? '', /SIG-1 appears twice/);
 });
 
+test('a state with no existingCode is accepted, because a run already in progress has none', () => {
+  const state = baseline();
+  assert.equal('existingCode' in state, false);
+  assert.deepEqual(validateState(state), []);
+});
+
+test('existingCode true and false are both accepted as preflight\'s answer', () => {
+  assert.deepEqual(validateState(withPatch({ existingCode: true })), []);
+  assert.deepEqual(validateState(withPatch({ existingCode: false })), []);
+});
+
+test('an existingCode that is not a boolean is reported with the field name and where the answer comes from', () => {
+  for (const value of ['yes', 1, null]) {
+    const violations = validateState(withPatch({ existingCode: value }));
+    assert.deepEqual(fields(violations), ['existingCode'], String(value));
+    assert.match(violations[0]?.message ?? '', /existingCode must be a boolean.*existingCode\.present/);
+  }
+});
+
 test('debt.emptyEnv holding a value rather than a name is reported', () => {
   // S2 is never broken on purpose. This is the shape it gets broken by accident.
   assert.deepEqual(

@@ -723,6 +723,14 @@ export function validateState(value: unknown): StateViolation[] {
     }
   }
 
+  // Optional at every version: a run already in progress has no
+  // `existingCode`, and an added optional field does not raise CONTRACT_VERSION.
+  // Absence means phase 3 dispatches no reader, exactly as before the field.
+  if (value['existingCode'] !== undefined && typeof value['existingCode'] !== 'boolean') {
+    add('existingCode',
+      'existingCode must be a boolean — write true or false from --memory-read\'s existingCode.present');
+  }
+
   if (atLeastV4) {
     if (typeof value['slug'] !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value['slug'])) {
       add('slug', 'contract-4 slug must be a canonical safe path segment');

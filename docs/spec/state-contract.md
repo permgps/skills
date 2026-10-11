@@ -36,6 +36,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `additions` | list of strings | preflight | dashboard |
 | `oneWay` | optional list of strings, one inward one-way change each | review | acceptance, dashboard |
 | `signals` | optional list of strings, one recorded signal each, appended by build, review, acceptance and polish | preflight | metrics |
+| `existingCode` | optional boolean, whether the project held code at preflight | preflight | spec |
 | `tests` | `{ passed, failed }` | build | dashboard |
 | `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–7 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
@@ -74,9 +75,10 @@ row says `dashboard`.** The orchestrator reads its own state constantly — on
 recovery after a compaction, and in the repair phase, which learns from
 `tasks[].status` which таск arrived and by which entrance. Listing itself as a
 reader of what it writes would turn a column about the integration point into a
-list of everywhere the state is opened. The two exceptions name the phase or
+list of everywhere the state is opened. The three exceptions name the phase or
 tool that reads the field besides the page: `oneWay` is read by acceptance for
-the отчёт, and `signals` by the metrics tool and by no screen.
+the отчёт, `signals` by the metrics tool and by no screen, and `existingCode`
+by the spec phase alone.
 
 `heldBy` was a dash here until the page began naming the claim inside its raised
 silence notice; it now says `dashboard` because that is now true, not to keep the
@@ -203,6 +205,16 @@ line of another shape and an id used twice. Optional and seeded empty by
 preflight on the same terms as `oneWay`: an absent `signals` means the прогон
 began before the field existed, and the metrics tool prints "not recorded",
 never zero. Nothing in the прогон reads it back; the dashboard does not render it.
+
+**`existingCode` is whether the project held code when the прогон began**,
+written once by preflight in step 4b from `--memory-read`'s
+`existingCode.present`. The rule that decides it lives in
+`tools/runtime/existing-code.mts`, and the spec phase reads the field only to
+decide whether to dispatch the existing-code reader. It is optional and not
+seeded: an absent `existingCode` means the прогон began before the field
+existed, and phase 3 dispatches no reader, exactly as before. The validator
+accepts only a boolean. Its `Read by` cell names the spec phase rather than a
+tool, because no tool or page reads it.
 
 **`gates[].findings`, the three lists inside `debt`, `additions`, `oneWay` and
 `signals` hold strings, one line each.** The rows above say so and the validator
@@ -472,7 +484,9 @@ renders as it did, titled by its slug alone. **`oneWay` arrived later within
 version 7 and raised nothing**: it is optional, the dashboard does not render
 it, and a state without it is read as one written before the scan existed.
 **`signals` arrived later still within version 7 and raised nothing**, for the
-same reasons.
+same reasons. **`existingCode` arrived later again within version 7 and raised
+nothing**: it is optional, widens no value set, and the dashboard does not
+render it.
 
 **Version 6** changes four value sets — the repair outcome gains
 `defect_verified` and `prerequisite_blocked` and loses `repaired`, decisions

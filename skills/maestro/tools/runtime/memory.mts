@@ -16,11 +16,17 @@
 // writes it. The read is capped, because `prior.md` is read into the contexts
 // of briefing, the spec and the plan, and a glossary has no size of its own.
 //
+// The read also says whether the project holds code, because preflight calls it
+// exactly once, at the point the answer is needed. The rule lives in
+// `existing-code.mts`; this module only passes it the memory file and project
+// glossary names, so those lists keep one home.
+//
 // Contract: docs/spec/phases.md, section "Memory".
 
 import { lstat, open, readFile, realpath, rename, stat, unlink } from 'node:fs/promises';
 import path from 'node:path';
 
+import { detectExistingCode } from './existing-code.mts';
 import { readRegisterRuns } from './register.mts';
 import { createLogger } from './shared/log.mts';
 import {
@@ -386,6 +392,15 @@ export const GLOSSARY_FILES: readonly string[] = ['GLOSSARY.md', 'CONTEXT.md'];
  */
 export const GLOSSARY_READ_LIMIT_BYTES = 32 * 1024;
 
+/**
+ * The memory file and project glossary names, reduced to basenames, that never
+ * make a project count as holding code — at any depth, since a nested
+ * `AGENTS.md` describes code rather than being it.
+ */
+const IGNORED_BASENAMES: ReadonlySet<string> = new Set(
+  [...KNOWN_MEMORY_FILES, ...NEVER_WRITTEN, ...GLOSSARY_MAPS, ...GLOSSARY_FILES].map(file => path.posix.basename(file)),
+);
+
 /** The project glossary as preflight found it. `body` is `null` for every file past the limit. */
 export interface ProjectGlossary {
   state: 'absent' | 'read' | 'over-limit';
@@ -696,7 +711,10 @@ const optionOf = (args: string[], name: string): string | undefined => {
  * `--memory-read --run-dir <dir>`: write `<dir>/prior.md` once, from the memory
  * files and the register. An existing `prior.md` is kept byte for byte, so a
  * resumed preflight reads what the first one read rather than what is on disk
- * now. Exit 0 written or kept; 2 when the run directory is not a usable one.
+ * now. Both results carry `existingCode`: detection reads only the tree, and at
+ * preflight the build has not run, so a resumed preflight that finds `prior.md`
+ * kept still learns the answer it has not yet published. Exit 0 written or
+ * kept; 2 when the run directory is not a usable one.
  */
 async function readCommand(args: string[], runRoot: string, now: Date): Promise<CommandOutcome> {
   const dir = optionOf(args, '--run-dir');
@@ -709,18 +727,22 @@ async function readCommand(args: string[], runRoot: string, now: Date): Promise<
     log.error('read-command', 'run directory does not exist', { dir });
     return { result: { error: `.maestro/${dir} does not exist — create the run directory first` }, code: 2 };
   }
+  const projectRoot = path.dirname(runRoot);
+  const existingCode = await detectExistingCode(projectRoot, IGNORED_BASENAMES);
+  log.debug('existing-code', 'existing code decided for preflight', { ...existingCode });
   const target = path.join(runPath, PRIOR_FILE);
   if (await exists(target)) {
     log.info('read-command', 'prior.md already written; kept', { target });
-    return { result: { action: 'kept', path: target }, code: 0 };
+    return { result: { action: 'kept', path: target, existingCode }, code: 0 };
   }
-  const prior = await readPriorMemory(path.dirname(runRoot), runRoot, dir);
+  const prior = await readPriorMemory(projectRoot, runRoot, dir);
   await replaceKeepingMode(target, renderPrior(prior, now));
   log.info('read-command', 'prior.md written', { target });
   return {
     result: {
       action: 'written',
       path: target,
+      existingCode,
       blockFiles: prior.blocks.map(block => block.file),
       runs: prior.runs.map(run => run.dir),
       glossary: {

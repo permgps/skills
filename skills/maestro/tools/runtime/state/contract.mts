@@ -858,6 +858,13 @@ export interface RunState {
    * before the field existed.
    */
   signals?: string[];
+  /**
+   * Whether the project held code at preflight, written once by preflight from
+   * `--memory-read`'s `existingCode.present`. Absent in a run that began before
+   * the field existed. The spec phase reads it only to decide whether to
+   * dispatch the existing-code reader; no tool or page reads it.
+   */
+  existingCode?: boolean;
   /** The last full suite run. */
   tests?: TestResult;
   /** ISO 8601, set by the acceptance phase. */

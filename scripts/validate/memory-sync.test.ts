@@ -241,3 +241,59 @@ test('an unknown host or an empty body is refused with exit 2 and touches nothin
     assert.deepEqual(await readdir(project.root), ['.maestro']);
   } finally { await project.dispose(); }
 });
+
+const hasGit = spawnSync('git', ['--version']).status === 0;
+
+/** Commit everything under the project root, as a real repository's history would hold it. */
+function commitAll(root: string): void {
+  for (const args of [['init', '-q'], ['add', '-A'], ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'init']]) {
+    const done = spawnSync('git', ['-C', root, ...args], { encoding: 'utf8' });
+    assert.equal(done.status, 0, `git ${args.join(' ')}: ${done.stderr}`);
+  }
+}
+
+/** A project shaped like a real Laravel one with Maestro installed: memory files, an install, a README and code. */
+async function laravelShaped(project: Target): Promise<void> {
+  const files: Record<string, string> = {
+    'app/Models/Landing.php': '<?php\nclass Landing {}\n',
+    'composer.json': '{"name":"acme/landing"}\n',
+    'AGENTS.md': '# Agents\n',
+    'CLAUDE.md': '# Claude\n',
+    '.claude/skills/maestro/SKILL.md': '# Maestro\n',
+    'README.md': '# Landing\n',
+  };
+  for (const [relative, body] of Object.entries(files)) {
+    await mkdir(path.dirname(path.join(project.root, relative)), { recursive: true });
+    await writeFile(path.join(project.root, relative), body, 'utf8');
+  }
+  await mkdir(path.join(project.maestro, CURRENT));
+  commitAll(project.root);
+}
+
+test('preflight\'s read says a project with committed code has existing code, and names the first file', { skip: hasGit ? false : 'git is not on PATH' }, async () => {
+  const project = await target();
+  try {
+    await laravelShaped(project);
+    const outcome = project.sync(['--memory-read', '--run-dir', CURRENT]);
+    assert.equal(outcome.code, 0, outcome.stdout);
+    assert.equal(outcome['action'], 'written');
+    const existing = outcome['existingCode'] as { present: boolean; source: string; first: string | null };
+    assert.equal(existing.present, true);
+    assert.equal(existing.source, 'git');
+    assert.notEqual(existing.first, null);
+    assert.match(existing.first ?? '', /^(app\/|composer\.json$)/);
+  } finally { await project.dispose(); }
+});
+
+test('a resumed read that keeps prior.md still reports the same existingCode', { skip: hasGit ? false : 'git is not on PATH' }, async () => {
+  const project = await target();
+  try {
+    await laravelShaped(project);
+    const first = project.sync(['--memory-read', '--run-dir', CURRENT]);
+    const again = project.sync(['--memory-read', '--run-dir', CURRENT]);
+    assert.equal(again.code, 0, again.stdout);
+    assert.equal(again['action'], 'kept');
+    assert.equal((again['existingCode'] as { present?: boolean } | undefined)?.present, true, again.stdout);
+    assert.deepEqual(again['existingCode'], first['existingCode']);
+  } finally { await project.dispose(); }
+});
