@@ -395,3 +395,59 @@ test('an interfaces.md with no Seams table names no producers, and only the skel
   const found = await modelsFor(contract8([tiered('01', 1, 'strong'), tiered('02', 2, 'standard')]), '## Terms\n\n| Term | Meaning |\n|---|---|\n| order | a purchase |\n');
   assert.deepEqual(found, []);
 });
+
+test('a cell that starts with a date is no producer range, so it is never expanded into ids', () => {
+  assert.equal(parseProducerIds('2026-10-11 decided in the kickoff'), null);
+});
+
+test('a range whose endpoints differ in width or run backwards names no ids, rather than a guess', () => {
+  assert.equal(parseProducerIds('01–99999999'), null);
+  assert.equal(parseProducerIds('13–02'), null);
+  assert.deepEqual(parseProducerIds('02, 13–05'), ['02']);
+});
+
+test('a range too long for any plan is refused before it is expanded', () => {
+  assert.equal(parseProducerIds('00000000–99999999'), null);
+});
+
+/** Run the models half with task files written exactly as `files` gives them; `null` writes no file for that таск. */
+async function modelsWithFiles(state: RunState, files: Record<string, string | null>): Promise<GateFinding[]> {
+  const root = await mkdtemp(path.join(tmpdir(), 'check-g3-files-'));
+  try {
+    const run = path.join(root, DIR);
+    await mkdir(path.join(run, 'tasks'), { recursive: true });
+    await writeFile(path.join(run, 'interfaces.md'), '# Interfaces\n');
+    for (const [id, body] of Object.entries(files)) {
+      if (body !== null) await writeFile(path.join(run, 'tasks', `${id}-work.md`), body);
+    }
+    return await checkG3Models(state, root);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+test('a Model row with a bold label or a capitalised tier is read for the tier it names', async () => {
+  const found = await modelsWithFiles(contract8([tiered('01', 1, 'strong'), tiered('02', 1, 'strong')]), {
+    '01': '| | |\n|---|---|\n| **Model** | `strong` — skeleton |\n',
+    '02': '| | |\n|---|---|\n| Model | Strong — producer of the API |\n',
+  });
+  assert.deepEqual(found, []);
+});
+
+test('a таск with no task file is reported as missing its file, not as missing a row', async () => {
+  const found = await modelsWithFiles(contract8([tiered('01', 1, 'strong'), tiered('02', 1, 'standard')]), {
+    '01': '| Model | `strong` |\n',
+    '02': null,
+  });
+  assert.deepEqual(found.map(item => item.requirementId), ['02']);
+  assert.match(found[0]!.message, /^no task file for таск 02 in tasks\//);
+});
+
+test('a доводка таск written strong, with its Model row reading strong — доводка, passes', async () => {
+  const found = await modelsWithFiles(contract8([tiered('01', 1, 'strong'), tiered('02', 2, 'standard'), tiered('03', 3, 'strong')]), {
+    '01': '| Model | `strong` — skeleton |\n',
+    '02': '| Model | `standard` |\n',
+    '03': '| Model | `strong` — доводка |\n',
+  });
+  assert.deepEqual(found, []);
+});

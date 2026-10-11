@@ -259,10 +259,20 @@ export const SEAMS_HEADER = '| Seam | Producer task | Consumer tasks | Integrati
 const PRODUCER_TOKEN = /^(\d{2,})(?:\s*[–-]\s*(\d{2,}))?/;
 
 /**
+ * The most ids one range may name. No plan is cut into a thousand таски, and a
+ * cell such as `00000000–99999999` would otherwise be expanded into memory
+ * before a single finding was written.
+ */
+const MAX_RANGE = 999;
+
+/**
  * The таск ids a Producer task cell starts with: `02`, `02, 05`, `02–13`, and
- * any prose after them (`02–13, one file each`). A range is expanded at its
- * first endpoint's width. `null` when the cell starts with no id, because a
- * producer named only in words is a producer no machine can find.
+ * any prose after them (`02–13, one file each`). A range is read only when its
+ * endpoints share a width, run forwards and name at most {@link MAX_RANGE}
+ * ids; anything else — a date such as `2026-10-11`, `13–02`, `01–99999999` —
+ * ends the ids there, because guessing which таски it meant would hide the
+ * typo. `null` when the cell starts with no id, because a producer named only
+ * in words is a producer no machine can find.
  */
 export function parseProducerIds(cell: string): string[] | null {
   let rest = cell.replace(/[`*]/g, '').trim();
@@ -271,7 +281,11 @@ export function parseProducerIds(cell: string): string[] | null {
     const match = PRODUCER_TOKEN.exec(rest);
     if (!match) break;
     const [first, last] = [match[1]!, match[2] ?? match[1]!];
-    const [from, to] = [Number(first), Number(last)].sort((a, b) => a - b) as [number, number];
+    const [from, to] = [Number(first), Number(last)];
+    if (first.length !== last.length || to < from || to - from >= MAX_RANGE) {
+      log.debug('producers', 'range refused', { first, last });
+      break;
+    }
     for (let id = from; id <= to; id += 1) ids.push(String(id).padStart(first.length, '0'));
     rest = rest.slice(match[0].length);
     const separator = /^\s*,\s*(?=\d{2,})/.exec(rest);
@@ -295,11 +309,17 @@ function seamRows(markdown: string): Array<{ seam: string; producer: string }> {
   return rows;
 }
 
-/** The first word of a task file's `| Model |` row, backticked or bare, or `null` when there is no row. */
+/**
+ * The first word of a task file's `| Model |` row, backticked or bare, in lower
+ * case, or `null` when there is no row. The label may be bold and either word
+ * capitalised: a hand-edited file that says `| **Model** | Strong |` means
+ * `strong`, and reporting it as a missing row would send someone to add a row
+ * that is already there.
+ */
 function modelRow(markdown: string): string | null {
-  const row = /^\|\s*Model\s*\|([^|\n]*)\|/m.exec(markdown);
+  const row = /^\|\s*\**\s*model\s*\**\s*\|([^|\n]*)\|/im.exec(markdown);
   if (!row) return null;
-  return /`?([a-z]+)`?/.exec(row[1] ?? '')?.[1] ?? '';
+  return /`?([a-z]+)`?/i.exec(row[1] ?? '')?.[1]?.toLowerCase() ?? '';
 }
 
 /**
@@ -326,7 +346,7 @@ export async function checkG3Models(state: RunState, target: string): Promise<Ga
     const ids = parseProducerIds(row.producer);
     if (ids === null) {
       findings.push({ requirementId: '',
-        message: `the seam «${name(row.seam)}» names its producer as "${row.producer}" — name the producer by its таск id, first in the Producer task cell` });
+        message: `the seam «${name(row.seam)}» names its producer as "${row.producer}" — name the producer by its таск id, first in the Producer task cell: \`02\`, \`02, 05\`, or a forward range \`02–13\`` });
       continue;
     }
     for (const id of ids) {
@@ -356,7 +376,12 @@ export async function checkG3Models(state: RunState, target: string): Promise<Ga
 
   for (const task of state.tasks) {
     const file = taskFiles.find(entry => entry.startsWith(`${task.id}-`));
-    const written = file === undefined ? null : modelRow(await readFile(path.join(tasksDir, file), 'utf8'));
+    if (file === undefined) {
+      findings.push({ requirementId: task.id,
+        message: `no task file for таск ${task.id} in tasks/ — write ${task.id}-<slug>.md with its \`| Model | ${task.model ?? 'strong or standard'} |\` row, as the plan phase cuts it` });
+      continue;
+    }
+    const written = modelRow(await readFile(path.join(tasksDir, file), 'utf8'));
     if (written === null) {
       findings.push({ requirementId: task.id,
         message: `task file for таск ${task.id} has no Model row — add \`| Model | ${task.model ?? 'strong or standard'} |\` between Depends on and Prerequisites` });
