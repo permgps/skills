@@ -12,6 +12,7 @@ import {
   REPORT_ANCHORS,
   REVIEW_ANCHORS,
   SIGNAL_ANCHORS,
+  CODEBASE_ANCHORS,
   STOP_ANCHORS,
   textAfterHandoff,
   bundleProfileFor,
@@ -1189,4 +1190,45 @@ test('a section after the hand-off is a finding on its first line, naming the ha
 test('a hand-off followed only by blank lines, or a phase with no hand-off, is not a finding', () => {
   assert.deepEqual(textAfterHandoff('phases/1-manifest.md', 'Step.\n\nThen read the briefing phase file.\n\n\n'), []);
   assert.deepEqual(textAfterHandoff('phases/9-memory.md', '# Memory\n\nNo next phase.\n'), []);
+});
+
+// --- existing code is read once, before the spec -------------------------------
+
+test('every codebase anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.equal(CODEBASE_ANCHORS.length, 12);
+  await withShippedCopy(async copy => {
+    for (const anchor of CODEBASE_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'codebase'), []);
+  });
+});
+
+for (const anchor of CODEBASE_ANCHORS) {
+  test(`${anchor.file} losing "${anchor.literal}" is the one codebase finding, named on that file`, async () => {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, anchor.file);
+      // The literal may wrap in the shipped text; collapse it the way the check reads it.
+      const flat = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal), `${anchor.file} carries no "${anchor.literal}"`);
+      await writeFile(target, flat.split(anchor.literal).join('removed'), 'utf8');
+      const violations = (await checkBundle(copy)).filter(v => v.check === 'codebase');
+      assert.deepEqual(violations.map(v => v.file), [anchor.file.split('/').join(path.sep)]);
+      assert.ok((violations[0]?.message ?? '').includes(anchor.literal), violations[0]?.message);
+    });
+  });
+}
+
+test('the existing-code reader losing the leaf sentence is the one leaf finding, with no rule of its own', async () => {
+  await withShippedCopy(async copy => {
+    const reader = path.join(copy, 'prompts', 'existing-code-reader.md');
+    const words = LEAF_RULE.split(' ').map(word => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    const body = await readFile(reader, 'utf8');
+    const dropped = body.replace(new RegExp(words.join('\\s+')), '');
+    assert.notEqual(dropped, body);
+    await writeFile(reader, dropped, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'leaf');
+    assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'existing-code-reader.md')]);
+  });
 });

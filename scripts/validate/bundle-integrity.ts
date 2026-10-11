@@ -600,6 +600,47 @@ export const REPORT_ANCHORS: readonly Anchor[] = [
  * `state-matches-spec`. Whether an orchestrator notices a reader asking is its
  * judgement, so no anchor stands for it.
  */
+/**
+ * The literal text that carries «existing code is read once, before the spec».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. Preflight records
+ * whether the project has code; the spec phase reads it once into
+ * `codebase.md`; the plan names things after it; executors are handed it and
+ * the task reader is not. The Terms header that gained *Name in code* is held in
+ * `MEMORY_ANCHORS`, where the header already lived. Who is handed the file is
+ * held by `npm run readers`, not here.
+ *
+ * The brief states a 300-line budget for `codebase.md`. Nothing at
+ * `npm run check` can measure a прогон's artifact, so only the brief's sentence
+ * is held, and the size of a real `codebase.md` is not checked anywhere.
+ */
+export const CODEBASE_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/0-preflight.md', literal: '`existingCode`',
+    why: 'preflight records the flag phase 3 decides on; without it no reader is ever dispatched' },
+  { file: 'phases/3-spec.md', literal: '`.maestro/<dir>/codebase.md`',
+    why: 'the output row: the file exists and the spec phase is its one writer' },
+  { file: 'phases/3-spec.md', literal: 'existing code not read before the spec:',
+    why: 'a failed read is a decision taken for the user, and it reaches the отчёт through debt.assumptions' },
+  { file: 'phases/3-spec.md', literal: '`order`, not `zakaz`',
+    why: 'identifiers that travel through the spec are English words, never transliterations' },
+  { file: 'phases/4-plan.md', literal: 'buildable without `codebase.md`',
+    why: 'the task reader is not handed it, so a task file must not depend on it' },
+  { file: 'phases/5-build.md', literal: 'and, when the прогон has one, `codebase.md`',
+    why: 'executors are handed what the repository already held, so they do not rediscover it' },
+  { file: 'phases/8-repair.md', literal: 'and, when the прогон has one, `codebase.md`',
+    why: 'a repair executor works in the same code as the build executor did' },
+  { file: 'prompts/executor.md', literal: '`interfaces.md` wins over `codebase.md`',
+    why: 'interfaces.md stays the authority on names; a disagreement is reported, never followed silently' },
+  { file: 'prompts/executor.md', literal: '`order`, not `zakaz`',
+    why: 'identifiers are English words, and in existing code the recorded convention wins' },
+  { file: 'prompts/task-reader.md', literal: 'Name in code',
+    why: 'a task file that names an existing thing differently is a finding' },
+  { file: 'prompts/existing-code-reader.md', literal: '## Names the work will touch',
+    why: 'the section the spec and the plan take names from' },
+  { file: 'prompts/existing-code-reader.md', literal: 'never what to build',
+    why: 'the reader reports what exists; a reader that designs is a second spec writer' },
+];
+
 export const SIGNAL_ANCHORS: readonly Anchor[] = [
   { file: 'phases/0-preflight.md', literal: '| `signals` | empty — build, review, acceptance and polish append',
     why: 'an unseeded list cannot tell "nothing recorded" from "never recorded"' },
@@ -999,6 +1040,12 @@ export async function checkBundle(
   // Only a bundle with a review phase records signals; Scout has none.
   if (byFile.has('phases/6-review.md')) {
     for (const v of missingAnchors(byFile, SIGNAL_ANCHORS, 'signals')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- existing code is read once, before the spec ----------------------------
+  // Only a bundle with a spec phase reads the existing code; Scout has none.
+  if (byFile.has('phases/3-spec.md')) {
+    for (const v of missingAnchors(byFile, CODEBASE_ANCHORS, 'codebase')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- the отчёт hands over what only the user can do -------------------------

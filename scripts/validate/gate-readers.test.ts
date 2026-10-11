@@ -5,6 +5,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
+  CODEBASE_DENIED,
+  CODEBASE_GIVEN_ROWS,
+  CODEBASE_HANDED,
+  CODEBASE_INPUT,
   checkGateReaders,
   declaredInputs,
   normalizeName,
@@ -27,8 +31,8 @@ const SPEC = `# Gates
 
 | Gate | Reader's brief | Given | Withheld |
 |---|---|---|---|
-| G2 | \`independent-reader.md\` | \`brief.md\`, \`spec.md\` | the манифест, \`prior.md\` |
-| G4 | \`acceptance-reader.md\` | \`manifest.md\`, the additions block of \`brief.md\`, the running build | \`spec.md\`, \`prior.md\` |
+| G2 | \`independent-reader.md\` | \`brief.md\`, \`spec.md\` | \`codebase.md\`, the манифест, \`prior.md\` |
+| G4 | \`acceptance-reader.md\` | \`manifest.md\`, the additions block of \`brief.md\`, the running build | \`codebase.md\`, \`spec.md\`, \`prior.md\` |
 `;
 
 const INDEPENDENT = `# Independent Reader
@@ -45,6 +49,7 @@ const INDEPENDENT = `# Independent Reader
 | Input | What it is |
 |---|---|
 | the манифест | the interpreted requirement list |
+| \`codebase.md\` | the прогон's reading of the code |
 | \`prior.md\` | what earlier runs decided |
 
 ## Your Question
@@ -67,6 +72,7 @@ const ACCEPTANCE = `# Acceptance Reader
 | Input | What it is |
 |---|---|
 | \`spec.md\` | the implementation specification |
+| \`codebase.md\` | the прогон's reading of the code |
 | \`prior.md\` | what earlier runs decided |
 
 ## Your Question
@@ -168,7 +174,9 @@ test('a gate the specification declares with no brief is reported', async () => 
   const violations = await violationsFor({
     spec: SPEC.replace('| G4 | `acceptance-reader.md` |', '| G4 | `gone-reader.md` |'),
   });
-  assert.deepEqual(checks(violations), ['briefs']);
+  // The brief the row stopped naming is now outside the table and still names
+  // codebase.md, which is a finding of its own.
+  assert.deepEqual(checks(violations), ['briefs', 'codebase-briefs']);
   assert.match(violations[0]?.message ?? '', /not in .*prompts/);
 });
 
@@ -217,8 +225,8 @@ test('a name is compared without the decoration it was written with', () => {
 
 test('a reader cannot both receive and withhold the same source interpretation', async () => {
   const violations = await violationsFor({ spec: SPEC.replace(
-    '| G2 | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `prior.md` |',
-    '| G2 | `independent-reader.md` | `brief.md`, `spec.md`, the манифест | the манифест, `prior.md` |'),
+    '| G2 | `independent-reader.md` | `brief.md`, `spec.md` | `codebase.md`, the манифест, `prior.md` |',
+    '| G2 | `independent-reader.md` | `brief.md`, `spec.md`, the манифест | `codebase.md`, the манифест, `prior.md` |'),
     independent: INDEPENDENT.replace('| `spec.md` | what is going to be built |',
       '| `spec.md` | what is going to be built |\n| the манифест | supplied interpretation |'),
   });
@@ -228,8 +236,8 @@ test('a reader cannot both receive and withhold the same source interpretation',
 test('a prior decision handed to the spec reader is reported', async () => {
   const violations = await violationsFor({
     spec: SPEC.replace(
-      '| G2 | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `prior.md` |',
-      '| G2 | `independent-reader.md` | `brief.md`, `spec.md`, `prior.md` | the манифест |'),
+      '| G2 | `independent-reader.md` | `brief.md`, `spec.md` | `codebase.md`, the манифест, `prior.md` |',
+      '| G2 | `independent-reader.md` | `brief.md`, `spec.md`, `prior.md` | `codebase.md`, the манифест |'),
     independent: INDEPENDENT
       .replace('| `spec.md` | what is going to be built |',
         '| `spec.md` | what is going to be built |\n| `prior.md` | what earlier runs decided |')
@@ -242,7 +250,7 @@ test('a prior decision handed to the spec reader is reported', async () => {
 
 test('a reader row that does not withhold prior memory is reported, even with its brief agreeing', async () => {
   const violations = await violationsFor({
-    spec: SPEC.replace('| `spec.md`, `prior.md` |', '| `spec.md` |'),
+    spec: SPEC.replace('| `codebase.md`, `spec.md`, `prior.md` |', '| `codebase.md`, `spec.md` |'),
     acceptance: ACCEPTANCE.replace('| `prior.md` | what earlier runs decided |\n', ''),
   });
   assert.deepEqual(checks(violations), ['memory']);
@@ -255,7 +263,7 @@ test('the withheld name is the file the memory read actually writes, so the two 
 
 // --- the task-file reader is held like every other reader ----------------------
 
-const TASK_ROW = '| G3 task | `task-reader.md` | the task file, `interfaces.md` | `spec.md`, `manifest.md`, the other task files, `prior.md` |\n';
+const TASK_ROW = '| G3 task | `task-reader.md` | the task file, `interfaces.md` | `spec.md`, `manifest.md`, `codebase.md`, the other task files, `prior.md` |\n';
 
 const TASK_READER = `# Task-File Reader
 
@@ -273,6 +281,7 @@ const TASK_READER = `# Task-File Reader
 | \`spec.md\` | the specification |
 | \`manifest.md\` | the numbered requirement list |
 | the other task files | every other таск |
+| \`codebase.md\` | the прогон's reading of the code |
 | \`prior.md\` | what earlier runs decided |
 
 ## Your Question
@@ -309,7 +318,7 @@ test('a G3 task row that does not withhold prior memory is reported', async () =
 
 // --- the standards reader gates nothing, and is held like every reader ---------
 
-const STANDARDS_ROW = '| standards (no gate) | `standards-reader.md` | every таск\'s per-commit diffs, the project\'s documented standards | `spec.md`, `manifest.md`, the task files, `interfaces.md`, `reviews/`, `prior.md` |\n';
+const STANDARDS_ROW = '| standards (no gate) | `standards-reader.md` | every таск\'s per-commit diffs, the project\'s documented standards | `spec.md`, `manifest.md`, the task files, `interfaces.md`, `reviews/`, `codebase.md`, `prior.md` |\n';
 
 const STANDARDS_READER = `# Standards Reader
 
@@ -329,6 +338,7 @@ const STANDARDS_READER = `# Standards Reader
 | the task files | what each executor was told |
 | \`interfaces.md\` | the shared boundaries |
 | \`reviews/\` | what each reviewer found |
+| \`codebase.md\` | the прогон's reading of the code |
 | \`prior.md\` | what earlier runs decided |
 
 ## Your Question
@@ -361,4 +371,137 @@ test('a standards row that does not withhold prior memory is reported', async ()
   });
   assert.deepEqual(checks(violations), ['memory']);
   assert.match(violations[0]!.message, /standards \(no gate\) does not withhold prior\.md/);
+});
+
+// --- codebase.md: only the plan-consistency reader and the executor get it -----
+
+const CONSISTENCY_ROW = '| G3 consistency | `plan-consistency-reader.md` | every task file, `interfaces.md`, `codebase.md` | `spec.md`, `prior.md` |\n';
+
+const CONSISTENCY_READER = `# Plan-Consistency Reader
+
+## What You Are Given
+
+| Input | What it is |
+|---|---|
+| every task file | every таск |
+| \`interfaces.md\` | the shared boundaries |
+| \`codebase.md\` | what the repository held before this прогон |
+
+## What You Are Not Given
+
+| Input | What it is |
+|---|---|
+| \`spec.md\` | the specification |
+| \`prior.md\` | what earlier runs decided |
+`;
+
+const EXECUTOR = `# Executor
+
+You have been given a task file, \`interfaces.md\`, and \`codebase.md\` when the
+прогон has one.
+
+## Your Job
+
+Build it.
+`;
+
+const REVIEWER = `# Reviewer
+
+You are given the task file and the diff.
+
+You have not seen \`spec.md\`, the plan, \`codebase.md\`, or any other таск.
+
+## Your Question
+
+Does the diff do what the task file says?
+`;
+
+const DIAGNOSTICIAN = `# Repair Diagnostician
+
+You are given the failure.
+
+## Your Question
+
+Why did it fail?
+`;
+
+const codebaseFixture = (overrides: { spec?: string; briefs?: Record<string, string> } = {}): Promise<Violation[]> =>
+  violationsFor({
+    spec: overrides.spec ?? `${SPEC}${CONSISTENCY_ROW}`,
+    briefs: {
+      'plan-consistency-reader.md': CONSISTENCY_READER,
+      'executor.md': EXECUTOR,
+      'reviewer.md': REVIEWER,
+      'repair-diagnostician.md': DIAGNOSTICIAN,
+      ...overrides.briefs,
+    },
+  });
+
+test('the plan-consistency reader given codebase.md, the executor told of it and the reviewer denied it produce no violations', async () => {
+  assert.deepEqual(await codebaseFixture(), []);
+});
+
+test('the G3 consistency row losing codebase.md is reported on gates.md', async () => {
+  const violations = await codebaseFixture({
+    spec: `${SPEC}${CONSISTENCY_ROW.replace(', `codebase.md` |', ' |')}`,
+    briefs: { 'plan-consistency-reader.md': CONSISTENCY_READER.replace('| `codebase.md` | what the repository held before this прогон |\n', '') },
+  });
+  assert.deepEqual(checks(violations), ['codebase']);
+  assert.match(violations[0]!.file, /gates\.md$/);
+  assert.match(violations[0]!.message, /gate G3 consistency does not give its reader codebase\.md/);
+});
+
+test('a G2 row giving codebase.md is reported, because a blind reader would inherit the прогон\'s reading of the code', async () => {
+  const violations = await codebaseFixture({
+    spec: `${SPEC.replace('| `brief.md`, `spec.md` | `codebase.md`, the манифест, `prior.md` |', '| `brief.md`, `spec.md`, `codebase.md` | the манифест, `prior.md` |')}${CONSISTENCY_ROW}`,
+    briefs: {
+      'independent-reader.md': INDEPENDENT
+        .replace('| `codebase.md` | the прогон\'s reading of the code |\n', '')
+        .replace('| `spec.md` | what is going to be built |\n', '| `spec.md` | what is going to be built |\n| `codebase.md` | the code |\n'),
+    },
+  });
+  assert.deepEqual(checks(violations), ['codebase']);
+  assert.match(violations[0]!.message, /gate G2 gives its reader codebase\.md — only G3 consistency may/);
+});
+
+test('a G4 row that does not withhold codebase.md is reported', async () => {
+  const violations = await codebaseFixture({
+    spec: `${SPEC.replace('| `codebase.md`, `spec.md`, `prior.md` |', '| `spec.md`, `prior.md` |')}${CONSISTENCY_ROW}`,
+    briefs: { 'acceptance-reader.md': ACCEPTANCE.replace('| `codebase.md` | the прогон\'s reading of the code |\n', '') },
+  });
+  assert.deepEqual(checks(violations), ['codebase']);
+  assert.match(violations[0]!.message, /gate G4 does not withhold codebase\.md/);
+});
+
+test('an executor brief whose opening does not name codebase.md is reported on that brief', async () => {
+  const violations = await codebaseFixture({
+    briefs: { 'executor.md': EXECUTOR.replace(', and `codebase.md` when the\nпрогон has one', '') + '\nRead `codebase.md` later.\n' },
+  });
+  assert.deepEqual(checks(violations), ['codebase-briefs']);
+  assert.match(violations[0]!.file, /executor\.md$/);
+  assert.match(violations[0]!.message, /opening of executor\.md/);
+});
+
+test('a reviewer brief whose "You have not seen" paragraph does not name codebase.md is reported', async () => {
+  const violations = await codebaseFixture({
+    briefs: { 'reviewer.md': REVIEWER.replace(' `codebase.md`,', '') },
+  });
+  assert.deepEqual(checks(violations), ['codebase-briefs']);
+  assert.match(violations[0]!.file, /reviewer\.md$/);
+});
+
+test('a repair diagnostician brief that mentions codebase.md is reported', async () => {
+  const violations = await codebaseFixture({
+    briefs: { 'repair-diagnostician.md': DIAGNOSTICIAN.replace('You are given the failure.', 'You are given the failure and `codebase.md`.') },
+  });
+  assert.deepEqual(checks(violations), ['codebase-briefs']);
+  assert.match(violations[0]!.file, /repair-diagnostician\.md$/);
+  assert.match(violations[0]!.message, /remove the mention/);
+});
+
+test('codebase.md is given to exactly the rows the list names, and the list names the real table\'s row', () => {
+  assert.equal(CODEBASE_INPUT, 'codebase.md');
+  assert.deepEqual([...CODEBASE_GIVEN_ROWS], ['G3 consistency']);
+  assert.deepEqual([...CODEBASE_HANDED], ['executor.md']);
+  assert.deepEqual([...CODEBASE_DENIED], ['reviewer.md']);
 });

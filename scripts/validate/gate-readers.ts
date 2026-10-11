@@ -47,6 +47,50 @@ const GATES_TABLE_COLUMNS = ['Gate', "Reader's brief", 'Given', 'Withheld'];
  */
 export const PRIOR_MEMORY_INPUT = 'prior.md';
 
+/**
+ * What the repository held before the прогон, as the existing-code reader
+ * returned it at the start of the spec phase.
+ *
+ * It is the прогон's own reading of the code. A reader judging the прогон's
+ * work against the user's words, or a таск against its task file, would inherit
+ * that reading and check the past instead of the work. Only the reader that
+ * checks whether the plan's names fit together needs it, because a name the
+ * code already has is one of the things that must fit. So the rows allowed to
+ * give it are listed, a listed row must give it, and every other row must
+ * withhold it — a reader added later inherits the withholding, as for
+ * `prior.md`.
+ */
+export const CODEBASE_INPUT = 'codebase.md';
+
+/** The `Gate` cells of the `gates.md` reader table allowed, and required, to give {@link CODEBASE_INPUT}. */
+export const CODEBASE_GIVEN_ROWS: readonly string[] = ['G3 consistency'];
+
+/**
+ * Briefs outside the reader table that are handed {@link CODEBASE_INPUT}. They
+ * carry no `What You Are Given` table, so the rule is held on their opening:
+ * the text before the first `## ` heading.
+ */
+export const CODEBASE_HANDED: readonly string[] = ['executor.md'];
+
+/**
+ * Briefs outside the reader table that are denied {@link CODEBASE_INPUT}, held
+ * on the opening paragraph that says what they have not seen.
+ */
+export const CODEBASE_DENIED: readonly string[] = ['reviewer.md'];
+
+/** The sentence that opens a denied brief's withholding paragraph. */
+const NOT_SEEN = 'You have not seen';
+
+/** A brief's opening: everything before its first `## ` heading. */
+const openingOf = (markdown: string): string => {
+  const index = markdown.search(/^## /m);
+  return index === -1 ? markdown : markdown.slice(0, index);
+};
+
+/** The paragraph that carries {@link NOT_SEEN}, whitespace collapsed, or `undefined`. */
+const notSeenParagraph = (markdown: string): string | undefined =>
+  markdown.split(/\n\s*\n/).map(paragraph => paragraph.replace(/\s+/g, ' ')).find(paragraph => paragraph.includes(NOT_SEEN));
+
 /** The reader's brief declares its inputs in a table with these two columns. */
 const INPUT_TABLE_COLUMNS = ['Input', 'What it is'];
 
@@ -160,6 +204,23 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
   }
   log.info('memory', 'prior memory withheld from every reader checked', { gates: rows.length });
 
+  for (const row of rows) {
+    const listed = CODEBASE_GIVEN_ROWS.includes(row.gate);
+    const gives = row.given.includes(CODEBASE_INPUT);
+    const withholds = row.withheld.includes(CODEBASE_INPUT);
+    log.debug('codebase', 'reader checked for codebase.md', { gate: row.gate, gives, withholds });
+    if (listed && !gives) {
+      add('codebase', specFile, row.line,
+        `gate ${row.gate} does not give its reader ${CODEBASE_INPUT} — it checks the plan's names against what the code already calls them; add it to the row's Given cell and to the brief's "${INPUT_HEADING}" table`);
+    } else if (!listed && gives) {
+      add('codebase', specFile, row.line,
+        `gate ${row.gate} gives its reader ${CODEBASE_INPUT} — only ${CODEBASE_GIVEN_ROWS.join(', ')} may hold the прогон's reading of the code; move it to Withheld`);
+    } else if (!listed && !withholds) {
+      add('codebase', specFile, row.line,
+        `gate ${row.gate} does not withhold ${CODEBASE_INPUT} — add it to the row's Withheld cell and to the brief's "${WITHHELD_HEADING}" table`);
+    }
+  }
+
   const present = new Set(await readdir(promptsDir));
   const compared: Array<{ gate: string; brief: string; inputs: string[] }> = [];
 
@@ -231,6 +292,36 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
 
     compared.push({ gate: row.gate, brief: row.brief, inputs });
   }
+
+  // The briefs outside the table: two named ones, and every other brief, which
+  // must not mention the file at all. A named brief that is absent is left to
+  // the bundle check, which already refuses a hand-over link to a missing brief.
+  const tableBriefs = new Set(rows.map(row => row.brief));
+  const outside = [...present].filter(name => name.endsWith('.md') && !tableBriefs.has(name)).sort();
+  for (const name of outside) {
+    const briefPath = path.join(promptsDir, name);
+    const brief = await readFile(briefPath, 'utf8');
+    if (CODEBASE_HANDED.includes(name)) {
+      const gives = openingOf(brief).includes(CODEBASE_INPUT);
+      log.debug('codebase-briefs', 'brief checked for codebase.md', { brief: name, gives, withholds: false });
+      if (!gives) {
+        add('codebase-briefs', briefPath, 0,
+          `the opening of ${name}, before its first "## " heading, does not name ${CODEBASE_INPUT} — this role is handed it and must be told so before it explores`);
+      }
+    } else if (CODEBASE_DENIED.includes(name)) {
+      const withholds = notSeenParagraph(brief)?.includes(CODEBASE_INPUT) ?? false;
+      log.debug('codebase-briefs', 'brief checked for codebase.md', { brief: name, gives: false, withholds });
+      if (!withholds) {
+        add('codebase-briefs', briefPath, 0,
+          `the "${NOT_SEEN} …" paragraph of ${name} does not name ${CODEBASE_INPUT} — add it to what this role has not seen and must not ask for`);
+      }
+    } else if (brief.includes(CODEBASE_INPUT)) {
+      log.debug('codebase-briefs', 'brief checked for codebase.md', { brief: name, gives: true, withholds: false });
+      add('codebase-briefs', briefPath, 0,
+        `${name} mentions ${CODEBASE_INPUT}, but it is neither in the ${specFile} reader table nor one of ${[...CODEBASE_HANDED, ...CODEBASE_DENIED].join(', ')} — remove the mention, or add the brief to the table with ${CODEBASE_INPUT} in its Withheld cell`);
+    }
+  }
+  log.info('codebase', 'codebase.md handed only where the list allows', { rows: rows.length, briefs: outside.length });
 
   log.info('inputs', 'reader inputs checked', {
     gates: rows.length,
