@@ -37,6 +37,7 @@ import { readState } from '../state/read.ts';
 import type { ScopeProgress } from '../state/verification.ts';
 import { projectState } from '../state/projection.ts';
 import { retrospect, type SignalGroup } from './signals.ts';
+import { shareOf, type StageShareOf } from './shares.ts';
 
 const log = createLogger('metrics');
 
@@ -86,6 +87,12 @@ export interface Measurement {
   finished: boolean;
   interruptedAt: string | null;
   stages: StageMeasure[];
+  /**
+   * Review and acceptance as shares of development, the figures
+   * `fixtures/recorded-stages.ts` is built from — printed so a finished прогон
+   * can be added there from its own measurement.
+   */
+  shares: StageShareOf;
   taskCount: number;
   tasksByStatus: Record<TaskStatus, number>;
   /**
@@ -173,6 +180,9 @@ export function measure(state: RunState): Measurement {
     };
   });
 
+  const shares = shareOf(state.stages);
+  log.debug('shares', 'review and acceptance measured against development', { runId: state.runId, ...shares });
+
   // A measurement reports rather than refuses: a state whose directory name
   // cannot be resolved — a newer contract, a hand-edited dir — is named by its
   // slug, and the warning says so instead of the measurement stopping.
@@ -195,6 +205,7 @@ export function measure(state: RunState): Measurement {
     finished: state.finishedAt !== undefined,
     interruptedAt: state.interruptedAt ?? null,
     stages,
+    shares,
     taskCount: state.tasks.length,
     tasksByStatus: countBy(TASK_STATUSES, state.tasks.map(task => task.status)),
     tasksByModel,
@@ -243,6 +254,9 @@ export function render(m: Measurement): string {
   for (const stage of m.stages) {
     row(`  ${stage.id}`, `${stage.status.padEnd(8)}${formatSpan(stage.ms)}`);
   }
+  const share = (value: number | null): string => value === null ? '—' : value.toFixed(3);
+  row('  review ÷ build', share(m.shares.review));
+  row('  acceptance ÷ build', share(m.shares.acceptance));
 
   lines.push('', '  таски');
   row('  count', String(m.taskCount));

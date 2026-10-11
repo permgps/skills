@@ -178,7 +178,7 @@ term, and a term with two homes drifts.
 | Прогресс проекта | Project progress | The bar in the header band: the share of the whole прогон travelled — stages weighted by how long they take, the build subdivided by how far its таски have got |
 | Покрытие брифа | Brief coverage | The share of live требования that reached the specification, as a line under G2 in Гейты. A different number from прогресс on purpose: one measures the road, the other the value |
 | Рабочее время | Time worked | Time the прогон has been worked on |
-| Осталось | Remaining | The estimate, always a range, and only once enough таски have finished to build it from |
+| Осталось | Remaining | The estimate, always a range, of the remaining таски and the review and acceptance still ahead, and only once enough таски have finished to build it from |
 | Таски | Tasks | How many таски are accepted out of how many were cut, with one square per таск |
 | Допущения | Assumptions | Decisions the прогон made for the user because nobody was asked |
 | Переменные | Variables | Environment variables the build needs and nobody has filled — names only, never values |
@@ -242,7 +242,9 @@ the stage rather than after the activity.
 
 `Осталось` is a range and says so. A single wall-clock number would be a
 fabrication dressed as a measurement; a range built from таски that already
-finished is neither.
+finished is neither. Its caption says what it covers: «с ревью и приёмкой»
+while both stages are ahead, the one stage left once the other is behind, and
+«Осталось закрыть прогон» when only the closing is.
 
 ## Run Condition
 

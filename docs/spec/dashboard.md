@@ -35,7 +35,7 @@ like to look at it.
 |---|---|---|---|
 | `dials` | Dials | Mode, depth, the register when the state names one, and any mid-run change | `mode`, `depth`, `explain`, `dialChanges[]` |
 | `header` | Что происходит | The run's condition as a colour and a word, the share of the road, one sentence about the таски, the таски in flight by title, and the eight stages as a strip with their clocks | `stages[]`, `tasks[]`, `currentStage`, `awaiting`, `lifecycle`, `outcome`, `interruptedAt` |
-| `estimate` | Осталось | The estimate as a range, and the critical path it was measured along; shown at the right of the header band | `tasks[]` |
+| `estimate` | Осталось | The estimate as a range — the remaining critical path plus the review and acceptance stages still ahead — and what it covers; shown at the right of the header band | `tasks[]`, `stages[]` |
 | `requirements` | Требования (счёт) | Live требования built, in progress and deferred, with a bar; verified instead of built once the current G4 passed | `requirements[]`, `tasks[]`, `verification` |
 | `tasks` | Таски | Accepted of cut, one square per таск in its status colour, with what is in motion, failed or retried in words | `tasks[]` |
 | `tests` | Тесты | The last suite's passed count, the failed count beside it, and the таск it ran after or the full suite at acceptance | `tests`, or the own suite of the таск that finished last |
@@ -471,15 +471,105 @@ could flatter its прогон:
   ремонт drops from 0.8 to 0.5 because work reappeared. A bar that only ever
   rises lies once, quietly, at the moment a review fails.
 - **Осталось is the median of finished таски along the remaining critical path,
-  shown as a range**, and says *рано считать* below two finished таски rather
-  than guessing. A precise wall-clock prediction is a fabrication; a range built
-  from what already happened is not. Nothing in the chat may offer the user a
-  sharper number than the page does.
+  plus the review and acceptance stages still ahead, shown as a range**, and
+  says *рано считать* below two finished таски rather than guessing. A precise
+  wall-clock prediction is a fabrication; a range built from what already
+  happened is not. Nothing in the chat may offer the user a sharper number than
+  the page does. How the two stages are counted is in *Осталось Runs To
+  Acceptance*.
 
 **`N тасков параллельно` on a волна is read from the clocks, not from the size
 of the wave.** A wave says what *may* run together. Claiming parallelism the
 прогон did not get is the kind of flattery that makes the rest of the screen
 untrustworthy.
+
+## Осталось Runs To Acceptance
+
+Review and acceptance come after the last таск, and on the recorded прогоны
+they took about as long again as development. An estimate that ended with the
+last таск went blank exactly while they ran. The range now runs to the end of
+acceptance, and its caption says what it covers.
+
+**Before a stage starts, it is a share of development.** For each recorded
+прогон, the share is the stage's span divided by the build stage's span, from
+the raw stamps. The bounds are the **lower and the upper quartile** of those
+ratios, by index — `sorted[floor(n/4)]` and `sorted[ceil(3n/4) − 1]` — rounded
+to two decimals. A mean would let one прогон whose review spanned a weekend move
+the whole range; the quartiles keep the middle half.
+
+| Stage | Low | High |
+|---|---|---|
+| `review` | 0.09 | 1.11 |
+| `acceptance` | 0.09 | 0.39 |
+
+The page holds these as `STAGE_SHARE`. `node scripts/metrics/shares.ts`
+derives them from `scripts/metrics/fixtures/recorded-stages.ts`, which holds the
+build, review and acceptance stamps of six finished прогоны and nothing else.
+`shares.test.ts` holds the page to that output, and `npm run dashboard` holds
+this table to the page.
+
+| Run | Contract | Review ÷ build | Acceptance ÷ build |
+|---|---|---|---|
+| `maestro-tic-tac-toe-20260819` | 1 | 0.414 | 0.218 |
+| `maestro-run-2026-08-19-daynight` | 1 | 0.995 | 0.389 |
+| `maestro-board-sizes-2026-08-19` | 2 | 1.114 | 0.089 |
+| `maestro-cube-3d-2026-08-20` | 2 | 0.074 | 0.213 |
+| `maestro-run-2026-08-20` | 2 | 0.091 | 2.018 |
+| `school-timetable-2026-08-21b` | 3 | 2.661 | 0.000 |
+
+The six are every finished прогон on record, all from August 2026. Five were
+written by contracts 1–3, which `readState` rejects, so only their stamps were
+copied. None recorded its waits, so every span is wall time with the user's
+pauses inside it, while the share multiplies a development clock with the waits
+taken out (*Working Time, Not The Calendar*). `school-timetable` was stamped
+after the fact: its review spans two days and its acceptance is zero-width.
+That is a thin sample, which is why the range is wide. The `estimate`
+explanation says so in both registers. A finished прогон is added by appending
+its three stages, which `measure` prints as `review ÷ build` and
+`acceptance ÷ build`, and re-running the command.
+
+**The share multiplies the projected development:** what the build stage has
+worked so far, plus the critical path still ahead. It does not multiply the
+median, because review and acceptance read the whole build and not one таск.
+
+**Once a stage starts, its own clock replaces its share.** Each bound becomes
+the share minus the stage's worked clock, and never less than one minute. This
+is the rule a `running` таск follows. A stage that has outrun the recorded
+прогоны is still not over until the state says so. A `failed` stage is
+counted on its clock, the same way.
+
+**What each state adds:**
+
+| # | State | Value | Caption |
+|---|---|---|---|
+| E1 | fewer than two finished таски | Рано считать | Нужно два готовых таска |
+| E2 | таски left; review and acceptance `pending` | chain + both shares | Критический путь: N тасков в цепочке · с ревью и приёмкой |
+| E3 | таски left; review `active` (alone, or beside an active build) | chain + review rest + acceptance share | same as E2 |
+| E4 | review `done`; acceptance ahead | chain + acceptance part | … · с приёмкой |
+| E5 | review `skipped`; acceptance ahead | chain + acceptance part | … · с приёмкой |
+| E6 | a stage entry absent | that stage adds 0 | names only what was added; «· с ревью» when acceptance is the one absent |
+| E7 | every таск done; a stage ahead | the stage parts only | На ревью и приёмку / На ревью / На приёмку |
+| E8 | every таск done; review and acceptance `done` or `skipped`; no `finishedAt` | — | Осталось закрыть прогон |
+| E9 | `finishedAt` set | — | Прогон завершён |
+| E10 | acceptance `done`, G4 failed, таски back in `repair` | the repair chain only | Критический путь: … with no stage named |
+
+English: "· with review and acceptance", "· with review", "· with acceptance",
+"For review and acceptance", "For review", "For acceptance", "Only closing the
+run is left".
+
+- **An absent stage adds nothing.** The page does not invent a stage the state
+  never wrote. A contract-9 state always carries all eight (`state-contract.md`).
+- **Overlap is read, not rejected.** The contract allows one `active` stage,
+  but the contract-2 running fixture has development and review active
+  together. Each stage is read on its own status, so the overlap adds the
+  review's rest beside the chain.
+- **No second acceptance round is predicted.** After G4 fails, acceptance is
+  `done`, its таски go back to repair, and acceptance runs again once they
+  return (`7-acceptance.md`). The estimate counts the repair chain and not
+  that round. Predicting it would mean predicting that the gate fails again.
+- **This is not `STAGE_WEIGHT`.** The progress bar weighs review 2 and
+  acceptance 1 against development 6. Those weights say how the bar creeps.
+  `STAGE_SHARE` predicts minutes, and neither may be read as the other.
 
 ## Working Time, Not The Calendar
 

@@ -942,6 +942,47 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     }
   }
 
+  // --- the stage shares «Осталось» adds are a copy of the specification's ---
+  // Derived by scripts/metrics/shares.ts, held to that output by its own test,
+  // and held here to the table the specification publishes, so neither copy
+  // can move alone.
+  const rerun = 're-run node scripts/metrics/shares.ts and copy its bounds into STAGE_SHARE '
+    + 'and the table under «Осталось Runs To Acceptance» in docs/spec/dashboard.md';
+  const shareTable = findTable(parseTables(spec['dashboard.md']), ['Stage', 'Low', 'High']);
+  const pageShares = (logic['STAGE_SHARE'] && typeof logic['STAGE_SHARE'] === 'object'
+    ? logic['STAGE_SHARE'] : {}) as Record<string, Record<string, unknown>>;
+  let comparedShares = 0;
+  if (!shareTable) {
+    add('shares', 0, `dashboard.md has no table with columns Stage, Low and High — ${rerun}`);
+  } else {
+    const specIds = shareTable.rows.map(row => cleanCell(row['Stage']));
+    for (const row of shareTable.rows) {
+      const id = cleanCell(row['Stage']);
+      const held = pageShares[id];
+      if (!held) {
+        add('shares', 0, `"${id}" has a share in the specification and none in the page — ${rerun}`);
+        continue;
+      }
+      for (const bound of ['low', 'high'] as const) {
+        const specValue = Number(cleanCell(row[bound === 'low' ? 'Low' : 'High']));
+        const pageValue = held[bound];
+        comparedShares += 1;
+        log.debug('shares', 'stage share compared', { stage: id, bound, page: pageValue, spec: specValue });
+        if (pageValue !== specValue) {
+          add('shares', 0, `${id}'s ${bound} share is ${String(pageValue)} in the page and `
+            + `${String(specValue)} in the specification — ${rerun}`);
+        }
+      }
+    }
+    for (const id of Object.keys(pageShares)) {
+      if (!specIds.includes(id)) {
+        add('shares', 0, `"${id}" has a share in the page and none in the specification — ${rerun}`);
+      }
+    }
+  }
+  log.info('shares', 'stage shares compared with the specification',
+    { stages: shareTable?.rows.length ?? 0, compared: comparedShares });
+
   // --- the stage order and the gate map are copies too ----------------------
   const phaseTable = findTable(parseTables(spec['phases.md']), ['Id', 'Stage']);
   let comparedStages = 0;

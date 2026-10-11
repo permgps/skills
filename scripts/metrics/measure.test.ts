@@ -121,6 +121,25 @@ test('every stage of the contract appears, absent ones included', () => {
   assert.equal(manifest?.ms, null);
 });
 
+test('a run reports review and acceptance as shares of development, so it can join the recorded runs', () => {
+  const state = baseline();
+  state.stages.push(
+    { id: 'review', status: 'done', startedAt: '2026-08-19T10:10:00Z', finishedAt: '2026-08-19T10:25:00Z' },
+    { id: 'acceptance', status: 'done', startedAt: '2026-08-19T10:25:00Z', finishedAt: '2026-08-19T10:30:00Z' },
+  );
+  const m = measure(state);
+  assert.deepEqual(m.shares, { review: 0.25, acceptance: 5 / 60 });
+  assert.match(render(m), /review ÷ build\s+0\.250\n/);
+  assert.match(render(m), /acceptance ÷ build\s+0\.083\n/);
+});
+
+test('a share the state cannot give is a dash, never a zero', () => {
+  const m = measure(baseline());
+  assert.deepEqual(m.shares, { review: null, acceptance: null });
+  assert.match(render(m), /review ÷ build\s+—\n/);
+  assert.match(render(m), /acceptance ÷ build\s+—\n/);
+});
+
 test('every gate of the contract appears, absent ones included', () => {
   const m = measure(baseline());
   assert.equal(m.gates.length, 4);

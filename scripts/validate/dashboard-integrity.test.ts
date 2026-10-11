@@ -112,6 +112,13 @@ const DASHBOARD = `# Dashboard
 |---|---|---|---|
 | \`progress\` | Прогресс проекта | the whole road | \`stages[]\` |
 | \`gates\` | Gates | G1-G4 | \`gates[]\` |
+
+## Осталось Runs To Acceptance
+
+| Stage | Low | High |
+|---|---|---|
+| \`review\` | 0.09 | 1.11 |
+| \`acceptance\` | 0.09 | 0.39 |
 `;
 
 const SPEC: SpecSources = {
@@ -130,6 +137,7 @@ const LOGIC = {
   EXPLAIN_ORDER: "['progress', 'gates']",
   CONDITION_ORDER: "['working', 'waiting']",
   REQUIREMENT_PROGRESS_ORDER: "['built', 'in-progress', 'deferred']",
+  STAGE_SHARE: '{ review: { low: 0.09, high: 1.11 }, acceptance: { low: 0.09, high: 0.39 } }',
   explain: "function (key) { return key === 'nothing' ? [] : ['what it is', 'what it holds']; }",
   explainStage: "function (id) { return id === 'nothing' ? [] : ['what it does', 'where it is']; }",
   findingsLine: "function (count, register) { return register === 'plain'"
@@ -430,6 +438,24 @@ test('a non-stage phase does not belong in the stage order', () => {
 test('a gate pointing at the wrong stage is reported', () => {
   const found = messages(page({ logic: { GATE_AFTER: "{ G1: 'build' }" } }));
   assert.match(found, /gate "G1" is labelled "build" in the page and "preflight" in the specification/);
+});
+
+test('a stage share the page holds differently from the specification is reported with both numbers', () => {
+  const found = messages(page({ logic: { STAGE_SHARE: '{ review: { low: 0.09, high: 1.2 }, acceptance: { low: 0.09, high: 0.39 } }' } }));
+  assert.match(found, /review's high share is 1\.2 in the page and 1\.11 in the specification/);
+  assert.match(found, /node scripts\/metrics\/shares\.ts/);
+});
+
+test('a stage share only one side carries is reported', () => {
+  const found = messages(page({ logic: { STAGE_SHARE: '{ review: { low: 0.09, high: 1.11 } }' } }));
+  assert.match(found, /"acceptance" has a share in the specification and none in the page/);
+  const extra = messages(page({ logic: { STAGE_SHARE: '{ review: { low: 0.09, high: 1.11 }, acceptance: { low: 0.09, high: 0.39 }, build: { low: 1, high: 1 } }' } }));
+  assert.match(extra, /"build" has a share in the page and none in the specification/);
+});
+
+test('a specification without the share table is reported', () => {
+  const spec = { ...SPEC, 'dashboard.md': SPEC['dashboard.md'].replace(/## Осталось Runs To Acceptance[\s\S]*$/, '') };
+  assert.match(messages(page(), spec), /dashboard\.md has no table with columns Stage, Low and High/);
 });
 
 test('a vocabulary with no value table is reported once, not as every field', () => {

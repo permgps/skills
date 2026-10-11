@@ -133,7 +133,9 @@ interface Logic {
   toggled: (open: Record<string, boolean>, key: string) => Record<string, boolean>;
   describeTask: (state: unknown, id: string, language?: string) => string[];
   describeRequirement: (state: unknown, id: string, language?: string) => string[];
-  estimateMs: (state: unknown, now: number, marks?: number[]) => { low: number; high: number } | null;
+  estimateMs: (state: unknown, now: number, marks?: number[]) => { low: number; high: number; stages: string[] } | null;
+  estimateCaption: (estimate: { low: number; high: number; stages: string[] }, chain: number, language?: string) => string;
+  STAGE_SHARE: Record<'review' | 'acceptance', { low: number; high: number }>;
   groupByWave: (tasks: unknown) => Array<{ wave: number; tasks: Array<{ id: string }> }>;
   peakParallel: (tasks: unknown, state: unknown, now: number) => number;
   testsOf: (state: unknown) => {
@@ -2640,4 +2642,177 @@ test('R10: an opened repair row shows exactly the lines it showed before the row
     'Saved in history: abcdef0, fedcba1', 'Restarts: 0', 'Trips to repair: 1',
     'Passed to a fresh subagent: 0 — not a defect', 'Defects: verified 1, open 2',
   ]);
+});
+
+// --- Осталось runs to acceptance ----------------------------------------------
+//
+// Two таски of twenty minutes give a median of twenty. The marks are DENSE, so
+// the idle ceiling never bites and every clock is the arithmetic it looks like.
+
+type Estimate = { low: number; high: number; stages: string[] };
+const AHEAD_NOW = AT(T('11:20'));
+const twoDone = (): Array<Record<string, unknown>> => [
+  task('01', { status: 'done', startedAt: T('10:00'), finishedAt: T('10:20') }),
+  task('02', { status: 'done', startedAt: T('10:00'), finishedAt: T('10:20') }),
+];
+const ahead = (tasks: Array<Record<string, unknown>>, stages: Array<Record<string, unknown>>): Record<string, unknown> =>
+  bare({ contractVersion: 9, tasks, stages });
+const estimateOf = (state: Record<string, unknown>): Estimate => {
+  const estimate = L.estimateMs(state, AHEAD_NOW, DENSE) as Estimate | null;
+  assert.ok(estimate, 'an estimate is expected once two таски have finished');
+  return plain(estimate) as Estimate;
+};
+const near = (actual: number, expected: number, what: string): void => {
+  assert.ok(Math.abs(actual - expected) < 1, `${what}: ${actual} vs ${expected}`);
+};
+const share = (): { review: { low: number; high: number }; acceptance: { low: number; high: number } } =>
+  plain(L.STAGE_SHARE) as ReturnType<typeof share>;
+const buildActive = { id: 'build', status: 'active', startedAt: T('10:00') };
+
+test('E2: with таски left and both stages ahead, the range adds their shares of the projected development', () => {
+  const s = share();
+  const estimate = estimateOf(ahead([...twoDone(), task('03', { blockedBy: ['01'] })], [
+    buildActive, { id: 'review', status: 'pending' }, { id: 'acceptance', status: 'pending' }]));
+  // Development has run 80 minutes and has one таск of 20 left: 100 in all.
+  near(estimate.low, 20 * MIN * 0.75 + (s.review.low + s.acceptance.low) * 100 * MIN, 'low');
+  near(estimate.high, 20 * MIN * 1.4 + (s.review.high + s.acceptance.high) * 100 * MIN, 'high');
+  assert.deepEqual(estimate.stages, ['review', 'acceptance']);
+  assert.equal(L.estimateCaption(estimate, 1, 'ru'), 'Критический путь: 1 таск в цепочке · с ревью и приёмкой');
+  assert.equal(L.estimateCaption(estimate, 1, 'en'), 'Critical path: 1 task in the chain · with review and acceptance');
+});
+
+test('E3: once review has started, its own clock replaces its share, even beside a running development', () => {
+  const s = share();
+  const estimate = estimateOf(ahead([...twoDone(), task('03', { blockedBy: ['01'] })], [
+    buildActive, { id: 'review', status: 'active', startedAt: T('11:00') }, { id: 'acceptance', status: 'pending' }]));
+  near(estimate.low, 20 * MIN * 0.75 + Math.max(MIN, s.review.low * 100 * MIN - 20 * MIN) + s.acceptance.low * 100 * MIN, 'low');
+  near(estimate.high, 20 * MIN * 1.4 + (s.review.high * 100 * MIN - 20 * MIN) + s.acceptance.high * 100 * MIN, 'high');
+  assert.deepEqual(estimate.stages, ['review', 'acceptance']);
+});
+
+test('E3: a stage that has run past its whole share still owes a minute, never a negative', () => {
+  const estimate = estimateOf(ahead(twoDone(), [
+    { id: 'build', status: 'done', startedAt: T('10:00'), finishedAt: T('10:20') },
+    { id: 'review', status: 'active', startedAt: T('10:20') }]));
+  assert.equal(estimate.low, MIN);
+  assert.equal(estimate.high, MIN);
+  assert.deepEqual(estimate.stages, ['review']);
+});
+
+test('a failed stage is counted on its own clock, like one still running', () => {
+  const failed = estimateOf(ahead(twoDone(), [
+    { id: 'build', status: 'done', startedAt: T('10:00'), finishedAt: T('10:40') },
+    { id: 'review', status: 'failed', startedAt: T('10:40') }, { id: 'acceptance', status: 'pending' }]));
+  assert.deepEqual(failed.stages, ['review', 'acceptance']);
+});
+
+test('E4 and E5: a review that is done or skipped adds nothing, and the caption names acceptance alone', () => {
+  const s = share();
+  for (const review of [
+    { id: 'review', status: 'done', startedAt: T('10:40'), finishedAt: T('10:50') },
+    { id: 'review', status: 'skipped', note: 'mode' },
+  ]) {
+    const estimate = estimateOf(ahead([...twoDone(), task('03')], [buildActive, review, { id: 'acceptance', status: 'pending' }]));
+    near(estimate.high, 20 * MIN * 1.4 + s.acceptance.high * 100 * MIN, review.status);
+    assert.deepEqual(estimate.stages, ['acceptance'], review.status);
+    assert.equal(L.estimateCaption(estimate, 1, 'ru'), 'Критический путь: 1 таск в цепочке · с приёмкой');
+    assert.equal(L.estimateCaption(estimate, 1, 'en'), 'Critical path: 1 task in the chain · with acceptance');
+  }
+});
+
+test('E6: a stage the state never wrote adds nothing, so the chain-only arithmetic stands', () => {
+  const estimate = estimateOf(ahead([...twoDone(), task('03')], []));
+  assert.equal(estimate.low, 20 * MIN * 0.75);
+  assert.equal(estimate.high, 20 * MIN * 1.4);
+  assert.deepEqual(estimate.stages, []);
+  assert.equal(L.estimateCaption(estimate, 1, 'ru'), 'Критический путь: 1 таск в цепочке');
+  const reviewOnly = estimateOf(ahead([...twoDone(), task('03')], [buildActive, { id: 'review', status: 'pending' }]));
+  assert.equal(L.estimateCaption(reviewOnly, 1, 'ru'), 'Критический путь: 1 таск в цепочке · с ревью');
+  assert.equal(L.estimateCaption(reviewOnly, 1, 'en'), 'Critical path: 1 task in the chain · with review');
+});
+
+test('E7: with every таск done the estimate no longer goes blank — it is review and acceptance', () => {
+  const s = share();
+  const estimate = estimateOf(ahead(twoDone(), [
+    { id: 'build', status: 'done', startedAt: T('10:00'), finishedAt: T('10:40') },
+    { id: 'review', status: 'pending' }, { id: 'acceptance', status: 'pending' }]));
+  near(estimate.low, (s.review.low + s.acceptance.low) * 40 * MIN, 'low');
+  near(estimate.high, (s.review.high + s.acceptance.high) * 40 * MIN, 'high');
+  assert.equal(L.estimateCaption(estimate, 0, 'ru'), 'На ревью и приёмку');
+  assert.equal(L.estimateCaption(estimate, 0, 'en'), 'For review and acceptance');
+  const acceptanceOnly = estimateOf(ahead(twoDone(), [
+    { id: 'build', status: 'done', startedAt: T('10:00'), finishedAt: T('10:40') },
+    { id: 'review', status: 'done', startedAt: T('10:40'), finishedAt: T('10:50') }, { id: 'acceptance', status: 'pending' }]));
+  assert.equal(L.estimateCaption(acceptanceOnly, 0, 'ru'), 'На приёмку');
+  assert.equal(L.estimateCaption(acceptanceOnly, 0, 'en'), 'For acceptance');
+});
+
+test('E8: with every таск done and both stages behind, only the closing is left', () => {
+  const estimate = estimateOf(ahead(twoDone(), [
+    { id: 'build', status: 'done', startedAt: T('10:00'), finishedAt: T('10:40') },
+    { id: 'review', status: 'done', startedAt: T('10:40'), finishedAt: T('10:50') },
+    { id: 'acceptance', status: 'done', startedAt: T('10:50'), finishedAt: T('11:00') }]));
+  assert.deepEqual(estimate, { low: 0, high: 0, stages: [] });
+  assert.equal(L.estimateCaption(estimate, 0, 'ru'), 'Осталось закрыть прогон');
+  assert.equal(L.estimateCaption(estimate, 0, 'en'), 'Only closing the run is left');
+});
+
+test('E10: after a failed acceptance the repair chain is counted, and no second round is predicted', () => {
+  const estimate = estimateOf(ahead([...twoDone(), task('03', { status: 'repair', repairs: 1 })], [
+    { id: 'build', status: 'done', startedAt: T('10:00'), finishedAt: T('10:40') },
+    { id: 'review', status: 'done', startedAt: T('10:40'), finishedAt: T('10:50') },
+    { id: 'acceptance', status: 'done', startedAt: T('10:50'), finishedAt: T('11:00') }]));
+  assert.equal(estimate.high, 20 * MIN * 0.5 * 1.4);
+  assert.deepEqual(estimate.stages, []);
+  assert.equal(L.estimateCaption(estimate, 1, 'ru'), 'Критический путь: 1 таск в цепочке');
+});
+
+test('the recorded running прогон: development and review overlap, and the range still runs to acceptance', async () => {
+  const state = parseStateSource(await readFile('docs/assets/state-running.fixture.js', 'utf8')) as Record<string, unknown>;
+  const now = AT(String(state['updatedAt']));
+  const full = plain(L.estimateMs(state, now)) as Estimate;
+  const chainOnly = plain(L.estimateMs({ ...state, stages: [] }, now)) as Estimate;
+  assert.deepEqual(full.stages, ['review', 'acceptance']);
+  assert.ok(full.low > chainOnly.low && full.high > chainOnly.high, `${JSON.stringify(full)} vs ${JSON.stringify(chainOnly)}`);
+  const chain = L.criticalPath(state['tasks']);
+  assert.match(L.estimateCaption(full, chain, 'ru'), / · с ревью и приёмкой$/);
+});
+
+test('the estimate\'s explanation names the six runs and why the range is wide, in every register and language', () => {
+  const state = ahead([...twoDone(), task('03', { blockedBy: ['01'] })], [
+    buildActive, { id: 'review', status: 'pending' }, { id: 'acceptance', status: 'pending' }]);
+  for (const register of ['normal', 'plain'] as const) {
+    for (const language of ['ru', 'en'] as const) {
+      const lines = L.explain('estimate', state, AHEAD_NOW, DENSE, register, language);
+      const shares = lines[3] ?? '';
+      const where = `${register}/${language}`;
+      assert.match(shares, /2026/, where);
+      assert.match(shares, /9\D+111 %/, `${where}: review's bounds as percentages`);
+      assert.match(shares, /9\D+39 %/, `${where}: acceptance's bounds as percentages`);
+      assert.match(lines[1] ?? '', language === 'ru' ? /с ревью и приёмкой\.$/ : /with review and acceptance\.$/, where);
+      if (register === 'plain') {
+        for (const word of [/медиан/i, /квартил/i, /\bmedian\b/i, /\bquartile/i]) assert.doesNotMatch(lines.join(' '), word, where);
+      }
+    }
+  }
+});
+
+test('the estimate\'s explanation says what is left once every таск is done', () => {
+  const stagesAhead = ahead(twoDone(), [
+    { id: 'build', status: 'done', startedAt: T('10:00'), finishedAt: T('10:40') },
+    { id: 'review', status: 'pending' }, { id: 'acceptance', status: 'pending' }]);
+  const closing = ahead(twoDone(), [
+    { id: 'build', status: 'done', startedAt: T('10:00'), finishedAt: T('10:40') },
+    { id: 'review', status: 'done', startedAt: T('10:40'), finishedAt: T('10:50') },
+    { id: 'acceptance', status: 'done', startedAt: T('10:50'), finishedAt: T('11:00') }]);
+  for (const register of ['normal', 'plain'] as const) {
+    for (const language of ['ru', 'en'] as const) {
+      const where = `${register}/${language}`;
+      const ahead1 = L.explain('estimate', stagesAhead, AHEAD_NOW, DENSE, register, language)[1] ?? '';
+      assert.match(ahead1, language === 'ru' ? /на ревью и приёмку/ : /for review and acceptance/, where);
+      assert.doesNotMatch(ahead1, /цепочке в 0|chain of 0/, where);
+      const closed = L.explain('estimate', closing, AHEAD_NOW, DENSE, register, language)[1] ?? '';
+      assert.match(closed, language === 'ru' ? /закрыть прогон/ : /closing the run/, where);
+    }
+  }
 });

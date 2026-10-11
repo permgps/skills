@@ -675,6 +675,24 @@ globalThis.MAESTRO_LOGIC = (function () {
           return 'Критический путь: ' + chain + ' '
             + plural(chain, 'таск', 'таска', 'тасков') + ' в цепочке';
         },
+        // What «Осталось» runs through after the таски. Fixed phrases rather
+        // than the stage labels glued together: the labels are nominative, and
+        // «с» and «на» each want their own case.
+        estimateStages: function (stages) {
+          var review = stages.indexOf('review') !== -1;
+          var acceptance = stages.indexOf('acceptance') !== -1;
+          if (review && acceptance) return 'с ревью и приёмкой';
+          if (review) return 'с ревью';
+          return acceptance ? 'с приёмкой' : '';
+        },
+        estimateStagesOnly: function (stages) {
+          var review = stages.indexOf('review') !== -1;
+          var acceptance = stages.indexOf('acceptance') !== -1;
+          if (review && acceptance) return 'На ревью и приёмку';
+          if (review) return 'На ревью';
+          return acceptance ? 'На приёмку' : '';
+        },
+        estimateClosing: 'Осталось закрыть прогон',
         // The squares carry each таск's status in colour; this line says the
         // same counts in words, so status is never colour-only. No share of
         // the way: the band's progress bar is the one road, and a second
@@ -1039,6 +1057,21 @@ globalThis.MAESTRO_LOGIC = (function () {
           return 'Critical path: ' + chain + ' '
             + L10N.en.UI.tasksWord(chain) + ' in the chain';
         },
+        estimateStages: function (stages) {
+          var review = stages.indexOf('review') !== -1;
+          var acceptance = stages.indexOf('acceptance') !== -1;
+          if (review && acceptance) return 'with review and acceptance';
+          if (review) return 'with review';
+          return acceptance ? 'with acceptance' : '';
+        },
+        estimateStagesOnly: function (stages) {
+          var review = stages.indexOf('review') !== -1;
+          var acceptance = stages.indexOf('acceptance') !== -1;
+          if (review && acceptance) return 'For review and acceptance';
+          if (review) return 'For review';
+          return acceptance ? 'For acceptance' : '';
+        },
+        estimateClosing: 'Only closing the run is left',
         tasksSub: function (counts) {
           if (counts.total === 0) return 'No tasks cut yet';
           return tasksSubParts(counts, L10N.en.TASK_STATUS, L10N.en.SCREEN.offContract, 'restarts');
@@ -1279,6 +1312,27 @@ globalThis.MAESTRO_LOGIC = (function () {
     preflight: 1, manifest: 1, briefing: 1, spec: 2,
     plan: 1, build: 6, review: 2, acceptance: 1
   };
+
+  /**
+   * How long review and acceptance take, as a share of development, before
+   * either has run.
+   *
+   * A constant, because the прогон has nothing of its own to measure them by
+   * until they start. It is the lower and the upper quartile of six finished
+   * прогоны of August 2026, derived by `scripts/metrics/shares.ts` from their
+   * recorded stamps; `shares.test.ts` fails when this copy drifts from that
+   * output, and `npm run dashboard` when the table in `docs/spec/dashboard.md`
+   * does. Six runs that recorded no waits are a thin sample, which is why the
+   * range is this wide and why the explanation says so rather than hiding it.
+   *
+   * Not `STAGE_WEIGHT`: that one says how the progress bar creeps, this one
+   * predicts minutes, and neither may be read as the other.
+   */
+  var STAGE_SHARE = {
+    review: { low: 0.09, high: 1.11 },
+    acceptance: { low: 0.09, high: 0.39 }
+  };
+  var SHARED_STAGES = ['review', 'acceptance'];
 
   /**
    * A gap between two marks longer than this is a person being away.
@@ -1839,11 +1893,46 @@ globalThis.MAESTRO_LOGIC = (function () {
   }
 
   /**
+   * What is left of one of the stages after development, as a pair of bounds,
+   * or `null` when it adds nothing.
+   *
+   * Before the stage starts it is its share of the projected development.
+   * Once it starts, its own worked clock is taken off that share, the rule a
+   * `running` таск follows, and it never owes less than a minute: a review
+   * that has outrun the recorded runs is still not over until the state says
+   * so. A `failed` stage is counted on its clock like a running one. A `done`
+   * one adds nothing — not even when its таски have gone back to repair after
+   * G4, because predicting a second acceptance round would be predicting that
+   * the gate fails again.
+   */
+  function stageRemainder(stage, share, base, state, now, stamps) {
+    if (!stage || !share || base <= 0) return null;
+    if (stage.status === 'pending' || ((stage.status === 'active' || stage.status === 'failed') && !stage.startedAt)) {
+      return { low: share.low * base, high: share.high * base };
+    }
+    if (stage.status !== 'active' && stage.status !== 'failed') return null;
+    var spent = worked(stage.startedAt, state, now, undefined, stamps) || 0;
+    return {
+      low: Math.max(60000, share.low * base - spent),
+      high: Math.max(60000, share.high * base - spent)
+    };
+  }
+
+  /**
    * What is left, as a range, or `null` while there is nothing to build it from.
    *
    * Measured along the critical path in minutes rather than as «median × chain
    * length»: a таск twenty minutes into its work would otherwise count as a
    * whole one, and the last almost-finished таск would read as a fresh start.
+   *
+   * Then review and acceptance, which come after the last таск and on the
+   * recorded runs took about as long again. Their share multiplies the
+   * projected development — what it has worked so far plus the chain still
+   * ahead — and not the median: they read the whole build, not one таск. A
+   * stage the state never wrote adds nothing; the page does not invent a stage.
+   * `stages` names the ones that added something, in run order, so the caption
+   * can say what the range covers. With nothing left at all the range is zero
+   * and the прогон only has its closing ahead of it.
    */
   function estimateMs(state, now, marks) {
     var median = medianTaskMs(state, now, marks);
@@ -1886,8 +1975,47 @@ globalThis.MAESTRO_LOGIC = (function () {
     list.forEach(function (task) {
       if (task && task.id) longest = Math.max(longest, chain(task.id, {}));
     });
-    if (longest <= 0) return null;
-    return { low: longest * 0.75, high: longest * 1.4 };
+
+    var found = {};
+    ((state && state.stages) || []).forEach(function (stage) {
+      if (stage && stage.id) found[stage.id] = stage;
+    });
+    var build = found.build;
+    var built = build && build.startedAt
+      ? (worked(build.startedAt, state, now, build.finishedAt, stamps) || 0)
+      : 0;
+    var base = built + longest;
+
+    var low = longest * 0.75;
+    var high = longest * 1.4;
+    var counted = [];
+    SHARED_STAGES.forEach(function (id) {
+      var part = stageRemainder(found[id], STAGE_SHARE[id], base, state, now, stamps);
+      if (!part) return;
+      low += part.low;
+      high += part.high;
+      counted.push(id);
+    });
+    return { low: low, high: high, stages: counted };
+  }
+
+  /** A stage's share bound as a whole percentage — the explanations' unit, never a decimal. */
+  function sharePercent(id, bound) {
+    return Math.round(STAGE_SHARE[id][bound] * 100);
+  }
+
+  /**
+   * The line under «Осталось»: the chain it was measured along and the stages
+   * it runs through, or what is left when no таск is.
+   */
+  function estimateCaption(estimate, chain, language) {
+    var T = words(language).UI;
+    var stages = (estimate && estimate.stages) || [];
+    if (chain > 0) {
+      var suffix = T.estimateStages(stages);
+      return T.criticalPathSub(chain) + (suffix ? ' · ' + suffix : '');
+    }
+    return stages.length > 0 ? T.estimateStagesOnly(stages) : T.estimateClosing;
   }
 
   /** The таски grouped by the layer the plan put them in, each group in id order. */
@@ -3001,14 +3129,23 @@ globalThis.MAESTRO_LOGIC = (function () {
       var estimate = estimateMs(state, now, marks);
       var chain = criticalPath(state.tasks);
       var median = medianTaskMs(state, now, marks);
+      var stages = estimate === null ? [] : estimate.stages;
+      var range = estimate === null ? '' : formatMinutes(estimate.low) + ' … ' + formatMinutes(estimate.high);
+      var ahead = L10N.ru.UI.estimateStages(stages);
       return [
         what,
         estimate === null
           ? 'Пока не из чего считать: нужна медиана, а она появляется после двух готовых тасков.'
-          : formatMinutes(estimate.low) + ' … ' + formatMinutes(estimate.high) + ' при медиане '
-            + formatMinutes(median) + ' и цепочке в ' + chain + ' '
-            + plural(chain, 'таск', 'таска', 'тасков') + '.',
-        'Считается по критическому пути — самой длинной цепочке зависимостей, а не по сумме оставшихся тасков: то, что идёт параллельно, времени не добавляет.'
+          : chain > 0
+            ? range + ' при медиане ' + formatMinutes(median) + ' и цепочке в ' + chain + ' '
+              + plural(chain, 'таск', 'таска', 'тасков') + (ahead ? ', ' + ahead : '') + '.'
+            : stages.length > 0
+              ? range + ' — ' + L10N.ru.UI.estimateStagesOnly(stages).toLowerCase() + ': все таски готовы.'
+              : 'Все таски готовы, ревью и приёмка позади — осталось закрыть прогон.',
+        'Считается по критическому пути — самой длинной цепочке зависимостей, а не по сумме оставшихся тасков: то, что идёт параллельно, времени не добавляет.',
+        'Ревью и приёмка добавлены долей от разработки: ревью — от ' + sharePercent('review', 'low') + ' до '
+          + sharePercent('review', 'high') + ' % её длины, приёмка — от ' + sharePercent('acceptance', 'low') + ' до '
+          + sharePercent('acceptance', 'high') + ' %, по шести прогонам августа 2026 года. Прогонов мало, и паузы в них не вычтены, поэтому вилка широкая. Когда этап начался, вместо доли считаются его собственные часы.'
       ];
     },
 
@@ -3239,14 +3376,23 @@ globalThis.MAESTRO_LOGIC = (function () {
       var estimate = estimateMs(state, now, marks);
       var chain = criticalPath(state.tasks);
       var median = medianTaskMs(state, now, marks);
+      var stages = estimate === null ? [] : estimate.stages;
+      var range = estimate === null ? '' : formatMinutes(estimate.low) + ' … ' + formatMinutes(estimate.high);
+      var ahead = L10N.ru.UI.estimateStages(stages);
       return [
         what,
         estimate === null
           ? 'Пока не из чего считать: нужно, чтобы закончились хотя бы два таска.'
-          : formatMinutes(estimate.low) + ' … ' + formatMinutes(estimate.high)
-            + ' при серединном времени ' + formatMinutes(median) + ' и цепочке в ' + chain + ' '
-            + plural(chain, 'таск', 'таска', 'тасков') + '.',
-        'Считается по самой длинной цепочке — по тем таскам, которые ждут друг друга. То, что делается одновременно, времени не добавляет. Одно точное число было бы выдумкой, вилка — нет.'
+          : chain > 0
+            ? range + ' при серединном времени ' + formatMinutes(median) + ' и цепочке в ' + chain + ' '
+              + plural(chain, 'таск', 'таска', 'тасков') + (ahead ? ', ' + ahead : '') + '.'
+            : stages.length > 0
+              ? range + ' — ' + L10N.ru.UI.estimateStagesOnly(stages).toLowerCase() + ': все таски готовы.'
+              : 'Все таски готовы, ревью и приёмка позади — осталось закрыть прогон.',
+        'Считается по самой длинной цепочке — по тем таскам, которые ждут друг друга. То, что делается одновременно, времени не добавляет. Одно точное число было бы выдумкой, вилка — нет.',
+        'Ревью и приёмку пришлось прикинуть по шести прошлым прогонам августа 2026 года: ревью там заняло от '
+          + sharePercent('review', 'low') + ' до ' + sharePercent('review', 'high') + ' % времени разработки, приёмка — от '
+          + sharePercent('acceptance', 'low') + ' до ' + sharePercent('acceptance', 'high') + ' %. Прогонов мало, и паузы в них не вычтены, поэтому вилка широкая. Когда этап начался, вместо прикидки считаются его собственные часы.'
       ];
     },
 
@@ -3468,14 +3614,23 @@ globalThis.MAESTRO_LOGIC = (function () {
       var estimate = estimateMs(state, now, marks);
       var chain = criticalPath(state.tasks);
       var median = medianTaskMs(state, now, marks);
+      var stages = estimate === null ? [] : estimate.stages;
+      var range = estimate === null ? '' : L10N.en.UI.minutes(estimate.low) + ' … ' + L10N.en.UI.minutes(estimate.high);
+      var ahead = L10N.en.UI.estimateStages(stages);
       return [
         what,
         estimate === null
           ? 'Nothing to count from yet: it needs a middle time, and that appears once two tasks have finished.'
-          : L10N.en.UI.minutes(estimate.low) + ' … ' + L10N.en.UI.minutes(estimate.high)
-            + ' at a middle time of ' + L10N.en.UI.minutes(median) + ' and a chain of ' + chain + ' '
-            + L10N.en.UI.tasksWord(chain) + '.',
-        'It is measured along the critical path — the longest chain of tasks waiting on each other — and not by adding up what is left: work that runs at the same time adds no time.'
+          : chain > 0
+            ? range + ' at a middle time of ' + L10N.en.UI.minutes(median) + ' and a chain of ' + chain + ' '
+              + L10N.en.UI.tasksWord(chain) + (ahead ? ', ' + ahead : '') + '.'
+            : stages.length > 0
+              ? range + ' — ' + L10N.en.UI.estimateStagesOnly(stages).toLowerCase() + ': every task is done.'
+              : 'Every task is done and review and acceptance are behind — only closing the run is left.',
+        'It is measured along the critical path — the longest chain of tasks waiting on each other — and not by adding up what is left: work that runs at the same time adds no time.',
+        'Review and acceptance are added as a share of development: review at ' + sharePercent('review', 'low') + ' to '
+          + sharePercent('review', 'high') + ' % of its length, acceptance at ' + sharePercent('acceptance', 'low') + ' to '
+          + sharePercent('acceptance', 'high') + ' %, from six runs of August 2026. Those are few runs, with their pauses not taken out, so the range is wide. Once a stage starts, its own clock replaces its share.'
       ];
     },
 
@@ -3706,14 +3861,23 @@ globalThis.MAESTRO_LOGIC = (function () {
       var estimate = estimateMs(state, now, marks);
       var chain = criticalPath(state.tasks);
       var median = medianTaskMs(state, now, marks);
+      var stages = estimate === null ? [] : estimate.stages;
+      var range = estimate === null ? '' : L10N.en.UI.minutes(estimate.low) + ' … ' + L10N.en.UI.minutes(estimate.high);
+      var ahead = L10N.en.UI.estimateStages(stages);
       return [
         what,
         estimate === null
           ? 'Nothing to work it out from yet: at least two tasks have to have finished.'
-          : L10N.en.UI.minutes(estimate.low) + ' … ' + L10N.en.UI.minutes(estimate.high)
-            + ' with a middle time of ' + L10N.en.UI.minutes(median) + ' and a chain of '
-            + chain + ' ' + L10N.en.UI.tasksWord(chain) + '.',
-        'It is worked out along the longest chain — the tasks that wait for one another. Whatever is done at the same time adds no time. One exact number would be an invention; a range is not.'
+          : chain > 0
+            ? range + ' with a middle time of ' + L10N.en.UI.minutes(median) + ' and a chain of '
+              + chain + ' ' + L10N.en.UI.tasksWord(chain) + (ahead ? ', ' + ahead : '') + '.'
+            : stages.length > 0
+              ? range + ' — ' + L10N.en.UI.estimateStagesOnly(stages).toLowerCase() + ': every task is done.'
+              : 'Every task is done and review and acceptance are behind — only closing the run is left.',
+        'It is worked out along the longest chain — the tasks that wait for one another. Whatever is done at the same time adds no time. One exact number would be an invention; a range is not.',
+        'Review and acceptance are guessed from six earlier runs, from August 2026: there review took ' + sharePercent('review', 'low')
+          + ' to ' + sharePercent('review', 'high') + ' % of the development time, and acceptance ' + sharePercent('acceptance', 'low')
+          + ' to ' + sharePercent('acceptance', 'high') + ' %. That is few runs, and their pauses were not taken out, so the range is wide. Once a stage starts, its own clock counts instead of the guess.'
       ];
     },
 
@@ -4124,6 +4288,8 @@ globalThis.MAESTRO_LOGIC = (function () {
     criticalPath: criticalPath,
     criticalChain: criticalChain,
     estimateMs: estimateMs,
+    estimateCaption: estimateCaption,
+    STAGE_SHARE: STAGE_SHARE,
     groupByWave: groupByWave,
     waveWaitsOf: waveWaitsOf,
     peakParallel: peakParallel,
@@ -4656,9 +4822,12 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     } else if (estimate === null) {
       text('estimate', T.UI.estimateEarly);
       text('estimate-sub', T.UI.estimateEarlySub);
+    } else if (estimate.high <= 0) {
+      text('estimate', '—');
+      text('estimate-sub', L.estimateCaption(estimate, chain, lang));
     } else {
       text('estimate', T.UI.estimateRange(estimate.low, estimate.high));
-      text('estimate-sub', T.UI.criticalPathSub(chain));
+      text('estimate-sub', L.estimateCaption(estimate, chain, lang));
     }
 
     // --- таски ----------------------------------------------------------
