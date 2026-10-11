@@ -23,16 +23,20 @@
 // From contract 8 it also holds who builds each таск. A producer of a seam and
 // the skeleton are `strong` by rule, so a machine can check them: the Seams
 // table of `interfaces.md` names the producers, the waves name the skeleton, and
-// each task file's `Model` row must agree with `tasks[].model`. That is all it
-// reads of either file — whether the task files agree with each other is still
-// the plan-consistency reader's verdict.
+// each task file's `Model` row must agree with `tasks[].model`. From contract 8
+// it also holds that a comparable reaches the таски that build what it shows:
+// each task file's `References` row cites `REF-*` ids the register in
+// `state.verification.references` holds, each with a location, and every
+// available visual reference and contextual example is cited by some таск. The
+// `Model` and `References` rows are all it reads of a task file — whether the
+// task files agree with each other is still the plan-consistency reader's verdict.
 
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { createLogger } from '../shared/log.ts';
-import type { RunState } from '../state/contract.ts';
+import type { ReferenceRole, RunState } from '../state/contract.ts';
 import { forState, ROOT } from '../state/paths.ts';
 import { validateCompletionRecords } from '../state/verification.ts';
 import { runGate, targetFromArgv, type GateFinding } from './cli.ts';
@@ -252,6 +256,9 @@ export function checkG3(state: RunState): GateFinding[] {
   return findings;
 }
 
+/** A seam's or a reference's text as a finding quotes it: no markup, at most 60 characters. */
+const name = (text: string): string => text.replace(/[`*]/g, '').slice(0, 60);
+
 /** The Seams table's header, exactly as `4-plan.md` fixes it. */
 export const SEAMS_HEADER = '| Seam | Producer task | Consumer tasks | Integration owner | Integration check |';
 
@@ -338,7 +345,6 @@ export async function checkG3Models(state: RunState, target: string): Promise<Ga
 
   const findings: GateFinding[] = [];
   const tasks = new Map(state.tasks.map(task => [task.id, task]));
-  const name = (seam: string): string => seam.replace(/[`*]/g, '').slice(0, 60);
 
   const producers = new Map<string, string>();
   const rows = seamRows(interfaces);
@@ -394,6 +400,110 @@ export async function checkG3Models(state: RunState, target: string): Promise<Ga
   return findings;
 }
 
+/**
+ * The cell of a task file's `| References |` row, trimmed, or `null` when there
+ * is no row. Found with the tolerance {@link modelRow} has: a bold label or a
+ * capitalised one is the row that is already there.
+ */
+export function referencesRow(markdown: string): string | null {
+  const row = /^\|\s*\**\s*references\s*\**\s*\|([^|\n]*)\|/im.exec(markdown);
+  return row ? (row[1] ?? '').trim() : null;
+}
+
+/** A cited id: backticked, so «supersedes REF-3» in a location stays prose. */
+const REFERENCE_ID = /`(REF-[A-Za-z0-9-]+)`/g;
+
+/**
+ * The entries of a References cell: `none`, or each backticked `REF-*` id with
+ * the text up to the next id as its location. `null` when the cell is neither,
+ * because a row that names references in words is a row no machine can check.
+ */
+export function parseReferenceEntries(cell: string): { none: boolean; entries: { id: string; location: string }[] } | null {
+  if (cell.replace(/[`*]/g, '').trim().toLowerCase() === 'none') return { none: true, entries: [] };
+  const ids = [...cell.matchAll(REFERENCE_ID)];
+  if (ids.length === 0) return null;
+  const entries = ids.map((match, index) => {
+    const start = match.index + match[0].length;
+    const end = ids[index + 1]?.index ?? cell.length;
+    const location = cell.slice(start, end).replace(/^[\s—–\-:,;]+/, '').replace(/[\s,;`]+$/, '');
+    return { id: match[1]!, location };
+  });
+  return { none: false, entries };
+}
+
+/**
+ * The roles a таск must cite when available. An authoritative behaviour reaches
+ * its таски through `verification.obligations[].implementationTaskIds`, which the
+ * map half already checks; `other` is no look to follow.
+ */
+const REQUIRED_ROLES: readonly ReferenceRole[] = ['visual_reference', 'contextual_example'];
+
+/**
+ * The references half of G3, from contract 8: every task file has a References
+ * row, each cited id is one the register holds and carries a location, and every
+ * available visual reference and contextual example is cited by some таск. It
+ * reads the register from the state, never `reference.md`, which is only its
+ * projection. A таск with no task file is the models half's finding, not this one's.
+ */
+export async function checkG3References(state: RunState, target: string): Promise<GateFinding[]> {
+  if (state.contractVersion < 8) return [];
+  const tasksDir = path.join(target, path.relative(ROOT, forState(state).tasksDir()));
+  const taskFiles = (await readdir(tasksDir)).filter(file => file.endsWith('.md') && !file.endsWith('-handoff.md'));
+  const register = state.verification?.references ?? [];
+  const held = new Set(register.map(reference => reference.id));
+
+  const findings: GateFinding[] = [];
+  const citedBy = new Map<string, string[]>();
+  for (const task of state.tasks) {
+    const file = taskFiles.find(entry => entry.startsWith(`${task.id}-`));
+    if (file === undefined) continue;
+    const cell = referencesRow(await readFile(path.join(tasksDir, file), 'utf8'));
+    if (cell === null) {
+      findings.push({ requirementId: task.id,
+        message: `task file for таск ${task.id} has no References row — add \`| References | none |\` or the \`REF-*\` ids it follows, each with its location, after User contract and authority` });
+      continue;
+    }
+    const parsed = parseReferenceEntries(cell);
+    log.debug('references', 'references row read', { task: task.id, none: parsed?.none ?? false, ids: parsed?.entries.map(entry => entry.id) ?? null });
+    if (parsed === null) {
+      findings.push({ requirementId: task.id,
+        message: `task file ${file} References row reads "${cell.slice(0, 60)}" — write \`none\` or each followed reference as \`REF-n\` in backticks followed by its location` });
+      continue;
+    }
+    for (const entry of parsed.entries) {
+      if (entry.location === '') {
+        findings.push({ requirementId: task.id,
+          message: `task file ${file} cites ${entry.id} with no location — write where the executor opens it` });
+      }
+      if (!held.has(entry.id)) {
+        findings.push({ requirementId: task.id,
+          message: `task file ${file} cites ${entry.id}, which the reference register does not hold — cite a REF id from reference.md or remove it` });
+        continue;
+      }
+      citedBy.set(entry.id, [...(citedBy.get(entry.id) ?? []), task.id]);
+    }
+  }
+
+  const required = register.filter(reference => reference.available === true && REQUIRED_ROLES.includes(reference.role));
+  for (const reference of required) {
+    const tasks = citedBy.get(reference.id) ?? [];
+    log.debug('references', 'required reference checked', { ref: reference.id, citedBy: tasks });
+    if (tasks.length > 0) continue;
+    findings.push({ requirementId: '',
+      message: `no таск cites ${reference.id} (${reference.role.replace(/_/g, ' ')}: ${name(reference.location)}) — add it to the References row of each таск that builds what it shows` });
+  }
+  log.info('references', 'references rows checked', { required: required.length, findings: findings.length });
+  return findings;
+}
+
+/**
+ * Both file halves of G3, in one call: `runGate` takes one file check, and the
+ * models and references halves read the same task files for different rows.
+ */
+export async function checkG3Files(state: RunState, target: string): Promise<GateFinding[]> {
+  return [...await checkG3Models(state, target), ...await checkG3References(state, target)];
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exit(await runGate('check-g3', checkG3, targetFromArgv(), checkG3Models));
+  process.exit(await runGate('check-g3', checkG3, targetFromArgv(), checkG3Files));
 }

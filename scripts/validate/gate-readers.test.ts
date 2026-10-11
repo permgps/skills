@@ -12,6 +12,8 @@ import {
   checkGateReaders,
   checkModelTiers,
   JUDGE_BRIEFS,
+  REFERENCE_DENIED,
+  REFERENCE_INPUT,
   declaredInputs,
   normalizeName,
   PRIOR_MEMORY_INPUT,
@@ -402,6 +404,8 @@ const EXECUTOR = `# Executor
 You have been given a task file, \`interfaces.md\`, and \`codebase.md\` when the
 прогон has one.
 
+You have not seen \`spec.md\`, \`reference.md\`, or the other таски.
+
 ## Your Job
 
 Build it.
@@ -411,7 +415,7 @@ const REVIEWER = `# Reviewer
 
 You are given the task file and the diff.
 
-You have not seen \`spec.md\`, the plan, \`codebase.md\`, or any other таск.
+You have not seen \`spec.md\`, the plan, \`codebase.md\`, \`reference.md\`, or any other таск.
 
 ## Your Question
 
@@ -491,6 +495,20 @@ test('a reviewer brief whose "You have not seen" paragraph does not name codebas
   assert.deepEqual(checks(violations), ['codebase-briefs']);
   assert.match(violations[0]!.file, /reviewer\.md$/);
 });
+
+test('reference.md is withheld from exactly the executor and the reviewer', () => {
+  assert.equal(REFERENCE_INPUT, 'reference.md');
+  assert.deepEqual([...REFERENCE_DENIED], ['executor.md', 'reviewer.md']);
+});
+
+for (const [brief, body] of [['executor.md', EXECUTOR], ['reviewer.md', REVIEWER]] as const) {
+  test(`${brief} dropping reference.md from its "You have not seen" paragraph is reported on that brief`, async () => {
+    const violations = await codebaseFixture({ briefs: { [brief]: body.replace(' \`reference.md\`,', '') } });
+    assert.deepEqual(checks(violations), ['reference-briefs']);
+    assert.ok(violations[0]!.file.endsWith(brief), violations[0]!.file);
+    assert.equal(violations[0]!.message, `name \`reference.md\` among what ${brief} has not seen — a таск follows only the references its task file cites`);
+  });
+}
 
 test('a repair diagnostician brief that mentions codebase.md is reported', async () => {
   const violations = await codebaseFixture({

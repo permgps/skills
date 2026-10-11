@@ -78,6 +78,16 @@ export const CODEBASE_HANDED: readonly string[] = ['executor.md'];
  */
 export const CODEBASE_DENIED: readonly string[] = ['reviewer.md'];
 
+/**
+ * The register of the user's comparables. No таск is handed it whole: the plan
+ * cites each reference a таск follows into its task file's References row, and
+ * the briefs below, which read task files, are denied the register itself.
+ */
+export const REFERENCE_INPUT = 'reference.md';
+
+/** Briefs held to name {@link REFERENCE_INPUT} in what they have not seen. */
+export const REFERENCE_DENIED: readonly string[] = ['executor.md', 'reviewer.md'];
+
 /** The sentence that opens a denied brief's withholding paragraph. */
 const NOT_SEEN = 'You have not seen';
 
@@ -404,6 +414,19 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
     }
   }
   log.info('codebase', 'codebase.md handed only where the list allows', { rows: rows.length, briefs: outside.length });
+
+  // Held on the same paragraph as codebase.md's withholding. A brief named here
+  // that the bundle does not ship is the bundle check's finding, not this one's.
+  for (const name of REFERENCE_DENIED.filter(brief => present.has(brief))) {
+    const briefPath = path.join(promptsDir, name);
+    const withholds = notSeenParagraph(await readFile(briefPath, 'utf8'))?.includes(REFERENCE_INPUT) ?? false;
+    log.debug('reference-briefs', 'brief checked for reference.md', { brief: name, withholds });
+    if (!withholds) {
+      add('reference-briefs', briefPath, 0,
+        `name \`${REFERENCE_INPUT}\` among what ${name} has not seen — a таск follows only the references its task file cites`);
+    }
+  }
+  log.info('reference', 'reference.md withheld from the briefs that read task files', { briefs: REFERENCE_DENIED.length });
 
   violations.push(...await checkModelTiers(specDir, bundleDir));
 

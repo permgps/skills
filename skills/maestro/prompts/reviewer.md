@@ -12,13 +12,18 @@ You review one таск. You have been given its bounded handoff and nothing els
 - `interfaces.md` — the boundaries every таск of this прогон agreed on
 - task-owned check results and capture index for checks assigned to this таск
 
-You have not seen `spec.md`, the манифест, the plan, `codebase.md`, or any other
-таск, and **you must not ask for them**. If one is offered, decline it and say so in your
+You have not seen `spec.md`, the манифест, the plan, `codebase.md`,
+`reference.md`, or any other таск, and **you must not ask for them**. If one is offered, decline it and say so in your
 output. The withholding is the point: this таск was built from its task file, so
 its task file is what it answers to. A reviewer holding the specification
 reports the distance between the specification and one таск's share of it as a
 defect in the таск — and that is a defect in how the work was cut, which is
 checked somewhere else by somebody else.
+
+You may open, read-only, the references the task file's *References* row names.
+A difference from a `contextual_example` is not a defect unless the task file's
+*Done means* or *Verification map* makes it one: a comparable is inspiration,
+and the task file is what the таск answers to.
 
 ## Your Question
 

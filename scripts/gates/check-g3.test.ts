@@ -4,13 +4,25 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { SEAMS_HEADER, checkG3, checkG3Models, parseProducerIds, type GateFinding } from './check-g3.ts';
+import {
+  SEAMS_HEADER,
+  checkG3,
+  checkG3Files,
+  checkG3Models,
+  checkG3References,
+  parseProducerIds,
+  parseReferenceEntries,
+  referencesRow,
+  type GateFinding,
+} from './check-g3.ts';
 import { verifiedState } from '../state/fixtures/verification.ts';
 import {
   CONTRACT_VERSION,
+  type ReferenceRole,
   type RequirementEntry,
   type RunState,
   type TaskEntry,
+  type VerificationReference,
 } from '../state/contract.ts';
 
 function task(id: string, requirementIds: string[]): TaskEntry {
@@ -409,8 +421,12 @@ test('a range too long for any plan is refused before it is expanded', () => {
   assert.equal(parseProducerIds('00000000–99999999'), null);
 });
 
-/** Run the models half with task files written exactly as `files` gives them; `null` writes no file for that таск. */
-async function modelsWithFiles(state: RunState, files: Record<string, string | null>): Promise<GateFinding[]> {
+/** Run a file half of G3 with task files written exactly as `files` gives them; `null` writes no file for that таск. */
+async function modelsWithFiles(
+  state: RunState,
+  files: Record<string, string | null>,
+  check: (state: RunState, target: string) => Promise<GateFinding[]> = checkG3Models,
+): Promise<GateFinding[]> {
   const root = await mkdtemp(path.join(tmpdir(), 'check-g3-files-'));
   try {
     const run = path.join(root, DIR);
@@ -419,7 +435,7 @@ async function modelsWithFiles(state: RunState, files: Record<string, string | n
     for (const [id, body] of Object.entries(files)) {
       if (body !== null) await writeFile(path.join(run, 'tasks', `${id}-work.md`), body);
     }
-    return await checkG3Models(state, root);
+    return await check(state, root);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -442,11 +458,175 @@ test('a таск with no task file is reported as missing its file, not as missi
   assert.match(found[0]!.message, /^no task file for таск 02 in tasks\//);
 });
 
-test('a доводка таск written strong, with its Model row reading strong — доводка, passes', async () => {
+test('a Model row with prose after its tier, «strong — hard: …», passes', async () => {
   const found = await modelsWithFiles(contract8([tiered('01', 1, 'strong'), tiered('02', 2, 'standard'), tiered('03', 3, 'strong')]), {
     '01': '| Model | `strong` — skeleton |\n',
     '02': '| Model | `standard` |\n',
-    '03': '| Model | `strong` — доводка |\n',
+    '03': '| Model | `strong` — hard: the payment callback |\n',
   });
   assert.deepEqual(found, []);
+});
+
+// --- the reference reaches the executor first, from contract 8 -----------------
+
+function reference(id: string, role: ReferenceRole, available: boolean, location: string): VerificationReference {
+  return { id, statement: `${id} as the user named it`, role, location, accessMethod: 'browser',
+    available, revision: 'r1', conditions: [], approvedDeviationIds: [] };
+}
+
+/** A contract-8 plan whose state carries `references` as its register, and nothing else of verification. */
+function withRegister(tasks: TaskEntry[], references: VerificationReference[]): RunState {
+  return { ...contract8(tasks), verification: { references } as unknown as NonNullable<RunState['verification']> };
+}
+
+const refsFor = (state: RunState, files: Record<string, string | null>): Promise<GateFinding[]> =>
+  modelsWithFiles(state, files, checkG3References);
+
+/** A task file carrying only a References row. */
+const cites = (cell: string): string => `| | |\n|---|---|\n| User contract and authority | «…» |\n| References | ${cell} |\n| Model | \`standard\` |\n`;
+
+const HERO = reference('REF-1', 'visual_reference', true, 'https://example.test, 1440 and 390');
+const MENU = reference('REF-2', 'contextual_example', true, 'https://menus.example.test/mega');
+const TWO = [tiered('01', 1, 'strong'), tiered('02', 2, 'standard')];
+
+test('a References cell is read as none, or as each backticked id with the text up to the next id', () => {
+  assert.deepEqual(parseReferenceEntries('none'), { none: true, entries: [] });
+  assert.deepEqual(parseReferenceEntries('`None`'), { none: true, entries: [] });
+  assert.deepEqual(parseReferenceEntries('`REF-8` — visual reference: https://domtut2-old.test, 1440 and 390; `REF-1` — authoritative behavior: old/'), {
+    none: false,
+    entries: [
+      { id: 'REF-8', location: 'visual reference: https://domtut2-old.test, 1440 and 390' },
+      { id: 'REF-1', location: 'authoritative behavior: old/' },
+    ],
+  });
+  assert.equal(parseReferenceEntries('the old site'), null);
+  assert.equal(parseReferenceEntries(''), null);
+});
+
+test('an un-backticked REF id inside a location is prose, never a second citation', () => {
+  assert.deepEqual(parseReferenceEntries('`REF-8` — visual reference: the isolated copy, supersedes REF-3'), {
+    none: false,
+    entries: [{ id: 'REF-8', location: 'visual reference: the isolated copy, supersedes REF-3' }],
+  });
+});
+
+test('the References row is found with a bold or capitalised label, and is null when absent', () => {
+  assert.equal(referencesRow('| **References** | none |\n'), 'none');
+  assert.equal(referencesRow('| references |  `REF-1` — x  |\n'), '`REF-1` — x');
+  assert.equal(referencesRow('| Model | `strong` |\n'), null);
+});
+
+test('every available visual reference and contextual example cited, each with a location, passes', async () => {
+  assert.deepEqual(await refsFor(withRegister(TWO, [HERO, MENU]), {
+    '01': cites('`REF-1` — visual reference: https://example.test, 1440 and 390'),
+    '02': cites('**`REF-2`** — contextual example: https://menus.example.test/mega; `REF-1` — visual reference: https://example.test'),
+  }), []);
+});
+
+test('none passes when the register requires nothing', async () => {
+  assert.deepEqual(await refsFor(withRegister(TWO, []), { '01': cites('none'), '02': cites('`none`') }), []);
+});
+
+test('a task file with no References row is reported on its таск, with the row to add', async () => {
+  const found = await refsFor(withRegister(TWO, []), { '01': cites('none'), '02': '| Model | `standard` |\n' });
+  assert.deepEqual(found, [{ requirementId: '02',
+    message: 'task file for таск 02 has no References row — add `| References | none |` or the `REF-*` ids it follows, each with its location, after User contract and authority' }]);
+});
+
+test('a References row naming references in words is reported, quoting the cell', async () => {
+  const found = await refsFor(withRegister(TWO, []), { '01': cites('none'), '02': cites('the old site, as REF-1 shows it') });
+  assert.deepEqual(found, [{ requirementId: '02',
+    message: 'task file 02-work.md References row reads "the old site, as REF-1 shows it" — write `none` or each followed reference as `REF-n` in backticks followed by its location' }]);
+});
+
+test('a cited id with no location is reported: the executor would not know where to open it', async () => {
+  const found = await refsFor(withRegister(TWO, [HERO]), { '01': cites('`REF-1` —'), '02': cites('none') });
+  assert.deepEqual(found, [{ requirementId: '01',
+    message: 'task file 01-work.md cites REF-1 with no location — write where the executor opens it' }]);
+});
+
+test('an id the register does not hold is reported on the таск that cites it', async () => {
+  const found = await refsFor(withRegister(TWO, [HERO]), {
+    '01': cites('`REF-1` — visual reference: https://example.test'),
+    '02': cites('`REF-9` — visual reference: somewhere'),
+  });
+  assert.deepEqual(found, [{ requirementId: '02',
+    message: 'task file 02-work.md cites REF-9, which the reference register does not hold — cite a REF id from reference.md or remove it' }]);
+});
+
+test('a required reference no таск cites is reported once, with its role and its location', async () => {
+  const found = await refsFor(withRegister(TWO, [HERO, MENU]), {
+    '01': cites('`REF-1` — visual reference: https://example.test'),
+    '02': cites('none'),
+  });
+  assert.deepEqual(found, [{ requirementId: '',
+    message: 'no таск cites REF-2 (contextual example: https://menus.example.test/mega) — add it to the References row of each таск that builds what it shows' }]);
+});
+
+test('authoritative, other and unavailable references may stay uncited, and citing one is allowed', async () => {
+  const register = [
+    reference('REF-1', 'authoritative_behavior', true, 'old/'),
+    reference('REF-2', 'other', true, 'import.md'),
+    reference('REF-3', 'visual_reference', false, 'https://gone.test'),
+    reference('REF-4', 'contextual_example', false, 'a screenshot nobody found'),
+  ];
+  assert.deepEqual(await refsFor(withRegister(TWO, register), { '01': cites('none'), '02': cites('none') }), []);
+  assert.deepEqual(await refsFor(withRegister(TWO, register), {
+    '01': cites('`REF-1` — authoritative behavior: old/'),
+    '02': cites('`REF-3` — visual reference, unavailable: https://gone.test'),
+  }), []);
+});
+
+test('a contract-7 plan is skipped: it reads no task file and finds nothing', async () => {
+  const state = { ...withRegister(TWO, [HERO]), contractVersion: 7 };
+  assert.deepEqual(await checkG3References(state, '/definitely/absent'), []);
+});
+
+test('a таск with no task file is left to the models half, not reported twice', async () => {
+  assert.deepEqual(await refsFor(withRegister(TWO, []), { '01': cites('none'), '02': null }), []);
+});
+
+/** The register of the domtut прогон of 2026-10-01: REF-3 and REF-7 superseded by REF-8, REF-5 never found. */
+const DOMTUT_REGISTER = [
+  reference('REF-1', 'authoritative_behavior', true, 'old/ (resources/themes/real_estate, cabinet, data/app.min.phar)'),
+  reference('REF-2', 'authoritative_behavior', true, 'mysql://127.0.0.1:3307/domtut_old'),
+  reference('REF-3', 'visual_reference', false, 'https://domtut2-old.test'),
+  reference('REF-4', 'other', true, 'import.md (part I)'),
+  reference('REF-5', 'visual_reference', false, 'owner screenshot of the new-build mega menu (not located in the repository)'),
+  reference('REF-6', 'authoritative_behavior', true, 'https://developer.help.paycom.uz (Paycom Merchant API)'),
+  reference('REF-7', 'visual_reference', false, 'https://domtut2-old.test served from an isolated copy outside old/'),
+  reference('REF-8', 'visual_reference', true, 'https://domtut2-old.test served from an isolated copy outside old/ (own cache/tmp)'),
+];
+
+test('in the domtut register only REF-8 must be cited: REF-5 is a visual reference nobody can open', async () => {
+  const state = withRegister(TWO, DOMTUT_REGISTER);
+  assert.deepEqual(await refsFor(state, {
+    '01': cites('`REF-8` — visual reference: https://domtut2-old.test, 1440 and 390; `REF-1` — authoritative behavior: old/'),
+    '02': cites('none'),
+  }), []);
+  const uncited = await refsFor(state, { '01': cites('`REF-1` — authoritative behavior: old/'), '02': cites('none') });
+  assert.deepEqual(uncited.map(item => item.message), [
+    'no таск cites REF-8 (visual reference: https://domtut2-old.test served from an isolated copy outsid) — add it to the References row of each таск that builds what it shows',
+  ]);
+});
+
+test('findings come in task order, then in register order', async () => {
+  const found = await refsFor(withRegister(TWO, [HERO, MENU]), {
+    '01': cites('`REF-7` — nowhere'),
+    '02': '| Model | `standard` |\n',
+  });
+  assert.deepEqual(found.map(item => item.message.slice(0, 26)), [
+    'task file 01-work.md cites',
+    'task file for таск 02 has ',
+    'no таск cites REF-1 (visua',
+    'no таск cites REF-2 (conte',
+  ]);
+});
+
+test('checkG3Files is the models half followed by the references half', async () => {
+  const found = await modelsWithFiles(withRegister([tiered('01', 1, 'standard'), tiered('02', 2, 'standard')], [HERO]), {
+    '01': '| Model | `standard` |\n| References | none |\n',
+    '02': '| Model | `standard` |\n| References | none |\n',
+  }, checkG3Files);
+  assert.deepEqual(found.map(item => item.message.slice(0, 22)), ['mark таск 01 `strong`:', 'no таск cites REF-1 (v']);
 });

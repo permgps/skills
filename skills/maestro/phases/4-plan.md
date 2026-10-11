@@ -218,7 +218,8 @@ Each file carries:
 | Id and title | `NN` and one line saying what will exist when it is done |
 | Требования | the ids it serves, so the review and G3 can both find them |
 | What to build | the relevant part of the spec, restated in full — not a pointer to it |
-| User contract and authority | exact redacted request/addition quotations with their SRC/CL IDs and source digest; neutral raw reference locations and conditions, and approved deviations; no unrelated spec or rationale |
+| User contract and authority | exact redacted request/addition quotations with their SRC/CL IDs and source digest, and approved deviations; no unrelated spec or rationale |
+| References | each `REF-*` id this таск follows, in backticks, then its role and location: `` `REF-8` — visual reference: https://domtut2-old.test, 1440 and 390 ``; or `none` |
 | Verification map | obligation/check IDs, observable behavior, implementation owner if needed, execution owner, integration prerequisites, and applicable variants |
 | Boundaries | which files this таск owns, and which signatures from `interfaces.md` it must meet |
 | Test surface | the signatures from `interfaces.md` this таск's tests go through — never an internal module |
@@ -228,6 +229,17 @@ Each file carries:
 | Prerequisites | each thing this таск consumes, named with the таск that produces it and its row in the Seams table of `interfaces.md` |
 | Forbidden writes | always `.maestro/`, plus every zone another таск owns |
 | Completion artifacts | what must exist when the таск is done; every one lies inside the files this таск owns |
+
+**The References row is how a comparable reaches the таск.** Cite in it, by its
+`REF-*` id from `reference.md`, each reference whose surface, behaviour or look
+this таск builds, with its role and the location the executor opens. Every
+available `visual_reference` and `contextual_example` is cited by at least one
+таск, and G3 refuses a plan where one is not. Write `none` when the таск follows
+no reference. Never paste the whole register into a task file: the executor
+never sees `reference.md`, and a row is what it opens. When one reference
+supersedes another, cite the superseding id — a superseded id still cited sends
+the executor to the look the user replaced. G3 holds the row from contract 8; a
+reopened contract-7 run may write it, and nothing checks it there.
 
 First map each live requirement to grounded obligations, then each obligation
 to implementation tasks when code is needed and to required executable checks

@@ -113,7 +113,9 @@ Give each reviewer its task file, that таск's per-commit diffs with the list
 out-of-zone paths, and `interfaces.md` — for a repaired таск also the defect
 under repair with its repair criteria and the residual parent criteria — briefed
 by [`../prompts/reviewer.md`](../prompts/reviewer.md). **Nothing else** — not
-`spec.md`, not the манифест, not another таск's file or diff.
+`spec.md`, not the манифест, not another таск's file or diff. The references a
+таск follows reach its reviewer through the task file's *References* row, opened
+read-only; `reference.md` itself is never handed to a reviewer.
 
 Include the task-owned check result records and capture index for criteria the
 task was assigned to execute. The reviewer checks whether the invocation,

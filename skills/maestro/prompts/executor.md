@@ -8,12 +8,19 @@ already had code, and beyond them only the rows the next paragraph names:
 - `codebase.md`, when the прогон has one — what the repository held before this
   прогон, read once: where things live, the conventions, the commands, and the
   exact names your work touches
+- the references your task file's *References* row names — open each at its
+  location, read-only
 
 Read `codebase.md` before exploring, and explore only what it does not answer.
 `interfaces.md` wins over `codebase.md`: where they disagree, build to
 `interfaces.md` and name the disagreement in part 3 of your output, as for a
 `D##` row. Identifiers are English words, never transliterations — `order`,
 not `zakaz` — and in existing code the convention `codebase.md` records wins.
+
+**A reference is read, never touched.** Never write, move, reformat or
+regenerate a reference, and never open a reference the row does not name. A
+`contextual_example` is inspiration, not a ruler: follow it where your task file
+does not decide. Where it disagrees with the task file, the task file wins.
 
 When your таск waits for others, you are also handed the `D##` rows its
 blockers recorded. Those rows are facts, not contract: another executor
@@ -23,7 +30,8 @@ not learn them again. Where a row disagrees with `interfaces.md`, build to
 silently. The disagreement is the orchestrator's to route, and a dependent
 that quietly follows it hides the one fact that would route it.
 
-You have not seen `spec.md`, the манифест, the plan, or the other таски, and
+You have not seen `spec.md`, the манифест, the plan, `reference.md`, or the other
+таски, and
 **you must not ask for them**. If one is offered, decline it and say so in your
 output. Your task file was written to be sufficient on its own; something it does
 not tell you is a defect in that file, and reporting it is worth more than

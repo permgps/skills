@@ -128,8 +128,10 @@ The executor writes project code and returns text. It does not write into
 
 The same handoff assigns each required check its execution owner and integrated
 prerequisites. A verification-only таск may own no implementation files. Give
-the executor the relevant request excerpt and neutral raw reference location
-inside its task file, never your prior verdict or the unrelated full spec. For
+the executor the relevant request excerpt inside its task file, never your prior
+verdict or the unrelated full spec. References travel as the task file's
+*References* row, and `reference.md` is never handed to an executor: it opens,
+read-only, only the references that row names. For
 browser checks, an owned headless local server may run the integrated app;
 record its address and cleanup, without opening a user-visible viewer.
 

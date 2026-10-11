@@ -9,6 +9,7 @@ import {
   BRIEFING_ANCHORS,
   CUT_ANCHORS,
   DIAGNOSIS_ANCHORS,
+  REFERENCE_ANCHORS,
   REPORT_ANCHORS,
   REVIEW_ANCHORS,
   SIGNAL_ANCHORS,
@@ -1250,6 +1251,27 @@ for (const anchor of MODEL_ANCHORS) {
       assert.ok(flat.includes(anchor.literal), `${anchor.file} carries no "${anchor.literal}"`);
       await writeFile(target, flat.split(anchor.literal).join('removed'), 'utf8');
       const violations = (await checkBundle(copy)).filter(v => v.check === 'models');
+      assert.deepEqual(violations.map(v => v.file), [anchor.file.split('/').join(path.sep)]);
+      assert.ok((violations[0]?.message ?? '').includes(anchor.literal), violations[0]?.message);
+    });
+  });
+}
+
+test('the shipped bundle carries every reference anchor, and the check finds none missing', async () => {
+  assert.equal(REFERENCE_ANCHORS.length, 6);
+  await withShippedCopy(async copy => {
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'references'), []);
+  });
+});
+
+for (const anchor of REFERENCE_ANCHORS) {
+  test(`${anchor.file} losing "${anchor.literal}" is the one references finding, named on that file`, async () => {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, anchor.file);
+      const flat = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal), `${anchor.file} carries no "${anchor.literal}"`);
+      await writeFile(target, flat.split(anchor.literal).join('removed'), 'utf8');
+      const violations = (await checkBundle(copy)).filter(v => v.check === 'references');
       assert.deepEqual(violations.map(v => v.file), [anchor.file.split('/').join(path.sep)]);
       assert.ok((violations[0]?.message ?? '').includes(anchor.literal), violations[0]?.message);
     });

@@ -665,6 +665,31 @@ export const MODEL_ANCHORS: readonly Anchor[] = [
 ];
 
 /**
+ * The literal text that carries «the reference reaches the executor first».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. The plan writes each
+ * таск's References row, G3 reads it by that row's label, and the executor and
+ * the reviewer open what it names and nothing else; each half lives in a
+ * different file, and a comparable that falls out of one reaches nobody. Which
+ * reference a таск follows is the plan's judgement, so no anchor stands for it.
+ */
+export const REFERENCE_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/4-plan.md', literal: '| References | each `REF-*` id this таск follows',
+    why: 'the task-file row G3 reads by its label, and the one way a comparable reaches the executor' },
+  { file: 'phases/4-plan.md',
+    literal: 'Every available `visual_reference` and `contextual_example` is cited by at least one таск, and G3 refuses a plan where one is not',
+    why: 'a comparable nobody cites is a look no executor ever opens' },
+  { file: 'phases/5-build.md', literal: '`reference.md` is never handed to an executor',
+    why: 'the whole register handed over is every look at once, and the таск follows the wrong one' },
+  { file: 'prompts/executor.md', literal: 'Never write, move, reformat or regenerate a reference',
+    why: 'a reference is the user\'s, and an executor that rewrites it erases what G4 measures against' },
+  { file: 'prompts/executor.md', literal: 'A `contextual_example` is inspiration, not a ruler',
+    why: 'an example followed as a ruler overrides the task file it was meant to serve' },
+  { file: 'prompts/reviewer.md', literal: 'A difference from a `contextual_example` is not a defect unless',
+    why: 'a reviewer that measures against an example sends a таск to repair for a look nobody required' },
+];
+
+/**
  * The literal text that carries «the phases record what the retrospective
  * reads».
  *
@@ -1125,6 +1150,12 @@ export async function checkBundle(
   // Only a bundle with a plan phase marks tiers; Scout has none.
   if (byFile.has('phases/4-plan.md')) {
     for (const v of missingAnchors(byFile, MODEL_ANCHORS, 'models')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- the reference reaches the executor first --------------------------------
+  // Only a bundle with a plan phase writes task files; Scout has none.
+  if (byFile.has('phases/4-plan.md')) {
+    for (const v of missingAnchors(byFile, REFERENCE_ANCHORS, 'references')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- the отчёт hands over what only the user can do -------------------------

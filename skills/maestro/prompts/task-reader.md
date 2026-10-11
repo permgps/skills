@@ -12,7 +12,7 @@ executor of this таск will be given when the plan is cut, and nothing else.
 
 | Input | What it is |
 |---|---|
-| the task file | `tasks/NN-<slug>.md` — what to build, the files it owns, its *Depends on*, *Prerequisites*, *Test surface* and *done means* |
+| the task file | `tasks/NN-<slug>.md` — what to build, the files it owns, its *Depends on*, *Prerequisites*, *Test surface*, *References* and *done means* |
 | `interfaces.md` | the boundaries every таск of this прогон shares: Project conventions, the Terms table (with each term's *Name in code*) and the Seams table |
 
 ## What You Are Not Given
