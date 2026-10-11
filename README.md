@@ -623,10 +623,13 @@ state on its own. Offline, no CDN, no fonts, no build step.
 
 ![The dashboard during the build stage](docs/assets/dashboard-running.png)
 
-Progress across the whole прогон, weighted by how long each stage typically takes —
-the build counts six, specification and review two, the rest one.
-Eight cards: brief coverage, the current stage, working time, what is left,
-таски, debt, tests, requirements. And the build itself grouped by wave, so the
+A band at the top says what is happening: the прогон's condition as a word and a
+colour — working, waiting for you, finished or failed — then progress across the
+whole прогон, one sentence about the таски, the таски in flight by title, and the
+eight stages as a strip with their clocks. What is left stands at its right.
+Progress is weighted by how long each stage typically takes — the build counts
+six, specification and review two, the rest one. Six cards follow: brief
+coverage, working time, таски, debt, tests, requirements. And the build itself grouped by wave, so the
 parallelism you paid for is the parallelism you can see — measured from the
 clocks rather than claimed from the plan. Every number is computed from the run
 state when the page draws itself, and «осталось» is a range that refuses to be

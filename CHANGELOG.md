@@ -28,6 +28,17 @@ number that claimed more than that would be claiming it falsely.
   `plan-gate`, `one-way-action`, `repair-limit` — and an optional one-line
   `awaiting.note` says what is awaited, in the прогон's language. All three are
   refused below contract 9, and a contract-8 run keeps running under 8.
+- **The dashboard opens with a band that says what is happening.** It names
+  the прогон's condition as a word and a colour — «Идёт работа», «Ждёт вас»,
+  «Завершён» or «Сбой» — read from `lifecycle`, `outcome`, `interruptedAt`,
+  `awaiting` and `stages[]`. A wait outranks a failed stage, and «Завершён»
+  never claims the work was verified. Under the word are the bar, one sentence
+  about the таски («2 из 6 тасков готовы, ещё 3 в работе»), the таски in work,
+  in review and in repair by title, and the eight stages as a strip with their
+  clocks. The `progress` and `stage` regions are retired into the band, and
+  the `estimate` region moved to its right. `npm run dashboard` holds the four
+  condition words to the new *Run Condition* table in `vocabulary.md`. No
+  contract change.
 - **A wait for the user stops the clocks.** From contract 9 the dashboard cuts
   every closed wait and the open one out of working time, the stage clocks, the
   таск durations, the median and the estimate before the 45-minute ceiling

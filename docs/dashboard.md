@@ -54,7 +54,21 @@ sources and independent returns before passing new gates.
 
 ![The dashboard during the build stage](assets/dashboard-running.png)
 
-The page opens with one bar: how much of the прогон is behind you. It is
+The page opens with a band that says what is happening. On its left, the
+прогон's condition as one word and a colour — «Идёт работа», «Ждёт вас»,
+«Завершён» or «Сбой». Under the word is a bar, one sentence about the таски
+(«2 из 6 тасков готовы, ещё 3 в работе»), and a line naming the таски in work,
+in review and in repair by title, three to a group. Under those is a strip of
+the eight stages, each with its own clock; a skipped one says «Пропущен» where
+its clock would be. On the band's right is «Осталось».
+
+The colour is never the only signal: the word says the same thing. «Ждёт вас»
+outranks a failed stage, because either way the next move is yours. «Завершён»
+says the прогон closed and nothing more — whether the work was verified is the
+notice under the band. A chat that died mid-stage still reads «Идёт работа»,
+because the page cannot tell it from a busy one; the silence notice says so.
+
+The bar is how much of the прогон is behind you. It is
 weighted by how long each stage takes rather than counting stages equally, and
 inside разработки it is subdivided by **how far the таски have got** — so it
 creeps with the work instead of standing still for an hour and then jumping.
@@ -69,10 +83,9 @@ cannot disagree about the same таск — and it means the bar can fall, which
 should: a таск sent from ревью back to ремонт lost work, and a bar that only
 ever rises would hide exactly that.
 
-Beneath it are eight cards. Four of them answer «где мы» — покрытие брифа, этап
-сейчас, прошло времени, осталось — and four answer «что осталось закрыть» —
-таски, долг, тесты, требования. Every one of those numbers is computed from the
-run state at render time; none is stored.
+Beneath the band are six cards: покрытие брифа, прошло времени, таски, долг,
+тесты, требования. Every one of those numbers is computed from the run state at
+render time; none is stored.
 
 **Осталось is a range and refuses to be sharper.** It is the median of finished
 таски measured along the remaining critical path, and below two finished таски
@@ -84,8 +97,9 @@ segment, for the work in flight. Before that, the card read «0 / 6» above a ba
 filled to 38% and the words «38% готово» — three numbers about one thing, two of
 them disagreeing.
 
-The stage timeline is the run: eight stages in order, the current one marked,
-each with the one-phrase note the phase left and its own duration.
+The stage timeline is the run in full: eight stages in order, the current one
+marked, each with the one-phrase note the phase left, its own duration, and the
+findings of a check that failed after it. The strip in the band is its summary.
 Every visible word comes from `docs/spec/vocabulary.md` — the state stores ids
 and the page resolves them at render time, so a wording change never requires a
 state migration. Those words are Russian, because the interface is: the
@@ -315,7 +329,7 @@ explanation is built by calling the same functions the region draws itself with,
 so it cannot tell you a story the number above it disagrees with.
 
 **In which words depends on how you answered the first question of the project.**
-If you chose *по-простому*, every one of the twenty-three explanations — fifteen
+If you chose *по-простому*, every one of the twenty-two explanations — fourteen
 regions and eight стадии — is written for someone who has never built software:
 «Осталось» stops saying *медиана* and says *серединное время*, the block called
 «Гейты» opens with what the four checks actually are, and Ревью says a субагент
