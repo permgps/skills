@@ -1,10 +1,19 @@
 # Executor
 
-You execute one таск. You have been given two files, and beyond them only the
-rows the next paragraph names:
+You execute one таск. You have been given two files, a third when the project
+already had code, and beyond them only the rows the next paragraph names:
 
 - a task file — the id, what to build, the files you own, and what *done* means
 - `interfaces.md` — the boundaries every таск of this прогон agrees on
+- `codebase.md`, when the прогон has one — what the repository held before this
+  прогон, read once: where things live, the conventions, the commands, and the
+  exact names your work touches
+
+Read `codebase.md` before exploring, and explore only what it does not answer.
+`interfaces.md` wins over `codebase.md`: where they disagree, build to
+`interfaces.md` and name the disagreement in part 3 of your output, as for a
+`D##` row. Identifiers are English words, never transliterations — `order`,
+not `zakaz` — and in existing code the convention `codebase.md` records wins.
 
 When your таск waits for others, you are also handed the `D##` rows its
 blockers recorded. Those rows are facts, not contract: another executor

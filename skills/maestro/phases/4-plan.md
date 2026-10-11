@@ -32,6 +32,10 @@ Read `.maestro/<dir>/prior.md` as well, when preflight wrote one. The Terms
 table of `interfaces.md` takes words from its project glossary and its memory
 block, and it decides nothing else here.
 
+Read `.maestro/<dir>/codebase.md` too, when the прогон has one. It is what the
+repository held before this прогон, as the existing-code reader returned it.
+Signatures in `interfaces.md` take the names it records.
+
 ### 2. Size the work
 
 | Project size | Signal | Таски | Wave width |
@@ -102,8 +106,9 @@ contexts and three reviews to build what one executor finishes in one pass.
 
 ### 3. Write `interfaces.md`
 
-The boundaries **you derived from the spec**: module names, function and endpoint
-signatures, data shapes, and which таск owns which files. This is how two таски
+The boundaries **you derived from the spec**, named after the code where the
+code already has the thing: module names, function and endpoint signatures,
+data shapes, and which таск owns which files. This is how two таски
 running at the same time agree without talking to each other.
 
 - Written once, by this phase. **Never appended to later.**
@@ -124,8 +129,9 @@ running at the same time agree without talking to each other.
   | Prior art | |
 
   *Prior art* names one existing test file an executor can copy the shape of.
-  Take the values from the repository as it is — its manifests, scripts and CI
-  configuration, and the documented start and test commands preflight's
+  Take the values from `codebase.md`'s *Commands* and *Conventions in use*
+  when it exists, and otherwise from the repository as it is — its manifests,
+  scripts and CI configuration, and the documented start and test commands preflight's
   readiness entry already read. A row with nothing to name says `none — <why>`;
   in a new project, prior art reads `none yet — таск NN writes the first`.
   Task files cite this section and never restate a command: a task file whose
@@ -135,12 +141,19 @@ running at the same time agree without talking to each other.
 - After the conventions, it carries a **Terms** table, one row per domain word
   that more than one task file uses, or that the user said:
 
-  | Term | Meaning | Words to avoid | User's wording |
-  |---|---|---|---|
+  | Term | Meaning | Name in code | Words to avoid | User's wording |
+  |---|---|---|---|---|
 
   *Meaning* says what the word counts, holds or names, in one line an executor
-  can build from. *Words to avoid* lists the near-synonyms that would make two
-  таски name one thing two ways. *User's wording* quotes the original-language
+  can build from. *Name in code* is the exact identifier, or identifiers, the
+  existing code uses for it, taken from `codebase.md` (`Order`,
+  `orders.total_cents`). It is `—` when the term has no counterpart yet; the
+  signature in `interfaces.md` then fixes the new name, in English. When the
+  plan deliberately renames an existing thing, the cell says `renames <old>`
+  and the таск that does it is named in the Seams table. That is the only way
+  a signature may differ from a name `codebase.md` records. *Words to avoid*
+  lists the near-synonyms that would make two таски name one thing two ways.
+  *User's wording* quotes the original-language
   span from the run state's `verification.sourceClauses` when the term came
   from the user, and `—` when the прогон coined it. This table exists because
   of the incident step 5 tells: a task file used «a running score» and never
@@ -181,12 +194,15 @@ running at the same time agree without talking to each other.
   row is a seam two executors will each guess at. Fewer seam rows are better:
   each row is a contract two executors must both meet. The user never confirms
   a seam, because they cannot judge one.
+- `interfaces.md` stays the authority on names. Where `codebase.md` and a
+  signature here differ without a `renames` row, the plan is wrong.
 
 ### 4. Write the task files
 
 One file per таск at `.maestro/<dir>/tasks/NN-<slug>.md`, numbered in dependency
-order. **An executor is given its task file and `interfaces.md`, and nothing
-else** — it does not get `spec.md`. A dependent таск is also handed its
+order. **An executor is given its task file and `interfaces.md`, and, when the
+прогон has one, `codebase.md`, and nothing else** — it does not get `spec.md`.
+A dependent таск is also handed its
 blockers' `D##` rows, which step 5 says it must never need. Anything from the spec the таск needs must
 therefore be *in* the task file.
 
@@ -266,6 +282,10 @@ record, and those do not exist yet. So a task file is buildable without the
 `D##` rows: they save an executor a rediscovery, they never fill a gap the task
 file left.
 
+The task reader is not handed `codebase.md` either, for the same reason: a task
+file is buildable without `codebase.md`. It saves an executor a rediscovery and
+never fills a gap the task file left.
+
 They are independent of each other, so they go out at once and the wave is as
 wide as the host allows.
 
@@ -275,14 +295,17 @@ a finding.** A required rendered criterion with an executable headless path is
 valid. The reader must also see each obligation/check ID and enough raw oracle
 provenance to know what result the task should test.
 
-Then hand **every** task file at once, with `interfaces.md`, to one more fresh
+Then hand **every** task file at once, with `interfaces.md` and, when the
+прогон has one, `codebase.md`, to one more fresh
 subagent briefed by
 [`../prompts/plan-consistency-reader.md`](../prompts/plan-consistency-reader.md).
 It is not given `spec.md` or the манифест. It looks between tasks: collisions,
 unowned artifacts or writers, completion artifacts outside allowed writes,
 prerequisites no upstream task produces, producer/consumer disagreement on a
 route, method, DTO, migration or port, and stale formatter or project-rule
-instructions. Each `CD-N` it returns is a coordination defect, fixed in the
+instructions. A signature or task-file name that contradicts a name
+`codebase.md` records, with no `renames` row, is a `CD-N` too. Each `CD-N` it
+returns is a coordination defect, fixed in the
 task files or `interfaces.md` before dispatch; it never reduces a requirement.
 Log INFO with the verdict and the counts of tasks and findings, and WARN once
 per `CD-N`. The same reader is dispatched again when repair finds a defect

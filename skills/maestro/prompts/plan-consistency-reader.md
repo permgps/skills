@@ -15,7 +15,8 @@ task produces, a route one task serves and another calls by a different name.
 | Input | What it is |
 |---|---|
 | every task file | `tasks/NN-<slug>.md` for every таск of this прогон, each with its Prerequisites, Forbidden writes and Completion artifacts |
-| `interfaces.md` | the shared boundaries, including the Project conventions section (test, typecheck and lint commands, where tests live, prior art), the Terms table (term, meaning, words to avoid, the user's wording) and the Seams table: seam, producer task, consumer tasks, integration owner, integration check |
+| `interfaces.md` | the shared boundaries, including the Project conventions section (test, typecheck and lint commands, where tests live, prior art), the Terms table (term, meaning, name in code, words to avoid, the user's wording) and the Seams table: seam, producer task, consumer tasks, integration owner, integration check |
+| `codebase.md` | what the repository held before this прогон, as the existing-code reader returned it; absent in a project with no code |
 
 ## What You Are Not Given
 
@@ -62,6 +63,10 @@ product:
   test command or project rule in a form the other tasks or `interfaces.md`
   contradict. The Project conventions section of `interfaces.md` is what a
   command is checked against: a task file cites it and never restates it.
+- **A name the code already has, written differently.** A signature in
+  `interfaces.md` or a name in a task file contradicts a name `codebase.md`
+  records, and the Terms row carries no `renames <old>`. Built as written, it
+  would produce a second name for a thing the code already calls something.
 
 Each finding is:
 

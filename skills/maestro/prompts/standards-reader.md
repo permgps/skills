@@ -28,6 +28,7 @@ nobody. You are the one reader who sees it.
 | `interfaces.md` | the boundaries every таск agreed on |
 | `reviews/` | what each таск's reviewer found |
 | `prior.md` | what earlier прогоны decided and remembered |
+| `codebase.md` | what the repository held before this прогон, as another reader read it |
 
 **That is all of it, and you must not ask for more.** If you are offered one of
 these, decline it and say so in your output. Whether each таск did what it was

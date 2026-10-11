@@ -95,8 +95,10 @@ phase spends the answer.
 
 ### 4. Hand each таск over
 
-Give the executor its task file and `interfaces.md`, briefed by
-[`../prompts/executor.md`](../prompts/executor.md). **Nothing else** — not
+Give the executor its task file and `interfaces.md`, and, when the прогон has
+one, `codebase.md`, briefed by [`../prompts/executor.md`](../prompts/executor.md).
+`codebase.md` is what the repository held before this прогон; it saves the executor a
+rediscovery and never overrides `interfaces.md`. **Nothing else** — not
 `spec.md`, not the манифест, not the other task files — with one named
 addition: a таск with blockers is also handed the `D##` rows its blockers
 recorded, taken from `discovered-interfaces.md` by the таск each row names,

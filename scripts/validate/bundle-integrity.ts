@@ -266,7 +266,7 @@ export const MEMORY_ANCHORS: readonly Anchor[] = [
     why: 'the spec reads what earlier runs decided before it settles the same thing' },
   { file: 'phases/3-spec.md', literal: 'contradicts <date> decision, because',
     why: 'a spec entry against an earlier decision is never a silent override' },
-  { file: 'phases/4-plan.md', literal: "| Term | Meaning | Words to avoid | User's wording |",
+  { file: 'phases/4-plan.md', literal: "| Term | Meaning | Name in code | Words to avoid | User's wording |",
     why: 'interfaces.md names each domain word once, so two таски cannot name one thing two ways' },
   { file: 'prompts/task-reader.md', literal: 'Words to avoid',
     why: 'the task reader is what holds a task file to the Terms table' },

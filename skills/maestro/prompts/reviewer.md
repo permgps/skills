@@ -12,8 +12,8 @@ You review one таск. You have been given its bounded handoff and nothing els
 - `interfaces.md` — the boundaries every таск of this прогон agreed on
 - task-owned check results and capture index for checks assigned to this таск
 
-You have not seen `spec.md`, the манифест, the plan, or any other таск, and
-**you must not ask for them**. If one is offered, decline it and say so in your
+You have not seen `spec.md`, the манифест, the plan, `codebase.md`, or any other
+таск, and **you must not ask for them**. If one is offered, decline it and say so in your
 output. The withholding is the point: this таск was built from its task file, so
 its task file is what it answers to. A reviewer holding the specification
 reports the distance between the specification and one таск's share of it as a

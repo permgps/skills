@@ -49,6 +49,45 @@ its source, or unresolved with the exact uncertainty. Include interaction
 entry, sustained state, content/resources, and exit where applicable. For
 non-UI work, use output obligations and proportionate checks.
 
+### 1b. Read the existing code, once
+
+The spec, the plan and every executor will name things the repository already
+has. One fresh reader finds those names before any of them is written down, so
+nothing later guesses a field name, a test command or an ordering rule. Whether
+it runs is decided by the run state's `existingCode`, which preflight recorded,
+and by whether this phase already wrote `codebase.md`:
+
+| `existingCode` | `codebase.md` on disk | What happens |
+|---|---|---|
+| `true` | no | dispatch the existing-code reader once, write its text to `codebase.md`, then write the spec |
+| `true` | yes, a resumed phase | no dispatch; read the file |
+| `false` | — | no reader; the spec is written from the манифест and the answers alone |
+| absent, a run from before the field | — | no reader, as for `false` |
+| `true`, and the reader fails or returns nothing usable | no | no file; record the failure line below, write the spec, and go on |
+
+Dispatch a fresh subagent briefed by
+[`../prompts/existing-code-reader.md`](../prompts/existing-code-reader.md).
+Hand it `manifest.md`, `answers.md` and the absolute project root, and nothing
+else: not `brief.md`, not `prior.md`. Write the text it returns verbatim, after
+redaction (S2), into `.maestro/<dir>/codebase.md`, the way the review phase
+writes reviews. It is written once and never edited. Log INFO `spec`
+`existing code read` with the reader's verdict and the file's line count.
+
+When the reader fails, or returns text without its six sections, write no
+file. Append one line to `debt.assumptions` and publish it, so the user sees a
+decision taken on their behalf. Log WARN `spec` `existing code not read` with
+the reason.
+
+```text
+existing code not read before the spec: <reason> — this прогон named things from the spec alone
+```
+
+No stop follows, and the user is not asked anything here.
+
+**`codebase.md` is what existed before this прогон.** `discovered-interfaces.md`
+is what the build adds. They have different writers and different moments, and
+neither is appended to the other.
+
 ### 2. Apply the depth, and apply it only here
 
 Depth is what decides how far beneath a требование to work. Every other phase
@@ -111,6 +150,15 @@ act on without asking you, and a reviewer can check without guessing.
   closed. The line is part of `spec.md`, so the G2 intent reader sees it.
   `prior.md` itself is withheld from that reader, as from every blind
   reader.
+- **Read `codebase.md` first, when the прогон has one.** An entry whose subject
+  the code already has names it by its exact name in code and says it extends
+  or changes it: "extend the existing `Order`". An entry whose subject is under
+  *No counterpart yet* says it is new. An entry never renames an existing thing
+  silently.
+- **Identifiers are English words, never transliterations:** `order`, not
+  `zakaz`. This holds for every name that travels through the spec, whatever
+  the прогон's language. In existing code, the convention `codebase.md` records
+  wins.
 - Written once. A later change is an **amendment**, and an amendment carries a
   `D##` row naming the demonstrated fact that forced it. A spec edited to match
   what was built is not a spec.
@@ -187,6 +235,7 @@ that reached the run state and not the бриф.
 
 | Artifact | State |
 |---|---|
+| `.maestro/<dir>/codebase.md` | written once, only in a project with code: the existing-code reader's text as it came back |
 | `.maestro/<dir>/spec.md` | written once, English, one entry per `in-spec` требование |
 | `.maestro/state.js` | no требование left `open`; `G2` recorded as passed |
 

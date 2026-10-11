@@ -87,19 +87,23 @@ So the list gets a machine-readable form. `scripts/validate/gate-readers.ts`
 holds every reader's brief to the `Given` and `Withheld` columns below, name for name: a name
 present in one and not the other is a finding that names both places.
 
-One more reader is held here and gates nothing: the standards reader, dispatched
-once after review over the whole прогон. Its output is observations only, and
-its blindness is held the same way as the gate readers'.
+Two more readers are held here and gate nothing. The standards reader is
+dispatched once after review over the whole прогон; its output is observations
+only. The existing-code reader is dispatched once at the start of the spec
+phase, in a project with code; its text becomes `codebase.md`, which only the
+plan-consistency reader among the readers below is given. The blindness of both
+is held the same way as the gate readers'.
 
 | Gate | Reader's brief | Given | Withheld |
 |---|---|---|---|
-| G1 source | `manifest-reader.md` | redacted source snapshots, candidate manifest | coordinator clause inventory, spec.md, answers.md, tasks, prior audit conclusions, `prior.md` |
-| G3 task | `task-reader.md` | the task file, `interfaces.md` | `spec.md`, `manifest.md`, the other task files, `prior.md` |
-| G3 consistency | `plan-consistency-reader.md` | every task file, `interfaces.md` | `spec.md`, `manifest.md`, `prior.md` |
-| G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning, `prior.md` |
-| G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts, `prior.md` |
-| G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, neutral raw reference register and capture identity, the running build | `spec.md`, the plan, the task files, `reviews/`, prior dispositions, the бриф's original text, `prior.md` |
-| standards (no gate) | `standards-reader.md` | every таск's per-commit diffs, the project's documented standards | `spec.md`, `manifest.md`, the task files, `interfaces.md`, `reviews/`, `prior.md` |
+| G1 source | `manifest-reader.md` | redacted source snapshots, candidate manifest | coordinator clause inventory, spec.md, answers.md, tasks, prior audit conclusions, `prior.md`, `codebase.md` |
+| G3 task | `task-reader.md` | the task file, `interfaces.md` | `spec.md`, `manifest.md`, the other task files, `prior.md`, `codebase.md` |
+| G3 consistency | `plan-consistency-reader.md` | every task file, `interfaces.md`, `codebase.md` | `spec.md`, `manifest.md`, `prior.md` |
+| G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning, `prior.md`, `codebase.md` |
+| G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts, `prior.md`, `codebase.md` |
+| G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, neutral raw reference register and capture identity, the running build | `spec.md`, the plan, the task files, `reviews/`, prior dispositions, the бриф's original text, `prior.md`, `codebase.md` |
+| standards (no gate) | `standards-reader.md` | every таск's per-commit diffs, the project's documented standards | `spec.md`, `manifest.md`, the task files, `interfaces.md`, `reviews/`, `prior.md`, `codebase.md` |
+| existing code (no gate) | `existing-code-reader.md` | `manifest.md`, `answers.md`, the repository | `brief.md`, `spec.md`, `prior.md`, `codebase.md` |
 
 The reference reader's first discovery pass is not bounded by the generated
 inventory. The orchestrator then reconciles its findings with all other

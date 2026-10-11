@@ -13,7 +13,7 @@ executor of this таск will be given when the plan is cut, and nothing else.
 | Input | What it is |
 |---|---|
 | the task file | `tasks/NN-<slug>.md` — what to build, the files it owns, its *Depends on*, *Prerequisites*, *Test surface* and *done means* |
-| `interfaces.md` | the boundaries every таск of this прогон shares: Project conventions, the Terms table and the Seams table |
+| `interfaces.md` | the boundaries every таск of this прогон shares: Project conventions, the Terms table (with each term's *Name in code*) and the Seams table |
 
 ## What You Are Not Given
 
@@ -23,6 +23,7 @@ executor of this таск will be given when the plan is cut, and nothing else.
 | `manifest.md` | the numbered requirement list |
 | the other task files | every other таск of this прогон |
 | `prior.md` | what earlier прогоны decided and remembered |
+| `codebase.md` | what the repository held before this прогон; a task file must be buildable without it |
 
 Nor any reasoning that produced the cut, and **you must not ask for any of
 it**. If you are offered one, decline it and say so in your output. The withholding is what makes
@@ -61,7 +62,9 @@ about the project:
   state without saying what it holds, a format without saying its shape.
   `interfaces.md` carries a **Terms** table. A task file that uses a word that
   table lists under *Words to avoid*, or a listed term with a different meaning
-  than its row gives, is this finding too. Quote the word and the row.
+  than its row gives, is this finding too. So is a task file that names a thing
+  other than its row's *Name in code* — the existing code already calls it
+  that. Quote the word and the row.
 - **A name that is not the real name.** The task file quotes an identifier, a
   path or a signature in a form that does not match `interfaces.md`, so building
   it literally would produce something nothing else can call.

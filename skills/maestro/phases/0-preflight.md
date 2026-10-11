@@ -196,6 +196,9 @@ Construct the complete contract-7 candidate in temporary JSON. It carries:
 | `signals` | empty — build, review, acceptance and polish append what a reader asked for or did beyond its brief |
 | `tests` | `null` — no suite has run |
 
+`existingCode` is not seeded here: it is written in step 4b, by the first
+publish after the helper has answered.
+
 Omit optional fields that have no value. In an active run, do not include
 `outcome` or `finishedAt`, even as JSON `null`; do the same for absent stage/task
 timestamps. Only fields explicitly defined as nullable (such as `tests`) use
@@ -267,6 +270,17 @@ announcement as well (step 6). A resumed preflight gets `action: "kept"` and
 no `glossary`, so the line is never appended twice. A `read` or an `absent` state adds
 nothing to say. A link in a map that names a missing file or leads outside the
 project is a `notRead` entry like any other.
+
+**The same JSON line says whether the project already holds code**, as
+`existingCode`: `present`, the `source` that decided it (`git` or `walk`),
+and the `first` qualifying path. The rule lives in the helper, not here.
+Publish `existingCode: <present>` into the state once, right after the read,
+with `--expect` set to the `updatedAt` step 4 published. When the project
+glossary is over its limit, that is the same publish that carries the
+`debt.assumptions` line, never a second one. The spec phase reads the field to
+decide whether to dispatch the existing-code reader. A resumed preflight gets
+`kept` with the same `existingCode`, and publishes it only if the state does
+not already carry the field.
 
 Do not interpret `prior.md` here. Briefing, the spec and the plan read it, at
 the moment they decide something. The memory block and the decisions are S6
@@ -429,7 +443,7 @@ nothing yet to check against the user's words.
 | `.maestro/<dir>/` | `<YYYY-MM-DD>-<slug>--wip`, created with a zero-byte provisional `manifest.md`; no source agreement yet |
 | `.maestro/README.md` | the register, with this run's row in progress — written by the first publish, never by hand |
 | `.maestro/<dir>/prior.md` | the memory block, the project glossary and earlier runs' decisions, written once by `--memory-read` |
-| `.maestro/state.js` | written, `preflight` active |
+| `.maestro/state.js` | written, `preflight` active, `existingCode` recorded |
 | `.maestro/dashboard.html` | copied, mirrored, and opened |
 | `.maestro/sync.mts`, `runtime/`, `index.html` | complete helper copied and index placed when available |
 | the dashboard address | said in the chat, with the tool's folded-pane line beside it |

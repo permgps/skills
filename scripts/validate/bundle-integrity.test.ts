@@ -544,7 +544,7 @@ test('the plan losing the Terms table header is reported on the plan phase', asy
   await withShippedCopy(async copy => {
     const plan = path.join(copy, 'phases', '4-plan.md');
     const body = await readFile(plan, 'utf8');
-    await writeFile(plan, body.replace("| Term | Meaning | Words to avoid | User's wording |", '| Term | Meaning |'), 'utf8');
+    await writeFile(plan, body.replace("| Term | Meaning | Name in code | Words to avoid | User's wording |", '| Term | Meaning |'), 'utf8');
     const violations = (await checkBundle(copy)).filter(v => v.check === 'memory');
     assert.deepEqual(violations.map(v => v.file), [path.join('phases', '4-plan.md')]);
   });

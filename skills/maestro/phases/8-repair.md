@@ -194,8 +194,9 @@ Next action: the attempt the decision allows, or closure as stopped_incomplete.
 
 ### 3. If it is a retry — hand it over again
 
-Give the executor its task file, `interfaces.md`, the failure exactly as it came
-back, and the handoff if there is one, briefed by
+Give the executor its task file, `interfaces.md`, and, when the прогон has one,
+`codebase.md`, the failure exactly as it came back, and the handoff if there is
+one, briefed by
 [`../prompts/executor.md`](../prompts/executor.md). Set the таск to `running`
 and write the state at that transition.
 
