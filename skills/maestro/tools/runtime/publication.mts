@@ -12,6 +12,7 @@ import { validateEvidence } from './state/evidence.mts';
 import { projectState } from './state/projection.mts';
 import { validateStateTransition } from './state/closure.mts';
 import { deriveVerification } from './state/verification.mts';
+import { keepWaits, type KeptWaits } from './state/waits.mts';
 import { atomicText, serializeState } from './state/write.mts';
 import { STATE_FILE, WIP_SUFFIX, parseRunDir, runDirName } from './state/paths.mts';
 import { relocateRunDir, restoreRunDir, type Relocation } from './relocation.mts';
@@ -54,8 +55,8 @@ export async function candidateViolations(candidate: unknown, dir: string,
   options: { evidence?: boolean } = {}): Promise<StateViolation[]> {
   try {
     const errors = [...validateState(candidate), ...languageViolations(candidate)];
-    if (!isRecord(candidate) || ![4, 5, 6, 7, 8].includes(candidate['contractVersion'] as number)) {
-      errors.push({ field: 'contractVersion', message: 'publication requires contract version 4, 5, 6, 7 or 8' });
+    if (!isRecord(candidate) || ![4, 5, 6, 7, 8, 9].includes(candidate['contractVersion'] as number)) {
+      errors.push({ field: 'contractVersion', message: 'publication requires contract version 4, 5, 6, 7, 8 or 9' });
     }
     if (errors.length === 0 && options.evidence !== false) {
       const state = candidate as RunState;
@@ -154,9 +155,26 @@ export async function candidateMode(args: string[], dir: string,
     return { code: 0, result: { status: 'legacy', verificationEstablished: false, notice: projection.notice,
       g4: projection.g4, scopeProgress: projection.scopeProgress, completionSafeguards: 'not-established' } };
   }
+  // Publication keeps the closed waits, so it reads the published state first
+  // and judges the candidate as it will be written. The read-only actions judge
+  // the candidate as written: they read no state.js and apply no wait rule.
+  const target = path.join(dir, 'state.js');
+  let previous: RunState | null = null;
+  let unreadable = false;
+  let waitClosed: KeptWaits['closed'] = null;
+  const refusedWaits: StateViolation[] = [];
+  if (action === '--publish') {
+    try { previous = await readPrevious(target); } catch { unreadable = true; }
+    if (isRecord(candidate) && typeof candidate['contractVersion'] === 'number' && candidate['contractVersion'] >= 9) {
+      const waits = keepWaits(previous, candidate as unknown as RunState);
+      candidate = waits.state;
+      waitClosed = waits.closed;
+      refusedWaits.push(...waits.violations);
+    }
+  }
   // Publication checks evidence only after a relocation, which needs the
   // transition checks first; the read-only actions check it straight away.
-  const errors = await candidateViolations(candidate, dir, { evidence: action !== '--publish' });
+  const errors = [...refusedWaits, ...await candidateViolations(candidate, dir, { evidence: action !== '--publish' })];
   const state = candidate as RunState;
   const summary = errors.length === 0 ? deriveVerification(state) : null;
   const pending = errors.length === 0 && action !== '--publish' ? await pendingRelocation(state, dir) : null;
@@ -171,14 +189,10 @@ export async function candidateMode(args: string[], dir: string,
       outcome: state.outcome ?? null, verificationEstablished: projection.verificationEstablished,
       ...(pending ? { relocationPending: pending } : {}) } };
   }
-  const target = path.join(dir, 'state.js');
-  let previous: RunState | null = null;
-  try {
-    previous = await readPrevious(target);
-    if (previous && previous.contractVersion >= 4 && validateState(previous).length) {
-      errors.push({ field: 'state.js', message: 'existing history is invalid; recover explicitly' });
-    }
-  } catch { errors.push({ field: 'state.js', message: 'existing state cannot be read; recover explicitly' }); }
+  if (unreadable) errors.push({ field: 'state.js', message: 'existing state cannot be read; recover explicitly' });
+  else if (previous && previous.contractVersion >= 4 && validateState(previous).length) {
+    errors.push({ field: 'state.js', message: 'existing history is invalid; recover explicitly' });
+  }
   const expected = option(args, '--expect');
   const holder = option(args, '--holder');
   const succession = errors.length === 0 && previous !== null && succeedsClosedRun(previous, state);
@@ -268,7 +282,14 @@ export async function candidateMode(args: string[], dir: string,
     return { code: 1, result: { status: 'rejected', violations: errors, url } };
   }
   log.info('publish', 'candidate published', { runId: state.runId, revision: state.updatedAt });
+  if (waitClosed) {
+    const facts = { runId: state.runId, by: waitClosed.by, since: waitClosed.since, until: waitClosed.until };
+    // A transition closing the wait means the orchestrator forgot to clear it.
+    if (waitClosed.by === 'transition') log.warn('waits', 'wait closed', facts);
+    else log.info('waits', 'wait closed', facts);
+  }
   return { code: 0, result: { status: 'published', revision: state.updatedAt, path: target, url, projection: summary,
+    ...(waitClosed ? { waitClosed: { by: waitClosed.by, since: waitClosed.since, until: waitClosed.until } } : {}),
     ...(relocation ? { relocated: relocation } : {}), ...(register ? { register } : {}),
     ...(succession && previous ? { succeeded: { runId: previous.runId, kept: path.relative(dir, kept ?? '') } } : {}) } };
 }

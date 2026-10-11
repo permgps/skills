@@ -29,19 +29,20 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], model, retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason?, title? }` | manifest | dashboard |
 | `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
-| `lifecycle` | `active` \| `closed` in contracts 4–8 | preflight | dashboard |
+| `lifecycle` | `active` \| `closed` in contracts 4–9 | preflight | dashboard |
 | `outcome` | `completed` \| `closed_with_exceptions` \| `stopped_incomplete`, only when closed | acceptance | dashboard |
 | `stopReason` | string, required for `stopped_incomplete` | acceptance | dashboard |
-| `verification` | versioned verification index, required in contracts 4–8 | preflight | dashboard |
+| `verification` | versioned verification index, required in contracts 4–9 | preflight | dashboard |
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
 | `oneWay` | optional list of strings, one inward one-way change each | review | acceptance, dashboard |
 | `signals` | optional list of strings, one recorded signal each, appended by build, review and acceptance | preflight | metrics |
 | `existingCode` | optional boolean, whether the project held code at preflight | preflight | spec |
 | `tests` | `{ passed, failed }` | build | dashboard |
-| `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–8 | acceptance | dashboard |
+| `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–9 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
-| `awaiting` | optional `{ kind: 'answer', since }`, set by every stop on a question from the манифест on | manifest | dashboard |
+| `awaiting` | optional `{ kind, since, note? }`, set by every stop on a question from the манифест on; `note` from contract 9 | manifest | dashboard |
+| `waits` | optional list of `{ since, until }`, the closed waits, from contract 9; appended by `sync.mts --publish` when `awaiting` ends, never by the orchestrator | manifest | dashboard |
 
 **`language` is the second such dial, and it is here for the same reason.** The
 dashboard has to paint its labels and its explanations in one of two languages,
@@ -258,6 +259,7 @@ cannot.
 | `verification.strategyReviews[].trigger` | `batch_without_closure`, `same_cause_survived`, `budget_exhausted`, `limit_request` |
 | `verification.strategyReviews[].decision` | `change_strategy`, `stop_incomplete`, `request_limit` |
 | `signals[]` | `withheld-request`, `brief-exceeded`, `out-of-zone-write` |
+| `awaiting.kind` | `answer`, `briefing-round`, `spec-gate`, `plan-gate`, `one-way-action`, `repair-limit` |
 
 **`pending` is a стадия's word and a гейт's, and never a таск's.** The three
 sets sit one under another above and the middle one is the odd column out, which

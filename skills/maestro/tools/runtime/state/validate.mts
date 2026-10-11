@@ -8,6 +8,7 @@
 import { createLogger } from '../shared/log.mts';
 import {
   AWAITING_KINDS,
+  AWAITING_NOTE_MAX,
   CONTRACT_VERSION,
   CLOSURE_OUTCOMES,
   DEPTHS,
@@ -24,6 +25,7 @@ import {
   STAGE_IDS,
   STAGE_STATUSES,
   TASK_STATUSES,
+  isAwaitingNote,
   isMoment,
   type RunState,
 } from './contract.mts';
@@ -251,6 +253,17 @@ export function validateState(value: unknown): StateViolation[] {
     add(field, `${field} arrives with contract 8 — a contract-7 run keeps running on the session's model; remove it`);
   };
   /**
+   * Whether this state promises what contract 9 added: the six kinds, the note
+   * and the closed waits. Below it each is refused rather than ignored, as
+   * `models` is below 8 — a contract-8 прогон keeps today's arithmetic, and a
+   * wait it carried would be subtracted by nothing.
+   */
+  const atLeastV9 = typeof version === 'number' && version >= 9 && version <= CONTRACT_VERSION;
+  const refuseBelowV9 = (field: string): void => {
+    log.debug('version-gate', 'field refused for its contract version', { version, field });
+    add(field, `${field} arrives with contract 9 — a contract-${String(version)} run keeps waiting for an answer only; remove it`);
+  };
+  /**
    * The finish dial was retired in contract 8, so its switch is refused from 8 and stays
    * a required boolean below it: a contract-7 прогон is still valid under its
    * own rules, and nothing reads the value any more.
@@ -299,6 +312,14 @@ export function validateState(value: unknown): StateViolation[] {
     });
   };
 
+  /** A wait's edge as milliseconds, or NaN after reporting why it is no moment. */
+  const waitEdge = (field: string, raw: unknown): number => {
+    if (isMoment(raw)) return Date.parse(String(raw));
+    log.debug('validate', 'wait rejected', { field, found: raw ?? null });
+    add(field, `${field} must be a moment — write ISO 8601 with Z or a ±hh:mm offset`);
+    return Number.NaN;
+  };
+
   requireMoment('startedAt', value['startedAt']);
   requireMoment('updatedAt', value['updatedAt']);
   requireMoment('interruptedAt', value['interruptedAt']);
@@ -341,15 +362,28 @@ export function validateState(value: unknown): StateViolation[] {
       log.debug('validate', 'awaiting rejected', { field: 'awaiting', found: typeof awaiting });
       add('awaiting', "awaiting must be an object — { kind: 'answer', since }");
     } else {
-      if (typeof awaiting['kind'] !== 'string' || !AWAITING_KINDS.includes(awaiting['kind'] as typeof AWAITING_KINDS[number])) {
-        log.debug('validate', 'awaiting rejected', { field: 'awaiting.kind', found: awaiting['kind'] ?? null });
+      const kind = awaiting['kind'];
+      if (typeof kind !== 'string' || !AWAITING_KINDS.includes(kind as typeof AWAITING_KINDS[number])) {
+        log.debug('validate', 'awaiting rejected', { field: 'awaiting.kind', found: kind ?? null });
+        requireOneOf('awaiting.kind', kind, AWAITING_KINDS);
+      } else if (kind !== 'answer' && !atLeastV9) {
+        refuseBelowV9('awaiting.kind');
       }
-      requireOneOf('awaiting.kind', awaiting['kind'], AWAITING_KINDS);
       requireString('awaiting.since', awaiting['since']);
       const since = awaiting['since'];
       if (typeof since === 'string' && since !== '' && !isStamp(since)) {
         log.debug('validate', 'awaiting rejected', { field: 'awaiting.since', found: since });
         add('awaiting.since', `awaiting.since is not a moment: ${JSON.stringify(since)}`);
+      }
+      // The note is published on the page and in every snapshot, so it is held
+      // to one short line: a paragraph would be a second channel for the
+      // question itself, and the question belongs in the chat.
+      const note = awaiting['note'];
+      if (note !== undefined && !atLeastV9) {
+        refuseBelowV9('awaiting.note');
+      } else if (note !== undefined && !isAwaitingNote(note)) {
+        log.debug('validate', 'awaiting rejected', { field: 'awaiting.note', found: typeof note === 'string' ? note.length : typeof note });
+        add('awaiting.note', `awaiting.note must be one non-empty line of at most ${AWAITING_NOTE_MAX} characters — say what is awaited, never a value`);
       }
     }
     if (value['lifecycle'] === 'closed' || typeof value['finishedAt'] === 'string') {
@@ -358,6 +392,43 @@ export function validateState(value: unknown): StateViolation[] {
     } else if (typeof value['interruptedAt'] === 'string') {
       log.debug('validate', 'awaiting on an interrupted run', { field: 'awaiting', found: value['interruptedAt'] });
       add('awaiting', 'a question is not an interruption — a stop on a question writes awaiting and leaves interruptedAt out');
+    }
+  }
+
+  // --- waits[] ---------------------------------------------------------------
+  // The closed waits, kept by sync.mts. Every clock on the page subtracts them,
+  // so each must be a span a reader can measure, and two that overlapped would
+  // subtract the same minutes twice.
+  const waits = value['waits'];
+  if (waits !== undefined && !atLeastV9) {
+    refuseBelowV9('waits');
+  } else if (waits !== undefined && requireArray('waits', waits)) {
+    let lastUntil = Number.NEGATIVE_INFINITY;
+    waits.forEach((entry, index) => {
+      const at = `waits[${index}]`;
+      if (!isRecord(entry)) {
+        log.debug('validate', 'wait rejected', { field: at, found: typeof entry });
+        add(at, `${at} must be an object — { since, until }`);
+        return;
+      }
+      const since = waitEdge(`${at}.since`, entry['since']);
+      const until = waitEdge(`${at}.until`, entry['until']);
+      if (Number.isNaN(since) || Number.isNaN(until)) return;
+      if (until < since) {
+        log.debug('validate', 'wait rejected', { field: `${at}.until`, since: entry['since'], until: entry['until'] });
+        add(`${at}.until`, `${at} ends before it begins — a wait closes at or after its since`);
+        return;
+      }
+      if (since < lastUntil) {
+        log.debug('validate', 'wait rejected', { field: `${at}.since`, since: entry['since'] });
+        add(`${at}.since`, `${at} begins before waits[${index - 1}] ended — waits are kept oldest first and never overlap`);
+      }
+      lastUntil = Math.max(lastUntil, until);
+    });
+    const open = isRecord(awaiting) ? awaiting['since'] : undefined;
+    if (isMoment(open) && Date.parse(String(open)) < lastUntil) {
+      log.debug('validate', 'awaiting rejected', { field: 'awaiting.since', found: open, lastUntil: new Date(lastUntil).toISOString() });
+      add('awaiting.since', 'awaiting.since is before the last closed wait ended — a new question is asked after the previous one was answered');
     }
   }
 

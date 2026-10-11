@@ -23,6 +23,8 @@ export function statusViolations(state: unknown): StatusViolation[] {
   }
   return errors;
 }
+const unspoken = (line: unknown): boolean =>
+  typeof line === 'string' && /[A-Za-z]/.test(line) && !/[\u0400-\u04ff]/.test(line);
 export function languageViolations(state: unknown): StateViolation[] {
   if (!record(state) || state['language'] !== 'ru') return [];
   const errors: StateViolation[] = [];
@@ -32,11 +34,15 @@ export function languageViolations(state: unknown): StateViolation[] {
       if (!record(item)) continue;
       const lines: unknown[] = many && Array.isArray(item[key]) ? item[key] : [item[key]];
       for (const [offset, line] of lines.entries()) {
-        if (typeof line === 'string' && /[A-Za-z]/.test(line) && !/[\u0400-\u04ff]/.test(line)) {
+        if (unspoken(line)) {
           errors.push({ field: `${field}[${index}].${key}${many ? `[${offset}]` : ''}`, message: 'has no Russian in it — this прогон speaks ru' });
         }
       }
     }
+  }
+  // The fourth sentence the panel prints as written: what a stop waits for.
+  if (record(state['awaiting']) && unspoken(state['awaiting']['note'])) {
+    errors.push({ field: 'awaiting.note', message: 'has no Russian in it — this прогон speaks ru' });
   }
   return errors;
 }
@@ -47,18 +53,22 @@ export const FOLDED = {
 export function legacyReports(state: unknown): string[] {
   const messages = statusViolations(state).map(error => `sync: ${error.field} is ${JSON.stringify(error.found)} — the contract allows ${error.allowed.join(', ')}`);
   if (messages.length) messages.push('      The page cannot count a status it cannot name: it shows such an entry as written, and the entry counts towards no progress at all.');
-  const unspoken = languageViolations(state);
-  for (const error of unspoken) messages.push(`sync: ${error.field} ${error.message}`);
-  // Historical refresh quotes only the three public display fields, as before.
-  if (unspoken.length && record(state)) {
-    for (const error of unspoken) {
+  const foreign = languageViolations(state);
+  for (const error of foreign) messages.push(`sync: ${error.field} ${error.message}`);
+  // Historical refresh quotes only the four public display fields, as before.
+  if (foreign.length && record(state)) {
+    for (const error of foreign) {
+      if (error.field === 'awaiting.note') {
+        messages.push('      ' + JSON.stringify(String((state['awaiting'] as Record<string, unknown>)['note']).slice(0, 100)));
+        continue;
+      }
       const match = /^(\w+)\[(\d+)\]\.(\w+)(?:\[(\d+)\])?$/.exec(error.field)!;
       const item = (state[match[1]!] as Record<string, unknown>[])[Number(match[2])];
       const value = item?.[match[3]!];
       const line = match[4] === undefined ? value : (value as unknown[])[Number(match[4])];
       messages.push('      ' + JSON.stringify(String(line).slice(0, 100)));
     }
-    messages.push("      These three fields are the прогон's own sentences on the panel, so they carry the dial's language: gates[].findings, tasks[].title, stages[].note. Every other field stays English, even where the panel quotes it as written.");
+    messages.push("      These four fields are the прогон's own sentences on the panel, so they carry the dial's language: gates[].findings, tasks[].title, stages[].note, awaiting.note. Every other field stays English, even where the panel quotes it as written.");
   }
   return messages;
 }

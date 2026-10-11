@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { validateState, isValidState, type StateViolation } from './validate.ts';
 import { CONTRACT_VERSION, type RunState, type VerificationRecordV3 } from './contract.ts';
-import { activeContract7State, activeContract8State, contract6State, contract7State, contract8State, sourceVerifiedState } from './fixtures/verification.ts';
+import { activeContract7State, activeContract8State, activeContract9State, contract6State, contract7State, contract8State, contract9State, sourceVerifiedState } from './fixtures/verification.ts';
 import { validateStateTransition } from './closure.ts';
 import { prepareLegacyResume } from './projection.ts';
 
@@ -1092,11 +1092,13 @@ test('a dial change to polish is refused from contract 8 and kept below it', () 
   assert.deepEqual(validateState({ ...contract8State(), dialChanges: [{ ...change, dial: 'depth', from: 'normal', to: 'deep' }] }), []);
 });
 
-test('a state without a title or an awaiting reply validates, at contract 3, 7 and 8 alike', () => {
+test('a state without a title, an awaiting reply or a closed wait validates, at contract 3, 7, 8 and 9 alike', () => {
   assert.deepEqual(validateState(baseline()), []);
   assert.deepEqual(validateState(activeContract7State()), []);
   assert.deepEqual(validateState(activeContract8State()), []);
-  assert.equal(CONTRACT_VERSION, 8);
+  assert.deepEqual(validateState(activeContract9State()), []);
+  assert.deepEqual(validateState(contract9State()), []);
+  assert.equal(CONTRACT_VERSION, 9);
 });
 
 test('a requirement title is one line of text, and an empty or non-string one is reported', () => {
@@ -1129,9 +1131,55 @@ test('a closed прогон waits for nobody, so awaiting on it is reported', ()
   assert.ok(fields(validateState(finished)).includes('awaiting'));
 });
 
-test('an awaiting reply names what it waits for, and only an answer is a thing a прогон waits for', () => {
+test('an awaiting reply names what it waits for: an answer below contract 9, any of the six kinds from it', () => {
   assert.deepEqual(fields(validateState(withPatch({ awaiting: { since: '2026-08-19T09:12:00Z' } }))), ['awaiting.kind']);
   assert.deepEqual(fields(validateState(withPatch({ awaiting: { kind: 'deploy', since: '2026-08-19T09:12:00Z' } }))), ['awaiting.kind']);
+  const since = '2026-09-29T09:15:00Z';
+  for (const kind of ['answer', 'briefing-round', 'spec-gate', 'plan-gate', 'one-way-action', 'repair-limit']) {
+    assert.deepEqual(validateState({ ...activeContract9State(), awaiting: { kind, since } }), [], `${kind} at 9`);
+    const eight = validateState({ ...activeContract8State(), awaiting: { kind, since } });
+    assert.deepEqual(fields(eight), kind === 'answer' ? [] : ['awaiting.kind'], `${kind} at 8`);
+    if (kind !== 'answer') assert.match(eight[0]!.message, /arrives with contract 9/);
+  }
+  assert.deepEqual(fields(validateState({ ...activeContract9State(), awaiting: { kind: 'deploy', since } })), ['awaiting.kind']);
+});
+
+test('a note says in one short line what is awaited, and only from contract 9', () => {
+  const since = '2026-09-29T09:15:00Z';
+  const nine = (note: unknown): StateViolation[] => validateState({ ...activeContract9State(), awaiting: { kind: 'spec-gate', since, note } });
+  assert.deepEqual(nine('the spec is in the chat'), []);
+  assert.deepEqual(nine('x'.repeat(160)), []);
+  for (const bad of ['', '   ', 'two\nlines', 'a carriage\rreturn', 'x'.repeat(161), 42]) {
+    assert.deepEqual(fields(nine(bad)), ['awaiting.note'], JSON.stringify(bad));
+  }
+  const eight = validateState({ ...activeContract8State(), awaiting: { kind: 'answer', since, note: 'the spec' } });
+  assert.deepEqual(fields(eight), ['awaiting.note']);
+  assert.match(eight[0]!.message, /arrives with contract 9/);
+});
+
+test('closed waits are moments in order that never overlap, and only from contract 9', () => {
+  const wait = (since: string, until: string): { since: string; until: string } => ({ since, until });
+  const nine = (waits: unknown): StateViolation[] => validateState({ ...activeContract9State(), waits });
+  assert.deepEqual(nine([]), []);
+  assert.deepEqual(nine([wait('2026-09-29T09:11:00Z', '2026-09-29T09:12:00Z'), wait('2026-09-29T09:12:00Z', '2026-09-29T09:14:00Z')]), []);
+  assert.deepEqual(nine([wait('2026-09-29T09:11:00Z', '2026-09-29T09:11:00Z')]), []);
+  assert.deepEqual(fields(nine([wait('after lunch', '2026-09-29T09:12:00Z')])), ['waits[0].since']);
+  assert.deepEqual(fields(nine([{ since: '2026-09-29T09:11:00Z' }])), ['waits[0].until']);
+  assert.deepEqual(fields(nine([wait('2026-09-29T09:12:00Z', '2026-09-29T09:11:00Z')])), ['waits[0].until']);
+  assert.deepEqual(fields(nine([wait('2026-09-29T09:11:00Z', '2026-09-29T09:13:00Z'), wait('2026-09-29T09:12:00Z', '2026-09-29T09:14:00Z')])), ['waits[1].since']);
+  assert.deepEqual(fields(nine([wait('2026-09-29T09:13:00Z', '2026-09-29T09:14:00Z'), wait('2026-09-29T09:11:00Z', '2026-09-29T09:12:00Z')])), ['waits[1].since']);
+  assert.deepEqual(fields(nine('none')), ['waits']);
+  assert.deepEqual(fields(nine(['09:11'])), ['waits[0]']);
+  const eight = validateState({ ...activeContract8State(), waits: [] });
+  assert.deepEqual(fields(eight), ['waits']);
+  assert.match(eight[0]!.message, /arrives with contract 9/);
+});
+
+test('an open wait cannot begin before the last closed one ended', () => {
+  const waits = [{ since: '2026-09-29T09:11:00Z', until: '2026-09-29T09:14:00Z' }];
+  const at = (since: string): StateViolation[] => validateState({ ...activeContract9State(), waits, awaiting: { kind: 'answer', since } });
+  assert.deepEqual(at('2026-09-29T09:14:00Z'), []);
+  assert.deepEqual(fields(at('2026-09-29T09:13:00Z')), ['awaiting.since']);
 });
 
 test('a question is not an interruption, so a state carrying both is reported', () => {

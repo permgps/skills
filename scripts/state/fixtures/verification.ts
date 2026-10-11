@@ -367,3 +367,19 @@ export const contract8State = (): ReturnType<typeof contract6State> => asContrac
 
 /** The contract-8 run while it is still building. */
 export const activeContract8State = (): ReturnType<typeof contract6State> => asContract8(activeContract7State());
+
+/**
+ * Contract 9 is contract 8 with a new number: its additions — `waits`,
+ * `awaiting.note` and five kinds — are optional, so the delivery itself does
+ * not change shape.
+ */
+export function asContract9<T extends RunState>(state: T): T {
+  const eight = state.contractVersion >= 8 ? state : asContract8(state);
+  return { ...eight, contractVersion: 9 };
+}
+
+/** The closed contract-9 delivery. */
+export const contract9State = (): ReturnType<typeof contract6State> => asContract9(contract8State());
+
+/** The contract-9 run while it is still building. */
+export const activeContract9State = (): ReturnType<typeof contract6State> => asContract9(activeContract8State());

@@ -21,6 +21,9 @@
  * against. The dashboard has no handling to add because it never read the field
  * under either name, but it does carry its own copy of this number, and
  * `scripts/validate/state-matches-spec.ts` holds the two together.
+ * Version 9 widens `awaiting.kind` to the six stops on a question and adds
+ * `awaiting.note` and `waits`, the closed waits `sync.mts` keeps. A wider value
+ * set raises the number; it keeps verification 3.
  * Version 8 requires `models` and `tasks[].model`. It keeps verification 3.
  * Version 7 requires `dir`, the run directory named by its start date with a
  * `--wip` suffix exactly while the run is active. It keeps verification 3.
@@ -33,7 +36,7 @@
  * readable without inferred verification; validateState enforces the version
  * boundary rather than narrowing this reader-facing interface.
  */
-export const CONTRACT_VERSION = 8;
+export const CONTRACT_VERSION = 9;
 
 /** The stage ids from docs/spec/phases.md, in run order. */
 export type StageId =
@@ -104,16 +107,42 @@ export interface Holder {
 }
 
 /**
- * The прогон ended its turn on a question at `since`. `kind` names what it
- * waits for; an answer is the only thing a прогон waits for today, and naming
- * it keeps a second kind from arriving as an unvalidated shape.
+ * The прогон ended its turn on a question at `since`. `kind` names which stop
+ * it is: one per stop on a question in `SKILL.md` › Asking A Question, with
+ * `answer` for the dials, манифест and claim questions. Below contract 9 only
+ * `answer` exists, so the wider set is refused there.
  */
-export const AWAITING_KINDS = ['answer'] as const;
+export const AWAITING_KINDS = [
+  'answer', 'briefing-round', 'spec-gate', 'plan-gate', 'one-way-action', 'repair-limit',
+] as const;
 export type AwaitingKind = typeof AWAITING_KINDS[number];
 
 export interface Awaiting {
   kind: AwaitingKind;
   since: string;
+  /**
+   * From contract 9: one line, at most 160 characters, saying what is awaited
+   * — never a value the user is asked to type, because the page and the
+   * snapshots publish it.
+   */
+  note?: string;
+}
+
+/** The longest `awaiting.note` a state may carry. */
+export const AWAITING_NOTE_MAX = 160;
+
+/** One non-empty line of at most {@link AWAITING_NOTE_MAX} characters. */
+export function isAwaitingNote(raw: unknown): raw is string {
+  return typeof raw === 'string' && raw.trim() !== '' && !/[\r\n]/.test(raw) && raw.length <= AWAITING_NOTE_MAX;
+}
+
+/**
+ * A wait that has ended: the прогон asked at `since` and its next write after
+ * the reply came at `until`. The page subtracts it whole from every clock.
+ */
+export interface Wait {
+  since: string;
+  until: string;
 }
 
 export type StageStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
@@ -913,4 +942,10 @@ export interface RunState {
    * a прогон waiting for its reader from one nobody is driving.
    */
   awaiting?: Awaiting;
+  /**
+   * From contract 9: the closed waits, oldest first, never overlapping. Kept by
+   * `sync.mts --publish`, which appends one whenever `awaiting` ends; the
+   * orchestrator carries the list as it read it and never writes it.
+   */
+  waits?: Wait[];
 }

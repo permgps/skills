@@ -18,12 +18,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { request as httpRequest } from 'node:http';
 import { mkdtemp, mkdir, writeFile, copyFile, readFile, rm, unlink, cp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, sha256, planningOwnershipState, correctedSourceAuditState, deferredScopeState, sourceVerifiedState, controlledState, verifiedState, contract6State, activeContract6State } from '../state/fixtures/verification.ts';
+import { CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, sha256, planningOwnershipState, correctedSourceAuditState, deferredScopeState, sourceVerifiedState, controlledState, verifiedState, contract6State, activeContract6State, activeContract9State, contract9State } from '../state/fixtures/verification.ts';
+import type { RunState } from '../state/contract.ts';
 import { prepareLegacyResume } from '../state/projection.ts';
 
 const SYNC = 'skills/maestro/tools/sync.mts';
@@ -493,6 +495,23 @@ test('a таск title and a стадия note are held to the same rule as a fi
     assert.equal(done.status, 1, done.out);
     assert.match(done.out, /tasks\[0\]\.title has no Russian in it/);
     assert.match(done.out, /stages\[0\]\.note has no Russian in it/);
+  });
+
+test('a note on what the прогон waits for is held to the same rule, and quoted', async () => {
+    const done = await sync({
+      ...STATE,
+      language: 'ru',
+      awaiting: { kind: 'spec-gate', since: '2026-08-19T11:50:00.000Z', note: 'the spec waits in the chat' },
+    });
+    assert.equal(done.status, 1, done.out);
+    assert.match(done.out, /awaiting\.note has no Russian in it/);
+    assert.match(done.out, /the spec waits in the chat/);
+    const spoken = await sync({
+      ...STATE,
+      language: 'ru',
+      awaiting: { kind: 'spec-gate', since: '2026-08-19T11:50:00.000Z', note: 'спецификация ждёт в чате' },
+    });
+    assert.equal(spoken.status, 0, spoken.out);
   });
 
 test('the record lines the panel quotes in English are left alone', async () => {
@@ -1401,4 +1420,143 @@ test('the copied helper answers --update-check with one JSON line and exit 0, di
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+// What publication keeps of a wait. A contract-9 run lives in its dated folder
+// under `.maestro/`, so these drive the copied helper there rather than through
+// `session()`, whose directory has no project around it.
+
+const WAIT_WIP = '2026-09-29-synthetic-menu--wip';
+
+interface WaitingProject {
+  maestro: string;
+  publish(state: RunState, expect?: string, holder?: string): Record<string, unknown> & { code: number };
+  published(): Promise<RunState>;
+  dispose(): Promise<void>;
+}
+
+async function waitingProject(): Promise<WaitingProject> {
+  const root = await mkdtemp(path.join(tmpdir(), 'sync-waits-'));
+  const maestro = path.join(root, '.maestro');
+  await mkdir(maestro);
+  await copyFile(SYNC, path.join(maestro, 'sync.mts'));
+  await cp('skills/maestro/tools/runtime', path.join(maestro, 'runtime'), { recursive: true });
+  await copyFile(PAGE, path.join(maestro, 'dashboard.html'));
+  for (const folder of [WAIT_WIP, '2026-10-05-dev-seeders--wip']) {
+    for (const [relative, body] of Object.entries({ ...CAPTURES, 'manifest.md': SOURCE_MANIFEST })) {
+      await mkdir(path.dirname(path.join(maestro, folder, relative)), { recursive: true });
+      await writeFile(path.join(maestro, folder, relative), body);
+    }
+  }
+  return {
+    maestro,
+    publish(state, expect, holder) {
+      const candidate = path.join(root, 'candidate.json');
+      writeFileSync(candidate, JSON.stringify(state));
+      const done = spawnSync(process.execPath, [path.join(maestro, 'sync.mts'), '--publish', candidate, '--no-open',
+        ...(expect ? ['--expect', expect] : []), ...(holder ? ['--holder', holder] : [])],
+      { encoding: 'utf8', env: { ...process.env, ...SEALED } });
+      return { ...JSON.parse(done.stdout.split('\n')[0] || '{}') as Record<string, unknown>, code: done.status ?? -1, err: done.stderr };
+    },
+    async published() {
+      const source = await readFile(path.join(maestro, 'state.js'), 'utf8');
+      return JSON.parse(source.slice(source.indexOf('=') + 1).trim().replace(/;$/, '')) as RunState;
+    },
+    async dispose() {
+      try {
+        const serve = JSON.parse(await readFile(path.join(maestro, 'serve.json'), 'utf8')) as { pid: number };
+        process.kill(serve.pid, 'SIGTERM');
+      } catch { /* no server was raised */ }
+      await rm(root, { recursive: true, force: true });
+    },
+  };
+}
+
+const ASKED_AT = '2026-09-29T09:20:00Z';
+const REPLIED_AT = '2026-09-29T09:30:00Z';
+
+/** The contract-9 run, built and waiting for an answer since its last write. */
+function asking(): RunState {
+  return { ...activeContract9State(), updatedAt: ASKED_AT, awaiting: { kind: 'answer', since: ASKED_AT } };
+}
+
+/** The write after the reply: restamped, `awaiting` gone, nothing else moved. */
+function replied(): RunState {
+  const state = { ...asking(), updatedAt: REPLIED_AT };
+  delete state.awaiting;
+  return state;
+}
+
+test('a cleared wait is kept by publication, ending at the candidate\'s own stamp', async () => {
+  const target = await waitingProject();
+  try {
+    assert.equal(target.publish(asking()).code, 0);
+    const done = target.publish(replied(), ASKED_AT);
+    assert.equal(done.code, 0, JSON.stringify(done));
+    assert.deepEqual(done['waitClosed'], { by: 'cleared', since: ASKED_AT, until: REPLIED_AT });
+    const state = await target.published();
+    assert.deepEqual(state.waits, [{ since: ASKED_AT, until: REPLIED_AT }]);
+    assert.equal(state.awaiting, undefined);
+  } finally { await target.dispose(); }
+});
+
+test('a stage that moves under an unchanged question closes the forgotten wait and drops awaiting', async () => {
+  const target = await waitingProject();
+  try {
+    assert.equal(target.publish(asking()).code, 0);
+    const moved: RunState = { ...asking(), updatedAt: REPLIED_AT, currentStage: 'review',
+      stages: [{ id: 'build', status: 'done', startedAt: '2026-09-29T09:10:00Z', finishedAt: REPLIED_AT },
+        { id: 'review', status: 'active', startedAt: REPLIED_AT }] };
+    const done = target.publish(moved, ASKED_AT);
+    assert.equal(done.code, 0, JSON.stringify(done));
+    assert.deepEqual(done['waitClosed'], { by: 'transition', since: ASKED_AT, until: REPLIED_AT });
+    assert.match(String(done['err']), /WARN \[sync\.waits\] wait closed/);
+    const state = await target.published();
+    assert.equal(state.awaiting, undefined);
+    assert.deepEqual(state.waits, [{ since: ASKED_AT, until: REPLIED_AT }]);
+  } finally { await target.dispose(); }
+});
+
+test('a candidate whose waits differ from the published list is rejected and nothing is replaced', async () => {
+  const target = await waitingProject();
+  try {
+    assert.equal(target.publish(asking()).code, 0);
+    assert.equal(target.publish(replied(), ASKED_AT).code, 0);
+    const before = await readFile(path.join(target.maestro, 'state.js'), 'utf8');
+    const rewritten: RunState = { ...replied(), updatedAt: '2026-09-29T09:40:00Z',
+      waits: [{ since: ASKED_AT, until: '2026-09-29T09:25:00Z' }] };
+    const done = target.publish(rewritten, REPLIED_AT);
+    assert.equal(done.code, 1, JSON.stringify(done));
+    assert.equal(done['status'], 'rejected');
+    assert.ok((done['violations'] as { field: string }[]).some(item => item.field === 'waits'));
+    assert.equal(await readFile(path.join(target.maestro, 'state.js'), 'utf8'), before);
+  } finally { await target.dispose(); }
+});
+
+test('reopening a closed contract-9 run keeps its waits, and a new run over it starts with none', async () => {
+  const target = await waitingProject();
+  try {
+    const claim = { token: 'q3m7x', since: '2026-09-29T09:00:00Z' };
+    assert.equal(target.publish({ ...asking(), heldBy: claim }, undefined, 'q3m7x').code, 0);
+    assert.equal(target.publish({ ...replied(), heldBy: claim }, ASKED_AT, 'q3m7x').code, 0);
+    const closing: RunState = { ...contract9State(), heldBy: claim, updatedAt: '2026-09-29T09:40:00Z' };
+    const closed = target.publish(closing, REPLIED_AT, 'q3m7x');
+    assert.equal(closed.code, 0, JSON.stringify(closed));
+    assert.deepEqual((await target.published()).waits, [{ since: ASKED_AT, until: REPLIED_AT }]);
+
+    const reopened: RunState = { ...closing, lifecycle: 'active', dir: WAIT_WIP, updatedAt: '2026-09-29T10:00:00Z' };
+    delete reopened.outcome; delete reopened.finishedAt;
+    const opened = target.publish(reopened, closing.updatedAt, 'q3m7x');
+    assert.equal(opened.code, 0, JSON.stringify(opened));
+    assert.deepEqual((await target.published()).waits, [{ since: ASKED_AT, until: REPLIED_AT }]);
+
+    const reclosed = target.publish({ ...closing, updatedAt: '2026-09-29T10:10:00Z' }, reopened.updatedAt, 'q3m7x');
+    assert.equal(reclosed.code, 0, JSON.stringify(reclosed));
+    const next: RunState = { ...activeContract9State(), runId: 'run-dev-seeders-1', slug: 'dev-seeders',
+      startedAt: '2026-10-05T09:00:00Z', updatedAt: '2026-10-05T09:00:00Z', dir: '2026-10-05-dev-seeders--wip',
+      heldBy: { token: 'ab12c', since: '2026-10-05T09:00:00Z' } };
+    const succeeded = target.publish(next, '2026-09-29T10:10:00Z', 'ab12c');
+    assert.equal(succeeded.code, 0, JSON.stringify(succeeded));
+    assert.equal('waits' in (await target.published()), false);
+  } finally { await target.dispose(); }
 });

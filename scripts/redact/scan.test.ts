@@ -112,6 +112,22 @@ test('a binary file containing something secret-shaped is still skipped', async 
   });
 });
 
+test('a credential written into what a stop awaits is found in the published state', async () => {
+  // `awaiting.note` is the one free sentence the прогон writes into state.js
+  // and the page prints; the sweep reads it like every other string there.
+  const state = { contractVersion: 9, awaiting: { kind: 'answer', since: '2026-10-11T10:00:00Z',
+    note: 'paste ANTHROPIC_API_KEY=sk-ant-api03-AAAABBBBCCCCDDDDEEEE into the chat' } };
+  await withTree({
+    '.maestro/2026-10-11-landing--wip/state.js': `globalThis.MAESTRO_STATE = ${JSON.stringify(state, null, 2)};\n`,
+  }, async root => {
+    const summary = await scanDirectory(root);
+    assert.equal(summary.violations.length, 1);
+    assert.equal(summary.violations[0]?.file, path.join('.maestro', '2026-10-11-landing--wip', 'state.js'));
+    assert.match(summary.violations[0]?.message ?? '', /ANTHROPIC_API_KEY/);
+    assert.equal(summary.violations[0]?.message.includes('sk-ant-api03'), false);
+  });
+});
+
 test('ignored directories are not walked', async () => {
   await withTree({
     'brief.md': '# clean\n',

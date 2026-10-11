@@ -35,6 +35,7 @@ import {
   activeControls, controlResult, deriveVerification, effectiveExecution, validateFingerprint,
   validateInputHashes, validateVerificationTransition, type VerificationViolation,
 } from './verification.mts';
+import { validateWaitsTransition } from './waits.mts';
 
 const log = createLogger('state');
 
@@ -678,6 +679,7 @@ export function validateClosureTransition(previous: RunState, next: RunState): V
 
 /** Every rule a write must satisfy against the state it replaces. */
 export function validateStateTransition(previous: RunState, next: RunState): VerificationViolation[] {
-  return [...validateVerificationTransition(previous, next), ...validateClosureTransition(previous, next)];
+  return [...validateVerificationTransition(previous, next), ...validateClosureTransition(previous, next),
+    ...validateWaitsTransition(previous, next)];
 }
 
