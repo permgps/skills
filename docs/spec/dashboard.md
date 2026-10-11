@@ -78,6 +78,11 @@ the lifecycle the page already renders, not by the suffix. The page carries its
 own copy of the `dir` grammar because it imports nothing; the copy is compared
 with the runtime's by `npm run dashboard`.
 
+**The tab says when the прогон waits for you.** While `awaiting` holds a wait
+the page would show — an active run, a `since` that parses — the browser tab's
+title is «● Ждём вас» / «● Waiting for you», so a tab in the background says so;
+otherwise it is the static `Maestro`. This applies at every contract version.
+
 ## The Reader's Own Two Controls
 
 Two switches in the header, and everything true of one is true of the other:
@@ -237,6 +242,22 @@ move, not the run. Without the field the page cannot tell the two apart, which
 is why a stop writes it before it asks. A finished or interrupted run, or an
 `awaiting` whose `since` does not parse, falls back to the ordinary rule above.
 
+The sentence names the stop, one per `awaiting.kind`
+([`state-contract.md`](state-contract.md)), each ending «в чате с <moment>»:
+
+| `kind` | ru | en |
+|---|---|---|
+| `answer` | Ждёт вашего ответа | Waiting for your reply |
+| `briefing-round` | Ждёт ваших ответов на вопросы брифинга | Waiting for your answers to the briefing questions |
+| `spec-gate` | Ждёт вашего одобрения спецификации | Waiting for your approval of the specification |
+| `plan-gate` | Ждёт вашего одобрения плана | Waiting for your approval of the plan |
+| `one-way-action` | Ждёт вашего разрешения на необратимое действие | Waiting for your permission for an irreversible action |
+| `repair-limit` | Попытки исправления исчерпаны: ждёт вашего решения | Repair attempts are spent: waiting for your decision |
+
+A kind the page does not know reads as `answer`. The прогон's `awaiting.note`,
+when it is one non-empty line, follows the moment after « — »; anything else is
+dropped rather than printed as a paragraph.
+
 The notice is worded in the register too. Plain, it says nothing has changed for
 however long; the normal wording names the write, which is a fact about the file
 rather than about the project.
@@ -307,6 +328,18 @@ own `finishedAt` is measured between its own two stamps; only what is still
 running is measured against the run clock. Timing everything against the run
 clock is the cheaper implementation and it makes every finished row report the
 same number, which is the whole run's elapsed time wearing a stage's label.
+
+**Waiting for the user is not work, from contract 9.** The closed `waits` and
+the open `awaiting`, which runs to the reference time, are cut out of every
+span first; each piece left is then measured by the marks-and-ceiling rule
+above. A wait is subtracted whole — a fifty-minute wait is fifty minutes off,
+never capped at 45 — and its edges split the gap it sits in. An open wait
+therefore freezes every clock until the reply is written. The stage clocks,
+the таск durations, the median and the estimate all inherit the rule; the
+calendar span does not, so the run's calendar line appears whenever a wait
+over a minute happened. The ceiling stays for silence that was not a question.
+A state below contract 9 keeps the arithmetic above, open `awaiting` included,
+and the working-time explanation says a wait is not counted only where it is so.
 
 ## Lifecycle
 

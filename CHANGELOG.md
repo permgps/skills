@@ -14,7 +14,34 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
-`CONTRACT_VERSION` moves to `8`.
+`CONTRACT_VERSION` moves to `9`.
+
+- **BREAKING: contract 9 keeps the time a прогон waited for you.** `waits` is
+  a new optional list of closed waits, `{ since, until }`, kept by
+  `sync.mts --publish`: it appends one when `awaiting` is cleared, replaced by a
+  new question, or left open across a stage or таск transition (a forgotten
+  clear, logged as WARN and closed for the orchestrator). Every edge comes from
+  the candidate's own stamps. A candidate may carry `waits` only as it last
+  read it; a rewritten list is refused with field `waits`, and `writeState`
+  refuses a later state that dropped or rewrote a closed wait. `awaiting.kind`
+  widens from `answer` to six stops — `briefing-round`, `spec-gate`,
+  `plan-gate`, `one-way-action`, `repair-limit` — and an optional one-line
+  `awaiting.note` says what is awaited, in the прогон's language. All three are
+  refused below contract 9, and a contract-8 run keeps running under 8.
+- **A wait for the user stops the clocks.** From contract 9 the dashboard cuts
+  every closed wait and the open one out of working time, the stage clocks, the
+  таск durations, the median and the estimate before the 45-minute ceiling
+  measures what is left. A wait is subtracted whole, and an open one freezes
+  the clocks until the reply is written. The working-time explanations say so.
+- **The page and the tab say what the прогон waits for.** The waiting line
+  names the stop — «Ждёт вашего одобрения спецификации в чате с …» — and
+  appends the note. While the прогон waits, the browser tab reads «● Ждём вас» /
+  «● Waiting for you».
+- **Each stop names its kind.** `SKILL.md`, the брифинг, spec, plan and repair
+  phases name the kind their stop writes, preflight seeds contract 9, and one
+  `STOP_ANCHORS` literal per kind holds each file to it.
+
+Earlier in this release `CONTRACT_VERSION` moved to `8`.
 
 - **A bare «да» in Scout's grill takes the recommendations.** Step 3 now words
   every question so that «да» accepts its recommendation; a yes/no question

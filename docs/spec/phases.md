@@ -183,11 +183,12 @@ headings:
 Two reasons that used to sit beside their rules in `SKILL.md` live here now.
 A прогон that stopped is resumed and never restarted because a restart takes a
 run that is three стадии in and charges the user for all three again, over a
-directory that already holds their answers. And a stop writes `awaiting` before
-it asks because a turn that ended on a question and a прогон nobody is driving
-are equally silent: the user cannot tell them apart from outside, and without
-the field neither can the dashboard, which would raise its silence alarm over a
-run that is only waiting for its reader. The dials questions write nothing,
+directory that already holds their answers. And a stop writes `awaiting`, with
+the `kind` that names it, before it asks because a turn that ended on a
+question and a прогон nobody is driving are equally silent: the user cannot tell
+them apart from outside, and without the field neither can the dashboard, which
+would raise its silence alarm over a run that is only waiting for its reader,
+nor say what it waits for, nor stop its clocks. The dials questions write nothing,
 because they come before preflight and no state of this прогон exists yet; a
 gate failing a third time is an interruption rather than a question, and writes
 `interruptedAt` instead — the validator refuses a state carrying both.

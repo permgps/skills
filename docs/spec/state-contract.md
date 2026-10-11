@@ -87,17 +87,55 @@ by the spec phase alone, and `models` by every phase that dispatches a
 silence notice; it now says `dashboard` because that is now true, not to keep the
 column's shape.
 
-**`awaiting` says the прогон ended its turn on a question.** `kind` is
-`answer`, the only thing a прогон waits for, and any other value is rejected;
+**`awaiting` says the прогон ended its turn on a question.** `kind` names
+which stop it is, one per stop in `SKILL.md` › *Asking A Question*:
+
+| `kind` | The stop |
+|---|---|
+| `answer` | the манифест, a claim or stale-state question, and anything else that asks; the dials questions come before any state and write nothing |
+| `briefing-round` | the брифинг block |
+| `spec-gate` | the spec shown for approval in `manual` |
+| `plan-gate` | the plan shown for approval in `manual` |
+| `one-way-action` | an S4 action, from whichever phase meets it |
+| `repair-limit` | the spent repair budget, presented with its remaining options |
+
+Below contract 9 only `answer` exists and every other kind is rejected.
 `since` is the moment that turn ended, `Date.parse`-able like every other
-stamp. It is written in the same write that precedes the stop and is absent on
+stamp. From contract 9 an optional `note` says in one line, at most 160
+characters, what is awaited — «спецификация на 12 разделов», never a value the
+user is asked to type, because the page and every snapshot publish it. It is written in the same write that precedes the stop and is absent on
 the next write after the user replies; a closed прогон never carries it, because a finished run waits
 for nobody, and neither does an interrupted one: a question is not an
 interruption, so a state carrying both `awaiting` and `interruptedAt` is
 rejected. It exists so the page can tell a run waiting for its reader from a
 run nobody is driving — the two are equally silent. It is **optional**, and
 absent means the page applies its ordinary silence rule, exactly as for every
-state written before the field existed. `contractVersion` does not move for it.
+state written before the field existed. `contractVersion` did not move for the
+field; it moved to 9 for the wider value set.
+
+**`waits` is the time the прогон spent waiting, kept by `sync.mts`.** From
+contract 9 each closed wait is `{ since, until }`, oldest first, never
+overlapping, and an open `awaiting.since` is never before the last `until`.
+The orchestrator only sets and clears `awaiting`; `sync.mts --publish` compares
+the published state with the candidate and appends the wait that ended:
+
+- **cleared** — the candidate carries no `awaiting`: the wait closes at
+  `max(since, candidate.updatedAt)`. A closing or interrupting write carries no
+  `awaiting`, so it closes the wait this way;
+- **transition** — the candidate keeps the same `since` while `currentStage`, a
+  стадия's status or a таск's status (matched by id, an entry on one side only
+  counting too) changed: a forgotten clear. The wait closes at
+  `max(since, candidate.updatedAt)` and `awaiting` is dropped from what is
+  published. A requirement or gate change is not a transition;
+- **new question** — the candidate carries another `since`: the old wait closes
+  at `max(since, min(new since, candidate.updatedAt))` and the new one is open.
+
+Every edge comes from the candidate's own stamps, never from a clock. A
+candidate may carry `waits` only as it last read it — absent, the published
+list, or the list publication computes — and anything else is refused with
+field `waits`. A new run starts with none; a reopened run keeps its own. The
+page subtracts every wait whole from its clocks
+([`dashboard.md`](dashboard.md) › *Working Time, Not The Calendar*).
 
 **`requirements[].title` is one English line naming a требование.** The
 manifest phase writes it beside each entry; it is English for the reason every
@@ -363,8 +401,9 @@ from one that was met.
   resumed run passes its next phase boundary. A stop on a question is not one:
   it writes `awaiting` instead. It is what lets the dashboard show
   an interrupted прогон as interrupted rather than as frozen.
-- **Three fields are written in the прогон's language; every other one is
-  English.** `gates[].findings`, `tasks[].title` and `stages[].note` are the
+- **Four fields are written in the прогон's language; every other one is
+  English.** `gates[].findings`, `tasks[].title`, `stages[].note` and
+  `awaiting.note` are the
   прогон's own sentences to the user — the page has labels for everything else
   and no vocabulary at all for a line somebody composed — so these carry
   `language`. The boundary is who is speaking, not whether the page shows the
@@ -497,6 +536,20 @@ Contract 8 also retires доводка:
   доводка runs. A comparable now reaches the executor through the task file's
   *References* row ([`phases.md`](phases.md) › *Plan*).
 
+## Version 9 Extension
+
+Contract 9 keeps verification version 3 and every contract-8 rule, and lets a
+wait for the user stop the clocks:
+
+- **`awaiting.kind`** widens from `answer` to the six stops above.
+- **`awaiting.note`** is an optional single line of at most 160 characters,
+  in the прогон's language, that never holds a value.
+- **`waits`** is the optional list of closed waits that `sync.mts` keeps.
+
+All three are refused below 9, as `models` is below 8: a contract-8 run
+reopened under 8 keeps waiting for an `answer` only, keeps today's
+arithmetic, and is never migrated. A new run writes 9.
+
 ## Versioning
 
 - `contractVersion` starts at `1` and is stored in every state file.
@@ -509,6 +562,14 @@ Contract 8 also retires доводка:
 - The contract is changed in `scripts/state/` before it is changed on either
   side. That is what makes the single integration point real rather than
   aspirational.
+
+**Version 9** widens the value set `awaiting.kind` and adds two optional
+fields, `awaiting.note` and `waits`. The value set is what raises it: a
+contract-8 reader refuses every new kind. The dashboard's
+`KNOWN_CONTRACT_VERSION` moves with it. From 9 the page
+subtracts every wait from its clocks; a contract-8 state keeps today's
+arithmetic, open `awaiting` included. The notice and the tab title apply at
+every version, because neither is arithmetic.
 
 **Version 8** requires two new fields, `models` and `tasks[].model`,
 adds the value set `tasks[].model`, and removes `polish` and its

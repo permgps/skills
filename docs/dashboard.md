@@ -355,6 +355,19 @@ on a question, once the run has a state, the orchestrator writes `awaiting`, and
 «Ждёт вашего ответа в чате с 2026-08-19 21:27» — calm, and never raised however long the
 wait. A state written before the field existed falls back to the ordinary rule.
 
+The line names what the run is waiting for: answers to the брифинг questions,
+approval of the specification or the plan in `manual`, permission for an
+irreversible action, or a decision once the repair attempts are spent — «Ждёт
+вашего одобрения спецификации в чате с …». The run's own one-line note, when it
+wrote one, follows after a dash. While it waits, the browser tab reads «● Ждём
+вас» (or «● Waiting for you»), so a tab in the background tells you too.
+
+From contract 9 the waiting does not count as work. Every clock — the working
+time, each stage, each таск, the median and the estimate — leaves out the time
+the run spent waiting for your reply, so the clocks stand still while it waits
+and pick up when you answer. The calendar time is shown beside the working time
+whenever they differ. A run on an older contract keeps the old arithmetic.
+
 The raised line also names the run's claim — «Метка прогона: k7f2 с 2026-08-19 21:27» —
 the same token a second chat quotes when it finds the run already claimed. The
 page says nothing about whether that holder is alive; it cannot know.

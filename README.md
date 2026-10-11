@@ -654,7 +654,10 @@ What else is on it:
   says how long it has been since the last write and raises the line once the
   silence is longer than any this run has already come through — a session that
   died no longer looks like one that is thinking. A run stopped on your question
-  says it is waiting for your reply instead.
+  says what it is waiting for instead — a reply, approval of the specification
+  or the plan, permission for an irreversible action — and the browser tab
+  reads «● Ждём вас». From contract 9 the clocks stop while it waits: time spent
+  waiting for you is not counted as working time.
 - **Two switches in the header** — theme (light, dark, auto) and language (ru,
   en, auto) — remembered by your browser only. See
   [the two switches](docs/dashboard.md#the-two-switches-in-the-header).
