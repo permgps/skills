@@ -96,8 +96,14 @@ The brief's coverage is a line under G2 in Гейты, and the total of what wai
 you heads «Ваш ход».
 
 **Осталось is a range and refuses to be sharper.** It is the median of finished
-таски measured along the remaining critical path, and below two finished таски
-it says *рано считать* rather than guessing.
+таски measured along the remaining critical path, plus the review and acceptance
+still ahead, and below two finished таски it says *рано считать* rather than
+guessing. Before review or acceptance starts, each is counted as a share of
+development taken from six finished прогоны of August 2026 — few, and with
+their pauses inside, so the range is wide. Once a stage starts, its own clock
+replaces its share. The line beneath says what the range covers: «Критический
+путь: 2 таска в цепочке · с ревью и приёмкой». With every таск done it reads
+«На ревью и приёмку», and with both stages behind, «Осталось закрыть прогон».
 
 The `Таски` card keeps two things apart on purpose: the big figure is the
 count of **accepted** таски, and the squares beneath it show every таск at once
@@ -353,8 +359,9 @@ closes rather than hovering over nothing.
 
 What it says is about **your прогон**, not about dashboards. «Осталось» does not
 explain that it holds an estimate; it says the estimate is 18…31 минуты, that
-the median behind it came from two finished таски, and that the chain it was
-measured along is three таски long. Before there is anything to say, it explains
+the median behind it came from two finished таски, that the chain it was
+measured along is three таски long, and which share of development review and
+acceptance were given and from how many прогоны. Before there is anything to say, it explains
 the empty state instead — which is when you are least able to guess. Each
 explanation is built by calling the same functions the region draws itself with,
 so it cannot tell you a story the number above it disagrees with.

@@ -638,8 +638,8 @@ clocks rather than claimed from the plan. Every таск bar says its status in 
 word; a bar in repair quotes what was sent back, a failed bar names how the last
 repair attempt ended, and a wave that has not started names the таски it waits
 for. Every number is computed from the run
-state when the page draws itself, and «осталось» is a range that refuses to be
-sharper than the таски it was measured from.
+state when the page draws itself, and «осталось» is a range, review and acceptance
+included, that refuses to be sharper than the прогоны it was measured from.
 
 What else is on it:
 

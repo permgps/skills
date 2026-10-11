@@ -61,6 +61,15 @@ number that claimed more than that would be claiming it falsely.
   `vocabulary.md` define and `npm run dashboard` holds the page to. A wave
   that has not started names what it waits for: «Волна 4 · ждёт 04». No
   contract change.
+- **«Осталось» runs to acceptance.** The range adds the review and acceptance
+  stages still ahead, and its caption says so: «… · с ревью и приёмкой». Before
+  a stage starts it counts as a share of the projected development — the lower
+  to the upper quartile of six finished прогоны of August 2026, derived by the
+  new `scripts/metrics/shares.ts` from their recorded stamps and held to the
+  page and to `docs/spec/dashboard.md` by tests and `npm run dashboard`. Once
+  a stage starts, its own clock replaces its share. The estimate no longer goes
+  blank while review and acceptance run, and `measure` prints each прогон's
+  review and acceptance share of development. No contract change.
 - **A wait for the user stops the clocks.** From contract 9 the dashboard cuts
   every closed wait and the open one out of working time, the stage clocks, the
   таск durations, the median and the estimate before the 45-minute ceiling
