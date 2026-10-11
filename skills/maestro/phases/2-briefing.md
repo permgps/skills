@@ -55,7 +55,8 @@ on something you were able to decide.
 
 - **Ask in one numbered block, not one question at a time.** A list is answered
   faster than a conversation, and the user can see how one answer bears on
-  another before committing to either.
+  another before committing to either. The block is a stop on a question whose
+  `awaiting.kind` is `briefing-round` (*Asking A Question* in `SKILL.md`).
 - Number each question with the требование it belongs to and a short gist of
   it — `R03 — способ оплаты` — so an answer arrives attached to something.
 - **Every question carries its options, and one is marked

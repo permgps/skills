@@ -1259,6 +1259,18 @@ test('the executor brief losing its S4 rule is the one stop finding, named on th
   });
 });
 
+test('a phase that lost the kind its stop writes is the one stop finding, named on that phase', async () => {
+  await withShippedCopy(async copy => {
+    const phase = path.join(copy, 'phases', '3-spec.md');
+    const body = await readFile(phase, 'utf8');
+    const dropped = body.replaceAll('`spec-gate`', 'a kind');
+    assert.notEqual(dropped, body);
+    await writeFile(phase, dropped, 'utf8');
+    const found = (await checkBundle(copy)).filter(v => v.check === 'stops');
+    assert.deepEqual(found.map(v => v.file), [path.join('phases', '3-spec.md')]);
+  });
+});
+
 // --- the hand-off is the last line a phase file holds --------------------------
 
 test('no shipped phase file holds text after its hand-off to the next phase', async () => {

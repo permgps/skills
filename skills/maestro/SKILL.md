@@ -365,25 +365,25 @@ Five things every stop owes the reader:
 - **The answer that continues, named, and what continuing does.** «Да» — or
   «yes» — is not an answer until something has said what it starts.
 - **The answer that changes something, visibly available.** A stop exists
-  because something is still open. A question offering only agreement has
-  closed it already and is asking the user to ratify a decision they were not
-  shown making.
+  because something is still open; a question offering only agreement asks
+  the user to ratify a decision they were not shown making.
 - **Their own words, always, beyond whatever you offered.** The options are a
-  shortcut and never the whole set: every one of these stops is a question
-  about their project, and no list you wrote contains everything they might
-  say.
+  shortcut, never the whole set: no list you wrote holds everything they might
+  say about their project.
 - **One option marked as the прогон's choice, with its reason in one clause.**
   How briefing records the reply is in `phases/2-briefing.md`.
 - **A write before the words, once this прогон has a state.** The last write
-  before the question carries `awaiting: { kind: 'answer', since: <now> }`; the
-  first write after the reply drops it, and the closing write never carries it.
+  before the question carries `awaiting: { kind, since: <now>, note }`: `kind`
+  is the one the phase names, `one-way-action` for an S4 action, `answer`
+  otherwise; `note` is one line on what is awaited, never a value. The first
+  write after the reply drops it and the closing write never carries it.
+  `waits` is kept by `sync.mts`: carry it as you read it, never write it.
 
 **`R##` never travels alone.** In anything the user reads, an id carries a short
 gist of its требование: «R03 — оплата картой», never a bare «R03».
 
 **«Не понял» is not an answer.** The stop stays open and the same question comes
-again with the premise it was missing. Switching register is a different thing
-and keeps its own trigger words (*The Dials*).
+again with the premise it was missing; a register switch keeps its own triggers (*The Dials*).
 
 **A turn that is not a question is not a stop.** The прогон ends its turn in
 exactly two places: at one of the stops above, and at the end of the run. Nowhere
@@ -523,10 +523,10 @@ sentence, and never leave a word untranslated because no label existed — if a
 word the user must read has no English twin in `vocabulary.md`, that is a gap in
 the vocabulary and it is filled there.
 
-**The exception is three fields of `state.js`, and it is the panel that makes
-it one.** `gates[].findings`, `tasks[].title` and `stages[].note` are the
-прогон's own sentences to the user, printed on the дашборд word for word, so
-those three carry the dial's language. Every other field stays English, even
+**The exception is four fields of `state.js`, and it is the panel that makes
+it one.** `gates[].findings`, `tasks[].title`, `stages[].note` and
+`awaiting.note` are the прогон's own sentences to the user, printed on the
+дашборд word for word, so those four carry the dial's language. Every other field stays English, even
 where the page shows it as written: `debt` and `oneWay` lines, `additions`,
 `stopReason`, a требование's `title` and the verification record's text are
 record lines the отчёт and the gates read too, and the page quotes them in

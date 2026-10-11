@@ -191,7 +191,7 @@ until it fits — S1 says a требование is removed only by the user.
 | Mode | What happens |
 |---|---|
 | `full`, `semi`, `interview` | the spec is written and the прогон continues |
-| `manual` | the spec is shown and the прогон waits for approval |
+| `manual` | the spec is shown and the прогон waits for approval: a stop on a question whose `awaiting.kind` is `spec-gate` |
 
 `manual` and `interview` differ in exactly two places, and this is one of them.
 If they ever differ anywhere else, one of them is wrong.

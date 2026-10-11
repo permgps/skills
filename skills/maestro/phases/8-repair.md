@@ -226,7 +226,8 @@ failure retain its root ID even if wording or task splits change. A newly
 discovered, unrelated omission gets its own identity, while the overall budget
 still limits the run. Exhaustion records an unresolved failure and presents
 concrete remaining options; it never creates a pass or broad waiver. Presenting
-them is a stop on a question — see *Asking A Question* in `SKILL.md`.
+them is a stop on a question whose `awaiting.kind` is `repair-limit` — see
+*Asking A Question* in `SKILL.md`.
 
 ### 4. If it is a user-authorized scope amendment — write it down
 

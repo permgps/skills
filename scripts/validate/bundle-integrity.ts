@@ -773,6 +773,18 @@ export const STOP_ANCHORS: readonly Anchor[] = [
     why: 'the build promises review will read the working tree; without the branch review stops on the first таск' },
   { file: 'prompts/executor.md', literal: 'Do no irreversible or outward-facing action',
     why: 'S4 binds the orchestrator, and the executor doing real integration work is the one holding the shell' },
+  // Each stop on a question names its kind where it is taken, so the page can
+  // say what the прогон waits for; a stop that lost its kind reads as a plain answer.
+  { file: 'SKILL.md', literal: '`one-way-action`',
+    why: 'an S4 action is asked from any phase, so only the resident file can name its kind' },
+  { file: 'phases/2-briefing.md', literal: '`briefing-round`',
+    why: 'the брифинг block is the stop the page would otherwise call a plain answer' },
+  { file: 'phases/3-spec.md', literal: '`spec-gate`',
+    why: 'a manual прогон waits on the spec, and the page names what it waits for only from this kind' },
+  { file: 'phases/4-plan.md', literal: '`plan-gate`',
+    why: 'a manual прогон waits on the plan, and the page names what it waits for only from this kind' },
+  { file: 'phases/8-repair.md', literal: '`repair-limit`',
+    why: 'a spent repair budget is the one repair stop that asks, and the user must see it is a decision, not a reply' },
 ];
 
 /**

@@ -433,7 +433,7 @@ the share it measures is zero out of zero.
 |---|---|
 | `full` | the plan is written and the прогон continues; the user is notified, not asked |
 | `semi`, `interview` | the plan is written and the прогон continues, interruptible |
-| `manual` | the plan is discussed and the прогон waits for approval |
+| `manual` | the plan is discussed and the прогон waits for approval: a stop on a question whose `awaiting.kind` is `plan-gate` |
 
 `manual` and `interview` differ in exactly two places, and this is the second.
 
