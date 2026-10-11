@@ -483,7 +483,7 @@ instead.
 - **Switch register or language** with the trigger words above, at any time.
 - **Change mode or depth** with their trigger words; it takes effect at
   the next phase boundary.
-- **The dashboard disappeared?** Say so, or run `node .maestro/sync.mts --reopen`
+- **The dashboard disappeared or froze?** Say so, or run `node .maestro/sync.mts --reopen`
   yourself.
 - **Stop.** There is no stop command; tell the run to stop and it closes as
   `stopped_incomplete` with your reason recorded.

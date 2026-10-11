@@ -330,7 +330,12 @@ same number, which is the whole run's elapsed time wearing a stage's label.
   not an empty page.
 - A page that has already shown a state and then loses the file keeps showing
   it and says the clocks stopped. Reporting an unreadable state there would be
-  false: one was read, and it is on the screen.
+  false: one was read, and it is on the screen. The same message then says what
+  to do: if the прогон is still going, ask in the chat to bring the dashboard
+  back, which `--reopen` answers. A frozen page that names its cause and not
+  the next step leaves its reader unable to tell waiting from acting. It names
+  the chat, not an agent: «агент» is the словарь's non-term for «субагент», a
+  word this page already explains.
 - A таск carrying a status the contract does not define is counted in the total,
   shown with its status as written, and worth nothing on the bar. Silently
   dropping it is what let a real прогон put six таски on the screen and chips

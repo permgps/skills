@@ -16,6 +16,12 @@ number that claimed more than that would be claiming it falsely.
 
 `CONTRACT_VERSION` moves to `8`.
 
+- **A frozen dashboard says what to do.** When `state.js` beside the page stops
+  loading, the message named the file and said the clocks stopped, and nothing
+  more. It now adds, in both languages: if the прогон is still going, ask in the
+  chat to bring the dashboard back — the request `--reopen` already answers. It
+  names the chat, not an agent, because «агент» is the словарь's non-term for
+  «субагент», a word the page already explains. No prompt changes.
 - **The прогон says when a newer Maestro is out.** `skills/maestro/SKILL.md`
   carries `metadata.version`, and `npm run bundle` holds it equal to
   `package.json`'s version, so a release bumps both in one commit. Preflight

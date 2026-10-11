@@ -13,7 +13,9 @@ diagnostic for a rejected candidate; this cannot turn a rejected state into a
 success. The snapshot is what lets the page show a
 прогон when it is opened with no address at all, which is what an in-app pane
 does to it; the file is what makes the clocks move. Whichever valid snapshot loaded last wins,
-and a load that fails never replaces a state that worked. It never opens
+and a load that fails never replaces a state that worked. A page that loses the
+file keeps the snapshot on screen, says the clocks stopped, and says what to do:
+if the run is still going, ask in the chat to bring the dashboard back. It never opens
 `manifest.md`, a task file, or any path in the repository — a view that reaches into artifacts becomes a second
 source of truth about a run, and the second one is silently wrong.
 
