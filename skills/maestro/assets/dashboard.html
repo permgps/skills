@@ -2625,10 +2625,16 @@ globalThis.MAESTRO_LOGIC = (function () {
   function repairOutcomeOf(state, id) {
     var record = state.contractVersion >= 4 ? state.verification : null;
     if (!record || !Array.isArray(record.repairAttempts)) return null;
+    // Moments are compared as moments: a stamp may name its zone as `Z` or
+    // `±hh:mm` and may drop its seconds, and neither sorts as text. A tie, or a
+    // stamp that does not read, goes to the later entry — the order repair
+    // wrote them in.
     var latest = null;
+    var latestAt = NaN;
     record.repairAttempts.forEach(function (attempt) {
       if (!attempt || attempt.taskId !== id) return;
-      if (!latest || String(attempt.at) >= String(latest.at)) latest = attempt;
+      var at = Date.parse(attempt.at);
+      if (!latest || !(at < latestAt)) { latest = attempt; latestAt = at; }
     });
     return latest ? { kind: 'repair-outcome', outcome: lineOf(latest.outcome) } : null;
   }

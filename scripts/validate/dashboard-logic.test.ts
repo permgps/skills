@@ -2472,6 +2472,19 @@ test('B8: two attempts at the same moment resolve to the later one in the record
   assert.deepEqual(plain(L.taskReasonOf(state, '01')), { kind: 'repair-outcome', outcome: 'still_failing' });
 });
 
+test('B8: the latest attempt is the latest moment, whatever zone or precision it was written in', () => {
+  const zoned = failedState([
+    v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T14:40:00+05:00', { outcome: 'defect_verified' }),
+    v3Attempt('RA-2', 'F-1', 'DF-1', '2026-09-29T09:50:00Z', { outcome: 'still_failing' }),
+  ]);
+  assert.deepEqual(plain(L.taskReasonOf(zoned, '01')), { kind: 'repair-outcome', outcome: 'still_failing' });
+  const precise = failedState([
+    v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:40:30Z', { outcome: 'still_failing' }),
+    v3Attempt('RA-2', 'F-1', 'DF-1', '2026-09-29T09:40Z', { outcome: 'defect_verified' }),
+  ]);
+  assert.deepEqual(plain(L.taskReasonOf(precise, '01')), { kind: 'repair-outcome', outcome: 'still_failing' });
+});
+
 test('B9: an outcome outside the five is carried as written', () => {
   const state = failedState([v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:20:00Z')]);
   (state.verification!.repairAttempts[0] as unknown as Record<string, unknown>)['outcome'] = 'gave_up';
