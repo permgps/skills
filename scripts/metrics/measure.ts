@@ -80,7 +80,6 @@ export interface Measurement {
   dir: string;
   mode: string;
   depth: string;
-  polish: boolean;
   dialChanges: number;
   /** `null` while the прогон has not finished. */
   totalMs: number | null;
@@ -191,7 +190,6 @@ export function measure(state: RunState): Measurement {
     dir,
     mode: state.mode,
     depth: state.depth,
-    polish: state.polish,
     dialChanges: state.dialChanges.length,
     totalMs: span(state.startedAt, state.finishedAt),
     finished: state.finishedAt !== undefined,
@@ -236,7 +234,7 @@ export function render(m: Measurement): string {
   };
 
   lines.push(`прогон ${m.runId} (${m.dir})`);
-  row('mode / depth', `${m.mode} / ${m.depth}${m.polish ? ' / polish' : ''}`);
+  row('mode / depth', `${m.mode} / ${m.depth}`);
   if (m.dialChanges > 0) row('dial changes', String(m.dialChanges));
   row('total', m.finished ? formatSpan(m.totalMs) : 'not finished');
   if (m.interruptedAt !== null) row('interrupted at', m.interruptedAt);

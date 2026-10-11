@@ -69,7 +69,7 @@ test('hidden grading truth and scenario names stay outside target prompt/host in
     const prepared = await prepareCompletionTarget(scenario);
     try {
       assert.doesNotMatch(prepared.input.prompt, /hidden|grader|suspected|insensitive|volatile|missing limit|readiness|bootstrap|strategy|batch/i);
-      assert.match(prepared.input.prompt, /full strict.*polish disabled/);
+      assert.match(prepared.input.prompt, /full strict/);
       const host = await readFile(path.join(prepared.input.target, 'AGENTS.md'), 'utf8');
       assert.doesNotMatch(host, /limit|detector|restart|menu/i);
       assert.match(host, /not requirements/);

@@ -674,7 +674,10 @@ export type SafeguardedRecord = VerificationRecordV2 | VerificationRecordV3;
 
 export type VerificationRecord = VerificationRecordV1 | VerificationRecordV2 | VerificationRecordV3;
 
-/** Which dial moved, and at which phase boundary it took effect. */
+/**
+ * Which dial moved, and at which phase boundary it took effect. `polish` stays
+ * in the type because a contract-7 state may record it; it is refused from 8.
+ */
 export interface DialChange {
   dial: 'mode' | 'depth' | 'polish';
   from: string;
@@ -843,7 +846,8 @@ export interface RunState {
   updatedAt?: string;
   mode: Mode;
   depth: Depth;
-  polish: boolean;
+  /** Contract 7 and below; refused from 8; read by nothing. */
+  polish?: boolean;
   /**
    * Optional, and absent is not `normal`. Every state written before the
    * register existed lacks it, and a reader that supplied a value on the
@@ -886,7 +890,7 @@ export interface RunState {
   oneWay?: string[];
   /**
    * Recorded signals, one `SIG-<n> <kind> — <subject> — <who>` line apiece,
-   * appended by build, review, acceptance and polish. Absent in a run that began
+   * appended by build, review and acceptance. Absent in a run that began
    * before the field existed.
    */
   signals?: string[];

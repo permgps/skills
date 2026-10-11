@@ -1066,6 +1066,32 @@ test('closing a contract-7 run with the suffix taken off is a lawful write', () 
   assert.ok(!validateStateTransition(prior, next).some(item => ['dir', 'slug', 'runId', 'startedAt', 'contractVersion'].includes(item.field)));
 });
 
+// --- contract 8 retires доводка --------------------------------------------
+
+const messagesOf = (state: unknown): string[] => validateState(state).map(item => `${item.field}: ${item.message}`);
+
+test('a contract-8 state that still carries polish is refused, because the finish dial was retired', () => {
+  const state = { ...contract8State(), polish: false };
+  assert.deepEqual(messagesOf(state), ['polish: polish was retired in contract 8 — remove it']);
+});
+
+test('a contract-7 state keeps polish required', () => {
+  const { polish: _dropped, ...state } = contract7State();
+  assert.deepEqual(messagesOf(state), ['polish: polish must be a boolean']);
+});
+
+test('a contract-7 state with polish true stays valid, and nothing reads the value', () => {
+  assert.deepEqual(validateState({ ...contract7State(), polish: true }), []);
+});
+
+test('a dial change to polish is refused from contract 8 and kept below it', () => {
+  const change = { dial: 'polish', from: 'false', to: 'true', atPhase: 'spec' } as const;
+  assert.deepEqual(validateState({ ...contract7State(), dialChanges: [change] }), []);
+  assert.deepEqual(messagesOf({ ...contract8State(), dialChanges: [change] }),
+    ['dialChanges[0].dial: dialChanges[0].dial must be one of mode, depth — got "polish"']);
+  assert.deepEqual(validateState({ ...contract8State(), dialChanges: [{ ...change, dial: 'depth', from: 'normal', to: 'deep' }] }), []);
+});
+
 test('a state without a title or an awaiting reply validates, at contract 3, 7 and 8 alike', () => {
   assert.deepEqual(validateState(baseline()), []);
   assert.deepEqual(validateState(activeContract7State()), []);

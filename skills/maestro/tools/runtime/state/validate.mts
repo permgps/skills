@@ -207,7 +207,6 @@ export function validateState(value: unknown): StateViolation[] {
   requireString('startedAt', value['startedAt']);
   requireOneOf('mode', value['mode'], MODES);
   requireOneOf('depth', value['depth'], DEPTHS);
-  if (typeof value['polish'] !== 'boolean') add('polish', 'polish must be a boolean');
   // Absent is lawful at every contract version, including this one: the register
   // arrived after 2 was already in use, so a state that predates it is not a
   // state that lost a field.
@@ -251,6 +250,19 @@ export function validateState(value: unknown): StateViolation[] {
     log.debug('version-gate', 'field refused for its contract version', { version, field });
     add(field, `${field} arrives with contract 8 — a contract-7 run keeps running on the session's model; remove it`);
   };
+  /**
+   * Доводка was retired in contract 8, so its switch is refused from 8 and stays
+   * a required boolean below it: a contract-7 прогон is still valid under its
+   * own rules, and nothing reads the value any more.
+   */
+  if (atLeastV8) {
+    if (value['polish'] !== undefined) {
+      log.debug('version-gate', 'retired field refused for its contract version', { version, field: 'polish' });
+      add('polish', 'polish was retired in contract 8 — remove it');
+    }
+  } else if (typeof value['polish'] !== 'boolean') {
+    add('polish', 'polish must be a boolean');
+  }
 
   /**
    * Whether a stamp is a moment, under the rule its contract is read by.
@@ -355,7 +367,8 @@ export function validateState(value: unknown): StateViolation[] {
     dialChanges.forEach((entry, index) => {
       const at = `dialChanges[${index}]`;
       if (!isRecord(entry)) return add(at, `${at} must be an object`);
-      requireOneOf(`${at}.dial`, entry['dial'], ['mode', 'depth', 'polish']);
+      // `polish` left with доводка in contract 8; an older прогон may still record a move of it.
+      requireOneOf(`${at}.dial`, entry['dial'], atLeastV8 ? ['mode', 'depth'] : ['mode', 'depth', 'polish']);
       requireString(`${at}.from`, entry['from']);
       requireString(`${at}.to`, entry['to']);
       requireOneOf(`${at}.atPhase`, entry['atPhase'], STAGE_IDS);

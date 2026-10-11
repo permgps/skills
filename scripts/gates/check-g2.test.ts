@@ -18,7 +18,6 @@ function stateWith(requirements: RequirementEntry[], gates?: GateEntry[]): RunSt
     startedAt: '2026-08-19T09:00:00Z',
     mode: 'semi',
     depth: 'normal',
-    polish: false,
     dialChanges: [],
     stages: [{ id: 'spec', status: 'done' }],
     currentStage: 'plan',

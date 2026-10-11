@@ -20,10 +20,10 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `heldBy` | optional `{ token, since }` | preflight | dashboard |
 | `mode` | `full` \| `semi` \| `interview` \| `manual` | preflight | dashboard |
 | `depth` | `strict` \| `normal` \| `deep` | preflight | dashboard |
-| `polish` | boolean | preflight | dashboard |
+| `polish` | boolean, contract 7 and below; refused from 8 | preflight | nothing |
 | `explain` | `plain` \| `normal` | preflight | dashboard |
 | `language` | `ru` \| `en` | preflight | dashboard |
-| `dialChanges[]` | list of `{ dial, from, to, atPhase }` | preflight | dashboard |
+| `dialChanges[]` | list of `{ dial, from, to, atPhase }`; `dial` is `mode` \| `depth`, and `polish` too below contract 8 | preflight | dashboard |
 | `stages[]` | list of `{ id, status, startedAt?, finishedAt?, note? }` | preflight | dashboard |
 | `currentStage` | stage id | preflight | dashboard |
 | `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], model, retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
@@ -36,7 +36,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
 | `oneWay` | optional list of strings, one inward one-way change each | review | acceptance, dashboard |
-| `signals` | optional list of strings, one recorded signal each, appended by build, review, acceptance and polish | preflight | metrics |
+| `signals` | optional list of strings, one recorded signal each, appended by build, review and acceptance | preflight | metrics |
 | `existingCode` | optional boolean, whether the project held code at preflight | preflight | spec |
 | `tests` | `{ passed, failed }` | build | dashboard |
 | `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–8 | acceptance | dashboard |
@@ -281,14 +281,13 @@ from one that was met.
   at once and reaches the state at the next ordinary write. It is not recorded
   in `dialChanges[]` either: that list says which part of the build was produced
   under which settings, and the register produces no part of the build. This is
-  what keeps `contractVersion` at `2` — `dialChanges[].dial` keeps its three
-  values, and `explain` arrives as an optional field, which raises nothing.
+  what keeps `contractVersion` at `2` — `dialChanges[].dial` keeps the
+  values it had, and `explain` arrives as an optional field, which raises nothing.
 - A стадия is opened by the same write that closes the one before it. For
   consecutive non-`skipped` стадии, `finishedAt` of one is `startedAt` of the
   next, so the стадии account for the whole прогон and no interval belongs to
   none of them. `skipped` стадии are stepped over — they carry a `note` and need
-  no timestamps of their own — and `polish` is outside the stage order and
-  outside the chain. `scripts/state/validate.ts` enforces this as three rules:
+  no timestamps of their own. `scripts/state/validate.ts` enforces this as three rules:
   the two stamps meet, no more than one стадия is `active`, and no стадия is
   left open behind one that has already started. The last of those is the half
   of the write that gets forgotten — the next стадия is opened and the previous
@@ -487,6 +486,15 @@ Both are required from contract 8 and refused below it, as `dir` is below 7: a
 contract-7 run carries neither, runs every таск on the session's model, and is
 never migrated. A tier on a contract-7 state would claim a choice nothing made.
 
+Contract 8 also retires доводка:
+
+- **`polish`** is refused from contract 8, and `polish` leaves the values of
+  `dialChanges[].dial`. Below 8 it stays a required boolean, so every older
+  state remains valid under its own rules, and nothing reads its value. A
+  contract-7 run reopened with `polish: true` keeps the value as written; no
+  доводка runs. A comparable now reaches the executor through the task file's
+  *References* row ([`phases.md`](phases.md) › *Plan*).
+
 ## Versioning
 
 - `contractVersion` starts at `1` and is stored in every state file.
@@ -500,8 +508,9 @@ never migrated. A tier on a contract-7 state would claim a choice nothing made.
   side. That is what makes the single integration point real rather than
   aspirational.
 
-**Version 8** requires two new fields, `models` and `tasks[].model`, and
-adds the value set `tasks[].model`. A required field is what raises it: an
+**Version 8** requires two new fields, `models` and `tasks[].model`,
+adds the value set `tasks[].model`, and removes `polish` and its
+`dialChanges[].dial` value. A required field is what raises it: an
 optional tier would raise nothing, and a прогон that left it out would build
 every таск on one model while the plan said otherwise. The dashboard's
 `KNOWN_CONTRACT_VERSION` moves with it and renders nothing new; a contract-7

@@ -27,7 +27,6 @@ function stateWith(
     startedAt: '2026-08-19T09:00:00Z',
     mode: 'semi',
     depth: 'normal',
-    polish: false,
     dialChanges: [],
     stages: [{ id: 'acceptance', status: 'done' }],
     currentStage: 'acceptance',

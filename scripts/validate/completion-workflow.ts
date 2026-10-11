@@ -169,7 +169,7 @@ export async function prepareCompletionTarget(scenario: Scenario, target?: strin
   const root = target ?? await mkdtemp(path.join(tmpdir(), 'maestro-completion-target-'));
   if (scenario === 'legacy') {
     const prepared = await prepareWorkflowTarget('broken', root);
-    return { input: { target: root, prompt: prepared.request + '\nUse full strict mode with polish disabled.', turns: [] },
+    return { input: { target: root, prompt: prepared.request + '\nUse full strict mode.', turns: [] },
       protectedDigests: { ...await bundleDigests(root),
         'request.txt': digest(await readFile(path.join(root, 'request.txt'), 'utf8')),
         'legacy/index.html': digest(await readFile(path.join(root, 'legacy/index.html'), 'utf8')) },
@@ -223,7 +223,7 @@ export async function prepareCompletionTarget(scenario: Scenario, target?: strin
     + 'Use actual separate contexts for readers/executors. Keep run artifacts here.\n'
     + 'Never open desktop viewers. MAESTRO_SYNC_NO_OPEN=1. Use owned headless checks.\n'
     + 'These host constraints are not requirements and do not enter the manifest.\n');
-  let prompt = 'Implement the original request in request.txt using skills/maestro/SKILL.md. Existing src/ is a starter. Use full strict mode, polish disabled. Report only what was actually verified.';
+  let prompt = 'Implement the original request in request.txt using skills/maestro/SKILL.md. Existing src/ is a starter. Use full strict mode. Report only what was actually verified.';
   if (scenario === 'source-limit') prompt += ' The existing .maestro/draft-manifest.md is the candidate to audit before agreement; preserve the original request as the authority.';
   return { input: { target: root, prompt, turns }, protectedDigests: { ...await bundleDigests(root), 'request.txt': digest(request) },
     inputDigest: digest(JSON.stringify([request, starter, turns])) };
@@ -237,7 +237,7 @@ export function gradeCompletionState(state: RunState | undefined, scenario: Scen
   const record = state.verification;
   const summary = deriveVerification(state);
   const progress = deriveScopeProgress(state);
-  if (state.mode !== 'full' || state.depth !== 'strict' || state.polish !== false) reasons.push('required full/strict/polish=false dials were not observed');
+  if (state.mode !== 'full' || state.depth !== 'strict') reasons.push('required full/strict dials were not observed');
   const sourceReaders = freshReturns(events).filter(dispatch => dispatch.role === 'manifest-reader'
     || record.manifestAudits.some(audit => audit.dispatchId === dispatch.id && audit.readerId === dispatch.childContextId));
   if (!sourceReaders.length) reasons.push('no returned independent source-audit dispatch');

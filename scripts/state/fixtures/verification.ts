@@ -348,16 +348,18 @@ export const repairContract7State = (): ReturnType<typeof contract6State> => asC
 /**
  * Contract 8 is contract 7 plus the models dial: every таск on `standard` and
  * both tiers on `session`, which is what a прогон on a host that cannot pick a
- * model per субагент writes.
+ * model per субагент writes. It also drops `polish`, which contract 8 refuses.
  */
 export function asContract8<T extends RunState>(state: T): T {
   const seven = state.contractVersion >= 7 ? state : asContract7(state);
-  return {
+  const eight: T = {
     ...seven,
     contractVersion: 8,
     models: { strong: 'session', standard: 'session' },
     tasks: seven.tasks.map(task => ({ ...task, model: 'standard' as const })),
   };
+  delete eight.polish;
+  return eight;
 }
 
 /** The closed contract-8 delivery. */
