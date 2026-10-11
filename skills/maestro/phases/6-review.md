@@ -201,11 +201,24 @@ Give the reader, briefed by
 
 - every таск's per-commit diffs, labelled with the таск id, in the order they
   landed — the same `git show` per commit as step 2;
-- the project's documented standards: the host's memory file with the region
-  between `<!-- maestro:begin -->` and `<!-- maestro:end -->` cut out,
-  `CONTRIBUTING*`, and any document the memory file or the README names as the
-  project's conventions. Lint and format configuration is not a document; the
-  lint command already enforces it. With none found, say «none documented».
+- the project's documented standards, found by searching the project root, not
+  only by following links:
+  - the memory file of every host this bundle supports — `CLAUDE.md`,
+    `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.override.md`, `AGENTS.md`,
+    `GEMINI.md` — each with the region between `<!-- maestro:begin -->` and
+    `<!-- maestro:end -->` cut out;
+  - `CONTRIBUTING*`, `CODING_STANDARDS*` and `STYLEGUIDE*`, at the root and in
+    `.github/`, in any case;
+  - under `docs/`, a Markdown file whose name holds `convention`, `standard`,
+    `style` or `contributing`;
+  - any document the memory file or the README names as the project's
+    conventions.
+
+  A file the search finds is read only if it describes how code is written: a
+  brand style guide or an accessibility standard stays out. Lint and format
+  configuration is not a document; the lint command already enforces it. A
+  document reached twice, through a link or under two names, is handed once.
+  With none found, say «none documented».
 
 **Nothing else** — not `spec.md`, not the манифест, not the task files, not
 `interfaces.md`, not the review files, not `prior.md`.

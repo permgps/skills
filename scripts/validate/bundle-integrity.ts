@@ -448,7 +448,9 @@ export const CUT_ANCHORS: readonly Anchor[] = [
  * counterexample is real are the reviewer's judgement, so the anchors hold the
  * rule, the one exception for absence and the tag, never the verdict.
  * The debug-tag condition itself is also held executably, by
- * `scripts/gates/debug-tags.ts`.
+ * `scripts/gates/debug-tags.ts`. The places the standards reader's documents
+ * are gathered from are held by `npm run readers`, which reads the spec as
+ * well; only the sentence that filters what the search finds is held here.
  */
 export const REVIEW_ANCHORS: readonly Anchor[] = [
   { file: 'prompts/reviewer.md', literal: 'tagged `unrequested`, and never blocking',
@@ -468,6 +470,8 @@ export const REVIEW_ANCHORS: readonly Anchor[] = [
     why: 'a review whose measurement moved with the depth would judge a таск by words it never had' },
   { file: 'phases/6-review.md', literal: 'One standards pass',
     why: 'duplication across таски is invisible to every per-таск review' },
+  { file: 'phases/6-review.md', literal: 'is read only if it describes how code is written',
+    why: 'a search that hands over every file it matches makes a brand guide a coding standard' },
   { file: 'phases/6-review.md', literal: 'finds it and does not run the pass again',
     why: 'a standards axis does not converge, so a repeated pass loops' },
   { file: 'phases/7-acceptance.md', literal: 'the standards pass\'s observations from `reviews/standards.md`',

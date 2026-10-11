@@ -16,7 +16,7 @@ nobody. You are the one reader who sees it.
 | Input | What it is |
 |---|---|
 | every таск's per-commit diffs | each commit of every таск, labelled with the таск id, in the order they landed |
-| the project's documented standards | what the project's own documents say its code should look like: the memory file outside the Maestro block, `CONTRIBUTING`, and any document they name as the conventions — or «none documented» |
+| the project's documented standards | what the project's own documents say its code should look like: the memory files `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.override.md`, `AGENTS.md` and `GEMINI.md` outside the Maestro block, `CONTRIBUTING*`, `CODING_STANDARDS*`, `STYLEGUIDE*`, conventions documents under `docs/`, and any document they name as the conventions — each one about how code is written — or «none documented» |
 
 ## What You Are Not Given
 

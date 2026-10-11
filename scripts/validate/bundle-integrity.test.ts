@@ -904,6 +904,19 @@ test('the standards reader calling a smell a violation is reported on its brief'
   });
 });
 
+test('a standards search that drops its filter sentence is reported on phase 6', async () => {
+  await withShippedCopy(async copy => {
+    const phase = path.join(copy, 'phases', '6-review.md');
+    const body = await readFile(phase, 'utf8');
+    const dropped = body.replace('is read only if it describes how code is written', 'is read');
+    assert.notEqual(dropped, body);
+    await writeFile(phase, dropped, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'review');
+    assert.deepEqual(violations.map(v => v.file), [path.join('phases', '6-review.md')]);
+    assert.match(violations[0]!.message, /is read only if it describes how code is written/);
+  });
+});
+
 // --- repair diagnoses by competing hypotheses ----------------------------------
 
 test('every diagnosis anchor names a file the shipped bundle has, and the bundle carries them all', async () => {

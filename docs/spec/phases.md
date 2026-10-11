@@ -695,9 +695,20 @@ That file is the record, so a review round after a repair and a resumed session
 do not run the pass again.
 
 The reader, briefed by `prompts/standards-reader.md`, is given every таск's
-per-commit diffs and the project's documented standards — the host's memory file
-with the Maestro block cut out, `CONTRIBUTING`, and documents they name as the
-conventions — and a baseline of nine named code smells. It is withheld
+per-commit diffs, the project's documented standards and a baseline of nine
+named code smells. The standards are found by searching the project root, not
+only by following links: the memory file of every supported host — `CLAUDE.md`,
+`.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.override.md`, `AGENTS.md`,
+`GEMINI.md` — each with the Maestro block cut out; `CONTRIBUTING*`,
+`CODING_STANDARDS*` and `STYLEGUIDE*` at the root and in `.github/`; Markdown
+files under `docs/` whose name holds `convention`, `standard`, `style` or
+`contributing`; and any document the memory file or the README names as the
+conventions. A found file counts only if it describes how code is written, and
+lint and format configuration never does. A project's own standards document
+that nothing links to was the one most likely to be missed, and it is the one
+the project wrote for exactly this purpose. `npm run readers` holds this list in
+the phase step, here and in the brief, taking the memory files from the
+runtime's host table. It is withheld
 `spec.md`, the манифест, the task files, `interfaces.md`, `reviews/` and
 `prior.md` ([`gates.md`](gates.md) holds the list). A standard is quoted; a smell
 is labelled `judgement: <smell>` and never called a violation.

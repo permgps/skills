@@ -12,11 +12,17 @@
 // every reader's brief to it name for name. That is the whole of the comparison
 // a machine can honestly make here — see *What this does not check* at the
 // bottom of this file for the half it deliberately leaves to review.
+//
+// The standards reader's one input is gathered by search, and the places
+// searched are stated three times: in the phase step, in its specification and
+// in the brief. The same check holds those three to one list, whose memory-file
+// half comes from the runtime's host table.
 
 import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { MEMORY_FILES_BY_HOST } from '../../skills/maestro/tools/runtime/memory.mts';
 import { createLogger } from '../shared/log.ts';
 import { formatViolation, type Violation } from '../shared/violation.ts';
 import { parseTables, type Table } from './spec-integrity.ts';
@@ -132,19 +138,22 @@ export const splitNames = (cell: string | number | undefined): string[] =>
     .filter(entry => entry !== '');
 
 /**
- * The body of one `##` section, from its heading to the next one.
+ * The body of one section, from its heading to the next heading of the same
+ * level or above. `level` is the number of `#`; a brief's sections are `##`,
+ * a phase file's steps are `###`.
  *
  * Deliberately not the whole document: a reader's brief is long, and a table
  * that merely happens to have an `Input` column somewhere else in it is not the
  * declaration this check is reading.
  */
-export function sectionBody(markdown: string, heading: string): string | undefined {
+export function sectionBody(markdown: string, heading: string, level = 2): string | undefined {
   const lines = markdown.split('\n');
-  const start = lines.findIndex(line => line.trim() === `## ${heading}`);
+  const start = lines.findIndex(line => line.trim() === `${'#'.repeat(level)} ${heading}`);
   if (start === -1) return undefined;
 
   const rest = lines.slice(start + 1);
-  const end = rest.findIndex(line => /^##\s/.test(line));
+  const closing = new RegExp(`^#{1,${level}}\\s`);
+  const end = rest.findIndex(line => closing.test(line));
   return (end === -1 ? rest : rest.slice(0, end)).join('\n');
 }
 
@@ -240,6 +249,97 @@ export async function checkModelTiers(specDir: string, bundleDir: string): Promi
     }
   }
   log.info('tiers', 'model tiers checked', { rows: table.rows.length, briefs: briefs.length, violations: violations.length });
+  return violations;
+}
+
+/**
+ * The places the standards reader's documents are gathered from that are not
+ * a host's memory file. A project's own standards document that nothing links
+ * to is the one most likely to be skipped, and the one written for exactly
+ * this purpose.
+ */
+export const STANDARDS_DOCUMENTS: readonly string[] = ['CONTRIBUTING*', 'CODING_STANDARDS*', 'STYLEGUIDE*', 'docs/'];
+
+/**
+ * Every place the standards reader's documents are gathered from: the memory
+ * file of every host the bundle supports, then {@link STANDARDS_DOCUMENTS}.
+ *
+ * The memory half is derived from the runtime's host table rather than
+ * restated, so a host added to that table is a finding here until the phase,
+ * the spec and the brief name its file. `npm run hosts` holds the table itself
+ * to `docs/spec/hosts.md`.
+ */
+export function standardsSources(): string[] {
+  const memory = Object.values(MEMORY_FILES_BY_HOST).flatMap(host => host.groups.flat());
+  return [...new Set([...memory, ...STANDARDS_DOCUMENTS])];
+}
+
+/** The hosts whose memory file a source is; none for a {@link STANDARDS_DOCUMENTS} entry. */
+const hostsOf = (source: string): string[] =>
+  Object.entries(MEMORY_FILES_BY_HOST).filter(([, host]) => host.groups.flat().includes(source)).map(([id]) => id);
+
+export interface StandardsPlace {
+  tree: 'spec' | 'bundle';
+  file: string;
+  heading: string;
+  level: number;
+}
+
+/**
+ * The three sections that state where the standards reader's one input comes
+ * from: the step that gathers it, the specification of that step, and the
+ * brief's description of what it is handed.
+ */
+export const STANDARDS_PLACES: readonly StandardsPlace[] = [
+  { tree: 'bundle', file: 'phases/6-review.md', heading: '6. One standards pass', level: 3 },
+  { tree: 'spec', file: 'phases.md', heading: 'One Standards Pass', level: 3 },
+  { tree: 'bundle', file: path.join(PROMPTS_DIR, 'standards-reader.md'), heading: INPUT_HEADING, level: 2 },
+];
+
+/**
+ * Hold every place in {@link STANDARDS_PLACES} to {@link standardsSources}:
+ * each source is named there, backticked, as the prose writes it. The
+ * backticks keep `docs/` from matching an incidental path. An absent file (a
+ * fixture of the reader table alone) has nothing to hold; a present file with
+ * the section missing is a finding, so a renamed heading is not skipped.
+ *
+ * What this does not check: whether a прогон searched those places, or whether
+ * the orchestrator's judgement that a file describes how code is written was
+ * right. That happens at run time, where nothing here reaches.
+ */
+export async function checkStandardsSources(specDir: string, bundleDir: string): Promise<Violation[]> {
+  const sources = standardsSources();
+  const violations: Violation[] = [];
+  const add = (file: string, line: number, message: string): void => {
+    violations.push({ check: 'standards', file, line, message });
+    log.error('standards', message, { file, line });
+  };
+  let held = 0;
+  for (const place of STANDARDS_PLACES) {
+    const file = path.join(place.tree === 'spec' ? specDir : bundleDir, place.file);
+    const markdown = await readFile(file, 'utf8').catch(() => undefined);
+    if (markdown === undefined) {
+      log.debug('standards', 'file absent; standards sources not held in it', { file });
+      continue;
+    }
+    held += 1;
+    const heading = `${'#'.repeat(place.level)} ${place.heading}`;
+    const body = sectionBody(markdown, place.heading, place.level);
+    log.debug('standards', 'section read', { file, section: place.heading, found: body !== undefined });
+    if (body === undefined) {
+      add(file, 0, `no \`${heading}\` section — the places the standards reader's documents are gathered from are held in it; restore the heading`);
+      continue;
+    }
+    for (const source of sources) {
+      if (body.includes(`\`${source}\``)) continue;
+      log.debug('standards', 'source not named', { file, source });
+      const hosts = hostsOf(source);
+      const what = hosts.length === 0 ? '' : ` — it is a memory file of ${hosts.join(' and ')}`;
+      add(file, 0,
+        `\`${source}\` is not named in ${place.file} › ${place.heading}${what}, and the standards reader's documents are gathered from every place the list names; add it`);
+    }
+  }
+  log.info('standards', 'standards sources checked', { sources: sources.length, files: held, violations: violations.length });
   return violations;
 }
 
@@ -429,6 +529,7 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
   log.info('reference', 'reference.md withheld from the briefs that read task files', { briefs: REFERENCE_DENIED.length });
 
   violations.push(...await checkModelTiers(specDir, bundleDir));
+  violations.push(...await checkStandardsSources(specDir, bundleDir));
 
   log.info('inputs', 'reader inputs checked', {
     gates: rows.length,

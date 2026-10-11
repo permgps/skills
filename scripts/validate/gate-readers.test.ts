@@ -11,6 +11,7 @@ import {
   CODEBASE_INPUT,
   checkGateReaders,
   checkModelTiers,
+  checkStandardsSources,
   JUDGE_BRIEFS,
   REFERENCE_DENIED,
   REFERENCE_INPUT,
@@ -19,9 +20,15 @@ import {
   PRIOR_MEMORY_INPUT,
   sectionBody,
   splitNames,
+  STANDARDS_DOCUMENTS,
+  standardsSources,
   type Violation,
 } from './gate-readers.ts';
 import { PRIOR_FILE } from '../memory/markers.ts';
+import { MEMORY_FILES_BY_HOST } from '../../skills/maestro/tools/runtime/memory.mts';
+
+/** Every standards source, backticked, as the shipped prose names them. */
+const SOURCES_LINE = standardsSources().map(source => `\`${source}\``).join(', ');
 
 // Fixtures are generated per test, as everywhere else in this directory: each
 // one differs from the agreeing baseline by exactly the defect under test.
@@ -331,7 +338,7 @@ const STANDARDS_READER = `# Standards Reader
 | Input | What it is |
 |---|---|
 | every таск's per-commit diffs | each commit of every таск, labelled |
-| the project's documented standards | the project's own documents |
+| the project's documented standards | the project's own documents: ${SOURCES_LINE} |
 
 ## What You Are Not Given
 
@@ -360,8 +367,8 @@ test('a standards reader handed the task files is reported, on both sides of the
     spec: `${SPEC}${STANDARDS_ROW}`,
     briefs: { 'standards-reader.md': STANDARDS_READER
       .replace('| the task files | what each executor was told |\n', '')
-      .replace('| the project\'s documented standards | the project\'s own documents |\n',
-        '| the project\'s documented standards | the project\'s own documents |\n'
+      .replace(`| the project's documented standards | the project's own documents: ${SOURCES_LINE} |\n`,
+        `| the project's documented standards | the project's own documents: ${SOURCES_LINE} |\n`
         + '| the task files | what each executor was told |\n') },
   });
   assert.deepEqual(checks(violations).sort(), ['inputs', 'withheld']);
@@ -600,4 +607,98 @@ test('the shipped tier table runs every shipped brief, and the ten judges on str
   const root = path.resolve(import.meta.dirname, '..', '..');
   assert.equal(JUDGE_BRIEFS.length, 10);
   assert.deepEqual(await checkModelTiers(path.join(root, 'docs', 'spec'), path.join(root, 'skills', 'maestro')), []);
+});
+
+// --- where the standards reader's documents are gathered from ---------------
+
+const STANDARDS_PHASE = `# Review\n\n### 5. Write the state\n\nx\n\n### 6. One standards pass\n\nSearch ${SOURCES_LINE}.\n\n## When It Does Not Go That Way\n\ny\n`;
+const STANDARDS_SPEC = `# Phases\n\n## Review\n\n### One Standards Pass\n\nThe reader is given ${SOURCES_LINE}.\n\n### The Таск Lifecycle\n\nz\n`;
+const STANDARDS_BRIEF = `# Standards Reader\n\n## What You Are Given\n\n| Input | What it is |\n|---|---|\n| the project's documented standards | ${SOURCES_LINE} |\n\n## What You Are Not Given\n\nw\n`;
+
+async function standardsFor(files: { phase?: string | null; spec?: string | null; brief?: string | null } = {}): Promise<Violation[]> {
+  const root = await mkdtemp(path.join(tmpdir(), 'gate-standards-'));
+  try {
+    const specDir = path.join(root, 'spec');
+    const bundleDir = path.join(root, 'bundle');
+    await mkdir(specDir, { recursive: true });
+    await mkdir(path.join(bundleDir, 'phases'), { recursive: true });
+    await mkdir(path.join(bundleDir, 'prompts'), { recursive: true });
+    const phase = files.phase === undefined ? STANDARDS_PHASE : files.phase;
+    const spec = files.spec === undefined ? STANDARDS_SPEC : files.spec;
+    const brief = files.brief === undefined ? STANDARDS_BRIEF : files.brief;
+    if (phase !== null) await writeFile(path.join(bundleDir, 'phases', '6-review.md'), phase);
+    if (spec !== null) await writeFile(path.join(specDir, 'phases.md'), spec);
+    if (brief !== null) await writeFile(path.join(bundleDir, 'prompts', 'standards-reader.md'), brief);
+    return await checkStandardsSources(specDir, bundleDir);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+test('a phase step, a spec section and a brief that name every standards source produce no violations', async () => {
+  assert.deepEqual(await standardsFor(), []);
+});
+
+test('a phase step that drops a host memory file is reported on the phase file, naming the host', async () => {
+  const found = await standardsFor({ phase: STANDARDS_PHASE.replace('`GEMINI.md`, ', '') });
+  assert.equal(found.length, 1, JSON.stringify(found));
+  assert.equal(found[0]!.check, 'standards');
+  assert.match(found[0]!.file, /phases[\\/]6-review\.md$/);
+  assert.match(found[0]!.message, /`GEMINI\.md`.*memory file of gemini-cli/);
+});
+
+test('a memory file two hosts load is reported with both hosts', async () => {
+  const found = await standardsFor({ phase: STANDARDS_PHASE.replace('`AGENTS.md`, ', '') });
+  assert.equal(found.length, 1, JSON.stringify(found));
+  assert.match(found[0]!.message, /memory file of claude-code and codex/);
+});
+
+test('a spec section that drops STYLEGUIDE* is reported on phases.md', async () => {
+  const found = await standardsFor({ spec: STANDARDS_SPEC.replace('`STYLEGUIDE*`, ', '') });
+  assert.equal(found.length, 1, JSON.stringify(found));
+  assert.match(found[0]!.file, /phases\.md$/);
+  assert.match(found[0]!.message, /`STYLEGUIDE\*`/);
+});
+
+test('a brief that drops CODING_STANDARDS* is reported on the brief', async () => {
+  const found = await standardsFor({ brief: STANDARDS_BRIEF.replace('`CODING_STANDARDS*`, ', '') });
+  assert.equal(found.length, 1, JSON.stringify(found));
+  assert.match(found[0]!.file, /standards-reader\.md$/);
+  assert.match(found[0]!.message, /`CODING_STANDARDS\*`/);
+});
+
+test('a source named in phases.md only outside One Standards Pass is still reported', async () => {
+  const spec = STANDARDS_SPEC.replace('`GEMINI.md`, ', '').replace('z\n', 'z, and `GEMINI.md`\n');
+  const found = await standardsFor({ spec });
+  assert.equal(found.length, 1, JSON.stringify(found));
+  assert.match(found[0]!.message, /`GEMINI\.md`/);
+});
+
+test('a renamed One Standards Pass heading is one missing-section finding, not a silent skip', async () => {
+  const found = await standardsFor({ spec: STANDARDS_SPEC.replace('### One Standards Pass', '### Standards Pass') });
+  assert.equal(found.length, 1, JSON.stringify(found));
+  assert.match(found[0]!.message, /no `### One Standards Pass` section/);
+});
+
+test('a fixture with none of the three files has nothing to hold', async () => {
+  assert.deepEqual(await standardsFor({ phase: null, spec: null, brief: null }), []);
+});
+
+test('the standards sources carry every memory file of every host, and every standards document', () => {
+  const sources = standardsSources();
+  for (const [id, host] of Object.entries(MEMORY_FILES_BY_HOST)) {
+    for (const file of host.groups.flat()) assert.ok(sources.includes(file), `${file} of ${id}`);
+  }
+  for (const document of STANDARDS_DOCUMENTS) assert.ok(sources.includes(document), document);
+  assert.equal(new Set(sources).size, sources.length);
+});
+
+test('the shipped phase step, spec section and brief name every standards source', async () => {
+  const root = path.resolve(import.meta.dirname, '..', '..');
+  assert.deepEqual(await checkStandardsSources(path.join(root, 'docs', 'spec'), path.join(root, 'skills', 'maestro')), []);
+});
+
+test('sectionBody at level 3 stops at the next ### and at the next ##', () => {
+  assert.equal(sectionBody('### A\n\na\n\n### B\n\nb\n', 'A', 3), '\na\n');
+  assert.equal(sectionBody('## R\n\n### A\n\na\n\n## S\n\ns\n', 'A', 3), '\na\n');
 });

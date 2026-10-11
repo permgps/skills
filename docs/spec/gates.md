@@ -113,7 +113,9 @@ dispatched once after review over the whole прогон; its output is observat
 only. The existing-code reader is dispatched once at the start of the spec
 phase, in a project with code; its text becomes `codebase.md`, which only the
 plan-consistency reader among the readers below is given. The blindness of both
-is held the same way as the gate readers'.
+is held the same way as the gate readers'. The same check holds the places the
+standards reader's one input is gathered from, named alike in phase 6, in
+[`phases.md`](phases.md) and in the brief.
 
 | Gate | Reader's brief | Given | Withheld |
 |---|---|---|---|
