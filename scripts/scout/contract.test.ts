@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import {
   checkBrief,
+  checkGrillQuestion,
   checkProposal,
+  resolveDelegatedReply,
   type BriefLine,
+  type GrillOption,
+  type GrillQuestion,
   type Proposal,
 } from './contract.ts';
 
@@ -179,4 +184,133 @@ test('a fix showing both passes', () => {
     }),
     [],
   );
+});
+
+// --- one grill question and a delegated reply ------------------------------
+
+const option = (text: string, recommended = false, yes?: boolean): GrillOption =>
+  (yes === undefined ? { text, recommended } : { text, recommended, yes });
+
+const question = (id: string, ...options: GrillOption[]): GrillQuestion => ({ id, options });
+
+test('a question with one recommended option passes', () => {
+  assert.deepEqual(
+    checkGrillQuestion(question('Q01',
+      option('Расписание на неделю', true),
+      option('Расписание на две недели'))),
+    [],
+  );
+});
+
+test('a question with no candidate answers fails', () => {
+  const violations = checkGrillQuestion(question('Q02'));
+  assert.deepEqual(violations.map(v => v.check), ['shape']);
+  assert.match(violations[0]?.message ?? '', /Q02 offers no candidate answers/);
+});
+
+test('a question recommending two options fails', () => {
+  const violations = checkGrillQuestion(question('Q03',
+    option('Подгруппы делятся пополам', true),
+    option('Подгруппы задаются вручную', true)));
+  assert.deepEqual(violations.map(v => v.check), ['recommendation']);
+  assert.match(violations[0]?.message ?? '', /Q03 marks 2 options recommended/);
+});
+
+test('a question recommending none fails unless it asks a fact about the user', () => {
+  const options = [option('Шесть уроков'), option('Семь уроков')];
+  assert.deepEqual(checkGrillQuestion({ id: 'Q04', options }).map(v => v.check), ['recommendation']);
+  assert.deepEqual(checkGrillQuestion({ id: 'Q04', options, fact: true }), []);
+});
+
+test('a fact about the user that recommends an answer fails — B1', () => {
+  const violations = checkGrillQuestion({
+    id: 'Q05',
+    fact: true,
+    options: [option('1500 ₽ в месяц', true), option('Не знаю пока')],
+  });
+  assert.deepEqual(violations.map(v => v.check), ['recommendation']);
+  assert.match(violations[0]?.message ?? '', /B1/);
+});
+
+test('a yes/no question recommending «нет» fails, and names its Q##', () => {
+  const violations = checkGrillQuestion(question('Q06',
+    option('Да, учитывать окна', false, true),
+    option('Нет, не учитывать', true)));
+  assert.deepEqual(violations.map(v => v.check), ['polarity']);
+  assert.match(violations[0]?.message ?? '', /Q06 is a yes\/no question whose recommendation is «нет»/);
+});
+
+test('a yes/no question recommending «да» passes', () => {
+  assert.deepEqual(
+    checkGrillQuestion(question('Q07',
+      option('Да, учитывать окна', true, true),
+      option('Нет, не учитывать'))),
+    [],
+  );
+});
+
+test('a bare «да» to the block resolves every Q## to its recommended option\'s full text, in block order', () => {
+  const block = [
+    question('Q01', option('Расписание на неделю', true), option('На две недели')),
+    question('Q02', option('Нет'), option('Да, подгруппы делятся пополам', true, true)),
+  ];
+  assert.deepEqual(resolveDelegatedReply(block), [
+    { id: 'Q01', chosen: 'Расписание на неделю' },
+    { id: 'Q02', chosen: 'Да, подгруппы делятся пополам' },
+  ]);
+});
+
+test('a fact about the user stays open under a bare «да»', () => {
+  const block: GrillQuestion[] = [
+    { id: 'Q01', fact: true, options: [option('До 1000 ₽'), option('Больше 1000 ₽')] },
+  ];
+  assert.deepEqual(resolveDelegatedReply(block), [{ id: 'Q01', open: true }]);
+});
+
+test('a question without exactly one recommendation stays open, never resolved to its first option', () => {
+  const block = [
+    question('Q01', option('Первый'), option('Второй')),
+    question('Q02', option('Первый', true), option('Второй', true)),
+  ];
+  assert.deepEqual(resolveDelegatedReply(block), [
+    { id: 'Q01', open: true },
+    { id: 'Q02', open: true },
+  ]);
+});
+
+test('a question the user answered in their own words is not resolved again', () => {
+  const block = [
+    question('Q01', option('Расписание на неделю', true), option('На две недели')),
+    question('Q02', option('Шесть уроков', true), option('Семь уроков')),
+  ];
+  assert.deepEqual(resolveDelegatedReply(block, new Set(['Q01'])), [
+    { id: 'Q02', chosen: 'Шесть уроков' },
+  ]);
+});
+
+// --- the two delegation rules, held where they are stated ------------------
+// The contract above reads no session, so the rules a session follows are held
+// by their wording: one literal per rule, in the step file and in the
+// specification. `npm run bundle:scout` cannot do this — it never sees
+// `docs/spec/scout/`.
+
+const GRILL_ANCHORS = [
+  'so that «да» accepts the recommended answer',
+  'is resolved per `Q##`',
+];
+
+const fromRoot = (relative: string): URL => new URL(`../../${relative}`, import.meta.url);
+
+const missingAnchors = async (relative: string): Promise<string[]> => {
+  const body = await readFile(fromRoot(relative), 'utf8');
+  return GRILL_ANCHORS.filter(anchor => !body.includes(anchor))
+    .map(anchor => `${relative} does not say "${anchor}"`);
+};
+
+test('the shipped grill step states both delegation rules', async () => {
+  assert.deepEqual(await missingAnchors('skills/scout/steps/3-grill.md'), []);
+});
+
+test('the Scout specification states both delegation rules', async () => {
+  assert.deepEqual(await missingAnchors('docs/spec/scout/steps.md'), []);
 });

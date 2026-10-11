@@ -1,12 +1,14 @@
-// The two things Scout produces that have a readable shape: the composed бриф
-// and one reconcile proposal.
+// The things Scout produces that have a readable shape: the composed бриф, one
+// reconcile proposal, and one grill question with what a delegated reply to it
+// resolves to.
 //
 // Neither of these runs during `npm run check` — this repository contains no
 // Scout session for them to read, exactly as it contains no прогон for the gate
 // scripts under `scripts/gates/`. What they are for is making the two contracts
 // in `docs/spec/scout/` executable and tested rather than only described.
 //
-// Read `docs/spec/scout/output.md` and `docs/spec/scout/reconcile.md` first.
+// Read `docs/spec/scout/output.md`, `docs/spec/scout/reconcile.md` and
+// `docs/spec/scout/steps.md` first.
 // This file states those rules in a form that can be proven; where the two
 // disagree, the specification is right and this is the bug.
 
@@ -217,4 +219,120 @@ export function checkProposal(proposal: Proposal, file = 'proposals'): Violation
   }
 
   return violations;
+}
+
+// --- one grill question and a delegated reply ------------------------------
+
+export interface GrillOption {
+  text: string;
+  recommended: boolean;
+  /** The option a «да» picks, when the question is a yes/no one. */
+  yes?: boolean;
+}
+
+export interface GrillQuestion {
+  id: string;
+  options: GrillOption[];
+  /**
+   * A fact only the user has — a price, a name, a number. `B1` forbids inventing
+   * it, so such a question offers candidates and recommends none.
+   */
+  fact?: boolean;
+}
+
+const recommendedOf = (question: GrillQuestion): GrillOption[] =>
+  question.options.filter(option => option.recommended);
+
+/**
+ * Check one grill question for the shape a bare «да» depends on: something to
+ * choose from, exactly one recommendation (none for a fact about the user), and
+ * a yes/no question worded so that «да» is the recommendation.
+ */
+export function checkGrillQuestion(question: GrillQuestion, file = 'grill'): Violation[] {
+  const violations: Violation[] = [];
+  const add = (check: string, message: string): void => {
+    violations.push({ check, file, line: 0, message });
+    log.error(check, message, { file, question: question.id });
+  };
+  const recommended = recommendedOf(question);
+  log.debug('grill', 'question checked', {
+    question: question.id,
+    options: question.options.length,
+    recommended: recommended.length,
+    fact: question.fact === true,
+  });
+
+  if (question.options.length === 0) {
+    add('shape', `${question.id} offers no candidate answers — a question answered by `
+      + 'composing makes the user redo the reading Scout already did');
+    return violations;
+  }
+
+  if (question.fact && recommended.length > 0) {
+    add('recommendation', `${question.id} asks a fact only the user has and recommends an `
+      + 'answer — B1: a fact about the user is never invented; offer candidates and recommend none');
+  }
+
+  if (!question.fact && recommended.length !== 1) {
+    add('recommendation', `${question.id} marks ${recommended.length} options recommended — `
+      + 'exactly one, or a bare «да» has nothing to take');
+  }
+
+  if (question.options.some(option => option.yes && !option.recommended)) {
+    add('polarity', `${question.id} is a yes/no question whose recommendation is «нет» — a `
+      + 'bare «да» would take the opposite; word it so that «да» accepts the recommendation');
+  }
+
+  return violations;
+}
+
+/** One printed-back line: the chosen answer in full, or a question left open. */
+export type DelegatedLine = { id: string; chosen: string } | { id: string; open: true };
+
+/**
+ * What a bare «да» or «как советуешь» to the block resolves to: one line per
+ * delegated question, in block order, each the recommended option's full text.
+ *
+ * The caller says which questions the user answered in their own words; every
+ * other one is delegated. Phrases are not matched here, for the reason
+ * `scripts/gates/answers.ts` gives: a list of «да» and «ок» in two languages is
+ * always one word short. A fact about the user, or a question that does not
+ * carry exactly one recommendation, stays open — it is never resolved to its
+ * first option, because a guess printed back reads exactly like a choice.
+ */
+export function resolveDelegatedReply(
+  block: GrillQuestion[],
+  answered: ReadonlySet<string> = new Set(),
+): DelegatedLine[] {
+  const lines: DelegatedLine[] = [];
+  let chosen = 0;
+  let open = 0;
+
+  for (const question of block) {
+    if (answered.has(question.id)) {
+      log.debug('delegated', 'question resolved', { question: question.id, outcome: 'answered' });
+      continue;
+    }
+    const recommended = recommendedOf(question);
+    const pick = !question.fact && recommended.length === 1 ? recommended[0] : undefined;
+    if (pick) {
+      lines.push({ id: question.id, chosen: pick.text });
+      chosen += 1;
+    } else {
+      lines.push({ id: question.id, open: true });
+      open += 1;
+    }
+    log.debug('delegated', 'question resolved', {
+      question: question.id,
+      outcome: pick ? 'chosen' : 'open',
+    });
+  }
+
+  log.info('delegated', 'delegated reply resolved', {
+    questions: block.length,
+    chosen,
+    open,
+    answered: block.length - chosen - open,
+  });
+  return lines;
 }

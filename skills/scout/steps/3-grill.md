@@ -40,7 +40,13 @@ attention on something you were able to decide. A ТЗ that opens no forks is a 
 - **Every question carries its candidate answers**, so it can be answered by
   choosing rather than by composing. Say which one you would pick and why, in one
   clause — a recommendation is help; asking without one makes the user do the
-  reading you already did.
+  reading you already did. The one exception is a fact about the user, below.
+- **Word each question so that «да» accepts the recommended answer.** A block is
+  often answered with one word, and a yes/no question recommending «нет» turns
+  that word into its opposite — reword it until the recommendation is «да». A
+  fact only the user has — a price, a name, a number — carries candidates and
+  **no** recommendation: recommending one would be inventing it, which `B1`
+  forbids.
 - **Every question that came from a находка names its source**, and says whether
   that source is a fact or a заявление.
 - **Seven to ten per round.** A backstop, not a rule: it never drops a fork, it
@@ -55,6 +61,15 @@ already answered them. Do not punish preparation.
 
 Record each answer in the user's own words, against its `Q##`.
 
+- **A bare «да» or «как советуешь» to the block is resolved per `Q##`**, each to
+  its recommended answer, and printed back **in the same turn**, one `Q##` per
+  line with the chosen answer in full — the way the reconcile step prints a bulk
+  «yes to all». Never «принял все рекомендации»: that is agreeing to a list
+  nobody read. A fact question has nothing to take; its line says it stays open
+  and needs their answer. In a mixed reply — «Q02 нет, остальное как советуешь» —
+  only what was delegated is resolved and printed. Record each resolved answer
+  as the reply plus the chosen answer's full text, so a proposal that cites it
+  quotes what the user accepted, not a bare «да».
 - An answer that is «не знаю» is an answer. It leaves the question open, and open
   is a state the last step knows how to print.
 - An answer that opens a new fork is normal. It goes in the next round, not into

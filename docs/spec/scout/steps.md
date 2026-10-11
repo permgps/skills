@@ -77,7 +77,49 @@ Two consequences worth stating because they are easy to get backwards:
 
 And the limit, stated in place per rule 3 of this specification: fork-versus-
 preference is a judgement made at run time, and no validator reads a question
-composed at run time. The text above is the whole of the guarantee.
+composed at run time. The text above is the whole of the guarantee. What a
+question's recommendation must look like, and what a delegated reply prints
+back, is stated in `scripts/scout/contract.ts` and its tests, which — like the
+бриф and proposal checks — read no session (see the next section).
+
+## A Bare «Да» To The Block
+
+The grill asks one block, so a user can answer the whole of it with one word.
+Two rules make that word mean what the user meant.
+
+**Each question is worded so that «да» accepts the recommended answer.** A
+one-word reply is read question by question, and a yes/no question whose
+recommendation is «нет» turns that one word into the opposite of the advice it
+followed. Such a question is reworded until its recommendation is «да».
+
+The exception is a fact only the user has — a price, a name, a number. The grill
+asks it always, and it carries candidate answers and **no** recommendation:
+recommending a price would be inventing one, which
+[`B1`](boundary.md) forbids.
+
+**A bare «да» or «как советуешь» to the block is resolved per `Q##`**, each to
+its recommended answer, and printed back in the same turn, one `Q##` per line
+with the chosen answer in full. This is the rule [`reconcile.md`](reconcile.md)
+already applies to a bulk «yes to all», for the same reason: a summary line
+(«принял все рекомендации») is agreement to a list the user did not read. A fact
+question has nothing to take; its line says it stays open and needs the user's
+own answer, and it follows the ordinary «не знаю» path from there. A mixed reply
+— one question answered in the user's words, «the rest as you advise» — resolves
+and prints only what it delegated.
+
+A resolved answer is recorded as the reply together with the chosen answer's
+full text. That text is what a proposal quotes when it cites the `Q##`
+([`reconcile.md`](reconcile.md)): a quoted «да» says nothing, while the option
+the user saw printed back and let stand is their choice, exactly as if they had
+picked it by number.
+
+The limit, in place: whether a reply delegated, and which questions it covered,
+is read by Scout at run time. Phrases are deliberately not matched by any
+program — a list of «да» and «ок» in two languages is always one word short.
+`scripts/scout/contract.ts` holds only the shape: one recommendation per
+question (none for a fact about the user), «да» as the recommendation of a
+yes/no question, and one printed line per resolved `Q##`, never a guess at a
+question that lacks a single recommendation.
 
 ## Degradation
 
