@@ -66,6 +66,7 @@ const VALUE_MAPS: Array<{ field: string; map: string }> = [
   { field: 'depth', map: 'DEPTH' },
   { field: 'explain', map: 'REGISTER' },
   { field: 'verification.strategyReviews[].decision', map: 'STRATEGY_DECISION' },
+  { field: 'verification.repairAttempts[].outcome', map: 'REPAIR_OUTCOME' },
   { field: 'verification.readiness[].probes[].result', map: 'READINESS_RESULT' },
   { field: 'oneWay[].kind', map: 'ONE_WAY_KIND' },
   { field: 'verification.checks[].result', map: 'CHECK_RESULT' },

@@ -10,8 +10,9 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { evaluateLogic, scriptBlock } from './dashboard-integrity.ts';
-import { correctedSourceAuditState, controlledState, repairContract6State, strategyReview, v3Attempt, sourceVerifiedState, deferredScopeState, sha256, verifiedState } from '../state/fixtures/verification.ts';
+import { correctedSourceAuditState, controlledState, defect, repairContract6State, strategyReview, v3Attempt, sourceVerifiedState, deferredScopeState, sha256, verifiedState } from '../state/fixtures/verification.ts';
 import { projectState } from '../state/projection.ts';
+import { parseStateSource } from '../state/read.ts';
 import { AWAITING_KINDS } from '../state/contract.ts';
 import { retrospectiveState } from '../state/fixtures/retrospective.ts';
 import { deriveVerification } from '../state/verification.ts';
@@ -144,6 +145,9 @@ interface Logic {
     ids: Record<'built' | 'in-progress' | 'deferred', string[]>;
   };
   taskSquaresOf: (state: unknown) => Array<{ id: string; title: string | null; status: string }>;
+  taskReasonOf: (state: unknown, id: string) =>
+    { kind: 'sent-back'; text: string } | { kind: 'repair-outcome'; outcome: string } | null;
+  waveWaitsOf: (tasks: unknown, group: unknown) => string[];
 }
 
 const html = await readFile(ASSET, 'utf8');
@@ -2400,4 +2404,227 @@ test('the retired coverage and debt cards explain nothing any more', () => {
       }
     }
   }
+});
+
+// Таск rows say why. A repair bar quotes what was sent back once a defect
+// records it, a failed bar names how the last repair attempt ended, and a wave
+// that has not started names the таски it waits for. The B and W numbers are
+// the rows of the tables in docs/spec/dashboard.md › Таск Rows Say Why.
+
+/** Contract 6, таск 01 in repair, a verified defect first and two open ones after it. */
+const sentBackState = (): ReturnType<typeof repairContract6State> => {
+  const state = repairContract6State();
+  state.verification!.defects = [
+    defect('DF-0', 'F-1', { status: 'verified', counterexample: 'An earlier defect, already fixed' }),
+    defect('DF-1', 'F-1'),
+    defect('DF-2', 'F-1', { counterexample: 'Escape leaves the panel open' }),
+  ];
+  return state;
+};
+
+/** Contract 6, таск 01 failed, with the given repair attempts on record. */
+const failedState = (attempts: ReturnType<typeof v3Attempt>[]): ReturnType<typeof repairContract6State> => {
+  const state = repairContract6State();
+  state.tasks[0]!.status = 'failed';
+  state.verification!.repairAttempts = attempts;
+  return state;
+};
+
+test('B5: a repair bar quotes the first open defect of its таск, verbatim', () => {
+  assert.deepEqual(plain(L.taskReasonOf(sentBackState(), '01')),
+    { kind: 'sent-back', text: 'Hovering the trigger leaves the panel hidden' });
+});
+
+test('B6: a repair bar whose таск has no open defect yet says nothing under it', () => {
+  const state = sentBackState();
+  state.verification!.defects = [state.verification!.defects[0]!];
+  assert.equal(L.taskReasonOf(state, '01'), null);
+});
+
+test('B6: a defect that belongs to another таск is never quoted under this one', () => {
+  const state = sentBackState();
+  for (const item of state.verification!.defects) item.parentTaskId = '02';
+  assert.equal(L.taskReasonOf(state, '01'), null);
+});
+
+test('B7: a contract-5 repair bar says nothing under it, whatever its record holds', () => {
+  const state = controlledState();
+  state.tasks[0]!.status = 'repair';
+  (state.verification as unknown as Record<string, unknown>)['defects'] = [defect('DF-1', 'F-1')];
+  assert.equal(L.taskReasonOf(state, '01'), null);
+});
+
+test('B8: a failed bar names the outcome of its таск\'s latest repair attempt', () => {
+  const state = failedState([
+    v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:20:00Z', { outcome: 'defect_verified' }),
+    v3Attempt('RA-2', 'F-1', 'DF-1', '2026-09-29T09:40:00Z', { outcome: 'prerequisite_blocked' }),
+    v3Attempt('RA-3', 'F-1', 'DF-1', '2026-09-29T09:30:00Z', { outcome: 'defect_verified' }),
+    v3Attempt('RA-4', 'F-1', 'DF-1', '2026-09-29T09:50:00Z', { taskId: '02', outcome: 'defect_verified' }),
+  ]);
+  assert.deepEqual(plain(L.taskReasonOf(state, '01')), { kind: 'repair-outcome', outcome: 'prerequisite_blocked' });
+});
+
+test('B8: two attempts at the same moment resolve to the later one in the record', () => {
+  const state = failedState([
+    v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:40:00Z', { outcome: 'defect_verified' }),
+    v3Attempt('RA-2', 'F-1', 'DF-1', '2026-09-29T09:40:00Z', { outcome: 'still_failing' }),
+  ]);
+  assert.deepEqual(plain(L.taskReasonOf(state, '01')), { kind: 'repair-outcome', outcome: 'still_failing' });
+});
+
+test('B9: an outcome outside the five is carried as written', () => {
+  const state = failedState([v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:20:00Z')]);
+  (state.verification!.repairAttempts[0] as unknown as Record<string, unknown>)['outcome'] = 'gave_up';
+  assert.deepEqual(plain(L.taskReasonOf(state, '01')), { kind: 'repair-outcome', outcome: 'gave_up' });
+});
+
+test('B10: a failed bar with no repair attempt, or before contract 4, says nothing under it', () => {
+  assert.equal(L.taskReasonOf(failedState([]), '01'), null);
+  const old = failedState([v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:20:00Z')]) as unknown as Record<string, unknown>;
+  old['contractVersion'] = 3;
+  assert.equal(L.taskReasonOf(old, '01'), null);
+});
+
+test('B1–B4 and B11: done, running, review, queued and off-contract bars say nothing under them', () => {
+  for (const status of ['done', 'running', 'review', 'queued', 'paused']) {
+    const state = sentBackState();
+    state.verification!.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:20:00Z')];
+    (state.tasks[0] as unknown as Record<string, unknown>)['status'] = status;
+    assert.equal(L.taskReasonOf(state, '01'), null, status);
+  }
+  assert.equal(L.taskReasonOf(sentBackState(), '99'), null);
+});
+
+test('a verification record that does not read gives no reason line and never throws', () => {
+  const repair = sentBackState() as unknown as { verification: Record<string, unknown> };
+  repair.verification['defects'] = 'x';
+  assert.equal(L.taskReasonOf(repair, '01'), null);
+  const failed = failedState([]) as unknown as { verification: Record<string, unknown> };
+  failed.verification['repairAttempts'] = 'x';
+  assert.equal(L.taskReasonOf(failed, '01'), null);
+  const broken = failedState([]) as unknown as { verification: Record<string, unknown> };
+  broken.verification['repairAttempts'] = [null, 7];
+  assert.equal(L.taskReasonOf(broken, '01'), null);
+});
+
+const waveTask = (id: string, wave: number, status: string, blockedBy: string[], startedAt?: string): Record<string, unknown> =>
+  ({ id, wave, status, blockedBy, ...(startedAt ? { startedAt } : {}) });
+const waitsOf = (tasks: Array<Record<string, unknown>>, wave: number): string[] =>
+  plain(L.waveWaitsOf(tasks, L.groupByWave(tasks).find(group => group.wave === wave))) as string[];
+
+test('W1: a wave that has not started waits for its blockers outside it that are not done', () => {
+  const tasks = [waveTask('04', 3, 'running', [], STARTED), waveTask('05', 3, 'done', [], STARTED),
+    waveTask('06', 4, 'queued', ['04', '05'])];
+  assert.deepEqual(waitsOf(tasks, 4), ['04']);
+});
+
+test('W2: a wave that waits for five lists them all, deduplicated, without its own таски', () => {
+  const tasks = [
+    ...['01', '02', '03', '04', '05'].map(id => waveTask(id, 2, 'running', [], STARTED)),
+    waveTask('06', 3, 'queued', ['01', '02', '03']),
+    waveTask('07', 3, 'queued', ['03', '04', '05', '06']),
+  ];
+  assert.deepEqual(waitsOf(tasks, 3), ['01', '02', '03', '04', '05']);
+});
+
+test('W3: a wave whose blockers are all done, or that has none, waits for nothing', () => {
+  const tasks = [waveTask('01', 1, 'queued', []), waveTask('02', 2, 'done', ['01'], STARTED),
+    waveTask('03', 3, 'queued', ['02'])];
+  assert.deepEqual(waitsOf(tasks, 1), []);
+  assert.deepEqual(waitsOf(tasks, 3), []);
+});
+
+test('W4: a wave with a таск started or past the queue names nothing it waits for', () => {
+  const started = [waveTask('01', 1, 'running', [], STARTED), waveTask('02', 2, 'queued', ['01'], STARTED),
+    waveTask('03', 2, 'queued', ['01'])];
+  assert.deepEqual(waitsOf(started, 2), []);
+  const moving = [waveTask('01', 1, 'running', [], STARTED), waveTask('02', 2, 'review', ['01']),
+    waveTask('03', 2, 'queued', ['01'])];
+  assert.deepEqual(waitsOf(moving, 2), []);
+});
+
+test('a wave still waits for a blocker that failed, and lists an unknown blocker as written', () => {
+  const tasks = [waveTask('01', 1, 'failed', [], STARTED), waveTask('02', 2, 'queued', ['01', 'X9'])];
+  assert.deepEqual(waitsOf(tasks, 2), ['01', 'X9']);
+});
+
+test('a wave lists its blockers in numeric order: 2 before 10', () => {
+  const tasks = [waveTask('10', 1, 'running', [], STARTED), waveTask('2', 1, 'running', [], STARTED),
+    waveTask('11', 2, 'queued', ['10', '2'])];
+  assert.deepEqual(waitsOf(tasks, 2), ['2', '10']);
+});
+
+test('the recorded running прогон: wave 4 waits for 04, and waves 1–3 for nothing', async () => {
+  const state = parseStateSource(await readFile('docs/assets/state-running.fixture.js', 'utf8')) as { tasks: unknown[] };
+  const waits = plain(L.groupByWave(state.tasks).map(group => L.waveWaitsOf(state.tasks, group)));
+  assert.deepEqual(waits, [[], [], [], ['04']]);
+  for (const item of state.tasks as Array<{ id: string }>) assert.equal(L.taskReasonOf(state, item.id), null, item.id);
+});
+
+test('the repair outcomes are worded for all five values in both languages', () => {
+  const keys = ['repaired', 'defect_verified', 'still_failing', 'unavailable', 'prerequisite_blocked'];
+  for (const language of ['ru', 'en'] as const) {
+    assert.deepEqual(Object.keys(L.L10N[language]['REPAIR_OUTCOME'] ?? {}).sort(), [...keys].sort(), language);
+  }
+  assert.equal(L.L10N.ru['REPAIR_OUTCOME']!['still_failing'], 'Всё ещё не проходит');
+  assert.equal(L.L10N.en['REPAIR_OUTCOME']!['prerequisite_blocked'], 'Waiting on another task');
+  assert.equal(L.label(L.L10N.ru['REPAIR_OUTCOME']!, 'gave_up'), 'gave_up');
+});
+
+test('the reason line keeps what was sent back verbatim, quotes inside it included', () => {
+  const text = 'Нажатие «Купить» ничего не делает';
+  assert.equal(ui('ru')['sentBack']!(text), 'Вернули: «Нажатие «Купить» ничего не делает»');
+  assert.equal(ui('en')['sentBack']!('Pressing "Buy" does nothing'), 'Sent back: “Pressing "Buy" does nothing”');
+  assert.equal(ui('ru')['lastRepair']!('Всё ещё не проходит'), 'Последняя попытка исправления: Всё ещё не проходит');
+  assert.equal(ui('en')['lastRepair']!('Still failing'), 'Last repair attempt: Still failing');
+});
+
+test('a wave header names what it waits for, at most three, then a count', () => {
+  const wave = (language: 'ru' | 'en') =>
+    L.L10N[language]!['UI']!['waveName'] as unknown as (wave: number, parallel: number, waits?: string[]) => string;
+  assert.equal(wave('ru')(4, 0, ['04']), 'Волна 4 · ждёт 04');
+  assert.equal(wave('en')(4, 0, ['04']), 'Wave 4 · waiting for 04');
+  const five = ['01', '02', '03', '04', '05'];
+  assert.equal(wave('ru')(3, 0, five), 'Волна 3 · ждёт 01, 02, 03 и ещё 2');
+  assert.equal(wave('en')(3, 0, five), 'Wave 3 · waiting for 01, 02, 03 and 2 more');
+  assert.equal(wave('ru')(2, 3, []), 'Волна 2 — 3 таска параллельно');
+  assert.equal(wave('en')(2, 3, []), 'Wave 2 — 3 tasks at once');
+  assert.equal(wave('ru')(2, 3), 'Волна 2 — 3 таска параллельно');
+});
+
+test('the build explanation says what every bar, reason line and waiting wave says, in all four voices', () => {
+  const state = sentBackState();
+  const expected: Record<string, RegExp> = {
+    'ru/normal': /состояние словом.*вернуло ревью.*последняя попытка исправления.*называет таски, которых ждёт/,
+    'ru/plain': /написано словом.*что нашли.*последняя попытка исправить.*называет таски, которых ждёт/,
+    'en/normal': /status in a word.*what review sent back.*last repair attempt.*names the tasks it waits for/,
+    'en/plain': /says in a word.*what was found.*last try at a fix.*names the tasks it waits for/,
+  };
+  for (const language of ['ru', 'en']) {
+    for (const register of ['normal', 'plain']) {
+      const lines = L.explain('build', state, NOW, L.collectMarks(state), register, language);
+      const said = lines.join(' ');
+      assert.match(said, expected[`${language}/${register}`]!, `${language}/${register}`);
+      assert.ok(lines.every(line => line.trim() !== ''), `${language}/${register} left a blank line`);
+      if (register === 'plain') {
+        for (const word of ['дефект', 'контрпример', 'defect', 'counterexample']) {
+          assert.ok(!said.toLowerCase().includes(word), `${language}/plain says «${word}»`);
+        }
+      }
+    }
+  }
+});
+
+test('R10: an opened repair row shows exactly the lines it showed before the rows said why', () => {
+  const state = sentBackState();
+  assert.deepEqual(plain(L.describeTask(state, '01', 'ru')), [
+    'На критическом пути', 'Служит требованиям: R01', 'Файлы: src/menu.js', 'Зона таска: src/menu',
+    'Сохранено в истории: abcdef0, fedcba1', 'Перезапуски: 0', 'Заходы в ремонт: 1',
+    'Передачи свежему субагенту: 0 — это не дефект', 'Дефекты: подтверждено 1, открыто 2',
+  ]);
+  assert.deepEqual(plain(L.describeTask(state, '01', 'en')), [
+    'On the critical path', 'Serves: R01', 'Files: src/menu.js', 'Owned area: src/menu',
+    'Saved in history: abcdef0, fedcba1', 'Restarts: 0', 'Trips to repair: 1',
+    'Passed to a fresh subagent: 0 — not a defect', 'Defects: verified 1, open 2',
+  ]);
 });

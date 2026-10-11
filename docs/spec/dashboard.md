@@ -42,7 +42,7 @@ like to look at it.
 | `elapsed` | Рабочее время | Working time since `startedAt`, the median таск beneath it, and the calendar span when the two differ | every timestamp in the state |
 | `handover` | Ваш ход | What only the user can settle: empty variables by name, placeholders, open promised work, one-way changes by kind, assumptions, and the total, which the retired Долг card counted | `debt`, `verification.promisedWork`, `oneWay` |
 | `stages` | Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
-| `build` | Ход разработки | The таски grouped by волна, each with its status, phase and clock | `tasks[]` |
+| `build` | Ход разработки | The таски grouped by волна, each a bar in its status colour with its status in a word and its clock; a repair bar quotes what was sent back, a failed bar names the last repair outcome, and a wave not yet started names what it waits for | `tasks[]`, `verification` |
 | `requirement-list` | Требования (список) | The манифест one требование at a time, with technical result; a row opens to its chain, and folded below are the words heard but not taken and what was delivered beyond the ask | `requirements[]`, `verification`, `tasks[]`, `additions` |
 | `gates` | Gates | G1–G4 with status, derived G4 evidence, and findings, and, under G2, the share of live требования that reached the specification | `gates[]`, `verification`, `lifecycle`, `outcome`, `requirements[]` |
 
@@ -664,7 +664,8 @@ verification-3 record and rendered in one place:
   `repair` or `failed`, as verified and open counts of that таск's unsuperseded
   defects. A verified defect closes no таск: a таск with one verified defect and
   residual criteria still reads «На исправлении», and defects never move the
-  таски share or the Таски card's accepted count.
+  таски share or the Таски card's accepted count. The line under a repair bar
+  quotes the first open one; see [Таск Rows Say Why](#таск-rows-say-why).
 - **Попытки исправления / Repair attempts** sits on the Таски card as attempts
   used out of the current total limit, followed by the latest strategy review's
   decision when one exists.
@@ -716,6 +717,76 @@ user. Open promised work
 appears only from contract 4, where the verification record carries it. A
 one-way line whose kind the contract does not define is kept in its own group,
 as written — never dropped and never guessed into a known kind.
+
+## Таск Rows Say Why
+
+Every row of `build` is a bar in its status colour, and every bar says its
+status in a word, so no status is told by colour alone — the rule the Таски
+squares already follow. Under two kinds of bar, one line says why the bar is
+that colour. A wave that has not started says what it waits for.
+
+*Open defect* below means a verification-3 defect with `status: open` whose
+`parentTaskId` is the таск. *Attempt* means a repair attempt whose `taskId` is
+the таск.
+
+| # | Status | State | Bar | Word on the bar | Line under the bar |
+|---|---|---|---|---|---|
+| B1 | `done` | any | `--accent` | Готов / Finished | none |
+| B2 | `running` | any | `--warn` | В работе / In progress | none |
+| B3 | `review` | any | `--info` | На ревью, with defect counts from contract 6 | none |
+| B4 | `queued` | any | dashed outline | В очереди / Queued | none |
+| B5 | `repair` | contract ≥ 6, at least one open defect | `--fix` | На исправлении, with defect counts | Вернули: «the first open defect's `counterexample`» |
+| B6 | `repair` | contract ≥ 6, no open defect yet | `--fix` | На исправлении, with defect counts if any | none |
+| B7 | `repair` | contract ≤ 5 | `--fix` | На исправлении | none |
+| B8 | `failed` | contract ≥ 4, at least one attempt | `--fail` | Упал | Последняя попытка исправления: the label of the latest attempt's `outcome` |
+| B9 | `failed` | the latest attempt's outcome is outside the five | `--fail` | Упал | Последняя попытка исправления: the outcome as written |
+| B10 | `failed` | no attempt, or contract ≤ 3 | `--fail` | Упал | none |
+| B11 | off-contract | any | neutral | the status as written | none |
+
+| # | Wave | Blockers outside the wave | Header |
+|---|---|---|---|
+| W1 | every таск `queued`, none with `startedAt` | 04 not done | Волна 4 · ждёт 04 |
+| W2 | same | five not done | Волна 3 · ждёт 01, 02, 03 и ещё 2 |
+| W3 | same | all done, or none | Волна 1 |
+| W4 | any таск started or past `queued` | any | the header as before, with «N тасков параллельно» when the clocks say so |
+
+**The first open defect is quoted, verbatim.** "First" is record order, which is
+the order repair wrote them. A таск with several open defects loses none of
+them: their count already stands beside the status word. The whole
+`counterexample` is the line's text and its title; only CSS clips it to one
+line on screen.
+
+**No line before a defect exists.** Review moves a таск to `repair`, and the
+defect is written later, in repair's step 1a. Between the two, and on any state
+before contract 6, the bar and its word show and nothing is under them. A
+finding is never used instead: findings name требования, not таски, and a
+reason read off one would put another таск's reason on this row.
+
+**The latest attempt names the outcome.** The latest is the attempt with the
+greatest `at` among those of the таск; on equal `at`, the later one in the
+array. Its outcome is labelled from the five values in
+[`vocabulary.md`](vocabulary.md) › Value Labels: `repaired` from verification
+1–2, and `defect_verified`, `still_failing`, `unavailable` and
+`prerequisite_blocked`. An outcome outside them is printed as written. A failed
+таск with no attempt ran out of restarts in the build, and shows no line.
+
+**Hypotheses never reach the page.** The line names the outcome only. An
+attempt's `hypothesis`, `diagnosis` and `action` are repair's working notes,
+and `phases.md` and `8-repair.md` › 2a keep them from the user.
+
+**There is no line under a review bar.** Every таск passes through review here,
+so the line would say the same thing on every row.
+
+**A wave waits for** the union of its таски's `blockedBy` ids that are outside
+the wave and not `done`, once each, in numeric id order. A blocker that failed
+stays on the list, because the wave does wait on it, and an id no таск carries
+is listed as written. The list shows at most three ids and then «и ещё N» /
+"and N more", the cap and wording of the header's in-flight line. A wave that
+has started names nothing: its wait is over, and the clocks say the rest.
+
+`taskReasonOf` and `waveWaitsOf` in the logic block compute these readings, so a
+test can call them. No contract field was added: every line reads `tasks[]`
+and `verification` as they already were.
 
 ## A Таск Opens
 

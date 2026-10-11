@@ -108,6 +108,11 @@ half-supported.
 | `verification.strategyReviews[].decision` | `change_strategy` | Сменить подход | Change approach |
 | `verification.strategyReviews[].decision` | `stop_incomplete` | Остановить | Stop |
 | `verification.strategyReviews[].decision` | `request_limit` | Запросить попытки | Ask for more attempts |
+| `verification.repairAttempts[].outcome` | `repaired` | Исправлено | Repaired |
+| `verification.repairAttempts[].outcome` | `defect_verified` | Исправление подтверждено | Fix verified |
+| `verification.repairAttempts[].outcome` | `still_failing` | Всё ещё не проходит | Still failing |
+| `verification.repairAttempts[].outcome` | `unavailable` | Не удалось проверить | Could not be checked |
+| `verification.repairAttempts[].outcome` | `prerequisite_blocked` | Ждёт другой таск | Waiting on another task |
 | `verification.readiness[].probes[].result` | `passed` | Пройдена | Passed |
 | `verification.readiness[].probes[].result` | `setup_failed` | Ошибка настройки | Setup failed |
 | `verification.readiness[].probes[].result` | `unavailable` | Недоступна | Unavailable |
@@ -136,6 +141,9 @@ half-supported.
 | `verification.acceptanceRounds[].requirementResults` | `passed` | Прошло проверку | Passed the check |
 | `verification.acceptanceRounds[].requirementResults` | `failed` | Не прошло проверку | Did not pass the check |
 | `verification.acceptanceRounds[].requirementResults` | `incomplete` | Не проверено до конца | Not fully checked |
+
+`repaired` is a verification 1–2 outcome. Verification 3 no longer writes it,
+and it keeps its label so that a historical state still reads.
 
 `Готово` and `Готов` differ because one describes a stage and the other a таск,
 and Russian will not let one form serve both without reading as a mistake. They

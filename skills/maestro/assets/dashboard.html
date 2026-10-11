@@ -278,6 +278,14 @@
   }
   .track > .fill.queued { background: none; color: var(--muted); border: 1px dashed var(--line); }
   .track > .fill .phase { opacity: .85; font-size: .8rem; }
+  /* Why the bar is the colour it is, under the bar and in its column. The words
+     carry the meaning; the tone only repeats the bar's. */
+  .task .why {
+    grid-column: 2; margin-top: -.3rem; font-size: .8rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .task .why.sent-back { color: var(--fix); }
+  .task .why.repair-outcome { color: var(--fail); }
   #build-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .8rem; }
   /* A row that opens says so on hover and on focus, and nowhere louder. */
   .opens { cursor: pointer; border-radius: 4px; }
@@ -500,6 +508,11 @@ globalThis.MAESTRO_LOGIC = (function () {
       STRATEGY_DECISION: {
         change_strategy: 'Сменить подход', stop_incomplete: 'Остановить',
         request_limit: 'Запросить попытки'
+      },
+      REPAIR_OUTCOME: {
+        repaired: 'Исправлено', defect_verified: 'Исправление подтверждено',
+        still_failing: 'Всё ещё не проходит', unavailable: 'Не удалось проверить',
+        prerequisite_blocked: 'Ждёт другой таск'
       },
       READINESS_RESULT: {
         passed: 'Пройдена', setup_failed: 'Ошибка настройки',
@@ -727,14 +740,19 @@ globalThis.MAESTRO_LOGIC = (function () {
         noTasks: 'Таски ещё не нарезаны.',
         noRequirements: 'Требования ещё не записаны.',
         noGates: 'Гейты ещё не заведены.',
-        waveName: function (wave, parallel) {
+        waveName: function (wave, parallel, waits) {
           var name = L10N.ru.SCREEN.wave + ' ' + wave;
           if (parallel > 1) {
             name += ' — ' + parallel + ' '
               + plural(parallel, 'таск', 'таска', 'тасков') + ' параллельно';
           }
+          if (waits && waits.length > 0) {
+            name += ' · ждёт ' + cappedList(waits, function (rest) { return ' и ещё ' + rest; });
+          }
           return name;
         },
+        sentBack: function (text) { return 'Вернули: «' + text + '»'; },
+        lastRepair: function (outcome) { return 'Последняя попытка исправления: ' + outcome; },
         requirementsTotal: function (n) { return 'Всего требований: ' + n; },
         calendar: function (span) { return 'Календарных ' + span; },
         explainAria: function (name) { return 'Что показывает: ' + name; },
@@ -879,6 +897,11 @@ globalThis.MAESTRO_LOGIC = (function () {
       STRATEGY_DECISION: {
         change_strategy: 'Change approach', stop_incomplete: 'Stop',
         request_limit: 'Ask for more attempts'
+      },
+      REPAIR_OUTCOME: {
+        repaired: 'Repaired', defect_verified: 'Fix verified',
+        still_failing: 'Still failing', unavailable: 'Could not be checked',
+        prerequisite_blocked: 'Waiting on another task'
       },
       READINESS_RESULT: {
         passed: 'Passed', setup_failed: 'Setup failed',
@@ -1066,14 +1089,19 @@ globalThis.MAESTRO_LOGIC = (function () {
         noTasks: 'No tasks cut yet.',
         noRequirements: 'No requirements written down yet.',
         noGates: 'No checks set up yet.',
-        waveName: function (wave, parallel) {
+        waveName: function (wave, parallel, waits) {
           var name = L10N.en.SCREEN.wave + ' ' + wave;
           if (parallel > 1) {
             name += ' — ' + parallel + ' '
               + L10N.en.UI.tasksWord(parallel) + ' at once';
           }
+          if (waits && waits.length > 0) {
+            name += ' · waiting for ' + cappedList(waits, function (rest) { return ' and ' + rest + ' more'; });
+          }
           return name;
         },
+        sentBack: function (text) { return 'Sent back: “' + text + '”'; },
+        lastRepair: function (outcome) { return 'Last repair attempt: ' + outcome; },
         requirementsTotal: function (n) { return 'Requirements in all: ' + n; },
         calendar: function (span) { return 'Calendar ' + span; },
         explainAria: function (name) { return 'What this shows: ' + name; },
@@ -1882,6 +1910,35 @@ globalThis.MAESTRO_LOGIC = (function () {
   }
 
   /**
+   * The таски a wave that has not started waits for: its таски's blockers
+   * outside the wave that are not done, once each, in id order.
+   *
+   * A wave that has started names nothing. Its wait is over, and what is left
+   * to say about it is what the clocks say. A blocker that failed stays on the
+   * list, because the wave does wait on it; an id no таск carries is listed as
+   * written rather than dropped, because the page reports the plan it was
+   * handed and does not repair it.
+   */
+  function waveWaitsOf(tasks, group) {
+    var members = (group && group.tasks) || [];
+    if (members.length === 0) return [];
+    var started = members.some(function (task) { return task.status !== 'queued' || !!task.startedAt; });
+    if (started) return [];
+    var status = {};
+    (tasks || []).forEach(function (task) { if (task && task.id !== undefined) status[String(task.id)] = task.status; });
+    var own = members.map(function (task) { return String(task.id); });
+    var waits = [];
+    members.forEach(function (task) {
+      (Array.isArray(task.blockedBy) ? task.blockedBy : []).forEach(function (blocker) {
+        var id = lineOf(blocker);
+        if (own.indexOf(id) !== -1 || status[id] === 'done' || waits.indexOf(id) !== -1) return;
+        waits.push(id);
+      });
+    });
+    return waits.sort(function (a, b) { return a.localeCompare(b, 'en', { numeric: true }); });
+  }
+
+  /**
    * How many of these таски were ever in flight at the same moment.
    *
    * Read from the clocks, not from the size of the wave. A wave is what *may*
@@ -2413,14 +2470,22 @@ globalThis.MAESTRO_LOGIC = (function () {
     return IN_FLIGHT_ORDER
       .filter(function (status) { return groups && groups[status] && groups[status].length > 0; })
       .map(function (status) {
-        var list = groups[status];
-        var names = list.slice(0, IN_FLIGHT_CAP).map(function (task) {
+        var names = groups[status].map(function (task) {
           return task.title === null ? task.id : quote(task.title);
         });
-        var rest = list.length - IN_FLIGHT_CAP;
-        return label(statusWords, status) + ': ' + names.join(', ') + (rest > 0 ? more(rest) : '');
+        return label(statusWords, status) + ': ' + cappedList(names, more);
       })
       .join(' · ');
+  }
+
+  /**
+   * The first IN_FLIGHT_CAP names, then «и ещё N» in the caller's words. The
+   * in-flight line and the wave header's wait list share it, so a wide plan
+   * reads the same way in both places and one cap governs both.
+   */
+  function cappedList(names, more) {
+    var rest = names.length - IN_FLIGHT_CAP;
+    return names.slice(0, IN_FLIGHT_CAP).join(', ') + (rest > 0 ? more(rest) : '');
   }
 
   /** The kinds a one-way line may carry, in the order the region lists them. */
@@ -2517,6 +2582,55 @@ globalThis.MAESTRO_LOGIC = (function () {
     try { closure = closureOf(state); } catch (error) { closure = null; }
     if (closure && closure.defects[task.id]) out.defects = closure.defects[task.id];
     return out;
+  }
+
+  /**
+   * Why a таск's bar is the colour it is, when the state has written it down:
+   * what review sent back for a repair таск, how the last repair attempt ended
+   * for a failed one. Null for every other row.
+   *
+   * A repair таск has no line until repair has written its defect. Review moves
+   * the таск first and the defect follows, and a finding names требования, not
+   * таски: reading a reason off a finding would put another таск's reason on
+   * this row. The first open defect is quoted; the count beside the status
+   * word already says when there are more.
+   *
+   * A failed таск gets the outcome and never the hypothesis, the diagnosis or
+   * the action — those are repair's working notes and stay off the page
+   * (8-repair › 2a). A record that does not read gives null, the way
+   * taskDetailOf treats closureOf: a half-read reason is a wrong one.
+   */
+  function taskReasonOf(state, id) {
+    var task = null;
+    ((state && state.tasks) || []).forEach(function (item) { if (item && item.id === id) task = item; });
+    if (!task) return null;
+    try {
+      if (task.status === 'repair') return sentBackOf(state, id);
+      if (task.status === 'failed') return repairOutcomeOf(state, id);
+    } catch (error) {
+      return null;
+    }
+    return null;
+  }
+
+  function sentBackOf(state, id) {
+    var record = state.contractVersion >= 6 ? state.verification : null;
+    if (!record || record.version !== 3 || !Array.isArray(record.defects)) return null;
+    var open = record.defects.filter(function (defect) {
+      return defect && defect.status === 'open' && defect.parentTaskId === id;
+    })[0];
+    return open ? { kind: 'sent-back', text: lineOf(open.counterexample) } : null;
+  }
+
+  function repairOutcomeOf(state, id) {
+    var record = state.contractVersion >= 4 ? state.verification : null;
+    if (!record || !Array.isArray(record.repairAttempts)) return null;
+    var latest = null;
+    record.repairAttempts.forEach(function (attempt) {
+      if (!attempt || attempt.taskId !== id) return;
+      if (!latest || String(attempt.at) >= String(latest.at)) latest = attempt;
+    });
+    return latest ? { kind: 'repair-outcome', outcome: lineOf(latest.outcome) } : null;
   }
 
   /**
@@ -2962,6 +3076,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Волн ' + groupByWave(tasks).length + ', тасков ' + tasks.length
             + ', наибольшая одновременность — ' + peakParallel(tasks, state, now) + '.',
         'Одновременность читается по часам, а не по размеру волны: волна — это то, что можно было запустить вместе, а не то, что действительно шло вместе.',
+        'Каждая полоса называет своё состояние словом, так что цвет никогда не единственный знак. Под полосой на исправлении — то, что вернуло ревью, дословно: контрпример первого открытого дефекта, как только исправление его записало. Под упавшей — чем кончилась последняя попытка исправления. Волна, которая ещё не началась, называет таски, которых ждёт.',
         'Строка таска нажимается: откроются его файлы, зона, сохранения в истории, требования, блокеры, перезапуски, заходы в ремонт и передачи свежему субагенту. Таски на критическом пути отмечены — в цепочке ' + criticalPath(tasks) + '; это та же цепочка, что посчитана в «Осталось» в шапке.'
       ];
     },
@@ -3202,6 +3317,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Волн ' + groupByWave(tasks).length + ', тасков ' + tasks.length
             + ', больше всего одновременно шло — ' + peakParallel(tasks, state, now) + '.',
         'Волна — это таски, которые можно было запустить вместе. Сколько шло вместе на самом деле, читается по часам, а не по размеру волны.',
+        'На каждой полосе её состояние написано словом, а не только цветом. Под полосой «На исправлении» — что нашли при проверке, слово в слово, как только это записано. Под упавшей — чем закончилась последняя попытка исправить. Волна, которая ещё не началась, называет таски, которых ждёт.',
         'Строку таска можно нажать: откроются его файлы, сохранённые шаги в истории проекта, требования, которым он служит, и таски, которых он ждёт. «Передачи свежему субагенту» — не ошибка: таск оказался длинным, и его отдали новому субагенту. Отмеченные таски — самая длинная цепочка, которая ещё не закончена; по ней считается «Осталось» в шапке.'
       ];
     },
@@ -3427,6 +3543,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Waves ' + groupByWave(tasks).length + ', tasks ' + tasks.length
             + ', and the most that ran at once — ' + peakParallel(tasks, state, now) + '.',
         'What ran at once is read off the clocks and never off the size of a wave: a wave is what could have been started together, not what actually was.',
+        'Every bar names its status in a word, so colour is never the only sign. Under a bar in repair is what review sent back, verbatim: the counterexample of the first open defect, once repair has recorded it. Under a failed bar is how the last repair attempt ended. A wave that has not started names the tasks it waits for.',
         'A task row opens on a press: its files, owned area, saved history entries, requirements, blockers, restarts, trips to repair and passes to a fresh subagent. Tasks on the critical path are marked — ' + criticalPath(tasks) + ' in the chain; it is the same chain «Remaining» in the header counts.'
       ];
     },
@@ -3668,6 +3785,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Waves ' + groupByWave(tasks).length + ', tasks ' + tasks.length
             + ', and the most that went at the same time — ' + peakParallel(tasks, state, now) + '.',
         'A wave is the tasks that could have been started together. How many actually went together is read off the clocks, not off the size of the wave.',
+        'Every bar says in a word where it has got to, not by colour alone. Under a bar «In repair» is what was found when it was checked, word for word, once it is written down. Under a failed bar is how the last try at a fix ended. A wave that has not started names the tasks it waits for.',
         'Press a task row to see its files, the saved steps in the project history, the requirements it serves and the tasks it waits for. «Passed to a fresh subagent» is not a mistake: the task was long, and it was handed to a new subagent. The marked tasks are the longest chain not yet finished; «Remaining» in the header is counted along it.'
       ];
     },
@@ -4001,6 +4119,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     criticalChain: criticalChain,
     estimateMs: estimateMs,
     groupByWave: groupByWave,
+    waveWaitsOf: waveWaitsOf,
     peakParallel: peakParallel,
     testsOf: testsOf,
     contractNotice: contractNotice,
@@ -4022,6 +4141,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     FOLD_AFTER: FOLD_AFTER,
     foldOf: foldOf,
     taskDetailOf: taskDetailOf,
+    taskReasonOf: taskReasonOf,
     requirementDetailOf: requirementDetailOf,
     contextClausesOf: contextClausesOf,
     additionsOf: additionsOf,
@@ -4638,7 +4758,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       // The claim of parallelism is read from the clocks, never from the size
       // of the wave: a wave is what may run together, not what did.
       var parallel = L.peakParallel(group.tasks, state, Date.now());
-      put(host, 'div', T.UI.waveName(group.wave, parallel), 'wave-name');
+      put(host, 'div', T.UI.waveName(group.wave, parallel, L.waveWaitsOf(tasks, group)), 'wave-name');
 
       group.tasks.forEach(function (task) {
         var onPath = critical.indexOf(task.id) !== -1;
@@ -4652,11 +4772,13 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
         if (STATUS_COLOR[task.status]) fill.style.background = STATUS_COLOR[task.status];
         put(fill, 'span', task.title, 'nm');
 
-        // Colour says the таск is not ordinary work; the word says which kind.
-        if (task.status === 'review' || task.status === 'repair' || task.status === 'failed') {
+        // Every bar says its status in a word, so no status is told by colour
+        // alone — the rule the Таски squares already follow.
+        if (L.TASK_ORDER.indexOf(task.status) !== -1) {
           put(fill, 'span', L.label(T.TASK_STATUS, task.status), 'phase');
-          if (closure && closure.defects[task.id]) put(fill, 'span', T.UI.taskDefects(closure.defects[task.id]), 'phase defects');
-        } else if (L.TASK_ORDER.indexOf(task.status) === -1) {
+          var counted = task.status === 'review' || task.status === 'repair' || task.status === 'failed';
+          if (counted && closure && closure.defects[task.id]) put(fill, 'span', T.UI.taskDefects(closure.defects[task.id]), 'phase defects');
+        } else {
           // A status the contract does not define is printed as it was written,
           // through the same reader that keeps a finding from becoming
           // `[object Object]`. The row keeps its neutral colour: the page does
@@ -4668,6 +4790,18 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
         if (task.startedAt) {
           clock.dataset.from = task.startedAt;
           clock.dataset.until = task.finishedAt || '';
+        }
+
+        // The line under the bar is the whole sentence in its text and its
+        // title; CSS clips it to one line, so a long counterexample is cut on
+        // screen and never in what the page holds.
+        var reason = L.taskReasonOf(state, task.id);
+        if (reason) {
+          var why = reason.kind === 'sent-back'
+            ? T.UI.sentBack(reason.text)
+            : T.UI.lastRepair(L.label(T.REPAIR_OUTCOME, reason.outcome));
+          var whyLine = put(row, 'div', why, 'why ' + reason.kind);
+          whyLine.title = why;
         }
 
         if (openRows['task:' + task.id]) {

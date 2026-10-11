@@ -33,6 +33,7 @@ const VOCABULARY = `# Vocabulary
 | \`depth\` | \`normal\` | Обычная | Normal |
 | \`explain\` | \`plain\` | Простые | Plain |
 | \`verification.strategyReviews[].decision\` | \`stop_incomplete\` | Остановить | Stop |
+| \`verification.repairAttempts[].outcome\` | \`still_failing\` | Всё ещё не проходит | Still failing |
 | \`verification.readiness[].probes[].result\` | \`passed\` | Пройдена | Passed |
 | \`oneWay[].kind\` | \`deleted\` | Удаления | Deletions |
 | \`verification.checks[].result\` | \`stale\` | Устарела | Out of date |
@@ -146,6 +147,7 @@ const RU = {
   DEPTH: "{ normal: 'Обычная' }",
   REGISTER: "{ plain: 'Простые' }",
   STRATEGY_DECISION: "{ stop_incomplete: 'Остановить' }",
+  REPAIR_OUTCOME: "{ still_failing: 'Всё ещё не проходит' }",
   READINESS_RESULT: "{ passed: 'Пройдена' }",
   ONE_WAY_KIND: "{ deleted: 'Удаления' }",
   CHECK_RESULT: "{ stale: 'Устарела' }",
@@ -173,6 +175,7 @@ const EN = {
   DEPTH: "{ normal: 'Normal' }",
   REGISTER: "{ plain: 'Plain' }",
   STRATEGY_DECISION: "{ stop_incomplete: 'Stop' }",
+  REPAIR_OUTCOME: "{ still_failing: 'Still failing' }",
   READINESS_RESULT: "{ passed: 'Passed' }",
   ONE_WAY_KIND: "{ deleted: 'Deletions' }",
   CHECK_RESULT: "{ stale: 'Out of date' }",
@@ -359,6 +362,16 @@ test('a logic block that exports nothing is reported', () => {
 test('a stage label the page words differently is reported with both wordings', () => {
   const found = messages(page({ ru: { STAGE_LABEL: "{ preflight: 'Подготовка', build: 'Сборка' }" } }));
   assert.match(found, /"build" is labelled "Сборка" in the page and "Разработка" in the specification/);
+});
+
+test('a repair outcome the page words differently from the vocabulary is reported with both wordings', () => {
+  const found = messages(page({ ru: { REPAIR_OUTCOME: "{ still_failing: 'Не проходит' }" } }));
+  assert.match(found, /verification\.repairAttempts\[\]\.outcome \(ru\) "still_failing" is labelled "Не проходит" in the page and "Всё ещё не проходит" in the specification/);
+});
+
+test('a repair outcome the vocabulary names and the page lacks is reported', () => {
+  const found = messages(page({ en: { REPAIR_OUTCOME: '{}' } }));
+  assert.match(found, /verification\.repairAttempts\[\]\.outcome \(en\) "still_failing" has a label in the specification and none in the page/);
 });
 
 test('a stage the vocabulary labels and the page forgot is reported', () => {
