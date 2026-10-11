@@ -16,6 +16,23 @@ number that claimed more than that would be claiming it falsely.
 
 `CONTRACT_VERSION` stays `7`.
 
+- **Existing code is read once, before the spec.** Preflight's `--memory-read`
+  also says whether the project already holds code: git is asked for tracked
+  and untracked files it does not ignore, and without git the directory is
+  walked. Maestro's own record, host installs, memory files, project glossary
+  files and root-level README, licence and git meta files do not count.
+  Preflight records the answer as the optional `existingCode` field. In a
+  project with code, the spec phase dispatches one fresh existing-code reader,
+  which changes nothing and returns where things live, the conventions, the
+  commands, the exact names the work will touch, what has no counterpart yet
+  and what not to touch. Its text goes verbatim into `codebase.md`, and a failed
+  read becomes a `debt.assumptions` line. The spec reads it first, identifiers
+  are English, and the Terms table gains *Name in code*, with `interfaces.md`
+  still the authority on names. Build and repair executors and the
+  plan-consistency reader are handed `codebase.md`; every other reader
+  withholds it, and a task file stays buildable without it. `npm run readers`
+  holds who is handed it, and `npm run bundle` holds twelve new literals in
+  `CODEBASE_ANCHORS`; 1320 tests pass. `CONTRACT_VERSION` stays `7`.
 - **Review checks what is risky to get wrong.** The reviewer has a sixth part:
   sign-in and permissions, money, deleting data, secrets, and messages sent to
   third parties. The reviewer decides from the diff whether a category

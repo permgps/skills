@@ -9,6 +9,7 @@ project that was built, not with Maestro.
 │   ├── <YYYY-MM-DD>-brief.md
 │   ├── manifest.md
 │   ├── prior.md
+│   ├── codebase.md
 │   ├── answers.md
 │   ├── reference.md
 │   ├── spec.md
@@ -66,6 +67,7 @@ actually built.
 | `brief.md` | manifest | manifest, G2, acceptance (the manifest plus the additions) | append-only |
 | `manifest.md` | manifest | briefing, spec, plan, acceptance, G1, G2, G3, G4 | append-only |
 | `prior.md` | preflight | briefing, spec, plan, memory | no |
+| `codebase.md` | spec | spec, plan, build, repair, G3 | no |
 | `answers.md` | briefing | spec, G1 | append-only |
 | `reference.md` | briefing | G2 reference reader, acceptance reference reader, polish | append-only |
 | `spec.md` | spec | plan, build, review | yes, by amendment only |
@@ -100,12 +102,24 @@ reads `D## — from таск NN — <fact>` so they can be selected — but as c
 not contract: the таск is still judged against its task file and
 `interfaces.md`.
 
+**`codebase.md` is what existed before the прогон; `discovered-interfaces.md` is
+what the build added.** The spec phase writes `codebase.md` once, in a project
+with code, from the text the existing-code reader returned, and neither file is
+ever appended to the other. It is handed to build and repair executors and to
+the plan-consistency reader. The task reader, the reviewer, and every reader
+of G1, G2 and G4 are not handed it: a task file is buildable without it, and a
+blind reader holding the прогон's own reading of the code would check the past
+instead of the work. Where `codebase.md` and `interfaces.md` disagree on a
+name, `interfaces.md` wins, and a deliberate rename is a `renames <old>` row in
+the Terms table.
+
 Each task file contains the relevant user-contract and reference excerpts, the
 observable obligation IDs and check IDs it serves, its implementation owner
 when implementation is required, the check execution owner, variants,
 integration prerequisites, and its Test surface: the signatures from
 `interfaces.md` its tests go through. `interfaces.md` carries shared boundaries, a Project conventions table (test, typecheck and lint commands, where tests live, prior art), a Terms
-table naming each domain word once, and the Seams table; the
+table naming each domain word once (term, meaning, name in code, words to
+avoid, the user's wording), and the Seams table; the
 executor does not receive the unrelated full specification. A verification-only
 task can own an execution without claiming implementation files. G3's
 mechanical half (`scripts/gates/check-g3.ts`) validates both

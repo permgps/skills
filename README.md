@@ -358,7 +358,7 @@ decides what to build; everything after it proves the right thing was built.
 | 0 | Preflight (*Подготовка* / Setup) | resolved dials, run state, dashboard, `prior.md` | the announcement; the first-run questions; a dirty working tree is a question outside `full` |
 | 1 | Manifest (*Требования* / Requirements) | `brief.md`, `manifest.md` | your words numbered `R01…`, with the original under each line when the languages differ — confirm or correct |
 | 2 | Briefing (*Брифинг* / Briefing) | `answers.md`, `reference.md` | one numbered block of forks, at most two rounds |
-| 3 | Specification (*Спецификация* / Specification) | `spec.md` | approval in `manual` only |
+| 3 | Specification (*Спецификация* / Specification) | `codebase.md` in a project with code, `spec.md` | approval in `manual` only |
 | 4 | Plan (*План* / Plan) | `tasks/`, `interfaces.md` | approval in `manual`; a notice elsewhere |
 | 5 | Build (*Разработка* / Development) | project code, `discovered-interfaces.md` | the dashboard's waves filling in; nothing to answer unless an S4 action comes up |
 | 6 | Review (*Ревью* / Review) | `reviews/` | nothing to answer |
@@ -508,6 +508,7 @@ your-project/.maestro/
 │   ├── manifest.md                 the numbered requirements
 │   ├── prior.md                    what earlier runs decided and your project glossary, read at preflight
 │   ├── answers.md, reference.md    briefing answers and the recorded reference
+│   ├── codebase.md                 what your repository held before the run, read once before the spec
 │   ├── spec.md, interfaces.md      the specification and the contracts between таски
 │   ├── discovered-interfaces.md    what the build found it needed
 │   ├── tasks/, reviews/            one file per таск and per review
@@ -562,6 +563,16 @@ your-project/.maestro/
   glossary or the бриф. All of it together is read up to 32 KiB; past that,
   none of it is read, and the run says so. Terms your project glossary already
   defines are not repeated in the memory block.
+- **Your existing code is read once, before the spec.** Preflight checks
+  whether the project already holds code; Maestro's own files, the host's
+  skill installs, memory files, your project glossary, a root README or
+  licence, and anything git ignores do not count. If it does, the
+  specification phase sends one fresh reader through the repository, which
+  changes nothing and writes down where things live, the conventions, the
+  exact run, test and lint commands, the names the work will touch, and what
+  not to touch, into `codebase.md`. The spec and the plan name things after
+  it — the Terms table gains a *Name in code* column — and every executor
+  reads it before exploring. The blind readers never see it.
 
 ## The Dashboard
 

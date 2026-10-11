@@ -216,7 +216,8 @@ specification says it narrows — or the reverse — is the same defect seen fro
 the reference side.
 
 `gate-readers` proves that every independent reader — the gate readers of G1,
-G2, G3 and G4, and the standards reader that gates nothing — is handed exactly
+G2, G3 and G4, and the standards and existing-code readers that gate nothing —
+is handed exactly
 what [`gates.md`](gates.md) says it is. That
 list lives in five places: the gate table, the phase table, the phase file, the
 reader's own brief in `prompts/`, and `SKILL.md`. Four of them are prose a model
@@ -227,7 +228,9 @@ time as a table, and this check holds each brief's own declaration to it name
 for name, naming both places when they disagree.
 
 It reads both the `Given` and `Withheld` columns against named tables in each
-reader brief. This checks declared input boundaries; an actual dispatch still
+reader brief. It also holds who is handed `codebase.md`: the G3 consistency row
+must give it, every other row must withhold it, `executor.md` names it in its
+opening, `reviewer.md` in what it has not seen, and no other brief mentions it. This checks declared input boundaries; an actual dispatch still
 needs workflow evaluation because a prompt file cannot prove what the agent
 received at run time.
 

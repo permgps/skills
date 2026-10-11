@@ -8,12 +8,12 @@ right thing was built.
 
 | Id | Name | Stage | Reads | Produces |
 |---|---|---|---|---|
-| preflight | Preflight | yes | user arguments, repository state, the memory file, the project glossary, the register and earlier runs' `decisions.md` | resolved dials, run state created, dashboard raised, `prior.md` |
+| preflight | Preflight | yes | user arguments, repository state, the memory file, the project glossary, the register and earlier runs' `decisions.md` | resolved dials, run state created with whether the project holds code, dashboard raised, `prior.md` |
 | manifest | Manifest | yes | бриф from the user, redacted source snapshots and independent audit return | `brief.md` — written once, then grown by its additions block — and `manifest.md` |
 | briefing | Briefing | yes | `manifest.md`, declared references, `prior.md` | `answers.md`, neutral `reference.md` |
-| spec | Specification | yes | `manifest.md`, `answers.md`, raw reference, `prior.md` | `spec.md`, obligation and source coverage map |
-| plan | Plan | yes | `spec.md`, obligations and checks, the repository's test, typecheck and lint configuration, `prior.md` | `tasks/`, `interfaces.md`, ownership map |
-| build | Build | yes | task files, relevant raw reference, `interfaces.md`, blockers' `D##` rows | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
+| spec | Specification | yes | `manifest.md`, `answers.md`, raw reference, `prior.md`, the repository (through the existing-code reader, once) | `codebase.md`, `spec.md`, obligation and source coverage map |
+| plan | Plan | yes | `spec.md`, obligations and checks, the repository's test, typecheck and lint configuration, `prior.md`, `codebase.md` | `tasks/`, `interfaces.md`, ownership map |
+| build | Build | yes | task files, relevant raw reference, `interfaces.md`, `codebase.md`, blockers' `D##` rows | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
 | review | Review | yes | task files, obligations, evidence, `interfaces.md`, project code, the project's documented standards | `reviews/` including `reviews/standards.md` once per прогон, findings and check limits |
 | acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md` |
 | polish | Доводка | no | `reference.md`, project code after required parity | optional polished build, `tasks/` of its own |
@@ -96,6 +96,49 @@ already knows.
   `Chosen:` line, and that text is shown back to the user. The entry shape is in
   [`artifacts.md`](artifacts.md), and [`gates.md`](gates.md) states what G1
   checks of it.
+
+## Specification
+
+### The Existing Code Is Read Once
+
+Every later step names things the repository may already have, and a guessed
+name is a defect found only when the build fails. So preflight decides once
+whether the project holds code, and the spec phase spends one fresh reader on
+it before the spec is written.
+
+**The rule.** A project holds code when at least one qualifying file exists.
+Git is asked first, for tracked files and untracked files it does not ignore;
+without git, or outside a work tree, the directory is walked in name order
+without following symlinks. A path does not qualify when it lies under
+`.maestro/`, `.git/`, `.claude/`, `.agents/`, `.codex/` or `.gemini/` at the
+root, has a `.git` segment, is named like a memory file or a project glossary
+file at any depth, or is a root-level `README`, `LICENSE`, `LICENCE`,
+`COPYING`, `.gitignore`, `.gitattributes` or `skills-lock.json`. Everything
+else qualifies, `.github/` included. `--memory-read` reports the answer, and
+preflight records it in the run state as `existingCode`
+([`state-contract.md`](state-contract.md)).
+
+| `existingCode` | `codebase.md` on disk | The spec phase does |
+|---|---|---|
+| `true` | no | dispatch the existing-code reader once, write its text verbatim after redaction to `codebase.md`, then write the spec |
+| `true` | yes, a resumed phase | no dispatch; read the file |
+| `false` | — | no reader; the spec is written as before |
+| absent, a run from before the field | — | no reader, as for `false` |
+| `true`, the reader fails or returns nothing usable | no | no file; one `existing code not read before the spec:` line in `debt.assumptions`, then the spec |
+
+No stop is added, and the user is not asked anything here.
+
+**The reader** is given `manifest.md`, `answers.md` and the repository, and
+withholds `brief.md`, `spec.md`, `prior.md` and `codebase.md`. It reports what
+exists, never what to build, in English, under six fixed headings: *Where
+things live*, *Conventions in use*, *Commands*, *Names the work will touch* (a
+table of requirement, kind, name in code and where), *No counterpart yet* and
+*Do not touch*. Every line names a path, and the text stays under 300 lines,
+because it goes to every executor. It runs on the session's model.
+
+The spec reads `codebase.md` first and names an existing thing by its exact
+name in code. Identifiers are English words, never transliterations, and in
+existing code the convention `codebase.md` records wins.
 
 ## Loading Rule
 
@@ -278,8 +321,12 @@ the section and never restate a command, so a task whose command disagrees with
 it is the plan-consistency reader's stale instruction.
 
 **Each domain word is named once.** After the conventions and before the Seams,
-`interfaces.md` carries a Terms table. Its columns are term, meaning, words to avoid, and the user's
-wording quoted from the original-language source clause. A word can arrive
+`interfaces.md` carries a Terms table. Its columns are term, meaning, name in
+code, words to avoid, and the user's wording quoted from the original-language
+source clause. *Name in code* is the identifier the existing code uses, taken
+from `codebase.md`; it is `—` when the term has no counterpart yet, and
+`renames <old>` when the plan deliberately renames one, with the таск named in
+the Seams table. A word can arrive
 with a meaning already, and for one word the манифест outranks the project
 glossary, which outranks the memory block. A term the project glossary defines
 is taken as it stands, its avoid words included. Terms that an earlier
@@ -302,12 +349,15 @@ findings, because the executor would otherwise choose what its tests call. So is
 a *done means* item that needs the output of a таск outside its *Depends on*,
 which only a stub could meet. A dependent таск is later also handed its
 blockers' `D##` rows; those do not exist when the reader reads, so a task file
-must be buildable without them. A plan-consistency reader sees all of them
-with `interfaces.md` and without `spec.md` or the манифест. It reports what
+must be buildable without them. The executor is also handed `codebase.md` and
+the task-file reader is not, for the same reason: a task file is buildable
+without it, and it saves an executor a rediscovery without filling a gap. A plan-consistency reader sees all of them
+with `interfaces.md` and `codebase.md`, and without `spec.md` or the манифест. It reports what
 lives between таски: collisions, unowned artifacts or writers, completion
 artifacts outside allowed writes, prerequisites with no upstream producer, a
 producer and consumer that disagree on a route, method, DTO, migration or port,
-and stale formatter or project-rule instructions. A finding is a coordination
+stale formatter or project-rule instructions, and a name that contradicts one
+`codebase.md` records with no `renames` row. A finding is a coordination
 defect, fixed in the task files before dispatch, and never a reduced
 requirement. Repair dispatches the same reader again when a defect crosses
 таски. Two таски sharing a file with neither blocking the other is refused
