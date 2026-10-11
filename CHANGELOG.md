@@ -36,12 +36,17 @@ number that claimed more than that would be claiming it falsely.
   the sole таск of wave 1 are `strong` by rule, and `check-g3` holds that from
   contract 8, reading the Seams table and the `Model` rows and nothing else;
   risk and a hard core are `strong` by judgement, and the reviewer still judges
-  every diff whatever the row says. The отчёт's *What was asked* ends with a
+  every diff whatever the row says. A Producer task cell is read only as ids
+  and forward ranges of one width, at most 999 ids, so a date is never
+  expanded; a bold or capitalised `Model` row counts, and a таск with no task
+  file is reported as such. A доводка таск is written into `tasks[]` as
+  `strong`, outside the plan's tier rule. The отчёт's *What was asked* ends with a
   `Models:` line, and `npm run metrics` counts таски, retries and repairs per
   tier. `npm run dials`, `readers`, `hosts`, `state` and `bundle` hold the
-  dial, the tier table, the host model lists, the config keys and eleven
-  anchors; `SKILL.md` stays at 551 lines; 1391 tests pass. `CONTRACT_VERSION`
-  is `8`; a contract-7 run keeps running on the session's model.
+  dial, the tier table, the host model lists, the config keys and thirteen
+  anchors; `SKILL.md` stays at 551 lines; 1399 tests pass. `CONTRACT_VERSION`
+  is `8`; a contract-7 run, reopened too, keeps running on the session's model
+  and writes no `models` and no `model`.
 - **Existing code is read once, before the spec.** Preflight's `--memory-read`
   also says whether the project already holds code: git is asked for tracked
   and untracked files it does not ignore, and without git the directory is
