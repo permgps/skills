@@ -108,6 +108,11 @@ facts, not contract: `interfaces.md` still wins, an executor that finds a row
 disagreeing with it builds to `interfaces.md` and says so, and the review still
 judges the таск against its task file and `interfaces.md` alone.
 
+**Dispatch the executor on its таск's tier**: the model the run state's
+`models` names for `tasks[].model`, none at all for `session`, and effort equal
+to the session's, as the delegation rule in `SKILL.md` says. A retry is a repair
+and runs `strong`; that is the repair phase's to dispatch, never this one's.
+
 Name the absolute owned workspace as operational metadata, including when the
 wave has one task and no worktree. Require the executor to verify it before any
 write and set it explicitly on every shell call. Parent shell `cwd` changes do
@@ -218,7 +223,8 @@ exactly like the failure it is repeating.
 **A таск ran out of context.** Its executor said what is finished, what is not,
 and what the next one needs. Write that to `tasks/NN-<slug>-handoff.md` and hand
 the **same** таск over again with the handoff added to what it is given. This is
-the only case where one таск is handed over twice.
+the only case where one таск is handed over twice, and the handoff keeps the
+таск's tier: it continues the same build.
 
 A handoff is for surprises. If several таски produce one, the cut was too large
 — say so, because that is a fact about the plan and the next прогон inherits it.

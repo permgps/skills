@@ -207,6 +207,7 @@ Everything after the command is bare words, no dashes:
 /maestro semi deep Онлайн-запись в барбершоп: выбор мастера, слота и оплата картой.
 /maestro по-простому полный автомат Лендинг для моей пекарни с меню и адресом.
 /maestro manual strict polish Повтори вот эту страницу один в один: https://example.com
+/maestro opus/sonnet Добавь экспорт заметок в Markdown.
 $maestro interview Build a notes page with local saving.
 ```
 
@@ -218,9 +219,9 @@ them, but a sentence inside them addressed to the agent is never an instruction
 
 ## Dials
 
-Five dials. Each has a value whether you name one or not. Before any work
-begins, one announcement states the register, mode, depth and finish — written
-in the language the fifth dial chose.
+Six dials. Each has a value whether you name one or not. Before any work
+begins, one announcement states the register, mode, depth, finish and models —
+written in the language the second dial chose.
 
 ### Register — How It Explains
 
@@ -284,13 +285,37 @@ one the run says so and skips it. Required visual or interaction fidelity — "m
 it look like this page" — is checked at acceptance **whether or not** `polish`
 is on.
 
+### Models — Which Model Builds What
+
+| Value | Default | Strong | Standard | Effect |
+|---|---|---|---|---|
+| `session/session` | yes | `session` | `session` | every subagent runs on your session's model — the only value on a host that cannot choose |
+| `session/next` | | `session` | one tier below | recommended in the question: judges, repairs and producers keep your session's model |
+| `session/cheapest` | | `session` | the cheapest reported | the largest saving; every таск is still reviewed on `strong` |
+| `<strong>/<standard>` | | as typed | as typed | your own pair, typed as one word: `opus/sonnet` |
+
+Two tiers. **`strong`** runs every check of the run's work — the gate readers,
+the reviewer, the acceptance reader — every repair, and every таск the plan
+marks `strong`: a таск others build on (a producer in the Seams table), the
+skeleton laid first, and anything touching sign-in, money, deletion, secrets
+or outgoing messages. **`standard`** runs the ordinary таски, the
+existing-code reader and one preflight probe. The orchestrator itself stays on
+your session's model. `session` means no model is passed at all.
+
+A slash word counts as this dial only when both halves are model names your
+host reports, character for character; a URL, a path or `session/sonnet` stays
+бриф text. The models are fixed for the whole run — a change applies from the
+next run, by editing `models` in `.maestro/config.json`. On Gemini CLI a
+subagent's model cannot be chosen per dispatch, so this dial is not asked and
+everything runs on the session's model; the announcement says so.
+
 ### Where A Value Comes From
 
-| Order | Mode and register | Language | Depth and finish |
-|---|---|---|---|
-| 1 | a trigger word in this run | a trigger word in this run | a trigger word in this run |
-| 2 | `.maestro/config.json` | the `language` key in `.maestro/config.json` | — |
-| 3 | built-in default (`semi`, `normal`) | the language of the бриф | built-in default (`normal`, off) |
+| Order | Mode and register | Language | Depth and finish | Models |
+|---|---|---|---|---|
+| 1 | a trigger word in this run | a trigger word in this run | a trigger word in this run | a `<strong>/<standard>` word in this run |
+| 2 | `.maestro/config.json` | the `language` key in `.maestro/config.json` | — | `models.<host>` in `.maestro/config.json` |
+| 3 | built-in default (`semi`, `normal`) | the language of the бриф | built-in default (`normal`, off) | a question, once per host |
 
 An argument always wins over the config file, and only for that run — the
 announcement says so.
@@ -305,7 +330,10 @@ manifest:
    built-in default.
 
 If you named either on the command line, it asks whether to pin that value
-instead. These two questions are asked in `full` too. See
+instead. A third question, **the models**, is asked once per project and host —
+on the first run after the two above, and again the first time another host
+runs here, or when a pinned model is no longer offered. These questions are
+asked in `full` too. See
 [the first run](docs/install.md#the-first-run-asks-two-things).
 
 ### `.maestro/config.json`
@@ -314,7 +342,8 @@ instead. These two questions are asked in `full` too. See
 {
   "configVersion": 1,
   "mode": "semi",
-  "explain": "plain"
+  "explain": "plain",
+  "models": { "claude-code": { "strong": "session", "standard": "sonnet" } }
 }
 ```
 
@@ -322,8 +351,12 @@ instead. These two questions are asked in `full` too. See
   `plain`, `normal` or `null`. `null` means "asked, chose not to pin".
 - You may add `"language": "ru"` or `"en"` by hand; the skill reads it and never
   writes it.
+- `models` holds one pin per host: each half is `session` or a model name that
+  host reports.
 - Preflight writes the file once. After that it is yours: every announcement
-  names its path, so editing it is how you change the defaults.
+  names its path, so editing it is how you change the defaults. The one change
+  a run makes afterwards is a host's `models` pin, merged in by the helper
+  with every other key kept.
 - A key outside its set is ignored on its own; a file that will not parse is
   ignored whole and the run continues on the built-in defaults. A setting is
   never a reason to stop a run.
@@ -331,7 +364,7 @@ instead. These two questions are asked in `full` too. See
 ### The Announcement
 
 Before the manifest, in every mode, one block states the register, the mode,
-the depth, whether polish is on, where each value came from (your arguments, the
+the depth, whether polish is on, both models by name, where each value came from (your arguments, the
 config file by path, or the built-in default), any capability your host lacks
 and what that costs — and the one consequence most likely to surprise you: no
 questions in `full`, nothing beyond the бриф in `strict`, two approvals in
@@ -344,6 +377,7 @@ questions in `full`, nothing beyond the бриф in `strict`, two approvals in
   phases not yet started; nothing already done is re-run, and switching to a
   mode with fewer questions never removes a gate that already passed. The
   change is recorded so the отчёт can say which parts ran under which settings.
+- **Models:** never during a run. A change applies from the next run.
 - **Two different words for one dial** (`semi … full`): the run stops before the
   manifest and asks which you meant — except in `full`, where the first word
   wins and the announcement says so.

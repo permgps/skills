@@ -13,7 +13,7 @@
 // a machine can honestly make here — see *What this does not check* at the
 // bottom of this file for the half it deliberately leaves to review.
 
-import { readFile, readdir } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -149,6 +149,88 @@ export function declaredInputs(markdown: string, heading = INPUT_HEADING): strin
   return table.rows
     .map(row => normalizeName(row['Input']))
     .filter(name => name !== '');
+}
+
+/** The columns of `dials.md` › *Models* › *Who Runs On Which Tier*. */
+const TIER_TABLE_COLUMNS = ['Role', 'Brief', 'Tier'];
+
+/**
+ * Every brief whose return decides a gate, a review or a repair. A gate rests
+ * on its judge being no weaker than what it judges, so a judge never runs
+ * `standard` — on any row it appears in.
+ */
+export const JUDGE_BRIEFS: readonly string[] = [
+  'manifest-reader.md', 'independent-reader.md', 'reference-reader.md', 'task-reader.md',
+  'plan-consistency-reader.md', 'reviewer.md', 'standards-reader.md', 'repair-diagnostician.md',
+  'strategy-reviewer.md', 'acceptance-reader.md', 'polish-reader.md',
+];
+
+/** Briefs that are not judges and run on `standard`: reading, not deciding. */
+export const STANDARD_BRIEFS: readonly string[] = ['existing-code-reader.md'];
+
+/** The one brief whose tier is the таск's own, marked by the plan. */
+export const TIERED_BRIEFS: readonly string[] = ['executor.md'];
+
+/** The tier cells the table may hold, decoration removed. */
+export const TIERS: readonly string[] = ['strong', 'standard', "the таск's"];
+
+/**
+ * Hold the tier table in `dials.md` to the shipped briefs: every brief has a
+ * row, every row names a brief that exists, a judge is `strong` wherever it
+ * appears, and only the executor takes its таск's tier. A spec directory with
+ * no `dials.md` (a fixture of the reader table alone) has no table to hold.
+ */
+export async function checkModelTiers(specDir: string, bundleDir: string): Promise<Violation[]> {
+  const specFile = path.join(specDir, 'dials.md');
+  const promptsDir = path.join(bundleDir, PROMPTS_DIR);
+  const violations: Violation[] = [];
+  const add = (file: string, line: number, message: string): void => {
+    violations.push({ check: 'tiers', file, line, message });
+    log.error('tiers', message, { file, line });
+  };
+  if (!await access(specFile).then(() => true, () => false)) {
+    log.debug('tiers', 'no dials specification; tiers not held', { specFile });
+    return violations;
+  }
+  const table = findTable(parseTables(await readFile(specFile, 'utf8')), TIER_TABLE_COLUMNS);
+  if (!table) {
+    add(specFile, 0, 'no table with columns Role, Brief and Tier — who runs on which model tier needs one home a machine can read');
+    return violations;
+  }
+  const briefs = (await readdir(promptsDir)).filter(name => name.endsWith('.md')).sort();
+  const covered = new Set<string>();
+  for (const row of table.rows) {
+    const role = normalizeName(row['Role']);
+    const brief = String(row['Brief'] ?? '').replace(/`/g, '').trim();
+    const tier = normalizeName(row['Tier']);
+    log.debug('tiers', 'row read', { role, brief, tier });
+    if (!TIERS.includes(tier)) {
+      add(specFile, row.__line, `role "${role}" runs on "${tier}" — write strong, standard or the таск's`);
+      continue;
+    }
+    if (brief === '' || brief === '—') continue;
+    if (!briefs.includes(brief)) {
+      add(specFile, row.__line, `role "${role}" names ${brief}, which ${promptsDir} does not ship — name the brief it is handed, or — for a dispatch with none`);
+      continue;
+    }
+    covered.add(brief);
+    if (JUDGE_BRIEFS.includes(brief) && tier !== 'strong') {
+      add(specFile, row.__line, `${brief} is a judge and role "${role}" runs it on ${tier} — a judge never runs below what it judges; write strong`);
+    }
+    if (tier === "the таск's" && !TIERED_BRIEFS.includes(brief)) {
+      add(specFile, row.__line, `role "${role}" takes the таск's tier, but ${brief} builds no таск — only ${TIERED_BRIEFS.join(', ')} does; write strong or standard`);
+    }
+  }
+  for (const brief of briefs) {
+    if (!covered.has(brief)) {
+      add(specFile, table.line, `${brief} ships in ${promptsDir} and no row of the tier table runs it — add its role and tier`);
+    }
+    if (![...JUDGE_BRIEFS, ...STANDARD_BRIEFS, ...TIERED_BRIEFS].includes(brief)) {
+      add(path.join(promptsDir, brief), 0, `${brief} is in none of JUDGE_BRIEFS, STANDARD_BRIEFS or TIERED_BRIEFS — decide whether it judges, and list it`);
+    }
+  }
+  log.info('tiers', 'model tiers checked', { rows: table.rows.length, briefs: briefs.length, violations: violations.length });
+  return violations;
 }
 
 export interface CheckOptions {
@@ -322,6 +404,8 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
     }
   }
   log.info('codebase', 'codebase.md handed only where the list allows', { rows: rows.length, briefs: outside.length });
+
+  violations.push(...await checkModelTiers(specDir, bundleDir));
 
   log.info('inputs', 'reader inputs checked', {
     gates: rows.length,

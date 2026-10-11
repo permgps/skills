@@ -630,6 +630,41 @@ export const CODEBASE_ANCHORS: readonly Anchor[] = [
 ];
 
 /**
+ * The literal text that carries «each субагент runs on its tier's model».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. The plan marks each
+ * таск and G3 holds the producer and skeleton rule mechanically; the phases
+ * that dispatch pass the tier; preflight pins the models through the helper;
+ * the reviewer judges risk whatever the mark says; the отчёт counts the tiers.
+ * Which brief runs on which tier is held by `npm run readers`, and the token
+ * rule by `npm run dials`, not here.
+ */
+export const MODEL_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/4-plan.md', literal: '| Seam | Producer task | Consumer tasks | Integration owner | Integration check |',
+    why: 'G3 finds the producers by this exact header; a reworded one hides every producer' },
+  { file: 'phases/4-plan.md', literal: '| Model | `strong` or `standard`',
+    why: 'the task-file row G3 reads and the executor is dispatched by' },
+  { file: 'phases/4-plan.md', literal: 'sole таск of wave 1',
+    why: 'the skeleton rule is mechanical only while the skeleton has a definition a machine can apply' },
+  { file: 'SKILL.md', literal: 'A judge never runs `standard`',
+    why: 'the resident rule every dispatching phase applies; a gate rests on its judge being no weaker' },
+  { file: 'phases/0-preflight.md', literal: '--config-models',
+    why: 'the one helper-owned change to the user\'s config; a hand-merged edit is the ritual it removes' },
+  { file: 'phases/3-spec.md', literal: 'on the `standard` model',
+    why: 'the existing-code reader reads, it does not judge, and runs on the cheaper tier' },
+  { file: 'phases/5-build.md', literal: 'Dispatch the executor on its таск\'s tier',
+    why: 'the build is where the plan\'s mark is spent' },
+  { file: 'phases/8-repair.md', literal: 'Every repair and retry executor runs `strong`',
+    why: 'a таск that failed once is not handed back to the tier that failed it' },
+  { file: 'phases/7-polish.md', literal: 'A доводка executor runs `strong`',
+    why: 'a polish round repairs what приёмка passed, so it runs as a repair' },
+  { file: 'prompts/reviewer.md', literal: 'whatever the task file\'s `Model` row says',
+    why: 'the plan picks who builds; the reviewer still judges risk from the diff, and neither relies on the other' },
+  { file: 'phases/7-acceptance.md', literal: 'Models: N таски on strong (<name>), M on standard (<name>)',
+    why: 'the отчёт\'s one line that says which model built what' },
+];
+
+/**
  * The literal text that carries «the phases record what the retrospective
  * reads».
  *
@@ -1046,6 +1081,12 @@ export async function checkBundle(
   // Only a bundle with a spec phase reads the existing code; Scout has none.
   if (byFile.has('phases/3-spec.md')) {
     for (const v of missingAnchors(byFile, CODEBASE_ANCHORS, 'codebase')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- each субагент runs on its tier's model ---------------------------------
+  // Only a bundle with a plan phase marks tiers; Scout has none.
+  if (byFile.has('phases/4-plan.md')) {
+    for (const v of missingAnchors(byFile, MODEL_ANCHORS, 'models')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- the отчёт hands over what only the user can do -------------------------

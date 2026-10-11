@@ -50,7 +50,17 @@ change its mind. Committing worked in the same прогон, which is the shape 
 failure has — the capabilities are separate answers and one of them being true
 says nothing about the next.
 
-**The dashboard is a fourth**: whether the user can watch the прогон depends on
+<!-- maestro:probes:model-per-subagent -->
+**The fan-out probe also settles the models.** Dispatch it on the `standard`
+model the dials resolved: it is the one dispatch whose job is to find out
+whether a per-dispatch model choice reaches the host, and it is trivial, so the
+tier costs nothing. When the host or the returned agent names a model other than
+the one requested, say so in one chat line, and carry
+`models: requested <x> for preflight probe, host reported <y>` into the first
+state's `debt.assumptions` (step 4). On a host whose subagent tool carries no
+model list the dials already degraded: nothing is requested, nothing compared.
+
+**The dashboard is a fifth**: whether the user can watch the прогон depends on
 the viewer, not the host, and it is established in step 5 by looking.
 
 Record browser verification capability separately from the dashboard viewer:
@@ -155,7 +165,10 @@ file exists to prevent.
 
 **Never rewrite a file that is already there.** It holds the user's answer, and
 the only thing that changes it afterwards is the user editing it. A прогон that
-found no file, asked, and wrote one is the whole of this step.
+found no file, asked, and wrote one is the whole of this step. **The one
+exception is not this step's:** a models pin for this host goes into the
+existing file in step 4, through the helper, which sets `models.<host>` and
+keeps every other key and value.
 
 ### 4. Prepare and publish the first state
 
@@ -170,11 +183,11 @@ run artifacts, `serve.json` and `opened.json`. Verify the copied runtime with
 publication. Only after it succeeds, remove the obsolete copied `.maestro/sync.py`
 file, if present; remove no other target file. The helper and runtime are one
 self-contained installation, without npm install, package.json or a build.
-Construct the complete contract-7 candidate in temporary JSON. It carries:
+Construct the complete contract-8 candidate in temporary JSON. It carries:
 
 | Field | Value at preflight |
 |---|---|
-| `contractVersion` | `7` for a new run; never auto-upgrade a historical state |
+| `contractVersion` | `8` for a new run; never auto-upgrade a historical state |
 | `runId` | stable for the whole прогон |
 | `slug` | from step 2 |
 | `dir` | from step 3: `<YYYY-MM-DD>-<slug>--wip`, the date being the UTC day of `startedAt` |
@@ -183,6 +196,7 @@ Construct the complete contract-7 candidate in temporary JSON. It carries:
 | `mode`, `depth`, `polish` | as resolved by the dials phase |
 | `explain` | as resolved by the dials phase |
 | `language` | as resolved by the dials phase — the бриф's own, unless a token or the config said otherwise |
+| `models` | as resolved by the dials phase: `{ strong, standard }`, `session` for a half that passes no model |
 | `dialChanges` | empty |
 | `stages` | all eight; `preflight` `active` carrying its `startedAt`, the rest `pending` carrying no stamps at all |
 | `currentStage` | `preflight` |
@@ -190,7 +204,7 @@ Construct the complete contract-7 candidate in temporary JSON. It carries:
 | `gates` | all four — `G1`, `G2`, `G3`, `G4` — `pending`, with no findings |
 | `lifecycle`, `outcome`, `finishedAt` | `active`, with no terminal outcome or closure timestamp |
 | `verification` | `version: 3`, `targetRevision: 1`, provisional acceptance input digest, `manifestDigest` as SHA-256 of empty draft, empty existing record arrays plus `sourceSnapshots`, `sourceClauses`, `manifestAudits`, `scopeMappings`, `journeys`, `negativeControls`; no invented `scopeBaseline`, `repairLimits: { perFinding: 2, total: 8 }`, and the verification-3 lists `readiness`, `defects`, `strategyReviews`, `inheritedExecutionIds`, `inheritedAttemptIds`, all empty |
-| `debt` | three empty lists: `placeholders`, `assumptions`, `emptyEnv` |
+| `debt` | three lists, `placeholders`, `assumptions`, `emptyEnv`, empty but for a models mismatch line from step 1b |
 | `additions` | empty |
 | `oneWay` | empty — the review phase appends what is hard to undo |
 | `signals` | empty — build, review, acceptance and polish append what a reader asked for or did beyond its brief |
@@ -203,6 +217,21 @@ Omit optional fields that have no value. In an active run, do not include
 `outcome` or `finishedAt`, even as JSON `null`; do the same for absent stage/task
 timestamps. Only fields explicitly defined as nullable (such as `tests`) use
 `null`.
+
+**Pin the models before the first publish.** When the dials handed a models pin
+decision, run it right after the copied runtime passes `--validate` and before
+`--publish`, piping the pair on stdin:
+
+```text
+node .maestro/sync.mts --config-models --host <id>
+```
+
+It sets `models.<host>` in `.maestro/config.json` and keeps everything else.
+Exit 0 is `written`. Exit 1 is `absent` (step 3b did not run) or
+`unreadable` (the file is not a JSON object, and is left as it was): the
+models hold for this прогон only, and the announcement says so. Exit 2 is a
+host or a pair the helper could not use; say it and go on with the resolved
+models. No pin decision, no call.
 
 Use `node .maestro/sync.mts --publish .maestro/.candidate.json` for this
 first write, adding `--holder '<token>'` when the run has a holder. When
@@ -425,6 +454,10 @@ it costs, one line each. A прогон that quietly ran its таски one at a
 because the host had no fan-out looks exactly like a прогон whose plan cut one
 таск, and this is the cheapest place to tell the two apart.
 
+**Add the models line** the dials composed, then a refused pin (`absent`,
+`unreadable`) and a model the host reported in place of the one requested, one
+line each.
+
 **Add what step 4b could not read**, one line each, naming the file and why.
 A project glossary over the limit is one line too, naming its size and the
 limit.
@@ -442,6 +475,7 @@ nothing yet to check against the user's words.
 |---|---|
 | `.maestro/<dir>/` | `<YYYY-MM-DD>-<slug>--wip`, created with a zero-byte provisional `manifest.md`; no source agreement yet |
 | `.maestro/README.md` | the register, with this run's row in progress — written by the first publish, never by hand |
+| `.maestro/config.json` | `models.<host>` set by `--config-models` when the dials handed a pin; nothing else in it changed |
 | `.maestro/<dir>/prior.md` | the memory block, the project glossary and earlier runs' decisions, written once by `--memory-read` |
 | `.maestro/state.js` | written, `preflight` active, `existingCode` recorded |
 | `.maestro/dashboard.html` | copied, mirrored, and opened |
@@ -467,7 +501,7 @@ when actually available, and the user's authorized current target.
 
 1. Read historical conformance using its original contract. Do not rewrite it.
 2. On explicit resume of a run written before contract 7, prepare an active
-   candidate under the contract the resume conversion targets (never 7): the
+   candidate under the contract the resume conversion targets (never 7 or 8): the
    run keeps its undated slug directory, gets no `dir` and no register row.
    Reconstruct obligations, unresolved findings, planning, debt, and additions
    from actual artifacts; leave G1 and G4 pending. Preserve published v4 graph,
@@ -488,7 +522,7 @@ capability leaves relevant guarantees not established and G1/G4 pending.
 
 Next action: fresh source audit and agreement, then the ordinary phase sequence.
 
-**Reopening a closed contract-7 run** — a бриф the user directs into a run
+**Reopening a closed contract-7 or contract-8 run** — a бриф the user directs into a run
 that already landed — is not a conversion. Publish an active candidate that
 keeps every published record, drops `outcome` and `finishedAt`, and sets `dir`
 back to `<YYYY-MM-DD>-<slug>--wip` with the date and slug unchanged. Publication

@@ -67,7 +67,8 @@ and by whether this phase already wrote `codebase.md`:
 | `true`, a resumed phase whose `debt.assumptions` already carries the failure line | no | no dispatch; write the spec without it, as after the failure |
 
 Dispatch a fresh subagent briefed by
-[`../prompts/existing-code-reader.md`](../prompts/existing-code-reader.md).
+[`../prompts/existing-code-reader.md`](../prompts/existing-code-reader.md), on the
+`standard` model: the run state's `models.standard`, none at all for `session`.
 Hand it `manifest.md`, `answers.md` and the absolute project root, and nothing
 else: not `brief.md`, not `prior.md`. Write the text it returns verbatim, after
 redaction (S2), into `.maestro/<dir>/codebase.md`, the way the review phase

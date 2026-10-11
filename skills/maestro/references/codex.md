@@ -24,6 +24,14 @@ established separately by live probes and workflow evaluation.
 | state-writer | coordinator-sync.mts |
 | evidence | opaque-remains-unverified |
 | retries | 2 |
+| model | per tier, from the run state's models; session passes none |
+| reasoning_effort | the session's |
+| agent_type | never |
+
+A role file's model overrides any value passed on the spawn, so `agent_type` is
+never passed: the tier would be lost without a word. Pass `model` from the run
+state's `models` for the dispatch's tier, and `reasoning_effort` equal to the
+session's when you know it.
 
 ## Preflight Probe
 

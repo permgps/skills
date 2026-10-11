@@ -19,6 +19,7 @@ parallelism, isolation and convenience — not correctness, and never silently.
 | a skills directory | installing the bundle at all | no | the host is not supported |
 | file writes | `.maestro/`, the project code, the memory file | no | the host is not supported |
 | version control | one commit per finished таск, and the history the review phase reads | yes | the прогон runs and says in the announcement that it cannot commit; the review phase reads the working tree instead of a diff, and says that it did |
+| model per subagent | the models dial | yes | the models question is not asked, every субагент runs on the session's model, and the announcement says so |
 | browser verification | real pointer/keyboard and rendered-state checks on the integrated local app | yes | affected required UI checks are unavailable and their requirements incomplete; unrelated checks continue, but completion cannot be claimed |
 
 Two of those rows are absolute and the rest are adjustments. A host that cannot
@@ -67,7 +68,7 @@ place it can be recorded cheaply.
 | Claude Code | supported. The capability set above is what v1 was written against, with one measured exception: **worktree isolation is unavailable when the session began outside a git repository**, because the host settles that question at session start and a later `git init` does not reopen it. Committing is unaffected |
 | Codex CLI | **unverified** — partial runs have been attempted; no complete successful brief-to-report run is established |
 | Codex app | **unverified** — requires separate discovery and complete-run evidence; CLI evidence does not establish app support |
-| Gemini CLI | **unverified** — the bundle installs, and no прогон has been run on it |
+| Gemini CLI | **unverified** — the bundle installs, and no прогон has been run on it. It has no model per subagent: a subagent's model is fixed in its definition file or `settings.json`, so the models dial degrades there |
 
 A row moves from *unverified* to *supported* when a прогон has been run on that
 host from бриф to отчёт, and its degradations have been written into the table
@@ -79,6 +80,34 @@ This is the same rule the install page applies to its own commands: a command
 whose output has been recorded is verified, and one that has only been read about
 is marked as unrun. A host list that grows by reading release notes is a
 compatibility claim, and this project makes one host at a time instead.
+
+## Where Each Host Lists Its Models
+
+The models dial offers only names the host reports at run time, so this table
+records where each host reports them, never which names. The dials phase reads
+the list from there; a token is a dial only when both halves are on it. The
+same rows are mirrored in `phases/0-dials.md`, and `npm run hosts` holds both
+tables to the host ids of the memory module.
+
+| Host id | Model list | Effort | Never pass |
+|---|---|---|---|
+| `claude-code` | the `model` parameter's values in the subagent tool's schema | the `effort` parameter, when the schema carries one | — (the `model` parameter takes precedence over an agent definition's model) |
+| `codex` | the `<model_catalog>` in `spawn_agent`'s description (source tag `rust-v0.161.0`, read 2026-10-09) | `reasoning_effort` | `agent_type` — a role file's model overrides any value passed on the spawn |
+| `gemini-cli` | none per dispatch: a subagent's model is fixed in its definition file or `settings.json` (documentation read 2026-10-11) | — | — |
+
+**Effort is passed equal to the session's** wherever the host takes it and the
+session's effort is known. When it is not, none is passed, and the announcement
+says that `standard` таски run at that model's default effort: a model named
+without an effort falls back to its own default and would quietly lower a
+`high` session, and saying so is the honest half when it cannot be prevented.
+
+**Preflight's probe confirms it.** The fan-out probe is dispatched on the
+`standard` model. When the host or the returned agent names a model other than
+the one requested, that is one chat line and one `debt.assumptions` entry,
+`models: requested <x> for <role>, host reported <y>`. Writing a host agent file
+to work around a host — `.gemini/agents/*.md`, a Codex role file — would edit
+the user's project or settings outside S5, which is why Gemini CLI degrades
+instead.
 
 ## Instruction File At Session Start
 
@@ -188,6 +217,12 @@ or return operation; exhaustion leaves the operation incomplete. A retry never
 changes the role's input boundary. Opaque envelopes or missing read observations
 remain evidence limitations; do not claim exact input visibility from a child's
 self-report or synthesize a receipt/model identity.
+
+Pass `model` from the run state's `models` for the dispatch's tier, none for
+`session`, and `reasoning_effort` equal to the session's. Never pass
+`agent_type`: a role file's model overrides the value passed on the spawn, and
+the tier would be lost without a word. `references/codex.md` declares the three
+as `model`, `reasoning_effort` and `agent_type` rules.
 
 Executors alone write project code. Each handoff names an absolute workspace,
 owned files and explicit cwd for every shell call. Concurrent editing requires

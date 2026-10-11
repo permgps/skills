@@ -231,10 +231,10 @@ where the прогон keeps its prose; the state carries what the dashboard sho
 
 ## The Dials
 
-Everything typed after `/maestro` splits into six parts: the register, the
-language, the mode, the depth, the finish, and the бриф. Bare words, no dashes.
-**Anything not recognised as a dial is бриф text** — a word the user meant
-literally is never stolen by a dial.
+Everything typed after `/maestro` splits into seven parts: the register, the
+language, the mode, the depth, the finish, the models, and the бриф. Bare words,
+no dashes. **Anything not recognised as a dial is бриф text** — a word the user
+meant literally is never stolen by a dial.
 
 **Register** — how you word what the user reads. Built-in default for `explain`:
 `normal`; a project pins its own in `.maestro/config.json`, and the first прогон
@@ -280,8 +280,10 @@ project asks which one. An argument always wins over a pinned mode, for that
 ([`phases/7-polish.md`](phases/7-polish.md)), comparing the running build
 against the user's own reference.
 
-A new capability always attaches to a parent требование. Depth buys thoroughness
-beneath the бриф; it never buys a direction away from it.
+**Models** — which model each субагент runs on: one bare `<strong>/<standard>`
+word whose halves are names the host reports. Built-in default for `models`:
+`session/session`; a project pins its own, asked once per host. Fixed for the
+whole прогон, never changed at a boundary.
 
 **The register and the language are the two dials that may change inside a
 phase.** Either takes effect on the next sentence, neither is recorded in a
@@ -289,11 +291,9 @@ phase.** Either takes effect on the next sentence, neither is recorded in a
 part of the build, so there is nothing for the отчёт to attribute to them. The
 new value reaches `state.js` at the next ordinary write.
 
-**Every other dial may be changed mid-прогон, at a phase boundary and never
-inside one.**
-The new value applies to phases not yet started; phases already passed are not
-re-run, because a прогон does not go backwards when the user changes their mind
-about how much to be asked. Switching to a mode with more gates adds them for
+**Every other dial but the models may be changed mid-прогон, at a phase boundary
+and never inside one.** The new value applies to phases not yet started; phases
+already passed are not re-run. Switching to a mode with more gates adds them for
 what is left; switching to one with fewer never removes a gate that has already
 passed. Record the change in `dialChanges[]` with the phase it took effect at, so
 the отчёт can say which parts of the прогон were produced under which settings.
@@ -428,6 +428,9 @@ This skill explicitly requests native subagent delegation for its independent
 roles, including executors, audits, readers, review, polish and diagnosis.
 On Codex use the demand-loaded runtime recipe selected by preflight and each
 dispatch phase. Never inherit coordinator history into an independent role.
+Pass each dispatch its tier's model from `models` (`session` passes none), effort
+as the session's: judges and repairs `strong`, a build executor its таск's tier,
+the existing-code reader and the probe `standard`. A judge never runs `standard`.
 
 An independent reader, reviewer, or executor is a separate agent dispatch with
 its own bounded inputs and a returned result. A summary you write yourself is
@@ -453,11 +456,8 @@ reader who has seen the specification confirms the specification, and a reader
 holding the бриф's original text beside the манифест answers from the looser of
 the two exactly where they disagree.
 
-**The original text is withheld and the additions are not**, which reads like an
-inconsistency and is the point. The original text is what the манифест was
-numbered from, and it was shown back to the user at G1 as the agreed contract;
-an addition never passed that gate, so it travels as the user's words alone and
-never as a reading of them that anybody agreed to.
+**The original text is withheld and the additions are not**: the text became
+the манифест agreed at G1, and an addition never passed that gate.
 
 When a gate fails, open
 [`references/failure-modes.md`](references/failure-modes.md) — the catalogue of

@@ -7,7 +7,7 @@ that fails is not a warning: the phase is redone.
 |---|---|---|
 | G1 | briefing | Every требование has a status and no unexplained open entry; every `answers.md` entry that offered options marks exactly one recommended and records the chosen option in full; contract 5 also requires a fresh returned independent source audit and frozen initial agreement |
 | G2 | spec | Every live требование is dispositioned; independent intent and raw-reference passes find no unresolved mandatory coverage gap |
-| G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner that transitively depends on each integration dependency; no two таски share a file unless one transitively blocks the other; a task reader finds each task executable, and a plan-consistency reader given every task file finds no coordination defect between them |
+| G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner that transitively depends on each integration dependency; no two таски share a file unless one transitively blocks the other; a task reader finds each task executable, and a plan-consistency reader given every task file finds no coordination defect between them; from contract 8, every producer in the Seams table and the skeleton (the sole таск of wave 1) are `strong`, and each task file's `Model` row agrees with `tasks[].model` |
 | G4 | acceptance | Current, applicable evidence and independent discovery cover the current contract; failures and incomplete checks are reconciled under [`verification.md`](verification.md); contract 6 also closes `completed` with no open defect, and stops after an exhausted budget only with a `budget_exhausted` strategy review |
 
 ## Evidence
@@ -16,7 +16,7 @@ that fails is not a warning: the phase is redone.
 |---|---|
 | G1 | The status map has no unexplained open entries; each `answers.md` entry with options carries a gist, one recommendation, an `Answer:` and a `Chosen:` that names an offered option or `own answer`; v5 has a current source/manifest audit and initial agreement baseline |
 | G2 | Status map, obligation/source coverage map, independent intent and raw-reference discovery findings |
-| G3 | Requirement → obligation → implementation task and obligation → check → execution task mappings, including verification-only tasks |
+| G3 | Requirement → obligation → implementation task and obligation → check → execution task mappings, including verification-only tasks; from contract 8, the Seams table's Producer task ids and each task file's `Model` row against `tasks[].model` |
 | G4 | Current check executions, complete coverage reviews, union of substantiated findings, and a fresh acceptance round |
 
 The requirement id is what makes a finding evidence rather than an opinion. A

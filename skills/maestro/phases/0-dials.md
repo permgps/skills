@@ -6,9 +6,10 @@ and none of them re-resolves.
 
 ## What The Arguments Contain
 
-Everything typed after `/maestro` is six things: a **register**, a **language**,
-a **mode**, a **depth**, a **finish**, and the бриф. Dials are bare words, no
-dashes.
+Everything typed after `/maestro` is seven things: a **register**, a
+**language**, a **mode**, a **depth**, a **finish**, the **models**, and the
+бриф. Dials are bare words, no dashes; the models are one bare
+`<strong>/<standard>` word, under *Models* below.
 
 **Anything you do not recognise as a dial is бриф text.** A word the user meant
 literally is never taken as a dial.
@@ -110,15 +111,77 @@ Default: off.
 `polish` asks nothing and approves nothing with the user. It changes no mode
 cell.
 
+## Models
+
+Which model each субагент runs on. There are two tiers: **`strong`** runs every
+judge, every `strong` таск and every repair; **`standard`** runs `standard`
+таски, the existing-code reader and the preflight probe. You stay on the
+session's model. Who is dispatched on which tier is the delegation rule in
+`SKILL.md`; this section only resolves which model each tier names.
+
+Built-in default for `models`: `session/session`.
+
+| Models | Strong | Standard | What you get |
+|---|---|---|---|
+| `session/session` | `session` | `session` | every субагент on the session's model; the only value on a host that cannot choose |
+| `session/next` | `session` | the reported model one tier below the session's | recommended: judges, repairs and producers keep the session's model |
+| `session/cheapest` | `session` | the cheapest reported model | the largest saving; every таск is still reviewed on `strong` |
+| `<strong>/<standard>` | as typed | as typed | a free choice; a `standard` stronger than `strong` is accepted and said in the announcement |
+
+`session` means **pass no model**: the субагент inherits the session's, and
+keeps following it if the session's model changes. Rank "one tier below" and
+"cheapest" over the names the host reports, never from a list you remember.
+When you cannot rank them, offer only `session/session` and the free choice,
+and say why in one line.
+
+**The token.** An argument is the models dial when it is one bare word holding
+exactly one `/`, with both halves non-empty, and both halves are model names
+this host reports — character for character, from the list the table below
+says where to read. Anything else stays бриф text: a URL, a path,
+`session/sonnet` (`session` is no reported name), a lone `sonnet`. A second,
+different models token follows the ambiguity rule under *Resolution*. On a host
+with no model list no token is ever a dial.
+
+**The host** is the one this session runs on — `claude-code`, `codex` or
+`gemini-cli`, the ids `9-memory.md` uses. Preflight's probe confirms what you
+read here; it does not choose the host.
+
+| Host id | Model list | Effort | Never pass |
+|---|---|---|---|
+| `claude-code` | the `model` parameter's values in the subagent tool's schema | the `effort` parameter, when the schema carries one | — (the `model` parameter takes precedence over an agent definition's model) |
+| `codex` | the `<model_catalog>` in `spawn_agent`'s description | `reasoning_effort` | `agent_type` — a role file's model overrides any value passed on the spawn |
+| `gemini-cli` | none per dispatch: a subagent's model is fixed in its definition file or the host's own settings | — | — |
+
+**Effort is passed equal to the session's** wherever the host takes it and you
+know the session's. When you do not, pass none and say in the announcement that
+`standard` таски run at that model's default effort: a model named without an
+effort falls back to its own default, which can quietly lower a `high` session.
+
+<!-- maestro:degrades:model-per-subagent -->
+**A host with no model list degrades.** The models question is not asked, the
+models are `session/session`, every субагент runs on the session's model, and
+the announcement says so. Nothing is pinned.
+
+**The pin.** `models.<host>` in `.maestro/config.json` counts only when both
+halves are `session` or names this host reports now. A pin naming a model the
+host no longer reports is **stale**: treat it as absent, ask again, and say in
+the announcement that the pin was stale. An invalid `models` key is ignored on
+its own, like any other key. When the file will not parse, treat the pin as
+absent; preflight's write will then be refused `unreadable`, and the
+announcement says the answer holds for this прогон only.
+
 ## The Project's Defaults
 
 Read `.maestro/config.json` before resolving, if it is there.
 
 ```json
-{ "configVersion": 1, "mode": "full", "explain": "plain" }
+{ "configVersion": 1, "mode": "full", "explain": "plain",
+  "models": { "claude-code": { "strong": "session", "standard": "sonnet" } } }
 ```
 
-Each of the two comes from the first of these that supplies it:
+`models` holds one pin per host, read under *Models* above: a token in the
+arguments, then `models.<host>`, then the question below. The mode and the
+register each come from the first of these that supplies it:
 
 1. a token for that dial in the arguments,
 2. its key in the file, when the value is one of the set,
@@ -190,6 +253,30 @@ Either answer produces a file: the chosen values, or `null` for a dial the user
 declined to pin. **You do not write it here** — hand the decision to preflight,
 which creates everything under `.maestro/`.
 
+### When This Host Has No Pin
+
+Asked once per project and host, whenever the host reports a model list and
+`models.<host>` is absent or stale — on a first прогон after the register and
+the mode, in the register just chosen. A token with a valid pin beside it asks
+nothing: the token holds for this прогон only. **Ask it
+in `full` too**, for the reason the two questions above are asked there: it is
+about the tool.
+
+| What the arguments named | What you ask |
+|---|---|
+| no models token | the four options of *Models*, each with the two names in brackets — `session/next` (<session's name> / <next one down>) — and `session/next` marked recommended |
+| a models token | pin these? |
+
+In `normal`, the option table under *Models* with the names filled in. In
+`plain`, explain the trade-off before the options, in ordinary words: the most
+important work runs on the strongest model, and the ordinary pieces can go to a
+simpler one, which is cheaper and faster, because every piece is checked. Give
+the model names in brackets, never as the option itself.
+
+The answer is the models pin decision: the pair to pin for this host, or none.
+**You write nothing here** — preflight writes it into the existing file, through
+the helper.
+
 ## Resolution
 
 1. Scan the arguments left to right for dial tokens.
@@ -203,7 +290,9 @@ which creates everything under `.maestro/`.
      that mode may not ask.
 4. An unset depth or finish takes its default. An unset mode or register comes
    from *The Project's Defaults* above. An unset language comes from the бриф,
-   through the three steps under *Language*.
+   through the three steps under *Language*. Unset models come from this host's
+   pin, then the question under *When This Host Has No Pin*; on a host with no
+   model list they are `session/session` and nothing is asked.
 5. A trigger phrase inside a longer sentence of бриф text does **not** set a
    dial. Dials are typed as bare words; they are not detected by meaning.
 
@@ -219,6 +308,10 @@ After resolution and before the manifest phase, state in one block:
 - where the mode or the register came from, whenever it was not typed: the path
   of the config file, or the built-in default. An argument that overrode a
   pinned value is said to hold for this прогон only.
+- the models: both names, `session` given as the session model's actual name,
+  where they came from (typed, the pin, the answer, the built-in default), a
+  stale pin, the effort line when the session's effort is unknown, and the
+  degradation line on a host with no model list.
 
 **Write the announcement in the register and the language it names.** A block
 explaining, in the словарь's own terms, that the прогон will speak plainly from
@@ -233,6 +326,7 @@ Use these:
 | `strict` | nothing beyond the бриф will be added |
 | `manual` | the run will wait for your approval twice |
 | `polish` | up to three доводка rounds run after приёмка |
+| models | judges, repairs, the skeleton and producers run on <strong>; every other таск on <standard> |
 | `plain` | всё объясняется простыми словами; сказать «как обычно» — и вернётся обычный язык. In `en`: everything is explained in ordinary words; say «as usual» to go back |
 
 The announcement is shown in **every** mode, `full` included. It is a statement,
@@ -252,13 +346,19 @@ not a question. Do not wait for a reply.
   change inside a phase, either takes effect on the next sentence, and neither
   is recorded anywhere — see *Changing It Mid-Прогон* under *Register* and under
   *Language* above.
+- **The models never change inside a прогон**, not even at a phase boundary: the
+  tier of each таск is fixed at the cut and the models here. Answer a request in
+  one line — the change applies from the next прогон, by editing `models.<host>`
+  in `.maestro/config.json`.
 
 ## Output Of This Phase
 
-- `explain`, `language`, `mode`, `depth` and `polish`, resolved.
+- `explain`, `language`, `mode`, `depth`, `polish` and `models`, resolved —
+  `models` as `{ strong, standard }`, `session` for a half that passes no model.
 - The announcement text, composed and ready, in the resolved register.
 - The config decision, when this is a first прогон: the values to pin, each of
   them or `null`.
+- The models pin decision: the pair to pin for this host, or none.
 
 The announcement is **shown by preflight**, once the run state exists — a dial
 announced before there is a run to announce it for is a promise with nothing

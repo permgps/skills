@@ -64,7 +64,8 @@ One таск per difference, cut the way the plan phase cuts: it owns its files,
 is one executor's whole job, and it says what *done* means in terms somebody
 else can check. Hand each over with
 [`../prompts/executor.md`](../prompts/executor.md), one commit each, and send
-each one through ревью exactly as a build таск goes.
+each one through ревью exactly as a build таск goes. A доводка executor runs
+`strong`, as a repair does: the run state's `models.strong`, none for `session`.
 
 **You write none of this code** (`S5`), and you do not mark a доводка таск
 `done` — that word is written by the review phase, here as everywhere.

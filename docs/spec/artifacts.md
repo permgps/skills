@@ -36,8 +36,11 @@ its precedence and the question that fills it belong to
 [`dials.md`](dials.md). It sits beside the run directories rather than inside
 one because a setting that lived in a run directory would be a setting the
 next прогон could not find. Preflight writes it on the first run in a project
-and never again; after that the user edits it, which is why it is the only
-mutable artifact here with no phase that rewrites it.
+and never again; after that the user edits it. **The one change a прогон makes
+to it afterwards is `models.<host>`**, the models pinned for a host that had
+none, set by the helper's `--config-models` in preflight; it keeps every other
+key and value, and refuses a file that is missing or not a JSON object rather
+than create or repair one.
 
 **The run directory is named by its state, not by its slug.** Its name is the
 state's `dir` ([`state-contract.md`](state-contract.md), *Version 7 Extension*):
@@ -127,10 +130,12 @@ requirement-to-obligation-to-task and obligation-to-check-to-owner paths, that
 every implementation owner is an integration dependency of the check, that the
 check's execution owner transitively depends on each integration dependency,
 that two таски sharing a path in `files` or `zone` are ordered by `blockedBy`,
-and that the task graph has no cycle or missing prerequisite. It does not read
-task files: whether a declared prerequisite, seam or completion artifact is
-consistent across them is the plan-consistency reader's verdict, recorded
-against G3. Headless rendered criteria are valid task checks; a visible viewer
+and that the task graph has no cycle or missing prerequisite. From contract 8
+it also reads the Seams table of `interfaces.md` and each task file's `Model`
+row, and nothing else of either: every producer and the skeleton are `strong`,
+and each row agrees with `tasks[].model`. Whether a declared prerequisite, seam
+or completion artifact is consistent across task files is still the
+plan-consistency reader's verdict, recorded against G3. Headless rendered criteria are valid task checks; a visible viewer
 takeover is not.
 
 `reference.md` is a neutral projection of declared source identity, role,

@@ -127,8 +127,8 @@ preflight records it in the run state as `existingCode`
 | `true`, the reader fails or returns nothing usable | no | no file; one `existing code not read before the spec:` line in `debt.assumptions`, then the spec |
 | `true`, a resumed phase whose `debt.assumptions` already carries that line | no | no dispatch; the spec is written without it, as after the failure |
 
-No stop is added, and the user is not asked anything here. The failure line is
-what makes the read once per прогон: a resumed phase that finds it does not
+The reader runs on the `standard` tier. No stop is added, and the user is not
+asked anything here. The failure line is what makes the read once per прогон: a resumed phase that finds it does not
 spend a second reader or append a second line.
 
 **The reader** is given `manifest.md`, `answers.md` and the repository, and
@@ -314,7 +314,21 @@ names its Test surface: the signatures from `interfaces.md` its tests go
 through, never an internal module. The Seams table gives each seam its
 producer, consumers, integration owner and integration check. Fewer seam rows
 are better, because each is a contract two executors must both meet. The user
-never confirms a seam: they cannot judge one.
+never confirms a seam: they cannot judge one. Its header is exactly
+`| Seam | Producer task | Consumer tasks | Integration owner | Integration check |`,
+and a Producer task cell starts with таск ids — one, several separated by
+commas, or a range `02–13` — optionally followed by prose.
+
+**Each task file names who builds it.** Its `Model` row, between *Depends on*
+and *Prerequisites*, is `strong` or `standard`, and a `strong` таск says why:
+producer of a seam, skeleton, `risk:<category>`, or `hard: <one line>`. The
+rule is mechanical first: a таск whose id is in a Producer task cell, and the
+sole таск of wave 1 — the skeleton, a wave of its own by definition — are
+`strong`, and G3 checks both. Risk and a hard core are judgement calls with
+their one-line reason. Everything else is `standard`. The plan writes the
+same word into `tasks[].model` and nothing changes it: a repair and a retry run
+`strong`, and a context handoff keeps the tier ([`dials.md`](dials.md) ›
+*Models*).
 
 **The project's commands are written once.** `interfaces.md` opens with a
 Project conventions table of five rows: the test, typecheck and lint commands,
@@ -498,7 +512,8 @@ already what the review read.
 A таск that runs out of context before it is done leaves
 `tasks/NN-<slug>-handoff.md` — what is finished, what is not, and what the next
 executor needs — and the same таск is handed over again with that file added to
-what it is given. **This is the only case where one таск is handed over twice.**
+what it is given. **This is the only case where one таск is handed over twice**,
+and the handoff keeps the таск's tier: it continues the same build.
 
 The handoff exists for surprises. A plan that produces one per таск cut its
 таски too large, and the granularity rules above are what to fix, not the
@@ -597,8 +612,10 @@ and permissions, money, deleting data, secrets, and messages sent to third
 parties. Four of them use the words `S4` and `S2` already use
 ([`safety.md`](safety.md)). Sign-in and permissions has no S-rule of its own.
 
-- **Who decides.** The reviewer decides from the diff whether a category applies.
-  The plan does not mark таски as risky, so the plan phase and G3 do not change.
+- **Who decides.** The reviewer decides from the diff whether a category applies,
+  whatever the task file's `Model` row says. The plan picks who builds, and a
+  risky таск may be `strong`; the reviewer still judges every diff against the
+  five categories, and neither relies on the other.
 - **When it blocks.** A risk finding blocks only with a concrete counterexample:
   an input, a request or a caller the diff lets through to the harm. Without
   one it is an observation. Suspicion is an observation by rule, not by
@@ -756,7 +773,7 @@ and passing it quietly are the same mistake made in opposite directions.
 
 | Section | Holds |
 |---|---|
-| What was asked | every `R##`, its status, and where it landed |
+| What was asked | every `R##`, its status, and where it landed, and one line saying how many таски ran on which model |
 | Disagreements | G4's findings and failed/incomplete requirements, each against its требование and check evidence |
 | Assumptions | every decision taken on the user's behalf, every unfilled variable by name, and every wording whose translation was uncertain |
 | Questions to forward | every placeholder standing in for a fact nobody supplied, as a questionnaire the user can send on to whoever knows |
@@ -767,6 +784,13 @@ and passing it quietly are the same mistake made in opposite directions.
 Fixed, because a отчёт whose shape is decided per прогон is a отчёт two прогона
 cannot be compared through. A section with nothing in it says so in one line
 rather than disappearing; an absent section reads as a section nobody wrote.
+
+*What was asked* ends with `Models: N таски on strong (<name>), M on standard
+(<name>)`, counted from `tasks[].model`; `session` is written as the session's
+model followed by "(session)". A contract-7 state writes `Models: not recorded —
+this прогон began before the models dial`. `npm run report` compares section
+names only, so this cell and its twin in `7-acceptance.md` are kept in step by
+hand.
 
 When приёмка runs a second time — after a failed G4 sent its disagreements to
 repair — the sections are written again, under that round's date, beneath
@@ -1071,7 +1095,8 @@ holds in the build, and a retry travels to an executor like everything else.
 
 ### What A Retry Is Given
 
-Whatever its door carries, and nothing else. The task file always; then the
+A retry runs `strong`, whatever its таск's tier. Whatever its door carries, and
+nothing else. The task file always; then the
 failure exactly as it came back, or the review's blocking finding, or the G4
 disagreement, or the `D##` together with what the таск it depends on built. The
 handoff too, if the таск left one. Not `spec.md`, not the манифест, not the other таски — the same

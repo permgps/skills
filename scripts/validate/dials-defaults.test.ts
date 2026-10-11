@@ -6,9 +6,11 @@ import path from 'node:path';
 
 import {
   checkDialsDefaults,
+  countLiteral,
   findDeclarations,
   readValues,
   DIALS,
+  TOKEN_RULE,
   type DialSpec,
   type Violation,
 } from './dials-defaults.ts';
@@ -243,7 +245,7 @@ test('prose about the built-in default without a dial declares nothing', () => {
 });
 
 test('the shipped dial list is what the real files are held to', () => {
-  assert.deepEqual(DIALS.map(dial => dial.dial), ['mode', 'explain', 'language']);
+  assert.deepEqual(DIALS.map(dial => dial.dial), ['mode', 'explain', 'language', 'models']);
 });
 
 // These files are prose wrapped at eighty columns. A reflow that moved a word
@@ -318,4 +320,82 @@ test('the two chosen dials are unaffected by the derived one beside them', async
     dials: [MODE, REGISTER, LANGUAGE],
   });
   assert.deepEqual(violations, []);
+});
+
+// The models dial: its table lives in the spec and the dials phase, SKILL.md
+// carries only the default sentence, and the token rule stands once on each side.
+const MODELS: DialSpec = DIALS.find(dial => dial.dial === 'models')!;
+
+const MODELS_TABLE = (rows: string): string => `
+| Models | Strong | Standard |
+|---|---|---|
+${rows}`;
+const MODELS_ROWS = '| `session/session` | `session` | `session` |\n| `session/next` | `session` | one tier below |\n';
+const TOKEN = `A slash word is the dial only when ${TOKEN_RULE}.\n`;
+
+const withModels = (extra: Overrides = {}): Overrides => ({
+  spec: `${SPEC}
+| Models | Strong | Standard | Default |
+|---|---|---|---|
+| \`session/session\` | \`session\` | \`session\` | yes |
+| \`session/next\` | \`session\` | one tier below | |
+
+${TOKEN}`,
+  phase: `${PHASE}
+Built-in default for \`models\`: \`session/session\`.
+${MODELS_TABLE(MODELS_ROWS)}
+${TOKEN}`,
+  skill: `${SKILL}
+**Models** — built-in default for \`models\`: \`session/session\`.
+`,
+  dials: [MODE, MODELS],
+  ...extra,
+});
+
+test('the models dial passes with its table in the spec and the dials phase, and only its default in SKILL.md', async () => {
+  assert.deepEqual(await violationsFor(withModels()), []);
+});
+
+test('a slashed default is read whole, never cut at the slash', () => {
+  assert.deepEqual(findDeclarations('Built-in default for `models`: `session/session`.'),
+    [{ dial: 'models', value: 'session/session', line: 1 }]);
+});
+
+test('a models value the specification defines and the dials phase omits is reported', async () => {
+  const phase = withModels().phase!.replace('| `session/next` | `session` | one tier below |\n', '');
+  const found = await violationsFor(withModels({ phase }));
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.file, /0-dials\.md$/);
+  assert.match(found[0]!.message, /^models "session\/next" is defined in .*dials\.md and missing here$/);
+});
+
+test('a wrong models default in SKILL.md is reported on that file', async () => {
+  const skill = withModels().skill!.replace('`session/session`.', '`session/next`.');
+  const found = await violationsFor(withModels({ skill }));
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.file, /SKILL\.md$/);
+  assert.match(found[0]!.message, /declares "session\/next" as the built-in default for "models"; .* says "session\/session"/);
+});
+
+test('a token rule missing from the dials phase is reported there, and only there', async () => {
+  const phase = withModels().phase!.replace(TOKEN, '');
+  const found = await violationsFor(withModels({ phase }));
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.file, /0-dials\.md$/);
+  assert.match(found[0]!.message, /"both halves are model names this host reports" is missing/);
+});
+
+test('a token rule missing from the specification is reported there, and only there', async () => {
+  const spec = withModels().spec!.replace(TOKEN, '');
+  const found = await violationsFor(withModels({ spec }));
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.file, /spec[\\/]dials\.md$/);
+});
+
+test('a token rule reflowed across lines still counts, and one stated twice is reported', async () => {
+  assert.equal(countLiteral('both halves are model\nnames this host reports', TOKEN_RULE), 1);
+  const phase = `${withModels().phase!}${TOKEN}`;
+  const found = await violationsFor(withModels({ phase }));
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.message, /stated 2 times/);
 });

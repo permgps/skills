@@ -190,7 +190,12 @@ running at the same time agree without talking to each other.
   recorded that.
 - It ends with a **Seams** table — seam, producer task, consumer tasks,
   integration owner, integration check — one row per route, DTO, migration,
-  port or file that one таск produces and another consumes. A seam with no
+  port or file that one таск produces and another consumes. Its header is
+  exactly `| Seam | Producer task | Consumer tasks | Integration owner | Integration check |`.
+  A **Producer task** cell starts with таск ids — `02`, `02, 05`, a range
+  `02–13` — and may go on in prose after them (`02–13, one file each`); G3
+  reads the ids and nothing else, so a producer named only in words is a
+  finding. A seam with no
   row is a seam two executors will each guess at. Fewer seam rows are better:
   each row is a contract two executors must both meet. The user never confirms
   a seam, because they cannot judge one.
@@ -219,6 +224,7 @@ Each file carries:
 | Test surface | the signatures from `interfaces.md` this таск's tests go through — never an internal module |
 | Done means | what the executor checks before returning, in terms it can check |
 | Depends on | the таск ids that must finish first, or none; execution-only tasks may have no implementation files |
+| Model | `strong` or `standard`; a `strong` таск says why: producer of <seam>, skeleton, risk:<category>, or hard: <one line> |
 | Prerequisites | each thing this таск consumes, named with the таск that produces it and its row in the Seams table of `interfaces.md` |
 | Forbidden writes | always `.maestro/`, plus every zone another таск owns |
 | Completion artifacts | what must exist when the таск is done; every one lies inside the files this таск owns |
@@ -358,11 +364,31 @@ know the numbers were rewritten, as the прогон losing its own plan. If a w
 genuinely has to change, that is a re-cut: one line to the user saying why, and a
 `D##` row if the code forced it.
 
+### 6b. Which model builds it
+
+Mark each таск `strong` or `standard` now, after the waves, because the
+skeleton rule needs them. In this order:
+
+1. **Mechanical.** A таск is `strong` when its id appears in a **Producer
+   task** cell of the Seams table, or when it is the sole таск of wave 1 — the
+   skeleton, a wave of its own by definition. A one-таск plan is therefore
+   `strong`. G3 checks both.
+2. **By judgement.** A таск is `strong` when it touches one of the five risk
+   categories — `access`, `money`, `deletion`, `secrets`, `messages` — or its
+   core is a hard algorithm or an unfamiliar integration. Its `Model` row
+   gives the reason in one line: `risk:money`, `hard: <what is hard>`.
+3. **Everything else is `standard`.**
+
+The tier is fixed here and never changed. A repair and a retry run `strong`
+whatever the row says; a context handoff keeps the таск's tier. The plan picks
+who builds, the reviewer still judges every diff against the five categories
+whatever the row says, and neither relies on the other.
+
 ### 7. Write the таски into the run state
 
 **The whole `tasks[]` array is written now, when the таски are cut** — not as
 each one starts. Every entry carries its id, title, `status`, `requirementIds`,
-`blockedBy`, `wave`, `zone`, and the three counters at zero.
+`blockedBy`, `wave`, `zone`, `model`, and the three counters at zero.
 
 - `status` is **`queued`**, and that is the only status a cut таск may be
   written with. `pending` is a стадия's word and a гейт's — `0-preflight.md` two
@@ -375,6 +401,7 @@ each one starts. Every entry carries its id, title, `status`, `requirementIds`,
 - `blockedBy` holds the таск ids that must finish first.
 - `wave` and `zone` come from step 6. The dashboard groups the build by wave;
   the zone is why two таски in one wave can be trusted not to collide.
+- `model` comes from step 6b, the same word as the task file's `Model` row.
 - `retries`, `repairs` and `handoffs` all start at `0`, and `files` starts empty.
   A counter created halfway through a прогон is a counter somebody increments
   from nothing, and the arithmetic downstream never says so.
@@ -425,7 +452,10 @@ The map between требования and таски holds in **both** directions
 
 The mechanical half also refuses two таски that share a path in their files or
 zone with neither blocking the other, and a check whose execution owner does
-not transitively depend on each of its integration prerequisites.
+not transitively depend on each of its integration prerequisites. From
+contract 8 it refuses a producer or the skeleton that is not `strong`, a
+Producer task cell that names no таск id, and a task file whose `Model` row
+disagrees with `tasks[].model`.
 
 One direction alone is worth little. A cut can cover every требование and still
 carry two таски invented along the way, and it can be entirely traceable while

@@ -108,6 +108,8 @@ export async function checkCodexRuntime(bundleDir: string): Promise<Violation[]>
     fork_turns: 'none', inputs: 'role-prompt-and-allowed-artifacts', returns: 'observed-final-by-child-id',
     workspace: 'absolute-explicit-cwd', 'editing-wave': 'one-without-concurrency-or-worktrees',
     'state-writer': 'coordinator-sync.mts', evidence: 'opaque-remains-unverified', retries: '2',
+    model: "per tier, from the run state's models; session passes none",
+    reasoning_effort: "the session's", agent_type: 'never',
   };
   for (const [rule, value] of Object.entries(expected)) {
     const rows = rules?.rows.filter(row => clean(row['Rule']) === rule) ?? [];
@@ -217,6 +219,42 @@ export function checkMemoryFiles(
   return violations;
 }
 
+/** The columns of *Where Each Host Lists Its Models*, in hosts.md and its mirror in the dials phase. */
+const MODEL_LIST_COLUMNS = ['Host id', 'Model list', 'Effort'];
+
+/**
+ * Where each host lists its models, against the host ids the runtime knows.
+ * The table in hosts.md is the fact's home and the dials phase carries the copy
+ * a прогон reads, so both must name exactly the hosts `HOST_IDS` names: a host
+ * missing from either is a host whose models dial reads nothing.
+ */
+export function checkModelLists(
+  files: ReadonlyArray<{ file: string; markdown: string }>, hostIds: readonly string[],
+): Violation[] {
+  const violations: Violation[] = [];
+  const add = (file: string, line: number, message: string): void => {
+    violations.push({ check: 'model-list', file, line, message });
+    log.error('model-list', message, { file, line });
+  };
+  for (const { file, markdown } of files) {
+    const table = findTable(parseTables(markdown), MODEL_LIST_COLUMNS);
+    if (!table) {
+      add(file, 0, 'no table with columns Host id, Model list and Effort — say where each host lists the models a субагент may run on');
+      continue;
+    }
+    const named = table.rows.map(row => clean(row['Host id'])).filter(id => id !== '');
+    log.debug('model-list', 'hosts read', { file, named });
+    for (const id of named) {
+      if (!hostIds.includes(id)) add(file, table.line, `the model-list table names ${id}, which HOST_IDS does not — use a host id the memory module knows`);
+    }
+    for (const id of hostIds) {
+      if (!named.includes(id)) add(file, table.line, `the model-list table has no row for ${id} — say where that host lists its models, or that it has none`);
+    }
+  }
+  log.info('model-list', 'model lists checked', { files: files.length, violations: violations.length });
+  return violations;
+}
+
 export async function checkHostDegradation(options: CheckOptions = {}): Promise<Violation[]> {
   const specDir = options.specDir ?? 'docs/spec';
   const bundleDir = options.bundleDir ?? 'skills/maestro';
@@ -235,10 +273,16 @@ export async function checkHostDegradation(options: CheckOptions = {}): Promise<
   // A bundle without the memory module (a synthetic fixture) has nothing to hold the table to.
   const memoryModule = path.join(bundleDir, MEMORY_MODULE);
   if (await access(memoryModule).then(() => true, () => false)) {
-    const { MEMORY_FILES_BY_HOST } = await import(pathToFileURL(path.resolve(memoryModule)).href) as {
+    const { MEMORY_FILES_BY_HOST, HOST_IDS } = await import(pathToFileURL(path.resolve(memoryModule)).href) as {
       MEMORY_FILES_BY_HOST: Record<string, HostMemoryFiles>;
+      HOST_IDS: readonly string[];
     };
     violations.push(...checkMemoryFiles(spec, specFile, MEMORY_FILES_BY_HOST, memoryModule));
+    const dialsFile = path.join(bundleDir, PHASES_DIR, '0-dials.md');
+    violations.push(...checkModelLists([
+      { file: specFile, markdown: spec },
+      { file: dialsFile, markdown: await readFile(dialsFile, 'utf8') },
+    ], HOST_IDS));
   }
 
   const table = findTable(parseTables(spec), [

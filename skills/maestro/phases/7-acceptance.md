@@ -153,7 +153,7 @@ sections under its own date rather than replacing what is there:
 
 | Section | Holds |
 |---|---|
-| What was asked | every `R##`, its status, and where it landed |
+| What was asked | every `R##`, its status, and where it landed, and one line saying how many таски ran on which model |
 | Disagreements | the G4 findings, each quoted against its требование |
 | Assumptions | `debt.assumptions` and `debt.emptyEnv` as the прогон recorded them — every decision taken on the user's behalf, every unfilled variable by name — plus any wording whose translation was uncertain |
 | Questions to forward | `debt.placeholders`, as a questionnaire the user can send on as it is — every placeholder standing in for a fact nobody supplied |
@@ -171,6 +171,12 @@ explain a row but never replace its structured result or declare an unsupported
 
 A section with nothing in it says so in one line. An absent section reads as a
 section nobody wrote.
+
+**What was asked ends with the models line**, counted from `tasks[].model`:
+`Models: N таски on strong (<name>), M on standard (<name>)`. `<name>` is the
+model the run state's `models` names; `session` is written as the session's
+model with "(session)" after it. A contract-7 state writes
+`Models: not recorded — this прогон began before the models dial`.
 
 **Questions to forward is a questionnaire, not a list.** A placeholder often
 waits on somebody other than the user, so the block is written to be sent to

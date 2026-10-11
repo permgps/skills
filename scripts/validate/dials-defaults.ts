@@ -52,12 +52,32 @@ export interface DialSpec {
    * the half of this check a derived dial keeps.
    */
   derived?: boolean;
+  /**
+   * Whether `SKILL.md` carries this dial's table too. The models dial's table
+   * lives in the specification and the dials phase only: `SKILL.md` is
+   * resident for the whole прогон and holds its default sentence, and a
+   * four-row table nobody reads after preflight would be paid for on every turn.
+   */
+  skillTable?: boolean;
+  /**
+   * A sentence the specification and the dials phase must each state exactly
+   * once, compared with whitespace collapsed so a reflow cannot delete it.
+   */
+  literal?: string;
 }
+
+/**
+ * When an argument is the models dial. A slash word that is not, a URL or a
+ * path, stays бриф text, and the sentence saying so is the one thing between a
+ * dial and a stolen word.
+ */
+export const TOKEN_RULE = 'both halves are model names this host reports';
 
 export const DIALS: readonly DialSpec[] = [
   { dial: 'mode', column: 'Mode', witness: 'Human gates' },
   { dial: 'explain', column: 'Register', witness: 'What changes' },
   { dial: 'language', column: 'Language', witness: 'What changes', derived: true },
+  { dial: 'models', column: 'Models', witness: 'Standard', skillTable: false, literal: TOKEN_RULE },
 ];
 
 /**
@@ -69,7 +89,13 @@ export const DIALS: readonly DialSpec[] = [
  * default for `mode`: `semi`; a project pins its own».
  */
 const DEFAULT_PHRASE =
-  /built-in\s+default\s+for\s+`([a-z][a-z-]*)`\s*[:,]?\s*`([a-z][a-z-]*)`/gi;
+  /built-in\s+default\s+for\s+`([a-z][a-z-]*)`\s*[:,]?\s*`([a-z][a-z/-]*)`/gi;
+
+/** How many times `literal` stands in `markdown`, whitespace collapsed on both sides. */
+export function countLiteral(markdown: string, literal: string): number {
+  const collapse = (text: string): string => text.replace(/\s+/g, ' ');
+  return collapse(markdown).split(collapse(literal)).length - 1;
+}
 
 const findTable = (tables: Table[], required: string[]): Table | undefined =>
   tables.find(table => required.every(column => table.columns.includes(column)));
@@ -168,6 +194,23 @@ export async function checkDialsDefaults(options: CheckOptions = {}): Promise<Vi
 
   if (authority.size === 0) return violations;
 
+  // --- a sentence both the specification and the dials phase state once ----
+  const phaseMarkdown = await readFile(path.join(bundleDir, PHASE_FILE), 'utf8');
+  for (const spec of dials) {
+    if (spec.literal === undefined || !authority.has(spec.dial)) continue;
+    for (const [file, markdown] of [[specFile, specMarkdown], [path.join(bundleDir, PHASE_FILE), phaseMarkdown]] as const) {
+      const count = countLiteral(markdown, spec.literal);
+      log.debug('literal', 'literal counted', { dial: spec.dial, file, count });
+      if (count === 0) {
+        add(spec.dial, file, 0,
+          `the sentence "${spec.literal}" is missing — state once, here, when an argument is the ${spec.dial} dial`);
+      } else if (count > 1) {
+        add(spec.dial, file, 0,
+          `the sentence "${spec.literal}" is stated ${count} times — keep it once, so the rule has one wording to drift from`);
+      }
+    }
+  }
+
   // --- the bundle names the same values and the same defaults --------------
   for (const relative of [PHASE_FILE, SKILL_FILE]) {
     const file = path.join(bundleDir, relative);
@@ -185,8 +228,10 @@ export async function checkDialsDefaults(options: CheckOptions = {}): Promise<Vi
       const known = authority.get(spec.dial);
       if (!known) continue;
 
-      const values = readValues(markdown, spec);
-      if (values === null) {
+      const values = relative === SKILL_FILE && spec.skillTable === false ? undefined : readValues(markdown, spec);
+      if (values === undefined) {
+        log.debug(spec.dial, 'table not held in this file', { file });
+      } else if (values === null) {
         add(spec.dial, file, 0,
           `no table with columns ${spec.column} and ${spec.witness}`);
       } else {

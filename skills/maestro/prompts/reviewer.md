@@ -49,8 +49,9 @@ Six parts, and they are checked separately:
    split function, a log line — is not behaviour, and not this finding.
 6. **Risk.** When the diff touches sign-in and permissions, money, deleting
    data, secrets, or messages sent to third parties, check that category
-   against the diff. You decide from the diff whether a category applies:
-   nobody marks a таск as risky, and you are not told. A finding here carries
+   against the diff. You decide from the diff whether a category applies,
+   whatever the task file's `Model` row says: a `standard` таск can still touch
+   money, and a `risk:` reason does not narrow you to its category. A finding here carries
    a concrete counterexample — an input, a request or a caller the diff lets
    through to the harm: another user's record read, a charge made twice, a row
    deleted by someone who does not own it, a secret written to a log or a

@@ -1,8 +1,9 @@
 # Dials
 
-Everything typed after `/maestro` splits into six parts: the **register**, the
-**language**, the **mode**, the **depth**, the **finish**, and the бриф. Bare
-words, no dashes.
+Everything typed after `/maestro` splits into seven parts: the **register**,
+the **language**, the **mode**, the **depth**, the **finish**, the **models**,
+and the бриф. Bare words, no dashes; the models are one bare
+`<strong>/<standard>` word.
 Anything not recognised as a dial is бриф text — a word the user meant literally
 is never stolen by a dial.
 
@@ -202,6 +203,84 @@ is off. The finish dial adds only discretionary refinement; it cannot waive a
 required fidelity check or turn missing evidence into a pass. See
 [`verification.md`](verification.md).
 
+## Models
+
+Which model each субагент runs on. There are two **tiers**: `strong` runs every
+judge, every `strong` таск and every repair; `standard` runs `standard`
+таски, the existing-code reader and the preflight probe. The orchestrator stays
+on the session's model.
+
+| Models | Strong | Standard | Default | Note |
+|---|---|---|---|---|
+| `session/session` | `session` | `session` | yes | the only value on a host that cannot choose a model per субагент |
+| `session/next` | `session` | the reported model one tier below the session's | | marked recommended in the question |
+| `session/cheapest` | `session` | the cheapest reported model | | |
+| `<strong>/<standard>` | as typed | as typed | | a free choice; a `standard` stronger than `strong` is accepted and announced |
+
+`session` means **pass no model**: the субагент inherits the session's, which
+is today's behaviour and survives a change of the session's model. "One tier
+below" and "cheapest" are ranked by the orchestrator over the names the host
+reports at run time, never from a list in this repository. When it cannot rank
+them, it offers only `session/session` and the free choice, and says why in one
+line.
+
+### The Token
+
+An argument is the models dial when it is one bare word with no whitespace,
+holding exactly one `/`, with both halves non-empty, and both halves are model
+names this host reports — character for character. Anything else stays бриф
+text: a URL (`://`, more than one `/`), a path, `session/sonnet` (`session` is no reported name), a
+lone `sonnet`. The scan is the ordinary left-to-right resolution, and a second,
+different models token follows the ordinary ambiguity rule. On a host with no
+per-dispatch model choice there is no reported list, so no token is ever a dial.
+
+Where each host lists its models, and which effort parameter it takes, is in
+[`hosts.md`](hosts.md) › *Where Each Host Lists Its Models*. Effort is passed
+equal to the session's wherever the host takes one and the session's is known;
+when it is not, none is passed, and the announcement says `standard` таски run
+at that model's default effort.
+
+### Who Runs On Which Tier
+
+| Role | Brief | Tier |
+|---|---|---|
+| preflight probe | — | `standard` |
+| G1 source reader | `manifest-reader.md` | `strong` |
+| existing-code reader | `existing-code-reader.md` | `standard` |
+| G2 intent reader | `independent-reader.md` | `strong` |
+| G2 reference reader | `reference-reader.md` | `strong` |
+| G3 task reader | `task-reader.md` | `strong` |
+| G3 plan-consistency reader | `plan-consistency-reader.md` | `strong` |
+| build executor | `executor.md` | the таск's |
+| repair executor | `executor.md` | `strong` |
+| reviewer | `reviewer.md` | `strong` |
+| standards reader | `standards-reader.md` | `strong` |
+| repair diagnostician | `repair-diagnostician.md` | `strong` |
+| strategy reviewer | `strategy-reviewer.md` | `strong` |
+| G4 acceptance reader | `acceptance-reader.md` | `strong` |
+| polish reader | `polish-reader.md` | `strong` |
+| polish executor | `executor.md` | `strong` |
+
+- **A judge never runs `standard`.** A gate rests on its judge being no weaker
+  than what it judges; `npm run readers` holds every judge brief to `strong`.
+- A **retry** after a failed build attempt is a repair, so it runs `strong`. A
+  **context handoff** continues the same build, so it keeps the таск's tier.
+- The **preflight probe** runs `standard` because it is the one dispatch whose
+  job is to find out whether a per-dispatch model reaches the host
+  ([`hosts.md`](hosts.md) › *The Capabilities*). It is trivial, so the tier
+  costs nothing.
+- Which tier a таск is built on is the plan's mark, `tasks[].model`
+  ([`phases.md`](phases.md) › Plan); G3 holds the mechanical half of it.
+
+### Fixed For The Прогон
+
+The models are fixed at the dials phase and the tier of each таск at the cut.
+Neither changes inside a прогон, not even at a phase boundary: a `dialChanges`
+entry would need a value nothing else uses, and the отчёт's per-model count
+would stop meaning one thing. A request to change them is answered in one line:
+the change applies from the next прогон, by editing `models.<host>` in
+`.maestro/config.json`.
+
 ## Where An Unset Mode Or Register Comes From
 
 `semi` and `normal` are the built-in defaults, and a project may pin its own of
@@ -213,15 +292,25 @@ each. Three sources, in this order, for both dials:
 | 2 | the project's pinned default | `<project>/.maestro/config.json` |
 | 3 | the built-in default | the Modes and Register tables above |
 
-The file holds those two dials and the version of its own shape:
+The file holds those two dials, the models pinned per host, and the version of
+its own shape:
 
 ```json
 {
   "configVersion": 1,
   "mode": "full",
-  "explain": "plain"
+  "explain": "plain",
+  "models": { "claude-code": { "strong": "session", "standard": "sonnet" } }
 }
 ```
+
+| Key | Values | Written by |
+|---|---|---|
+| `configVersion` | `1` | preflight, on a first прогон |
+| `mode` | a mode, or `null` | preflight, on a first прогон |
+| `explain` | a register, or `null` | preflight, on a first прогон |
+| `language` | `ru` or `en` | the user, by hand; never a прогон |
+| `models` | one `{ strong, standard }` per host id, each half `session` or a model name that host reports | the helper's `--config-models`, in preflight, once per host |
 
 `mode` is one of the four modes or `null`; `explain` is `plain`, `normal` or
 `null`. Unknown keys are ignored, so `depth` and `polish` can be pinned later
@@ -231,10 +320,26 @@ written before the register existed simply carries no `explain`, and a run that
 reads one falls through to the built-in default.
 
 **A key outside its set is ignored, and each key is ignored on its own**: an
-unreadable `explain` does not throw away a good `mode`. A file that will not
+unreadable `explain` does not throw away a good `mode`, and an invalid
+`models` throws away neither. A file that will not
 parse at all is ignored whole, the run proceeds on `semi` and `normal`, and the
 announcement says the file was unreadable. A setting is never a reason to stop a
 run.
+
+### Where Unset Models Come From
+
+| Order | Source | Lives in |
+|---|---|---|
+| 1 | the arguments of this run | a models token the user typed |
+| 2 | this host's pinned models | `<project>/.maestro/config.json`, key `models.<host>` |
+| 3 | the question | asked once per project and host |
+
+A host with no model list skips all three: the models are `session/session` and
+nothing is asked. **A pin counts only when both halves are `session` or names
+this host reports now.** A pin naming a model the host no longer reports is
+**stale**: it is treated as absent, the question is asked again, and the
+announcement says the pin was stale. A token beside a valid pin holds for this
+прогон only and asks nothing; a token with no valid pin asks whether to pin it.
 
 ### The First Run In A Project
 
@@ -269,6 +374,27 @@ The dials phase asks; **preflight writes the file**, beside the run state. That
 is the split this phase already has — it composes an announcement preflight
 shows — and it keeps everything created under `.maestro/` with one writer.
 
+### When This Host Has No Pin
+
+The models are asked once per project **and host**: a second host meets a file
+the first one wrote. The question comes after the register and the mode, in the
+register just chosen, in `full` too and for the same reason. Its options are
+the four rows of *Models*, built from what the host reports at run time, each
+with the two model names in brackets and `session/next` marked recommended. In
+`plain` it first explains the trade-off: the most important work runs on the
+strongest model, and the ordinary pieces can go to a simpler one, which is
+cheaper and faster, because every piece is checked.
+
+**The answer goes into the existing file through the helper**, which is the one
+exception to "never rewrite a file that is already there": `node
+.maestro/sync.mts --config-models --host <id>` sets `models.<host>` and keeps
+every other key and value, after the copied runtime validates and before the
+first publish. It refuses `absent` when there is no file — creating one would
+read as "the register and the mode were asked" — and `unreadable` when the file
+is not a JSON object, which it leaves byte for byte. Either refusal leaves the
+models for this прогон only, and the announcement says so. A hand-merged JSON
+edit of the user's file is exactly the ritual a helper exists to remove.
+
 ## Resolution
 
 1. Scan the arguments left to right for dial tokens.
@@ -300,6 +426,11 @@ and the same block in the wrong language is that failure twice over.
 The announcement is shown in every mode, `full` included. It is a statement, not
 a question.
 
+It names both models, with `session` given as the session model's actual name,
+and where they came from: typed, the pin, the answer, or the built-in default.
+A stale pin, a refused pin write, the effort line and a host with no model list
+are each one more line.
+
 When the mode or the register did not come from the arguments, the announcement
 names where it did come from — the path of the config file, or the built-in default. A run that
 has stopped asking questions must be able to say why, and "a file settled this
@@ -321,3 +452,5 @@ mode, the announcement says the override holds for this run only.
   may change inside a phase, either takes effect at once, and neither is
   recorded. *Switching It Mid-Прогон*, under *Register* and under *Language*
   above, says why.
+- **The models are the exception the other way**: they never change inside a
+  прогон at all. *Models* › *Fixed For The Прогон* says why.

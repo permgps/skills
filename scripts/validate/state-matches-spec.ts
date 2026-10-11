@@ -7,7 +7,7 @@
 // an interface is erased before anything can look at it — that is the one place
 // here where a checker parses code instead of importing it.
 
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -145,6 +145,48 @@ export interface CheckOptions {
   contractFile?: string;
   phasesFile?: string;
   dashboardFile?: string;
+  configFile?: string;
+}
+
+/** The constant naming every key `.maestro/config.json` may carry. */
+const CONFIG_KEYS_CONSTANT = 'CONFIG_KEYS';
+
+/**
+ * The config's shape: the key table in `dials.md` against `CONFIG_KEYS`, both
+ * ways. A spec directory with no `dials.md` (a fixture of the contract alone)
+ * has no table to hold.
+ */
+export async function checkConfigKeys(specDir: string, configFile: string): Promise<Violation[]> {
+  const specFile = path.join(specDir, 'dials.md');
+  const violations: Violation[] = [];
+  const add = (file: string, line: number, message: string): void => {
+    violations.push({ check: 'config', file, line, message });
+    log.error('config', message, { file, line });
+  };
+  if (!await access(specFile).then(() => true, () => false)) {
+    log.debug('config', 'no dials specification; config keys not held', { specFile });
+    return violations;
+  }
+  const table = findTable(parseTables(await readFile(specFile, 'utf8')), ['Key', 'Values', 'Written by']);
+  const keys = parseStringArrayConst(await readFile(configFile, 'utf8'), CONFIG_KEYS_CONSTANT);
+  if (!table) {
+    add(specFile, 0, 'no table with columns Key, Values and Written by — the config file needs its keys listed where a machine can read them');
+    return violations;
+  }
+  if (keys === null) {
+    add(configFile, 0, `no ${CONFIG_KEYS_CONSTANT} constant found — the config module names the keys it keeps`);
+    return violations;
+  }
+  const specified = table.rows.map(row => clean(row['Key'])).filter(key => key !== '');
+  log.debug('config', 'config keys read', { specified, keys });
+  for (const key of specified) {
+    if (!keys.includes(key)) add(specFile, table.line, `config key "${key}" is specified and absent from ${CONFIG_KEYS_CONSTANT} — add it there, or drop the row`);
+  }
+  for (const key of keys) {
+    if (!specified.includes(key)) add(configFile, 0, `${CONFIG_KEYS_CONSTANT} carries "${key}", which the key table in ${specFile} does not — add its row`);
+  }
+  log.info('config', 'config keys compared', { spec: specified.length, code: keys.length });
+  return violations;
 }
 
 export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise<Violation[]> {
@@ -153,6 +195,7 @@ export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise
   const contractFile = options.contractFile ?? 'skills/maestro/tools/runtime/state/contract.mts';
   const phasesFile = options.phasesFile ?? path.join(specDir, 'phases.md');
   const dashboardFile = options.dashboardFile ?? 'skills/maestro/assets/dashboard.html';
+  const configFile = options.configFile ?? 'skills/maestro/tools/runtime/config.mts';
 
   const violations: Violation[] = [];
   const add = (check: string, file: string, line: number, message: string): void => {
@@ -342,6 +385,7 @@ export async function checkStateMatchesSpec(options: CheckOptions = {}): Promise
     });
   }
 
+  violations.push(...await checkConfigKeys(specDir, configFile));
   return violations;
 }
 
