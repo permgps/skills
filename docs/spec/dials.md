@@ -426,6 +426,15 @@ and where they came from: typed, the pin, the answer, or the built-in default.
 A stale pin, a refused pin write, the effort line and a host with no model list
 are each one more line.
 
+When a newer Maestro is published than the one running, the announcement
+carries one more line naming the new version and `npx skills update`. The
+helper composes it in the прогон's language (`sync.mts --update-check`,
+preflight step 4c) from `metadata.version` in the installed `SKILL.md` and one
+GET of the published one. Offline, a timeout, any error, an equal or older
+published version, and `MAESTRO_NO_UPDATE_CHECK=1` all say nothing: a check
+that could not answer is never a reason to stop a прогон, and never a line the
+user has to read.
+
 When the mode or the register did not come from the arguments, the announcement
 names where it did come from — the path of the config file, or the built-in default. A run that
 has stopped asking questions must be able to say why, and "a file settled this

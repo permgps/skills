@@ -16,6 +16,20 @@ number that claimed more than that would be claiming it falsely.
 
 `CONTRACT_VERSION` moves to `8`.
 
+- **The прогон says when a newer Maestro is out.** `skills/maestro/SKILL.md`
+  carries `metadata.version`, and `npm run bundle` holds it equal to
+  `package.json`'s version, so a release bumps both in one commit. Preflight
+  step 4c runs `node .maestro/sync.mts --update-check --skill <dir>`: the helper
+  reads the installed version and makes one GET of the published `SKILL.md` on
+  the default branch, with a 2-second timeout, a 64 KiB limit and no query
+  string, header or body of its own. When the published version is newer, the
+  announcement carries one line, in the прогон's language, naming it and
+  `npx skills update`. Offline, a timeout, any error, an equal or older version
+  and `MAESTRO_NO_UPDATE_CHECK=1` all say nothing, and the command always exits
+  0. The published `SKILL.md` gains its version only when this is pushed;
+  until then every check finds no published version and stays silent. `SKILL.md` stays
+  at its 547-line ceiling: the frontmatter's two lines replaced a sentence whose
+  reasoning `docs/spec/phases.md` already carries.
 - **Доводка is retired; the reference reaches the executor first.** The finish
   dial is gone, with `phases/7-polish.md`, the polish reader, its tier rows, the
   dashboard's доводка chip and every branch that read it. `polish`, «доведи до

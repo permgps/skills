@@ -52,6 +52,7 @@ the target, without replacing the populated run directory:
     shared/log.mts
     shared/owned-block.mts
     publication.mts, relocation.mts, register.mts, legacy.mts, dashboard.mts, server.mts, opener.mts
+    config.mts, memory.mts, existing-code.mts, update-check.mts
   dashboard.html
   state.js, validation.js
   serve.json, opened.json
@@ -72,11 +73,20 @@ with spaces in paths. It needs no Python, target dependencies, compiler,
 loader, build or external network after installation. Local loopback HTTP is
 used for the dashboard; browser and agent capabilities remain separate.
 
+The one outbound request is optional. In preflight, `--update-check` reads
+`metadata.version` from the installed `SKILL.md` and makes a single GET of the
+published one (`raw.githubusercontent.com/permgps/skills/main/skills/maestro/SKILL.md`),
+with a 2-second timeout and no query string, header or body of its own. When the
+published version is newer, the announcement names it and `npx skills update`.
+Offline or on any error it says nothing, and it always exits 0. Set
+`MAESTRO_NO_UPDATE_CHECK=1` to turn it off.
+
 ```bash
 node .maestro/sync.mts --validate .maestro/.candidate.json
 node .maestro/sync.mts --project .maestro/state.js
 node .maestro/sync.mts --no-open
 node .maestro/sync.mts --reopen
+node .maestro/sync.mts --update-check --skill <installed skill directory>
 LOG_LEVEL=DEBUG node .maestro/sync.mts --no-open
 ```
 

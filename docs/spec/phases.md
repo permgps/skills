@@ -8,7 +8,7 @@ right thing was built.
 
 | Id | Name | Stage | Reads | Produces |
 |---|---|---|---|---|
-| preflight | Preflight | yes | user arguments, repository state, the memory file, the project glossary, the register and earlier runs' `decisions.md` | resolved dials, run state created with whether the project holds code, dashboard raised, `prior.md` |
+| preflight | Preflight | yes | user arguments, repository state, the memory file, the project glossary, the register and earlier runs' `decisions.md`, the published `SKILL.md`'s version | resolved dials, run state created with whether the project holds code, dashboard raised, `prior.md` |
 | manifest | Manifest | yes | бриф from the user, redacted source snapshots and independent audit return | `brief.md` — written once, then grown by its additions block — and `manifest.md` |
 | briefing | Briefing | yes | `manifest.md`, declared references, `prior.md` | `answers.md`, neutral `reference.md` |
 | spec | Specification | yes | `manifest.md`, `answers.md`, raw reference, `prior.md`, the repository (through the existing-code reader, once) | `codebase.md`, `spec.md`, obligation and source coverage map |

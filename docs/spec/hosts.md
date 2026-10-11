@@ -253,7 +253,11 @@ Copy `tools/sync.mts` and the complete `tools/runtime/` tree into `.maestro/`
 alongside the dashboard, retaining run state and viewer/opened records. Verify
 the replacement before removing the obsolete copied helper. No target build,
 npm install, TS compiler, loader, Python or external network is needed after
-installation. Local loopback HTTP remains available. Scout gains no runtime.
+installation. Local loopback HTTP remains available. The one outbound request
+is optional: preflight's update check makes a single GET of the published
+`SKILL.md` with a 2-second timeout, sends nothing about the user, the project
+or the прогон, is silent when it fails, and is off under
+`MAESTRO_NO_UPDATE_CHECK=1`. Scout gains no runtime.
 
 ## Optional Git Guard
 

@@ -153,6 +153,13 @@ installed helper — `sync.mts` and `runtime/` together — into `.maestro/`
 without touching existing runs, so an updated bundle reaches a project with its
 next run.
 
+You do not have to remember to check. Each run's preflight compares the
+installed `SKILL.md`'s `metadata.version` with the published one, in one GET
+with a 2-second timeout that sends nothing about you or your project. When a
+newer version is out, the announcement names it and `npx skills update`;
+offline or on any error it says nothing. Set `MAESTRO_NO_UPDATE_CHECK=1` to turn
+the check off.
+
 No uninstall command is documented. To remove a skill, delete its installed
 directory (for example `.claude/skills/maestro`) and the guard's hook entry if
 you wired one. `.maestro/` in your projects and the memory block in your
@@ -364,7 +371,8 @@ the depth, both models by name, where each value came from (your arguments, the
 config file by path, or the built-in default), any capability your host lacks
 and what that costs — and the one consequence most likely to surprise you: no
 questions in `full`, nothing beyond the бриф in `strict`, two approvals in
-`manual`. It is a statement, not a question.
+`manual`. When a newer Maestro is published, one more line says so. It is a
+statement, not a question.
 
 ### Changing Dials Mid-Run
 
