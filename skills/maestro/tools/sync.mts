@@ -8,6 +8,7 @@ import { createLogger } from './runtime/shared/log.mts';
 import { candidateMode, candidateViolations, isRecord, validationEnvelope, writeValidation } from './runtime/publication.mts';
 import { mirror, snapshots, placeIndex, mirrorValidation } from './runtime/dashboard.mts';
 import { FOLDED, spoken, legacyReports, movedMessage } from './runtime/legacy.mts';
+import { configCommand } from './runtime/config.mts';
 import { memoryCommand } from './runtime/memory.mts';
 import { openPage, openingMessage } from './runtime/opener.mts';
 import { ensureViewer, serveDirectory } from './runtime/server.mts';
@@ -23,7 +24,7 @@ async function viewer(noOpen: boolean): Promise<string | null> {
   await openPage(RUN_DIR, url, false, noOpen);
   return url;
 }
-/** The block body for --memory-write; null when nothing is piped, so a terminal never hangs. */
+/** The block body for --memory-write, the pin for --config-models; null when nothing is piped, so a terminal never hangs. */
 async function stdinText(): Promise<string | null> {
   if (process.stdin.isTTY) return null;
   const chunks: Buffer[] = [];
@@ -79,6 +80,11 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
   }
   if (args[0] === '--memory-read' || args[0] === '--memory-write') {
     const outcome = await memoryCommand(args, RUN_DIR, stdinText);
+    process.stdout.write(JSON.stringify(outcome.result) + '\n');
+    return outcome.code;
+  }
+  if (args[0] === '--config-models') {
+    const outcome = await configCommand(args, RUN_DIR, stdinText);
     process.stdout.write(JSON.stringify(outcome.result) + '\n');
     return outcome.code;
   }

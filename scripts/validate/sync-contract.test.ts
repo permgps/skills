@@ -1346,3 +1346,31 @@ test('the viewer answers only requests addressed to the loopback name it serves 
     await run.dispose();
   }
 });
+
+// Preflight step 4 runs `--config-models` through the copied helper over the
+// user's own config.json. The file here is the domtut прогон's, byte for byte,
+// so the merge is proven on a shape a real first прогон wrote.
+test('the copied helper pins the models into a real config.json and keeps its mode and register', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'sync-config-'));
+  try {
+    const maestro = path.join(root, '.maestro');
+    await mkdir(maestro);
+    await copyFile(SYNC, path.join(maestro, 'sync.mts'));
+    await cp('skills/maestro/tools/runtime', path.join(maestro, 'runtime'), { recursive: true });
+    await writeFile(path.join(maestro, 'config.json'), '{\n  "configVersion": 1,\n  "mode": "full",\n  "explain": "normal"\n}\n');
+    const done = spawnSync(process.execPath, [path.join(maestro, 'sync.mts'), '--config-models', '--host', 'claude-code'], {
+      encoding: 'utf8', input: '{"strong":"session","standard":"sonnet"}', env: { ...process.env, ...SEALED },
+    });
+    assert.equal(done.status, 0, done.stdout + done.stderr);
+    const result = JSON.parse(done.stdout.split('\n')[0] ?? '{}') as Record<string, unknown>;
+    assert.equal(result['result'], 'written');
+    assert.equal(result['replaced'], false);
+    assert.deepEqual(JSON.parse(await readFile(path.join(maestro, 'config.json'), 'utf8')), {
+      configVersion: 1, mode: 'full', explain: 'normal',
+      models: { 'claude-code': { strong: 'session', standard: 'sonnet' } },
+    });
+    assert.deepEqual((await readdir(maestro)).sort(), ['config.json', 'runtime', 'sync.mts']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

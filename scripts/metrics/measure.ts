@@ -21,10 +21,13 @@ import { createLogger } from '../shared/log.ts';
 import { runDirName } from '../state/paths.ts';
 import {
   GATE_IDS,
+  MODEL_TIERS,
   REQUIREMENT_STATUSES,
   STAGE_IDS,
   TASK_STATUSES,
   type GateId,
+  type ModelPair,
+  type ModelTier,
   type RequirementStatus,
   type RunState,
   type StageId,
@@ -64,6 +67,12 @@ export interface StageMeasure {
   ms: number | null;
 }
 
+/**
+ * A count per tier, or `not recorded` for a прогон begun before contract 8 —
+ * never zero, because a contract-7 прогон did build its таски, on one model.
+ */
+export type ByModel = Record<ModelTier, number> | 'not recorded';
+
 export interface Measurement {
   runId: string;
   slug: string;
@@ -80,6 +89,16 @@ export interface Measurement {
   stages: StageMeasure[];
   taskCount: number;
   tasksByStatus: Record<TaskStatus, number>;
+  /**
+   * How many таски each tier built, and how often each tier's таски restarted or
+   * went to repair. Whether `standard` таски fail review more often is the
+   * models dial's own revisit condition, and these three are how it is read.
+   */
+  tasksByModel: ByModel;
+  retriesByModel: ByModel;
+  repairsByModel: ByModel;
+  /** The model each tier ran on, or `null` below contract 8. */
+  models: ModelPair | null;
   /** The most таски whose recorded windows overlapped at one moment. */
   widestWave: number;
   requirementsByStatus: Record<RequirementStatus, number>;
@@ -133,6 +152,16 @@ export function widestWave(state: RunState): number {
   return widest;
 }
 
+/** Sum `pick` over each tier's таски; a contract below 8 recorded no tier. */
+function byModel(state: RunState, pick: (task: RunState['tasks'][number]) => number): ByModel {
+  if (state.contractVersion < 8) return 'not recorded';
+  const counts = Object.fromEntries(MODEL_TIERS.map(tier => [tier, 0])) as Record<ModelTier, number>;
+  for (const task of state.tasks) {
+    if (task.model !== undefined && MODEL_TIERS.includes(task.model)) counts[task.model] += pick(task);
+  }
+  return counts;
+}
+
 export function measure(state: RunState): Measurement {
   const projection = projectState(state);
   const results = Object.values(projection.summary?.requirementResults ?? {});
@@ -152,6 +181,10 @@ export function measure(state: RunState): Measurement {
   try { dir = runDirName(state); }
   catch { log.warn('run-dir', 'run directory unresolved; naming the run by its slug', { runId: state.runId, dir: state.dir }); }
   log.debug('run-dir', 'run directory resolved for the measurement', { runId: state.runId, dir });
+  const tasksByModel = byModel(state, () => 1);
+  const retriesByModel = byModel(state, task => task.retries ?? 0);
+  const repairsByModel = byModel(state, task => task.repairs ?? 0);
+  log.debug('models', 'tiers counted', { tasksByModel, retriesByModel, repairsByModel });
   return {
     runId: state.runId,
     slug: state.slug,
@@ -166,6 +199,10 @@ export function measure(state: RunState): Measurement {
     stages,
     taskCount: state.tasks.length,
     tasksByStatus: countBy(TASK_STATUSES, state.tasks.map(task => task.status)),
+    tasksByModel,
+    retriesByModel,
+    repairsByModel,
+    models: state.contractVersion >= 8 ? state.models ?? null : null,
     widestWave: widestWave(state),
     requirementsByStatus: countBy(
       REQUIREMENT_STATUSES,
@@ -214,6 +251,14 @@ export function render(m: Measurement): string {
   row('  widest wave', m.widestWave === 0 ? '— (no window recorded)' : String(m.widestWave));
   for (const status of TASK_STATUSES) {
     if (m.tasksByStatus[status] > 0) row(`  ${status}`, String(m.tasksByStatus[status]));
+  }
+  if (m.tasksByModel === 'not recorded' || m.retriesByModel === 'not recorded' || m.repairsByModel === 'not recorded') {
+    row('  by model', 'not recorded — a прогон begun before the models dial');
+  } else {
+    for (const tier of MODEL_TIERS) {
+      const name = m.models?.[tier] ?? '—';
+      row(`  on ${tier}`, `${m.tasksByModel[tier]} (${name}), ${m.retriesByModel[tier]} retries, ${m.repairsByModel[tier]} repairs`);
+    }
   }
 
   lines.push('', '  требования');

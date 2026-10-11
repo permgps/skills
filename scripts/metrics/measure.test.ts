@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { CONTRACT_VERSION, type RunState } from '../state/contract.ts';
-import { verifiedState } from '../state/fixtures/verification.ts';
+import { asContract8, contract7State, verifiedState } from '../state/fixtures/verification.ts';
 import { serializeState } from '../state/write.ts';
 import { STATE_FILE } from '../state/paths.ts';
 import { formatSpan, main, measure, render, span, targetFromArgv, wantsJson, widestWave } from './measure.ts';
@@ -254,4 +254,39 @@ test('a прогон full of signals is measured, not judged: main still exits 0
     const { code } = await printed(() => main(dir, false));
     assert.equal(code, 0);
   });
+});
+
+/** A contract-8 прогон of three таски: one strong that went to repair, two standard, one of them restarted. */
+function tiered(): RunState {
+  const state = asContract8(contract7State());
+  state.models = { strong: 'session', standard: 'sonnet' };
+  const first = state.tasks[0]!;
+  state.tasks = [
+    { ...first, id: '01', model: 'strong', retries: 0, repairs: 1 },
+    { ...first, id: '02', model: 'standard', retries: 2, repairs: 0 },
+    { ...first, id: '03', model: 'standard', retries: 0, repairs: 1 },
+  ];
+  return state;
+}
+
+test('a contract-8 прогон counts its таски, retries and repairs per tier exactly', () => {
+  const m = measure(tiered());
+  assert.deepEqual(m.tasksByModel, { strong: 1, standard: 2 });
+  assert.deepEqual(m.retriesByModel, { strong: 0, standard: 2 });
+  assert.deepEqual(m.repairsByModel, { strong: 1, standard: 1 });
+  assert.deepEqual(m.models, { strong: 'session', standard: 'sonnet' });
+  const text = render(m);
+  assert.match(text, /on strong\s+1 \(session\), 0 retries, 1 repairs\n/);
+  assert.match(text, /on standard\s+2 \(sonnet\), 2 retries, 1 repairs\n/);
+});
+
+test('a прогон begun before the models dial reports its tiers as not recorded, never as zero', () => {
+  for (const state of [baseline(), contract7State()]) {
+    const m = measure(state);
+    assert.equal(m.tasksByModel, 'not recorded');
+    assert.equal(m.retriesByModel, 'not recorded');
+    assert.equal(m.repairsByModel, 'not recorded');
+    assert.equal(m.models, null);
+    assert.match(render(m), /by model\s+not recorded — a прогон begun before the models dial\n/);
+  }
 });

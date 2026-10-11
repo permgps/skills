@@ -159,12 +159,12 @@ async function throughLink(target: string): Promise<string> {
   if (!isLink) return target;
   try {
     const real = await realpath(target);
-    log.debug('write', 'memory file is a symlink; writing the file it points at', { target, real });
+    log.debug('write', 'file is a symlink; writing the file it points at', { target, real });
     return real;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
-    log.error('write', 'memory file is a symlink to nothing', { target });
-    throw new Error(`${target} is a symlink to a file that does not exist — point it at the memory file or remove it, then write again`);
+    log.error('write', 'file is a symlink to nothing', { target });
+    throw new Error(`${target} is a symlink to a file that does not exist — point it at a real file or remove it, then write again`);
   }
 }
 
@@ -297,8 +297,10 @@ export async function resolveMemoryFile(projectRoot: string, host: string): Prom
  *
  * A symlink is followed rather than replaced: the rename lands on the file it
  * points at, so the link and every other name for that file keep one text.
+ *
+ * Exported for `config.mts`, the one other writer of a file the user owns.
  */
-async function replaceKeepingMode(link: string, body: string): Promise<void> {
+export async function replaceKeepingMode(link: string, body: string): Promise<void> {
   const target = await throughLink(link);
   let mode = 0o644;
   try { mode = (await stat(target)).mode & 0o777; }
@@ -320,7 +322,7 @@ async function replaceKeepingMode(link: string, body: string): Promise<void> {
   } catch (error) {
     if (created) await unlink(temporary).catch(() => undefined);
     const reason = error instanceof Error ? error.message : String(error);
-    log.error('write', 'memory file could not be replaced', { target, reason });
+    log.error('write', 'file could not be replaced', { target, reason });
     throw error;
   }
 }
