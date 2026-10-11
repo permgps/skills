@@ -125,15 +125,19 @@ preflight records it in the run state as `existingCode`
 | `false` | — | no reader; the spec is written as before |
 | absent, a run from before the field | — | no reader, as for `false` |
 | `true`, the reader fails or returns nothing usable | no | no file; one `existing code not read before the spec:` line in `debt.assumptions`, then the spec |
+| `true`, a resumed phase whose `debt.assumptions` already carries that line | no | no dispatch; the spec is written without it, as after the failure |
 
-No stop is added, and the user is not asked anything here.
+No stop is added, and the user is not asked anything here. The failure line is
+what makes the read once per прогон: a resumed phase that finds it does not
+spend a second reader or append a second line.
 
 **The reader** is given `manifest.md`, `answers.md` and the repository, and
 withholds `brief.md`, `spec.md`, `prior.md` and `codebase.md`. It reports what
 exists, never what to build, in English, under six fixed headings: *Where
 things live*, *Conventions in use*, *Commands*, *Names the work will touch* (a
 table of requirement, kind, name in code and where), *No counterpart yet* and
-*Do not touch*. Every line names a path, and the text stays under 300 lines,
+*Do not touch*. Every line names a path, except under *No counterpart yet*,
+which names requirements the repository has nothing for, and the text stays under 300 lines,
 because it goes to every executor. It runs on the session's model.
 
 The spec reads `codebase.md` first and names an existing thing by its exact

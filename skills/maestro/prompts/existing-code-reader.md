@@ -47,7 +47,8 @@ judgement of the code's quality is outside this brief.
 ## What You Return
 
 Plain text in English, under exactly these six `##` headings, in this order.
-Every line names a path, as `path` or `path:line`.
+Every line names a path, as `path` or `path:line`, except under *No counterpart
+yet*, whose lines name requirements the repository has nothing for.
 
 1. `## Where things live` — the directories and modules the work touches, one
    line each.

@@ -589,18 +589,6 @@ export const REPORT_ANCHORS: readonly Anchor[] = [
 ];
 
 /**
- * The literal text that carries «the phases record what the retrospective
- * reads».
- *
- * Matched literally for the reason `MEMORY_ANCHORS` is. Preflight seeds
- * `signals`; build, review, acceptance and polish each append the line for the
- * signal they used to be told only to "record" — a reader asking for an input it
- * is denied, a reviewer returning a patch, a таск writing outside its files. The
- * line's grammar is held by the state validator, and the kinds by
- * `state-matches-spec`. Whether an orchestrator notices a reader asking is its
- * judgement, so no anchor stands for it.
- */
-/**
  * The literal text that carries «existing code is read once, before the spec».
  *
  * Matched literally for the reason `MEMORY_ANCHORS` is. Preflight records
@@ -641,6 +629,18 @@ export const CODEBASE_ANCHORS: readonly Anchor[] = [
     why: 'the reader reports what exists; a reader that designs is a second spec writer' },
 ];
 
+/**
+ * The literal text that carries «the phases record what the retrospective
+ * reads».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. Preflight seeds
+ * `signals`; build, review, acceptance and polish each append the line for the
+ * signal they used to be told only to "record" — a reader asking for an input it
+ * is denied, a reviewer returning a patch, a таск writing outside its files. The
+ * line's grammar is held by the state validator, and the kinds by
+ * `state-matches-spec`. Whether an orchestrator notices a reader asking is its
+ * judgement, so no anchor stands for it.
+ */
 export const SIGNAL_ANCHORS: readonly Anchor[] = [
   { file: 'phases/0-preflight.md', literal: '| `signals` | empty — build, review, acceptance and polish append',
     why: 'an unseeded list cannot tell "nothing recorded" from "never recorded"' },

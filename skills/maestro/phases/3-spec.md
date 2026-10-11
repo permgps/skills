@@ -64,6 +64,7 @@ and by whether this phase already wrote `codebase.md`:
 | `false` | — | no reader; the spec is written from the манифест and the answers alone |
 | absent, a run from before the field | — | no reader, as for `false` |
 | `true`, and the reader fails or returns nothing usable | no | no file; record the failure line below, write the spec, and go on |
+| `true`, a resumed phase whose `debt.assumptions` already carries the failure line | no | no dispatch; write the spec without it, as after the failure |
 
 Dispatch a fresh subagent briefed by
 [`../prompts/existing-code-reader.md`](../prompts/existing-code-reader.md).
@@ -82,7 +83,9 @@ the reason.
 existing code not read before the spec: <reason> — this прогон named things from the spec alone
 ```
 
-No stop follows, and the user is not asked anything here.
+No stop follows, and the user is not asked anything here. That line is what
+keeps the read to once per прогон: a resumed phase that finds it dispatches no
+second reader and appends no second line.
 
 **`codebase.md` is what existed before this прогон.** `discovered-interfaces.md`
 is what the build adds. They have different writers and different moments, and
