@@ -585,14 +585,14 @@ and contracts 7 and 8 share verification 3 with contract 6. The contract version
 run does not change between two published states except through the legacy
 resume conversion.
 
-**Relocation and the register.** When a contract-7 `--publish` candidate names a
+**Relocation and the register.** When a `--publish` candidate of contract 7 or later names a
 `dir` other than the published one, publication moves `.maestro/<published>` to
 `.maestro/<candidate>` after the structural checks and before the evidence
 checks, which then run against the new location. The move is `git mv` when the
 folder holds tracked files and a plain rename otherwise. A target that already
 exists refuses the publish with nothing moved; any rejection after the move puts
 the folder back by the same method. `--validate` and `--project` never move
-anything. After every successful contract-7 publish, publication rewrites the
+anything. After every successful publish of contract 7 or later, publication rewrites the
 run's row in `.maestro/README.md` from the published state; a register write that
 fails does not undo the publish, is reported in the result, and is repaired by
 the next publish.

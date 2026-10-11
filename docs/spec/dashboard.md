@@ -69,7 +69,7 @@ test in the repository could reach.
 
 ## The Title Names The Run
 
-The header's title is the slug and, for a contract-7 state, the day the run
+The header's title is the slug and, for a state of contract 7 or later, the day the run
 started, read out of `dir` — «Прогон: <slug> · <YYYY-MM-DD>». A state whose
 `dir` is absent or does not parse is titled by its slug alone, as every state
 before contract 7 was. The page reads the date and nothing else out of `dir`:

@@ -296,9 +296,11 @@ is on.
 
 Two tiers. **`strong`** runs every check of the run's work — the gate readers,
 the reviewer, the acceptance reader — every repair, and every таск the plan
-marks `strong`: a таск others build on (a producer in the Seams table), the
-skeleton laid first, and anything touching sign-in, money, deletion, secrets
-or outgoing messages. **`standard`** runs the ordinary таски, the
+marks `strong`: always a таск others build on (a producer in the Seams table)
+and the skeleton laid first, and, by the planner's judgement with a one-line
+reason, a таск touching sign-in, money, deletion, secrets or outgoing
+messages, or one whose core is hard. Every доводка таск runs `strong` too.
+**`standard`** runs the ordinary таски, the
 existing-code reader and one preflight probe. The orchestrator itself stays on
 your session's model. `session` means no model is passed at all.
 
@@ -861,8 +863,11 @@ diffs, not filtered away.
   records, defects under a parent таск, strategy reviews, a user-only limit
   raise, and the plan-consistency reader at G3. A contract-5 run resumes as
   contract 6 with its history marked inherited.
-- Contract 7, which new runs publish, keeps all of this and adds the dated run
-  directory and the register.
+- Contract 7 keeps all of this and adds the dated run directory and the
+  register.
+- Contract 8, which new runs publish, adds the run's `models` and each таск's
+  `model` tier. A contract-7 run keeps running on the session's model and is
+  never migrated.
 
 The fields, and what may be left out of them, are in
 [`docs/spec/state-contract.md`](docs/spec/state-contract.md); what verification

@@ -192,12 +192,12 @@ running at the same time agree without talking to each other.
   integration owner, integration check — one row per route, DTO, migration,
   port or file that one таск produces and another consumes. Its header is
   exactly `| Seam | Producer task | Consumer tasks | Integration owner | Integration check |`.
-  A **Producer task** cell starts with таск ids — `02`, `02, 05`, a range
-  `02–13` — and may go on in prose after them (`02–13, one file each`); G3
-  reads the ids and nothing else, so a producer named only in words is a
-  finding. A seam with no
-  row is a seam two executors will each guess at. Fewer seam rows are better:
-  each row is a contract two executors must both meet. The user never confirms
+  A **Producer task** cell starts with таск ids — `02`, `02, 05`, a forward
+  range `02–13` or `02-13` — and may go on in prose after them
+  (`02–13, one file each`); G3 reads the ids and nothing else, so a producer
+  named only in words is a finding. A seam with no row is a seam two
+  executors will each guess at. Fewer seam rows are better: each row is a
+  contract two executors must both meet. The user never confirms
   a seam, because they cannot judge one.
 - `interfaces.md` stays the authority on names. Where `codebase.md` and a
   signature here differ without a `renames` row, the plan is wrong.
@@ -402,6 +402,9 @@ each one starts. Every entry carries its id, title, `status`, `requirementIds`,
 - `wave` and `zone` come from step 6. The dashboard groups the build by wave;
   the zone is why two таски in one wave can be trusted not to collide.
 - `model` comes from step 6b, the same word as the task file's `Model` row.
+  A contract-7 run writes no `model`, and its task files carry no `Model`
+  row: a run reopened under contract 7 is refused every field from 8, and
+  each of its субагенты runs on the session's model.
 - `retries`, `repairs` and `handoffs` all start at `0`, and `files` starts empty.
   A counter created halfway through a прогон is a counter somebody increments
   from nothing, and the arithmetic downstream never says so.
@@ -454,8 +457,8 @@ The mechanical half also refuses two таски that share a path in their files
 zone with neither blocking the other, and a check whose execution owner does
 not transitively depend on each of its integration prerequisites. From
 contract 8 it refuses a producer or the skeleton that is not `strong`, a
-Producer task cell that names no таск id, and a task file whose `Model` row
-disagrees with `tasks[].model`.
+Producer task cell that names no таск id, a producer id that is not a таск of
+the plan, and a task file whose `Model` row disagrees with `tasks[].model`.
 
 One direction alone is worth little. A cut can cover every требование and still
 carry two таски invented along the way, and it can be entirely traceable while

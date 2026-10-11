@@ -200,7 +200,8 @@ one, briefed by
 [`../prompts/executor.md`](../prompts/executor.md). Set the таск to `running`
 and write the state at that transition. **Every repair and retry executor runs
 `strong`**, whatever its таск's tier: the run state's `models.strong`, none at
-all for `session`, effort equal to the session's.
+all for `session` or for a run with no `models` (contract 7), effort equal to
+the session's.
 
 Under contract 6 the brief is about one defect. It states the defect and its
 counterexample, the parent таск, the repair criteria as check IDs, the residual

@@ -328,7 +328,9 @@ sole таск of wave 1 — the skeleton, a wave of its own by definition — ar
 their one-line reason. Everything else is `standard`. The plan writes the
 same word into `tasks[].model` and nothing changes it: a repair and a retry run
 `strong`, and a context handoff keeps the tier ([`dials.md`](dials.md) ›
-*Models*).
+*Models*). A contract-7 run, reopened under its own contract, writes no
+`model` and no `Model` row, and each of its субагенты runs on the session's
+model.
 
 **The project's commands are written once.** `interfaces.md` opens with a
 Project conventions table of five rows: the test, typecheck and lint commands,
@@ -1030,6 +1032,10 @@ differences it can see. Each difference becomes a таск, cut and handed to an
 executor exactly as a build таск is: one commit, one review, `done` written by
 the review phase. **Доводка changes what is worked on, never how**; a polish
 change that skipped review would be the one change in the прогон nobody checked.
+A доводка таск runs `strong`, as a repair does. From contract 8 it is written
+into `tasks[]` with `model: strong` and a task file whose `Model` row reads
+`strong` — доводка; the plan's tier rule does not apply to it, and a
+contract-7 run writes neither.
 
 A round that returns nothing ends доводка, whether it was the first or the
 third. Three is a ceiling, not a quota, and a second round run to use up the

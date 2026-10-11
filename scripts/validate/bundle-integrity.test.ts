@@ -1235,7 +1235,7 @@ test('the existing-code reader losing the leaf sentence is the one leaf finding,
 });
 
 test('the shipped bundle carries every models anchor, and the check finds none missing', async () => {
-  assert.equal(MODEL_ANCHORS.length, 11);
+  assert.equal(MODEL_ANCHORS.length, 13);
   await withShippedCopy(async copy => {
     assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'models'), []);
   });

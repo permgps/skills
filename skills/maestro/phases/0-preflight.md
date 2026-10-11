@@ -51,11 +51,11 @@ failure has — the capabilities are separate answers and one of them being true
 says nothing about the next.
 
 <!-- maestro:probes:model-per-subagent -->
-**The fan-out probe also settles the models.** Dispatch it on the `standard`
-model the dials resolved: it is the one dispatch whose job is to find out
-whether a per-dispatch model choice reaches the host, and it is trivial, so the
-tier costs nothing. When the host or the returned agent names a model other than
-the one requested, say so in one chat line, and carry
+**A fourth, the models, is settled by the fan-out probe.** Dispatch it on the
+`standard` model the dials resolved: it is the one dispatch whose job is to
+find out whether a per-dispatch model choice reaches the host, and it is
+trivial, so the tier costs nothing. When the host or the returned agent names
+a model other than the one requested, say so in one chat line, and carry
 `models: requested <x> for preflight probe, host reported <y>` into the first
 state's `debt.assumptions` (step 4). On a host whose subagent tool carries no
 model list the dials already degraded: nothing is requested, nothing compared.
@@ -527,6 +527,10 @@ that already landed — is not a conversion. Publish an active candidate that
 keeps every published record, drops `outcome` and `finishedAt`, and sets `dir`
 back to `<YYYY-MM-DD>-<slug>--wip` with the date and slug unchanged. Publication
 moves the folder back and returns the register row to in progress; say in the
-chat that the run was reopened under its original date.
+chat that the run was reopened under its original date. A reopened run keeps
+its contract: a contract-7 run gains no `models` and its таски no `model`,
+every субагент runs on the session's model, and the announcement says so. A
+models pin the dials resolved is still written in step 4, because it belongs
+to the project and this host, not to the run.
 
 Then read the manifest phase file.

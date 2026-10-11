@@ -66,6 +66,10 @@ else can check. Hand each over with
 [`../prompts/executor.md`](../prompts/executor.md), one commit each, and send
 each one through ревью exactly as a build таск goes. A доводка executor runs
 `strong`, as a repair does: the run state's `models.strong`, none for `session`.
+From contract 8, write each доводка таск into `tasks[]` with `model: strong`,
+and its task file's `Model` row as `strong` — доводка. The plan's step 6b does
+not apply here: a доводка таск is never `standard`, and the state refuses a
+таск that carries no tier. A contract-7 run writes neither.
 
 **You write none of this code** (`S5`), and you do not mark a доводка таск
 `done` — that word is written by the review phase, here as everywhere.

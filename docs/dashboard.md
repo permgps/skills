@@ -18,7 +18,7 @@ and a load that fails never replaces a state that worked. It never opens
 source of truth about a run, and the second one is silently wrong.
 
 The title names the run: «Прогон: <slug> · <YYYY-MM-DD>», the date being the day
-a contract-7 run started, read out of its `dir`. A run from before contract 7 is
+a run of contract 7 or later started, read out of its `dir`. A run from before contract 7 is
 titled by its slug alone. Whether the run is still in progress is shown by the
 lifecycle on the page, not by the directory's `--wip` suffix.
 

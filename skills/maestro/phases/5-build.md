@@ -109,8 +109,9 @@ disagreeing with it builds to `interfaces.md` and says so, and the review still
 judges the таск against its task file and `interfaces.md` alone.
 
 **Dispatch the executor on its таск's tier**: the model the run state's
-`models` names for `tasks[].model`, none at all for `session`, and effort equal
-to the session's, as the delegation rule in `SKILL.md` says. A retry is a repair
+`models` names for `tasks[].model`, none at all for `session` or for a run
+with no `models` (contract 7), and effort equal to the session's, as the
+delegation rule in `SKILL.md` says. A retry is a repair
 and runs `strong`; that is the repair phase's to dispatch, never this one's.
 
 Name the absolute owned workspace as operational metadata, including when the

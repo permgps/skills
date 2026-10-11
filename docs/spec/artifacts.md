@@ -24,7 +24,7 @@ project that was built, not with Maestro.
 │   ├── decisions.md
 │   ├── amendments.md
 │   └── state.js                 (the run's last state, kept when the next run starts)
-├── README.md                    (the register: one row per contract-7 run)
+├── README.md                    (the register: one row per run of contract 7 or later)
 ├── config.json
 ├── state.js
 └── dashboard.html
@@ -49,7 +49,7 @@ while the run is active. The name answers «этот ещё делается и�
 collapsed file tree without opening anything. Every path below is relative to
 that directory, and every phase builds it from `dir`.
 
-**`README.md` is the register.** One row per contract-7 run — when it started,
+**`README.md` is the register.** One row per run of contract 7 or later — when it started,
 its directory, whether it is in progress, completed, closed with exceptions or
 stopped incomplete, and when it finished — between the owned markers
 `<!-- maestro:runs:begin -->` and `<!-- maestro:runs:end -->`. The first publish

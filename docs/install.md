@@ -55,7 +55,7 @@ the target, without replacing the populated run directory:
   dashboard.html
   state.js, validation.js
   serve.json, opened.json
-  README.md                        the run register, one row per contract-7 run
+  README.md                        the run register, one row per run of contract 7 or later
   <YYYY-MM-DD>-<slug>--wip/        a run in progress; the suffix comes off when it closes
   <YYYY-MM-DD>-<slug>/             a run that closed
   <slug>/                          a run from before contract 7, under its old name
