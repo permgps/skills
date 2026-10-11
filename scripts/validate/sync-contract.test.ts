@@ -1374,3 +1374,31 @@ test('the copied helper pins the models into a real config.json and keeps its mo
     await rm(root, { recursive: true, force: true });
   }
 });
+
+// Preflight step 4c asks through the copied helper whether a newer Maestro is
+// out. Neither case may reach the network: the switch is read first, and an
+// installed directory with no SKILL.md is read before any request is made.
+test('the copied helper answers --update-check with one JSON line and exit 0, disabled or unknown, without a request', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'sync-update-'));
+  try {
+    const maestro = path.join(root, '.maestro');
+    const emptySkill = path.join(root, 'installed skill');
+    await mkdir(maestro);
+    await mkdir(emptySkill);
+    await copyFile(SYNC, path.join(maestro, 'sync.mts'));
+    await cp('skills/maestro/tools/runtime', path.join(maestro, 'runtime'), { recursive: true });
+    const script = path.join(maestro, 'sync.mts');
+
+    const disabled = run(script, { MAESTRO_NO_UPDATE_CHECK: '1' }, ['--update-check', '--skill', emptySkill]);
+    assert.equal(disabled.status, 0, disabled.out + disabled.err);
+    assert.equal(disabled.out, '{"result":"disabled"}\n');
+
+    const unknown = run(script, { MAESTRO_NO_UPDATE_CHECK: '' }, ['--update-check', '--skill', emptySkill]);
+    assert.equal(unknown.status, 0, unknown.out + unknown.err);
+    assert.equal(unknown.out, '{"result":"unknown"}\n');
+    assert.doesNotMatch(unknown.err, /requesting published/);
+    assert.deepEqual((await readdir(maestro)).sort(), ['runtime', 'sync.mts']);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

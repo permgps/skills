@@ -10,6 +10,7 @@ import { mirror, snapshots, placeIndex, mirrorValidation } from './runtime/dashb
 import { FOLDED, spoken, legacyReports, movedMessage } from './runtime/legacy.mts';
 import { configCommand } from './runtime/config.mts';
 import { memoryCommand } from './runtime/memory.mts';
+import { updateCommand } from './runtime/update-check.mts';
 import { openPage, openingMessage } from './runtime/opener.mts';
 import { ensureViewer, serveDirectory } from './runtime/server.mts';
 import { extractStateLiteral } from './runtime/state/read.mts';
@@ -85,6 +86,11 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
   }
   if (args[0] === '--config-models') {
     const outcome = await configCommand(args, RUN_DIR, stdinText);
+    process.stdout.write(JSON.stringify(outcome.result) + '\n');
+    return outcome.code;
+  }
+  if (args[0] === '--update-check') {
+    const outcome = await updateCommand(args, RUN_DIR);
     process.stdout.write(JSON.stringify(outcome.result) + '\n');
     return outcome.code;
   }
