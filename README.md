@@ -926,7 +926,7 @@ development dependencies are `typescript` and `@types/node`.
 | `npm run hosts` | every host degradation is probed and spent, the memory-file table matches, and every host says where it lists its models |
 | `npm run doors` | every entry into repair is defined |
 | `npm run dials` | dial values and defaults agree across files, and the models token rule is stated once on each side |
-| `npm run readers` | each gate reader is given and withheld what it should be, and every brief runs on its tier — judges always `strong` |
+| `npm run readers` | each gate reader is given and withheld what it should be, every brief runs on its tier — judges always `strong` — and the standards reader's documents are searched for in the same places everywhere they are named |
 | `npm run report` | the отчёт's sections agree in the bundle and the specification |
 | `npm run view` | the viewer boundary: the run opens only its dashboard |
 | `npm run test` | every `*.test.ts`, including the copied-runtime integration tests and the README reference check |

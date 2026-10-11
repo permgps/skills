@@ -16,6 +16,18 @@ number that claimed more than that would be claiming it falsely.
 
 `CONTRACT_VERSION` moves to `8`.
 
+- **The standards reader finds the standards itself.** Phase 6 handed the
+  standards reader the memory file, `CONTRIBUTING*` and only the documents they
+  or the README named, so a `CODING_STANDARDS.md` or a `STYLEGUIDE.md` that
+  nothing linked to was never checked. The step now searches the project root:
+  the memory file of every supported host (`CLAUDE.md`, `.claude/CLAUDE.md`,
+  `CLAUDE.local.md`, `AGENTS.override.md`, `AGENTS.md`, `GEMINI.md`), each
+  with the Maestro block cut out; `CONTRIBUTING*`, `CODING_STANDARDS*` and
+  `STYLEGUIDE*` at the root and in `.github/`; and conventions documents under
+  `docs/`. Named documents still count. A found file is handed over only if it
+  describes how code is written. What the reader is given and withheld is
+  unchanged. `npm run readers` holds the list in phase 6, the spec and the
+  brief, taking the memory files from the runtime's host table.
 - **A frozen dashboard says what to do.** When `state.js` beside the page stops
   loading, the message named the file and said the clocks stopped, and nothing
   more. It now adds, in both languages: if the прогон is still going, ask in the

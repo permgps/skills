@@ -230,7 +230,11 @@ for name, naming both places when they disagree.
 It reads both the `Given` and `Withheld` columns against named tables in each
 reader brief. It also holds who is handed `codebase.md`: the G3 consistency row
 must give it, every other row must withhold it, `executor.md` names it in its
-opening, `reviewer.md` in what it has not seen, and no other brief mentions it. This checks declared input boundaries; an actual dispatch still
+opening, `reviewer.md` in what it has not seen, and no other brief mentions it.
+It holds the places the standards reader's documents are gathered from: phase
+6's step, [`phases.md`](phases.md) › *One Standards Pass* and the brief each
+name every host's memory file, taken from the runtime's host table, and
+`CONTRIBUTING*`, `CODING_STANDARDS*`, `STYLEGUIDE*` and `docs/`. This checks declared input boundaries; an actual dispatch still
 needs workflow evaluation because a prompt file cannot prove what the agent
 received at run time.
 
