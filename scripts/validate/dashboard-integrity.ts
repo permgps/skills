@@ -32,7 +32,7 @@ const log = createLogger('dashboard-integrity');
  */
 const REQUIRED_REGIONS = [
   'run-clock', 'dials',
-  'band', 'strip', 'cards',
+  'band', 'strip', 'cards', 'task-squares',
   'stages', 'tasks', 'requirements', 'gates', 'handover',
   'requirement-rows', 'requirement-folds',
 ];
@@ -732,37 +732,56 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
   log.info('labels', 'labels compared with the vocabulary',
     { maps: (VALUE_MAPS.length + 1) * LANGUAGES.length });
 
-  // --- the band's four condition words are the vocabulary's -----------------
+  // --- words the page derives rather than reads ----------------------------
   //
-  // No field holds a condition: the page derives it, so VALUE_MAPS cannot see
-  // the map. It is still a word the user reads at the top of every screen, and
-  // a word the page coins is the drift this checker exists for. The keys are
-  // held to CONDITION_ORDER as well, because `conditionOf` can only return what
-  // that list names and a vocabulary row it never returns is a word no screen
-  // will ever show.
-  const conditionOrder = Array.isArray(logic['CONDITION_ORDER'])
-    ? (logic['CONDITION_ORDER'] as unknown[]).map(String) : [];
-  for (const { language, label } of LANGUAGES) {
-    const conditions = findTable(vocabularyTables, ['Condition', label]);
-    if (!conditions) {
-      add('conditions', 0, `vocabulary.md has no table with columns Condition and ${label}`);
-      continue;
+  // No field holds a condition or a requirement's progress: the page derives
+  // both, so VALUE_MAPS cannot see their maps. They are still words the user
+  // reads — the band at the top of every screen, the Требования card under
+  // it — and a word the page coins is the drift this checker exists for. The
+  // keys are held to the page's order list as well, because the deriving
+  // function can only return what that list names, and a vocabulary row it
+  // never returns is a word no screen will ever show. One helper for both, so
+  // the second table cannot be held more loosely than the first.
+  const holdLabelTable = (table: {
+    check: string; column: string; mapName: string; orderName: string;
+    section: string; noun: string; nouns: string; counted: string; logLine: string;
+  }): void => {
+    const order = Array.isArray(logic[table.orderName])
+      ? (logic[table.orderName] as unknown[]).map(String) : [];
+    for (const { language, label } of LANGUAGES) {
+      const rows = findTable(vocabularyTables, [table.column, label]);
+      if (!rows) {
+        add(table.check, 0, `vocabulary.md has no table with columns ${table.column} and ${label}`);
+        continue;
+      }
+      const owned = new Map(rows.rows.map(row =>
+        [cleanCell(row[table.column]).replace(/`/g, '').trim(), cleanCell(row[label])] as const));
+      const held = branchMap(language, table.mapName);
+      const missing = [...owned.keys()].filter(key => !(key in held));
+      log.debug(table.check, `${table.noun} map compared`, { map: `${table.mapName} (${language})`, missing });
+      compare(table.check, `${table.noun} (${language})`, owned, held);
+      const keys = [...owned.keys()];
+      if (keys.join(',') !== order.join(',')) {
+        add(table.check, 0,
+          `vocabulary.md lists the ${table.nouns} [${keys.join(', ')}] and the page's ${table.orderName} `
+          + `is [${order.join(', ')}] — keep the ${table.section} rows in the order ${table.orderName} `
+          + `lists them, and no ${table.noun} the page cannot return`);
+      }
+      log.info(table.check, table.logLine, { language, [table.counted]: keys.length, missing: missing.length });
     }
-    const owned = new Map(conditions.rows.map(row =>
-      [cleanCell(row['Condition']).replace(/`/g, '').trim(), cleanCell(row[label])] as const));
-    const held = branchMap(language, 'CONDITION');
-    const missing = [...owned.keys()].filter(key => !(key in held));
-    log.debug('conditions', 'condition map compared', { map: `CONDITION (${language})`, missing });
-    compare('conditions', `condition (${language})`, owned, held);
-    const keys = [...owned.keys()];
-    if (keys.join(',') !== conditionOrder.join(',')) {
-      add('conditions', 0,
-        `vocabulary.md lists the conditions [${keys.join(', ')}] and the page's CONDITION_ORDER `
-        + `is [${conditionOrder.join(', ')}] — keep the Run Condition rows in the order CONDITION_ORDER `
-        + 'lists them, and no condition the page cannot return');
-    }
-    log.info('conditions', 'conditions checked', { language, conditions: keys.length, missing: missing.length });
-  }
+  };
+
+  holdLabelTable({
+    check: 'conditions', column: 'Condition', mapName: 'CONDITION', orderName: 'CONDITION_ORDER',
+    section: 'Run Condition', noun: 'condition', nouns: 'conditions', counted: 'conditions',
+    logLine: 'conditions checked',
+  });
+  holdLabelTable({
+    check: 'progress', column: 'Progress', mapName: 'REQUIREMENT_PROGRESS',
+    orderName: 'REQUIREMENT_PROGRESS_ORDER', section: 'Requirement Progress',
+    noun: 'requirement progress', nouns: 'requirement progress buckets', counted: 'progress',
+    logLine: 'requirement progress checked',
+  });
 
   // --- the plain register says nothing only the trade understands -----------
   //

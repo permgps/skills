@@ -54,6 +54,14 @@ const VOCABULARY = `# Vocabulary
 | \`working\` | Идёт работа | Working | anything else |
 | \`waiting\` | Ждёт вас | Waiting for you | a stop on a question |
 
+## Requirement Progress
+
+| Progress | Label | Label (en) | When |
+|---|---|---|---|
+| \`built\` | Построено | Built | every таск naming it is done |
+| \`in-progress\` | В работе | In progress | anything else live |
+| \`deferred\` | Отложено | Deferred | the user put it off |
+
 ## Plain Words
 
 | Shorthand | Say instead |
@@ -120,6 +128,7 @@ const LOGIC = {
   GATE_AFTER: "{ G1: 'preflight' }",
   EXPLAIN_ORDER: "['progress', 'gates']",
   CONDITION_ORDER: "['working', 'waiting']",
+  REQUIREMENT_PROGRESS_ORDER: "['built', 'in-progress', 'deferred']",
   explain: "function (key) { return key === 'nothing' ? [] : ['what it is', 'what it holds']; }",
   explainStage: "function (id) { return id === 'nothing' ? [] : ['what it does', 'where it is']; }",
   findingsLine: "function (count, register) { return register === 'plain'"
@@ -145,6 +154,7 @@ const RU = {
   DEFECT_STATUS: "{ open: 'Открыт' }",
   REQUIREMENT_RESULT: "{ incomplete: 'Не проверено до конца' }",
   CONDITION: "{ working: 'Идёт работа', waiting: 'Ждёт вас' }",
+  REQUIREMENT_PROGRESS: "{ built: 'Построено', 'in-progress': 'В работе', deferred: 'Отложено' }",
   EXPLAIN: "{ progress: function () { return ['что это', 'что показывает']; } }",
   STAGE_EXPLAIN: "{ preflight: function () { return ['подготовка заводит прогон']; },"
     + " build: function () { return ['разработка пишет код']; } }",
@@ -171,6 +181,7 @@ const EN = {
   DEFECT_STATUS: "{ open: 'Open' }",
   REQUIREMENT_RESULT: "{ incomplete: 'Not fully checked' }",
   CONDITION: "{ working: 'Working', waiting: 'Waiting for you' }",
+  REQUIREMENT_PROGRESS: "{ built: 'Built', 'in-progress': 'In progress', deferred: 'Deferred' }",
   EXPLAIN: "{ progress: function () { return ['what it is', 'what it holds']; } }",
   STAGE_EXPLAIN: "{ preflight: function () { return ['setup opens the run']; },"
     + " build: function () { return ['development writes the code']; } }",
@@ -195,7 +206,7 @@ const RENDER = `<script>
 const EXPLAINED = ['progress', 'gates'];
 
 const REGIONS = [
-  'run-clock', 'dials', 'band', 'strip', 'cards',
+  'run-clock', 'dials', 'band', 'strip', 'cards', 'task-squares',
   'stages', 'tasks', 'requirements', 'gates', 'handover',
   'requirement-rows', 'requirement-folds',
 ];
@@ -907,4 +918,31 @@ test('a vocabulary with no Run Condition table is reported rather than skipped',
 test('a page with no band to render the header into is reported', () => {
   const found = messages(page({ regions: REGIONS.filter(id => id !== 'band') }));
   assert.match(found, /no element with id "band"/);
+});
+
+test('a requirement progress bucket the page words differently from the vocabulary is reported with both wordings', () => {
+  const found = messages(page({ ru: { REQUIREMENT_PROGRESS: "{ built: 'Готово', 'in-progress': 'В работе', deferred: 'Отложено' }" } }));
+  assert.match(found, /requirement progress \(ru\) "built" is labelled "Готово" in the page and "Построено" in the specification/);
+});
+
+test('a requirement progress bucket the vocabulary names and the page lacks is reported', () => {
+  const found = messages(page({ en: { REQUIREMENT_PROGRESS: "{ built: 'Built', 'in-progress': 'In progress' }" } }));
+  assert.match(found, /requirement progress \(en\) "deferred" has a label in the specification and none in the page/);
+});
+
+test('a requirement progress bucket the page words and the vocabulary does not define is reported', () => {
+  const found = messages(page({
+    ru: { REQUIREMENT_PROGRESS: "{ built: 'Построено', 'in-progress': 'В работе', deferred: 'Отложено', verified: 'Проверено' }" },
+  }));
+  assert.match(found, /requirement progress \(ru\) "verified" is labelled in the page and defined nowhere in the specification/);
+});
+
+test('requirement progress rows out of the page\'s order are reported', () => {
+  const found = messages(page({ logic: { REQUIREMENT_PROGRESS_ORDER: "['deferred', 'in-progress', 'built']" } }));
+  assert.match(found, /vocabulary\.md lists the requirement progress buckets \[built, in-progress, deferred\] and the page's REQUIREMENT_PROGRESS_ORDER is \[deferred, in-progress, built\]/);
+});
+
+test('a page with no squares to draw the таски into is reported', () => {
+  const found = messages(page({ regions: REGIONS.filter(id => id !== 'task-squares') }));
+  assert.match(found, /no element with id "task-squares"/);
 });

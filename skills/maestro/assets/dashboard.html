@@ -197,26 +197,35 @@
   /* The rounded ends belong to the track, which clips them, so a bar of two
      segments meets in a flat seam instead of two facing bulges. */
   .bar > i { display: block; height: 100%; background: var(--ink); }
-  /* Work in flight is not work accepted, and it takes the tone this page
-     already uses for everything not yet settled. */
-  .bar > i.flight { background: var(--muted); }
   .sub { color: var(--muted); font-size: .85rem; margin: 0; }
 
-  /* --- the six cards --- */
+  /* --- the four cards --- */
   #cards {
     display: grid; gap: 1rem; padding: 0; border: 0; background: none;
     grid-template-columns: repeat(2, 1fr);
   }
-  /* Two rows of three on anything wide enough; two columns on a phone. */
-  @media (min-width: 62rem) { #cards { grid-template-columns: repeat(3, 1fr); } }
+  /* One row of four on anything wide enough; two by two on a phone. */
+  @media (min-width: 62rem) { #cards { grid-template-columns: repeat(4, 1fr); } }
   .card {
     background: var(--panel); border: 1px solid var(--line);
     border-radius: 8px; padding: .9rem 1rem; min-height: 7.5rem;
   }
   .card .value { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   .card .value small { font-size: .95rem; font-weight: 400; color: var(--muted); }
-  .ring { display: block; margin: .2rem 0; }
-  .ring circle { fill: none; stroke-width: 9; }
+  #tests-failed.fail { color: var(--fail); }
+  /* One square per таск, in the chip palette. The colour is never the only
+     carrier of the status: each square names it, and the line under the
+     squares counts the same statuses in words. */
+  .squares { display: flex; flex-wrap: wrap; gap: .2rem; list-style: none; padding: 0; margin: .5rem 0 .4rem; }
+  .sq { width: .7rem; height: .7rem; border-radius: 2px; box-sizing: border-box; background: var(--ghost); }
+  .sq-done { background: var(--accent); }
+  .sq-running { background: var(--warn); }
+  .sq-review { background: var(--info); }
+  .sq-repair { background: var(--fix); }
+  .sq-failed { background: var(--fail); }
+  .sq-queued { background: none; border: 1px solid var(--ghost); }
+  .sq-off-contract { background: none; border: 1px dashed var(--muted); }
+  .coverage-line { margin-top: .2rem; }
 
   /* --- rows shared by stages, requirements and gates --- */
   .row {
@@ -360,16 +369,25 @@
 <main id="regions">
 
   <section id="cards">
-    <div class="card" data-region="coverage">
-      <h2 data-label="coverage"></h2>
-      <svg class="ring" viewBox="0 0 80 80" width="72" height="72" aria-hidden="true">
-        <circle cx="40" cy="40" r="34" stroke="var(--ghost)"></circle>
-        <circle id="coverage-arc" cx="40" cy="40" r="34" stroke="var(--accent)"
-                stroke-linecap="round" transform="rotate(-90 40 40)"
-                stroke-dasharray="213.6" stroke-dashoffset="213.6"></circle>
-      </svg>
-      <div class="value"><span id="coverage-percent">—</span><small>%</small></div>
-      <p class="sub" id="coverage-sub"></p>
+    <div class="card" data-region="requirements">
+      <h2 data-label="requirements"></h2>
+      <div class="value"><span id="req-built">—</span><small id="req-live"></small></div>
+      <div class="bar"><i id="req-fill" style="width:0%"></i></div>
+      <p class="sub" id="req-sub"></p>
+    </div>
+
+    <div class="card" data-region="tasks">
+      <h2 data-label="tasks"></h2>
+      <div class="value"><span id="tasks-done">—</span><small id="tasks-total"></small></div>
+      <ol class="squares" id="task-squares"></ol>
+      <p class="sub" id="tasks-sub"></p>
+      <p class="sub" id="tasks-budget"></p>
+    </div>
+
+    <div class="card" data-region="tests">
+      <h2 data-label="tests"></h2>
+      <div class="value"><span id="tests-count">—</span> <small id="tests-failed"></small></div>
+      <p class="sub" id="tests-sub"></p>
     </div>
 
     <div class="card" data-region="elapsed">
@@ -377,32 +395,6 @@
       <div class="value" id="run-clock">—</div>
       <p class="sub" id="run-median"></p>
       <p class="sub" id="run-calendar"></p>
-    </div>
-
-    <div class="card" data-region="tasks">
-      <h2 data-label="tasks"></h2>
-      <div class="value"><span id="tasks-done">—</span><small id="tasks-total"></small></div>
-      <div class="bar"><i id="tasks-fill" style="width:0%"></i><i id="tasks-flight" class="flight" style="width:0%"></i></div>
-      <p class="sub" id="tasks-sub"></p>
-      <p class="sub" id="tasks-budget"></p>
-    </div>
-
-    <div class="card" data-region="debt">
-      <h2 data-label="debt"></h2>
-      <div class="value" id="debt-count">—</div>
-      <p class="sub" id="debt-sub"></p>
-    </div>
-
-    <div class="card" data-region="tests">
-      <h2 data-label="tests"></h2>
-      <div class="value" id="tests-count">—</div>
-      <p class="sub" id="tests-sub"></p>
-    </div>
-
-    <div class="card" data-region="requirements">
-      <h2 data-label="requirements"></h2>
-      <div class="value" id="req-count">—</div>
-      <p class="sub" id="req-sub"></p>
     </div>
   </section>
 
@@ -544,16 +536,24 @@ globalThis.MAESTRO_LOGIC = (function () {
       CONDITION: {
         working: 'Идёт работа', waiting: 'Ждёт вас', finished: 'Завершён', failed: 'Сбой'
       },
+      /**
+       * Where a live требование stands, as the Требования card counts it.
+       *
+       * Derived like CONDITION, in `requirementProgressOf`, and worded by
+       * vocabulary.md › Requirement Progress. «Построено», never «Готово»:
+       * a built требование has not been checked, and only the finished-work
+       * check may say it was — the card then says REQUIREMENT_RESULT.passed.
+       */
+      REQUIREMENT_PROGRESS: { built: 'Построено', 'in-progress': 'В работе', deferred: 'Отложено' },
       /** The words on screen that are the value of no field. */
       SCREEN: {
         dials: 'Тумблеры прогона',
         header: 'Что происходит',
         progress: 'Прогресс проекта',
         coverage: 'Покрытие брифа',
-        elapsed: 'Прошло времени',
+        elapsed: 'Рабочее время',
         estimate: 'Осталось',
         tasks: 'Таски',
-        debt: 'Долг',
         assumptions: 'Допущения',
         variables: 'Переменные',
         tests: 'Тесты',
@@ -641,11 +641,6 @@ globalThis.MAESTRO_LOGIC = (function () {
             function (rest) { return ' и ещё ' + rest; });
         },
         bandCaption: function (percent) { return L10N.ru.SCREEN.progress + ' — ' + percent + '%'; },
-        coverageSub: function (cover) {
-          return cover.live > 0
-            ? cover.inSpec + ' из ' + cover.live + ' требований'
-            : 'Требования ещё не записаны';
-        },
         // One wording, not two. `UI` is read as source by the checker, so a
         // `plain ? … : …` here would ship «Медиана» to the scan whichever
         // branch ran — and rightly: a branch never taken still ships. Wording
@@ -667,31 +662,35 @@ globalThis.MAESTRO_LOGIC = (function () {
           return 'Критический путь: ' + chain + ' '
             + plural(chain, 'таск', 'таска', 'тасков') + ' в цепочке';
         },
-        // «готово» belongs to the figure above, which counts accepted таски.
-        // Calling the share «готово» is what made the card say «0 / 6» over
-        // «38% готово» — two numbers about one thing, disagreeing.
-        tasksSub: function (counts, share) {
+        // The squares carry each таск's status in colour; this line says the
+        // same counts in words, so status is never colour-only. No share of
+        // the way: the band's progress bar is the one road, and a second
+        // percentage of it here was a second rendering of one number.
+        tasksSub: function (counts) {
           if (counts.total === 0) return 'Таски ещё не нарезаны';
-          var say = L10N.ru.TASK_STATUS;
-          var line = share + '% пути';
-          if (counts.running > 0) line += ' · ' + say.running + ' ' + counts.running;
-          if (counts.review > 0) line += ' · ' + say.review + ' ' + counts.review;
-          if (counts.repair > 0) line += ' · ' + say.repair + ' ' + counts.repair;
-          if (counts.offContract > 0) {
-            line += ' · ' + L10N.ru.SCREEN.offContract + ' ' + counts.offContract;
-          }
-          if (counts.retries > 0) line += ' · повторов ' + counts.retries;
-          return line;
+          return tasksSubParts(counts, L10N.ru.TASK_STATUS, L10N.ru.SCREEN.offContract, 'повторов');
         },
-        debtSub: function (debt) {
-          return 'Заглушки ' + debt.placeholders
-            + ' · ' + L10N.ru.SCREEN.assumptions + ' ' + debt.assumptions
-            + ' · ' + L10N.ru.SCREEN.variables + ' ' + debt.emptyEnv;
+        requirementsSub: function (progress) {
+          if (progress.live === 0) return 'Требования ещё не записаны';
+          var say = L10N.ru.REQUIREMENT_PROGRESS;
+          return (progress.verified === null ? say.built : L10N.ru.REQUIREMENT_RESULT.passed)
+            + ' · ' + say['in-progress'].toLowerCase() + ' ' + progress.inProgress
+            + ' · ' + say.deferred.toLowerCase() + ' ' + progress.deferred;
         },
         testsSub: function (tests) {
           if (!tests) return 'Прогон ещё не запускал тесты';
-          return tests.failed > 0 ? 'Упало ' + tests.failed : 'После последнего таска';
+          if (tests.source === 'run') return 'Полный набор на приёмке';
+          return 'После таска ' + tests.taskId + (tests.title ? ' «' + tests.title + '»' : '');
         },
+        testsFailed: function (n) { return '· упало ' + n; },
+        coverageLine: function (cover) {
+          return L10N.ru.SCREEN.coverage + ': ' + (cover.live > 0
+            ? cover.inSpec + ' из ' + cover.live + ' '
+              + plural(cover.live, 'требования', 'требований', 'требований')
+              + ' в спецификации — ' + cover.percent + '%'
+            : 'требования ещё не записаны');
+        },
+        handoverTotal: function (n) { return 'Всего ' + n + ' ' + plural(n, 'пункт', 'пункта', 'пунктов'); },
         // The row above already names the check and its status, so this line
         // names neither. That is also what keeps it out of trouble: `UI` is
         // read as source, so «Гейт» in the normal branch would be scanned
@@ -908,6 +907,7 @@ globalThis.MAESTRO_LOGIC = (function () {
       CONDITION: {
         working: 'Working', waiting: 'Waiting for you', finished: 'Finished', failed: 'Failed'
       },
+      REQUIREMENT_PROGRESS: { built: 'Built', 'in-progress': 'In progress', deferred: 'Deferred' },
       SCREEN: {
         dials: 'Dials',
         header: 'What is happening',
@@ -916,7 +916,6 @@ globalThis.MAESTRO_LOGIC = (function () {
         elapsed: 'Time worked',
         estimate: 'Remaining',
         tasks: 'Tasks',
-        debt: 'Debt',
         assumptions: 'Assumptions',
         variables: 'Variables',
         tests: 'Tests',
@@ -999,11 +998,6 @@ globalThis.MAESTRO_LOGIC = (function () {
             function (rest) { return ' and ' + rest + ' more'; });
         },
         bandCaption: function (percent) { return L10N.en.SCREEN.progress + ' — ' + percent + '%'; },
-        coverageSub: function (cover) {
-          return cover.live > 0
-            ? cover.inSpec + ' of ' + cover.live + ' requirements'
-            : 'No requirements written down yet';
-        },
         medianSub: function (ms) {
           // No register split here: English already owns the plain words for
           // this, and `median` is on the English shorthand list with nothing
@@ -1022,28 +1016,30 @@ globalThis.MAESTRO_LOGIC = (function () {
           return 'Critical path: ' + chain + ' '
             + L10N.en.UI.tasksWord(chain) + ' in the chain';
         },
-        tasksSub: function (counts, share) {
+        tasksSub: function (counts) {
           if (counts.total === 0) return 'No tasks cut yet';
-          var say = L10N.en.TASK_STATUS;
-          var line = share + '% of the way';
-          if (counts.running > 0) line += ' · ' + say.running + ' ' + counts.running;
-          if (counts.review > 0) line += ' · ' + say.review + ' ' + counts.review;
-          if (counts.repair > 0) line += ' · ' + say.repair + ' ' + counts.repair;
-          if (counts.offContract > 0) {
-            line += ' · ' + L10N.en.SCREEN.offContract + ' ' + counts.offContract;
-          }
-          if (counts.retries > 0) line += ' · restarts ' + counts.retries;
-          return line;
+          return tasksSubParts(counts, L10N.en.TASK_STATUS, L10N.en.SCREEN.offContract, 'restarts');
         },
-        debtSub: function (debt) {
-          return 'Placeholders ' + debt.placeholders
-            + ' · ' + L10N.en.SCREEN.assumptions + ' ' + debt.assumptions
-            + ' · ' + L10N.en.SCREEN.variables + ' ' + debt.emptyEnv;
+        requirementsSub: function (progress) {
+          if (progress.live === 0) return 'No requirements written down yet';
+          var say = L10N.en.REQUIREMENT_PROGRESS;
+          return (progress.verified === null ? say.built : L10N.en.REQUIREMENT_RESULT.passed)
+            + ' · ' + say['in-progress'].toLowerCase() + ' ' + progress.inProgress
+            + ' · ' + say.deferred.toLowerCase() + ' ' + progress.deferred;
         },
         testsSub: function (tests) {
-          if (!tests) return 'The run has not started the tests yet';
-          return tests.failed > 0 ? 'Failed ' + tests.failed : 'After the last task';
+          if (!tests) return 'The run has not run any tests yet';
+          if (tests.source === 'run') return 'Full suite at acceptance';
+          return 'After task ' + tests.taskId + (tests.title ? ' “' + tests.title + '”' : '');
         },
+        testsFailed: function (n) { return '· failed ' + n; },
+        coverageLine: function (cover) {
+          return L10N.en.SCREEN.coverage + ': ' + (cover.live > 0
+            ? cover.inSpec + ' of ' + cover.live + ' ' + (cover.live === 1 ? 'requirement' : 'requirements')
+              + ' in the specification — ' + cover.percent + '%'
+            : 'no requirements written down yet');
+        },
+        handoverTotal: function (n) { return 'In all ' + n + ' ' + (n === 1 ? 'item' : 'items'); },
         findingsFolded: function (count, plain) {
           var one = count === 1;
           return plain
@@ -1571,6 +1567,90 @@ globalThis.MAESTRO_LOGIC = (function () {
     return counts;
   }
 
+  /**
+   * The Таски sub-line's parts, shared by both languages; the words are each
+   * language's own. Empty when nothing is in motion, failed, off-contract or
+   * retried — the figure and the squares already say everything else.
+   */
+  function tasksSubParts(counts, say, offContract, retried) {
+    var parts = [];
+    ['running', 'review', 'repair', 'failed'].forEach(function (status) {
+      if (counts[status] > 0) parts.push(say[status] + ' ' + counts[status]);
+    });
+    if (counts.offContract > 0) parts.push(offContract + ' ' + counts.offContract);
+    if (counts.retries > 0) parts.push(retried + ' ' + counts.retries);
+    return parts.join(' · ');
+  }
+
+  /** The three places a live требование can stand, in the order the card names them. */
+  var REQUIREMENT_PROGRESS_ORDER = ['built', 'in-progress', 'deferred'];
+
+  /**
+   * Where the live требования stand: `{ live, built, inProgress, deferred,
+   * verified, ids }`. The three buckets partition live, so they always add up
+   * to it — docs/spec/dashboard.md › Four Cards holds the table.
+   *
+   * A deferred требование is live, because `countRequirements` counts it so and
+   * the coverage line divides by the same number, yet it is never built: the
+   * user put it off, and work that happens to touch it does not settle it.
+   * Built means every таск that names it is done — activity is not delivery,
+   * so one таск still running, failed or off-contract keeps it in progress,
+   * and so does having no таск at all.
+   *
+   * `verified` is the count of требования the current G4 found passed, and
+   * `null` until that G4 has passed. It reads `verificationOf`, never the G4
+   * row in `gates`: the row is what a phase wrote, the record is what was
+   * checked, and a state older than contract 4 has no record and so never
+   * says verified. `ids` are kept for the requirement list's filter.
+   */
+  function requirementProgressOf(state) {
+    var tasks = ((state && state.tasks) || []).filter(Boolean);
+    var out = { live: 0, built: 0, inProgress: 0, deferred: 0, verified: null,
+                ids: { built: [], 'in-progress': [], deferred: [] } };
+    ((state && state.requirements) || []).forEach(function (requirement) {
+      var status = requirement && requirement.status;
+      if (status === 'dropped') return;
+      out.live += 1;
+      var id = requirement && requirement.id;
+      var bucket = 'in-progress';
+      if (status === 'deferred') {
+        bucket = 'deferred';
+      } else {
+        var naming = tasks.filter(function (task) {
+          return Array.isArray(task.requirementIds) && task.requirementIds.indexOf(id) !== -1;
+        });
+        if (naming.length > 0 && naming.every(function (task) { return task.status === 'done'; })) bucket = 'built';
+      }
+      if (bucket === 'built') out.built += 1;
+      else if (bucket === 'deferred') out.deferred += 1;
+      else out.inProgress += 1;
+      if (typeof id === 'string') out.ids[bucket].push(id);
+    });
+    var verification = null;
+    try { verification = verificationOf(state); } catch (error) { verification = null; }
+    if (verification && !verification.legacy && verification.g4 === 'passed') {
+      var results = verification.requirementResults || {};
+      out.verified = Object.keys(results).filter(function (key) { return results[key] === 'passed'; }).length;
+    }
+    return out;
+  }
+
+  /**
+   * One square per таск for the Таски card, in `tasks[]` order:
+   * `{ id, title, status }`. A status the contract does not define is
+   * `off-contract`, drawn apart from every known colour rather than guessed.
+   */
+  function taskSquaresOf(state) {
+    return ((state && state.tasks) || []).filter(Boolean).map(function (task) {
+      var title = typeof task.title === 'string' && task.title.trim() !== '' ? task.title.trim() : null;
+      return {
+        id: String(task.id),
+        title: title,
+        status: TASK_ORDER.indexOf(task.status) === -1 ? 'off-contract' : task.status
+      };
+    });
+  }
+
   /** The share of live требования that reached the specification. */
   function coverage(requirements) {
     var counts = countRequirements(requirements);
@@ -1830,32 +1910,48 @@ globalThis.MAESTRO_LOGIC = (function () {
     return peak;
   }
 
-  // Counted from `handoverOf`, so the Долг card and the Ваш ход region read one
-  // list and cannot disagree about how many placeholders there are.
-  function debtCounts(state) {
-    var handover = handoverOf(state);
-    var out = {
-      placeholders: handover.placeholders.length,
-      assumptions: handover.assumptions.length,
-      emptyEnv: handover.emptyEnv.length
-    };
-    out.total = out.placeholders + out.assumptions + out.emptyEnv;
-    return out;
-  }
-
   /**
-   * The suite to show: the last full run, or failing that the last таск's own.
+   * The suite to show and where it came from: `{ passed, failed, source,
+   * taskId?, title? }`.
+   *
+   * `state.tests` is written by acceptance alone (`phases/7-acceptance.md`),
+   * so when it is there it *is* the full suite at acceptance. Before that, the
+   * suite is the own suite of the таск that finished last — by `finishedAt`,
+   * not by its place in `tasks[]`: parallel таски finish out of plan order,
+   * and the array tail named a таск that had not run its tests most recently.
+   * A таск with no `finishedAt` loses to one that has it, and between two
+   * without it the later in the list wins.
    *
    * `null` is not zero. A прогон with no suite says nothing rather than
    * claiming every test passed.
    */
   function testsOf(state) {
-    if (state && state.tests) return state.tests;
-    var list = (state && state.tasks) || [];
-    for (var i = list.length - 1; i >= 0; i -= 1) {
-      if (list[i] && list[i].tests) return list[i].tests;
+    var suite = function (tests) {
+      return { passed: tests.passed, failed: tests.failed };
+    };
+    if (state && state.tests && typeof state.tests === 'object') {
+      var full = suite(state.tests);
+      full.source = 'run';
+      return full;
     }
-    return null;
+    var best = null;
+    var bestAt = NaN;
+    ((state && state.tasks) || []).forEach(function (task) {
+      if (!task || !task.tests || typeof task.tests !== 'object') return;
+      var at = typeof task.finishedAt === 'string' ? Date.parse(task.finishedAt) : NaN;
+      var wins = best === null
+        || (!isNaN(at) && (isNaN(bestAt) || at >= bestAt))
+        || (isNaN(at) && isNaN(bestAt));
+      if (!wins) return;
+      best = task;
+      bestAt = at;
+    });
+    if (best === null) return null;
+    var own = suite(best.tests);
+    own.source = 'task';
+    own.taskId = String(best.id);
+    own.title = typeof best.title === 'string' && best.title.trim() !== '' ? best.title.trim() : null;
+    return own;
   }
 
   /** Renders what it can rather than refusing — docs/spec/state-contract.md. */
@@ -2766,18 +2862,6 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
-    coverage: function (state) {
-      var share = coverage(state.requirements);
-      var counts = countRequirements(state.requirements);
-      return [
-        'Какая доля живых требований манифеста дошла до спеки.',
-        share.live === 0
-          ? 'Требования ещё не записаны — манифест пишется в первой фазе, до неё круг пуст.'
-          : share.inSpec + ' из ' + share.live + ' живых требований в спеке, это ' + share.percent + '%.',
-        'Снятых требований ' + counts.dropped + ', и в знаменатель они не входят: снятое требование — не пробел в покрытии, его больше нет.'
-      ];
-    },
-
     elapsed: function (state, now, marks) {
       var median = medianTaskMs(state, now, marks);
       return [
@@ -2810,55 +2894,49 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     tasks: function (state) {
       var counts = countTasks(state.tasks);
-      var travelled = taskShare(state.tasks);
       return [
-        'Сколько тасков закончено из нарезанных.',
+        'Сколько тасков принято из нарезанных, и по квадрату на каждый таск.',
         counts.total === 0
           ? 'Таски ещё не нарезаны — это делает фаза плана.'
           : 'Готово ' + counts.done + ' из ' + counts.total + ', в работе ' + counts.active
             + ': пишется ' + counts.running + ', на ревью ' + counts.review
             + ', в ремонте ' + counts.repair
+            + (counts.failed > 0 ? ', упало ' + counts.failed : '')
             + (counts.offContract > 0 ? ', вне контракта ' + counts.offContract : '') + '.',
-        'Цифра сверху — принятые таски, и полоска шире неё: второй отрезок — работа в полёте, ревью за 0,8 таска, ремонт и работа за 0,5. Пройдено ' + Math.round(travelled.share * 100) + '% пути. Полоска умеет и отступать: таск, отправленный с ревью в ремонт, теряет часть пути, потому что работа вернулась.'
+        'Квадрат окрашен по статусу своего таска: принят, пишется, на ревью, в ремонте, упал; в очереди — пустой, вне контракта — пунктирный. Цвет никогда не говорит один: у квадрата есть подпись, а строка под квадратами называет те же статусы словами. Доля пройденного пути — в полосе наверху.'
           + (counts.retries > 0
             ? ' Повторов ' + counts.retries + '. Таск, вернувшийся не готовым, идёт в ремонт, а не переписывается на месте.'
             : '')
       ];
     },
 
-    debt: function (state) {
-      var debt = debtCounts(state);
-      return [
-        'Долг прогона: то, что сделано не до конца и о чём это записано честно.',
-        debt.total === 0
-          ? 'Долга нет.'
-          : 'Всего ' + debt.total + ': заглушек ' + debt.placeholders + ', допущений '
-            + debt.assumptions + ', пустых переменных ' + debt.emptyEnv + '.',
-        'В пустых переменных лежат только имена. Значение секрета не попадает в состояние никогда — это правило безопасности, а не договорённость.'
-      ];
-    },
-
     tests: function (state) {
       var tests = testsOf(state);
       return [
-        'Последний прогон тестов.',
+        'Последний набор тестов: сколько прошло, сколько упало и после чего он запускался.',
         tests
-          ? 'Прошло ' + tests.passed + ', упало ' + tests.failed + '.'
+          ? 'Прошло ' + tests.passed + ', упало ' + tests.failed + ' — '
+            + (tests.source === 'run'
+              ? 'полный набор на приёмке.'
+              : 'набор таска ' + tests.taskId + (tests.title ? ' «' + tests.title + '»' : '') + '.')
           : 'Прогон ещё не запускал тесты. Пусто — это не «ноль упавших»: страница молчит, а не утверждает, что всё зелено.',
-        'Показывается полный прогон, а если его не было — набор последнего таска.'
+        'Полный набор пишет только приёмка. До неё показан набор таска, который закончился последним, — по времени окончания, а не по месту в списке: параллельные таски заканчиваются не по порядку.'
       ];
     },
 
     requirements: function (state) {
+      var progress = requirementProgressOf(state);
       var counts = countRequirements(state.requirements);
       return [
-        'Манифест целиком, посчитанный по статусам.',
-        counts.total === 0
+        'Живые требования манифеста: сколько построено, сколько в работе и сколько отложено.',
+        progress.live === 0
           ? 'Требования ещё не записаны.'
-          : 'Всего ' + counts.total + ', живых ' + counts.live + ': в спеке ' + counts['in-spec']
-            + ', открытых ' + counts.open + ', заглушкой ' + counts.placeholder
-            + ', отложенных ' + counts.deferred + ', снятых ' + counts.dropped + '.',
-        'Требование — это слова пользователя под номером. Ни одно не исчезает молча: у снятого и у отложенного записана причина.'
+          : (progress.verified === null
+            ? 'Построено ' + progress.built + ' из ' + progress.live
+            : 'Прошло проверку ' + progress.verified + ' из ' + progress.live + ' (построено ' + progress.built + ')')
+            + ', в работе ' + progress.inProgress + ', отложено ' + progress.deferred
+            + '; снятых ' + counts.dropped + ', в счёт они не входят.',
+        'Построено — значит, каждый таск, который называет требование, принят. Требование без тасков или с таском в работе, упавшим или вне контракта — в работе. Отложенное живое, но построенным не считается. Построено — ещё не «проверено»: «Прошло проверку» карточка говорит только после того, как пройден G4 — проверка готовой работы, — и тогда считает требования, которые её прошли.'
       ];
     },
 
@@ -2884,7 +2962,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Волн ' + groupByWave(tasks).length + ', тасков ' + tasks.length
             + ', наибольшая одновременность — ' + peakParallel(tasks, state, now) + '.',
         'Одновременность читается по часам, а не по размеру волны: волна — это то, что можно было запустить вместе, а не то, что действительно шло вместе.',
-        'Строка таска нажимается: откроются его файлы, зона, сохранения в истории, требования, блокеры, перезапуски, заходы в ремонт и передачи свежему субагенту. Таски на критическом пути отмечены — в цепочке ' + criticalPath(tasks) + '; это та же цепочка, что посчитана в карточке «Осталось».'
+        'Строка таска нажимается: откроются его файлы, зона, сохранения в истории, требования, блокеры, перезапуски, заходы в ремонт и передачи свежему субагенту. Таски на критическом пути отмечены — в цепочке ' + criticalPath(tasks) + '; это та же цепочка, что посчитана в «Осталось» в шапке.'
       ];
     },
 
@@ -2906,10 +2984,10 @@ globalThis.MAESTRO_LOGIC = (function () {
         'То, что может решить только пользователь: пустые переменные окружения (только имена), заглушки, обещанная и не сделанная работа, необратимые изменения и допущения.',
         h.total === 0
           ? 'Сейчас от вас ничего не ждут.'
-          : 'Переменных ' + h.emptyEnv.length + ', заглушек ' + h.placeholders.length
+          : 'Всего ' + h.total + ': переменных ' + h.emptyEnv.length + ', заглушек ' + h.placeholders.length
             + ', обещано доделать ' + h.promised.length + ', необратимых изменений ' + h.oneWayCount
             + ', допущений ' + h.assumptions.length + '.',
-        'Карточка «Долг» считает те же списки, поэтому её числа и этот блок не расходятся. Обещанная работа видна с контракта 4. Группа длиннее пяти строк свёрнута.'
+        'Строка «Всего» наверху блока складывает всё, что ждёт вас, из тех же списков, что и группы под ней. В пустых переменных лежат только имена: значение секрета не попадает в состояние никогда — это правило безопасности, а не договорённость. Обещанная работа видна с контракта 4. Группа длиннее пяти строк свёрнута.'
       ];
     },
 
@@ -2923,6 +3001,8 @@ globalThis.MAESTRO_LOGIC = (function () {
         if (gate.status === 'failed') standing += left; else settled += left;
       });
       var found = settled + standing;
+      var share = coverage(state.requirements);
+      var counts = countRequirements(state.requirements);
       return [
         'Четыре гейта прогона: G1 после брифинга, G2 после спеки, G3 после плана, G4 на приёмке.',
         gates.length === 0
@@ -2933,13 +3013,17 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Находок ' + found + ': под пройденными ' + settled + ', под проваленными ' + standing
             + '. Находка под пройденным гейтом — запись об уже отработанном, а не открытая проблема:'
             + ' гейт не проходят, пока замечание не закрыто. Поэтому такой список свёрнут и не окрашен в цвет провала.',
+        share.live === 0
+          ? 'Под G2 — покрытие брифа: требования ещё не записаны, манифест пишется в первой фазе.'
+          : 'Под G2 — покрытие брифа: ' + share.inSpec + ' из ' + share.live + ' живых требований дошли до спеки, это '
+            + share.percent + '%. Снятых ' + counts.dropped + ', и в знаменатель они не входят: снятое требование — не пробел в покрытии, его больше нет.',
         'Гейт — это сравнение двух документов прогона, а не мнение о нём. G4 читает готовую работу против манифеста, и спека при этом от субагента скрыта.'
       ];
     }
   };
 
   /**
-   * The same fourteen regions, for a reader who has never built software.
+   * The same twelve regions, for a reader who has never built software.
    *
    * Built from the same functions as the entries above, for the same reason:
    * an explanation that recomputed its own numbers could disagree with the one
@@ -3014,19 +3098,6 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
-    coverage: function (state) {
-      var share = coverage(state.requirements);
-      var counts = countRequirements(state.requirements);
-      return [
-        'Какая доля того, что вы просили, уже описана в спецификации.',
-        share.live === 0
-          ? 'Список того, что вы просили, ещё не составлен — его пишут на первом шаге.'
-          : share.inSpec + ' из ' + share.live + ' — это ' + share.percent + '%.',
-        'Требование — это один пункт вашей просьбы под своим номером. Снятых требований '
-          + counts.dropped + ', и в счёт они не идут: снятое вы отменили сами, это не пробел.'
-      ];
-    },
-
     elapsed: function (state, now, marks) {
       var median = medianTaskMs(state, now, marks);
       return [
@@ -3060,34 +3131,22 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     tasks: function (state) {
       var counts = countTasks(state.tasks);
-      var travelled = taskShare(state.tasks);
       return [
-        'Сколько кусков работы закончено из нарезанных.',
+        'Сколько кусков работы закончено из нарезанных, и по квадратику на каждый.',
         counts.total === 0
           ? 'Работу ещё не нарезали на таски — это делают на шаге плана.'
           : 'Готово ' + counts.done + ' из ' + counts.total + ', в работе ' + counts.active
             + ': пишется ' + counts.running + ', на ревью ' + counts.review
             + ', в ремонте ' + counts.repair
+            + (counts.failed > 0 ? ', упало ' + counts.failed : '')
             + (counts.offContract > 0
               ? ', и ещё ' + counts.offContract + ' ' + plural(counts.offContract, 'таск', 'таска', 'тасков')
                 + ' — со словом, которого страница не знает'
               : '') + '.',
-        'Ревью — это когда написанное перечитывает и проверяет другой субагент — отдельный помощник, который этот код не писал. Большая цифра считает только полностью принятые таски, а полоска — весь путь: начатый таск это половина, проверяемый — почти весь. Пройдено ' + Math.round(travelled.share * 100) + '% пути. Полоска умеет и отступать: если проверка вернула таск в исправление, часть пути пропала вместе с работой.'
+        'Ревью — это когда написанное перечитывает и проверяет другой субагент — отдельный помощник, который этот код не писал. Большая цифра считает только полностью принятые таски. Каждый квадратик окрашен по тому, где сейчас его таск, пустой — ещё не начат, а строка под квадратиками говорит то же словами, так что цвет ничего не сообщает в одиночку.'
           + (counts.retries > 0
             ? ' Переделок ' + counts.retries + '. Таск, вернувшийся не готовым, идёт в ремонт, а не переписывается на месте.'
             : '')
-      ];
-    },
-
-    debt: function (state) {
-      var debt = debtCounts(state);
-      return [
-        'Долг: то, что сделано не до конца, и о чём это сказано честно.',
-        debt.total === 0
-          ? 'Долга нет.'
-          : 'Всего ' + debt.total + ': заглушек ' + debt.placeholders + ', допущений '
-            + debt.assumptions + ', пустых переменных ' + debt.emptyEnv + '.',
-        'Заглушка — это место, где нужны были ваши данные, а их не было: телефон, адрес, цена. Допущение — то, что прогон решил за вас, никого не спросив. В пустых переменных лежат только имена — значение пароля не попадает в файлы никогда.'
       ];
     },
 
@@ -3096,23 +3155,28 @@ globalThis.MAESTRO_LOGIC = (function () {
       return [
         'Последняя проверка написанного кода.',
         tests
-          ? 'Прошло ' + tests.passed + ', упало ' + tests.failed + '.'
+          ? 'Прошло ' + tests.passed + ', упало ' + tests.failed + ' — '
+            + (tests.source === 'run'
+              ? 'все тесты сразу, на приёмке.'
+              : 'тесты таска ' + tests.taskId + (tests.title ? ' «' + tests.title + '»' : '') + '.')
           : 'Тесты ещё не запускали. Пусто — это не «ноль упавших»: страница молчит, а не утверждает, что всё хорошо.',
-        'Тест — это маленькая программа, которая проверяет, что другая программа делает обещанное. Показан полный запуск, а если его не было — тесты последнего таска.'
+        'Тест — это маленькая программа, которая проверяет, что другая программа делает обещанное. В самом конце, на приёмке, запускаются все тесты вместе; до того показаны тесты таска, который закончился последним.'
       ];
     },
 
     requirements: function (state) {
+      var progress = requirementProgressOf(state);
       var counts = countRequirements(state.requirements);
       return [
-        'Всё, что вы просили, посчитанное по состояниям.',
-        counts.total === 0
+        'Всё, что вы просили: сколько уже построено, сколько ещё в работе и сколько отложено.',
+        progress.live === 0
           ? 'Список того, что вы просили, ещё не записан.'
-          : 'Всего ' + counts.total + ', живых ' + counts.live + ': в спецификации '
-            + counts['in-spec'] + ', открытых ' + counts.open + ', заглушкой '
-            + counts.placeholder + ', отложенных ' + counts.deferred + ', снятых '
-            + counts.dropped + '.',
-        'Требование — это один пункт вашей просьбы под своим номером. Ни один не пропадает молча: у снятого и у отложенного записана причина.'
+          : (progress.verified === null
+            ? 'Построено ' + progress.built + ' из ' + progress.live
+            : 'Прошло проверку ' + progress.verified + ' из ' + progress.live + ' (построено ' + progress.built + ')')
+            + ', в работе ' + progress.inProgress + ', отложено ' + progress.deferred
+            + '; снятых ' + counts.dropped + ', в счёт они не идут.',
+        'Требование — это один пункт вашей просьбы под своим номером. Построено — значит, все таски, которые делают этот пункт, приняты. Это ещё не «проверено»: «Прошло проверку» появляется только после последней проверки, на приёмке, когда готовую работу сверили с вашим списком. Отложенное вы попросили сделать потом, поэтому построенным оно не считается.'
       ];
     },
 
@@ -3138,7 +3202,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Волн ' + groupByWave(tasks).length + ', тасков ' + tasks.length
             + ', больше всего одновременно шло — ' + peakParallel(tasks, state, now) + '.',
         'Волна — это таски, которые можно было запустить вместе. Сколько шло вместе на самом деле, читается по часам, а не по размеру волны.',
-        'Строку таска можно нажать: откроются его файлы, сохранённые шаги в истории проекта, требования, которым он служит, и таски, которых он ждёт. «Передачи свежему субагенту» — не ошибка: таск оказался длинным, и его отдали новому субагенту. Отмеченные таски — самая длинная цепочка, которая ещё не закончена; по ней считается «Осталось».'
+        'Строку таска можно нажать: откроются его файлы, сохранённые шаги в истории проекта, требования, которым он служит, и таски, которых он ждёт. «Передачи свежему субагенту» — не ошибка: таск оказался длинным, и его отдали новому субагенту. Отмеченные таски — самая длинная цепочка, которая ещё не закончена; по ней считается «Осталось» в шапке.'
       ];
     },
 
@@ -3160,10 +3224,10 @@ globalThis.MAESTRO_LOGIC = (function () {
         'Здесь собрано то, что можете сделать только вы: вписать значения настроек (здесь только их имена — сами значения сюда никогда не пишутся), заменить заглушки — временные тексты на месте ваших цен, адресов и описаний, — посмотреть на изменения, которые нельзя отменить, и решить, согласны ли вы с допущениями.',
         h.total === 0
           ? 'Сейчас от вас ничего не ждут.'
-          : 'Настроек без значения ' + h.emptyEnv.length + ', заглушек ' + h.placeholders.length
+          : 'Всего ' + h.total + ': настроек без значения ' + h.emptyEnv.length + ', заглушек ' + h.placeholders.length
             + ', обещанной и не сделанной работы ' + h.promised.length + ', изменений, которые нельзя отменить, '
             + h.oneWayCount + ', допущений ' + h.assumptions.length + '.',
-        'Допущение — это решение, которое прогон принял за вас, потому что не спросил. Карточка «Долг» считает то же самое, поэтому её числа с этим блоком не расходятся.'
+        'Допущение — это решение, которое прогон принял за вас, потому что не спросил. Строка «Всего» наверху блока складывает всё, что ждёт вас.'
       ];
     },
 
@@ -3177,6 +3241,8 @@ globalThis.MAESTRO_LOGIC = (function () {
         if (gate.status === 'failed') standing += left; else settled += left;
       });
       var found = settled + standing;
+      var share = coverage(state.requirements);
+      var counts = countRequirements(state.requirements);
       return [
         'Блок «Гейты» — это четыре проверки, каждая после своего шага: G1 после брифинга, G2 после спецификации, G3 после плана, G4 на приёмке.',
         gates.length === 0
@@ -3187,13 +3253,18 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Замечаний ' + found + ': под пройденными ' + settled + ', под непройденными ' + standing
             + '. Замечание под пройденной проверкой говорит о том, что уже исправлено: проверку не проходят,'
             + ' пока замечание открыто. Поэтому такой список свёрнут и не покрашен в цвет ошибки.',
+        share.live === 0
+          ? 'Под проверкой спецификации — покрытие брифа: список того, что вы просили, ещё не составлен.'
+          : 'Под проверкой спецификации — покрытие брифа: ' + share.inSpec + ' из ' + share.live
+            + ' пунктов вашей просьбы уже описаны в спецификации, это ' + share.percent + '%. Снятых '
+            + counts.dropped + ', и в счёт они не идут: снятое вы отменили сами, это не пробел.',
         'Проверка сравнивает два документа работы, а не высказывает о ней мнение. На последней, G4, готовую работу сверяет с вашим списком отдельный субагент — помощник, которому прогон отдаёт одну проверку и который эту работу не делал; спецификацию от него прячут, чтобы он не подтвердил её сам себе.'
       ];
     }
   };
 
   /**
-   * The same fourteen regions in English, in the normal register.
+   * The same twelve regions in English, in the normal register.
    *
    * Built from the same functions as the Russian entries above and returning
    * the same shape: a first paragraph saying what the region is, then what it
@@ -3255,20 +3326,6 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
-    coverage: function (state) {
-      var share = coverage(state.requirements);
-      var counts = countRequirements(state.requirements);
-      return [
-        'What share of the live requirements of the manifest reached the specification.',
-        share.live === 0
-          ? 'No requirements written down yet — the manifest is written in the first stage, and before it this circle is empty.'
-          : share.inSpec + ' of ' + share.live + ' live requirements are in the specification, which is '
-            + share.percent + '%.',
-        'Dropped requirements: ' + counts.dropped
-          + ', and they are not in the denominator — a dropped requirement is not a hole in the coverage, it is gone.'
-      ];
-    },
-
     elapsed: function (state, now, marks) {
       var median = medianTaskMs(state, now, marks);
       return [
@@ -3302,56 +3359,49 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     tasks: function (state) {
       var counts = countTasks(state.tasks);
-      var travelled = taskShare(state.tasks);
       return [
-        'How many tasks are finished out of the ones that were cut.',
+        'How many tasks are accepted out of the ones that were cut, with one square per task.',
         counts.total === 0
           ? 'No tasks cut yet — the plan stage does that.'
           : 'Finished ' + counts.done + ' of ' + counts.total + ', in flight ' + counts.active
             + ': being written ' + counts.running + ', in review ' + counts.review
             + ', in repair ' + counts.repair
+            + (counts.failed > 0 ? ', failed ' + counts.failed : '')
             + (counts.offContract > 0 ? ', off-contract ' + counts.offContract : '') + '.',
-        'The figure above counts accepted tasks, and the bar runs wider than it: the second segment is the work in flight — review is 0.8 of a task, repair and writing 0.5. ' + Math.round(travelled.share * 100) + '% of the way so far. The bar can also fall back: a task sent from review to repair loses part of its distance, because the work returned.'
+        'Each square takes the colour of its task’s status: accepted, being written, in review, in repair, failed; a queued one is hollow and an off-contract one dashed. Colour never speaks alone: every square is labelled, and the line under the squares names the same statuses in words. The share of the road is the bar in the header.'
           + (counts.retries > 0
             ? ' Restarts: ' + counts.retries + '. A task that came back unfinished goes to repair rather than being rewritten where it stands.'
             : '')
       ];
     },
 
-    debt: function (state) {
-      var debt = debtCounts(state);
-      return [
-        'What the run owes you and has not settled, said out loud.',
-        debt.total === 0
-          ? 'Nothing is owed.'
-          : 'In all ' + debt.total + ': placeholders ' + debt.placeholders + ', assumptions '
-            + debt.assumptions + ', empty variables ' + debt.emptyEnv + '.',
-        'The empty variables hold names only. The value of a secret never reaches the run’s files — that is a safety rule, not an agreement.'
-      ];
-    },
-
     tests: function (state) {
       var tests = testsOf(state);
       return [
-        'The last run of the tests.',
+        'The last test suite: how many passed, how many failed, and what it ran after.',
         tests
-          ? 'Passed ' + tests.passed + ', failed ' + tests.failed + '.'
-          : 'The run has not started the tests yet. Empty is not «none failed»: the page is silent, it is not claiming everything is green.',
-        'The full run is shown, and if there has not been one, the last task’s own set.'
+          ? 'Passed ' + tests.passed + ', failed ' + tests.failed + ' — '
+            + (tests.source === 'run'
+              ? 'the full suite at acceptance.'
+              : 'the suite of task ' + tests.taskId + (tests.title ? ' “' + tests.title + '”' : '') + '.')
+          : 'The run has not run any tests yet. Empty is not «none failed»: the page is silent, it is not claiming everything is green.',
+        'Only acceptance writes the full suite. Before it, the suite shown is that of the task that finished last — by its finishing time, not by its place in the list: tasks that run side by side finish out of order.'
       ];
     },
 
     requirements: function (state) {
+      var progress = requirementProgressOf(state);
       var counts = countRequirements(state.requirements);
       return [
-        'The whole manifest, counted by status.',
-        counts.total === 0
+        'The live requirements of the manifest: how many are built, in progress and deferred.',
+        progress.live === 0
           ? 'No requirements written down yet.'
-          : 'In all ' + counts.total + ', live ' + counts.live + ': in the specification '
-            + counts['in-spec'] + ', open ' + counts.open + ', as a placeholder '
-            + counts.placeholder + ', deferred ' + counts.deferred + ', dropped '
-            + counts.dropped + '.',
-        'A requirement is the user’s own words under a number. Not one of them disappears quietly: a dropped and a deferred one each carry a recorded reason.'
+          : (progress.verified === null
+            ? 'Built ' + progress.built + ' of ' + progress.live
+            : 'Passed the check ' + progress.verified + ' of ' + progress.live + ' (built ' + progress.built + ')')
+            + ', in progress ' + progress.inProgress + ', deferred ' + progress.deferred
+            + '; dropped ' + counts.dropped + ', and they are not counted.',
+        'Built means every task that names the requirement was accepted. One with no task, or with a task still in progress, failed or off-contract, is in progress. A deferred one is live but never counts as built. Built is not verified: the card says «Passed the check» only once G4, the check of the finished work, has passed, and then counts the requirements that passed it.'
       ];
     },
 
@@ -3377,7 +3427,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Waves ' + groupByWave(tasks).length + ', tasks ' + tasks.length
             + ', and the most that ran at once — ' + peakParallel(tasks, state, now) + '.',
         'What ran at once is read off the clocks and never off the size of a wave: a wave is what could have been started together, not what actually was.',
-        'A task row opens on a press: its files, owned area, saved history entries, requirements, blockers, restarts, trips to repair and passes to a fresh subagent. Tasks on the critical path are marked — ' + criticalPath(tasks) + ' in the chain; it is the same chain the Remaining card counts.'
+        'A task row opens on a press: its files, owned area, saved history entries, requirements, blockers, restarts, trips to repair and passes to a fresh subagent. Tasks on the critical path are marked — ' + criticalPath(tasks) + ' in the chain; it is the same chain «Remaining» in the header counts.'
       ];
     },
 
@@ -3399,10 +3449,10 @@ globalThis.MAESTRO_LOGIC = (function () {
         'What only the user can settle: empty environment variables (names only), placeholders, promised work not yet done, one-way changes and assumptions.',
         h.total === 0
           ? 'Nothing is waiting on you right now.'
-          : 'Variables ' + h.emptyEnv.length + ', placeholders ' + h.placeholders.length
+          : 'In all ' + h.total + ': variables ' + h.emptyEnv.length + ', placeholders ' + h.placeholders.length
             + ', promised work ' + h.promised.length + ', one-way changes ' + h.oneWayCount
             + ', assumptions ' + h.assumptions.length + '.',
-        'The Debt card counts the same lists, so its numbers and this block cannot disagree. Promised work appears from contract 4. A group longer than five lines is folded.'
+        'The «In all» line at the top of the block adds up everything waiting on you, from the same lists as the groups below it. The empty variables hold names only: the value of a secret never reaches the run’s files — that is a safety rule, not an agreement. Promised work appears from contract 4. A group longer than five lines is folded.'
       ];
     },
 
@@ -3416,6 +3466,8 @@ globalThis.MAESTRO_LOGIC = (function () {
         if (gate.status === 'failed') standing += left; else settled += left;
       });
       var found = settled + standing;
+      var share = coverage(state.requirements);
+      var counts = countRequirements(state.requirements);
       return [
         'The four checks of the run: G1 after briefing, G2 after the specification, G3 after the plan, G4 at acceptance.',
         gates.length === 0
@@ -3427,13 +3479,18 @@ globalThis.MAESTRO_LOGIC = (function () {
             + standing + ' under checks that did not. A finding under a passed check is a record of'
             + ' something already acted on rather than an open problem: a check is not passed while a'
             + ' finding is still standing. That is why such a list is folded and not painted as a failure.',
+        share.live === 0
+          ? 'Under G2 — brief coverage: no requirements written down yet; the manifest is written in the first stage.'
+          : 'Under G2 — brief coverage: ' + share.inSpec + ' of ' + share.live + ' live requirements reached the specification, which is '
+            + share.percent + '%. Dropped requirements: ' + counts.dropped
+            + ', and they are not in the denominator — a dropped requirement is not a hole in the coverage, it is gone.',
         'A check compares two documents of the run rather than holding an opinion about it. At the last one, the finished work is read against the manifest, and the specification is hidden from the reader so that it cannot confirm itself.'
       ];
     }
   };
 
   /**
-   * The same fourteen regions in English, for a reader who has never built
+   * The same twelve regions in English, for a reader who has never built
    * software.
    *
    * The two rules of docs/spec/vocabulary.md apply here as they do to the
@@ -3506,19 +3563,6 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
-    coverage: function (state) {
-      var share = coverage(state.requirements);
-      var counts = countRequirements(state.requirements);
-      return [
-        'What share of what you asked for is already described in the specification.',
-        share.live === 0
-          ? 'The list of what you asked for has not been written yet — it is written on the first step.'
-          : share.inSpec + ' of ' + share.live + ' — that is ' + share.percent + '%.',
-        'A requirement is one point of what you asked for, under its own number. '
-          + counts.dropped + ' of them were dropped, and those do not count: you cancelled them yourself, so they are not a hole.'
-      ];
-    },
-
     elapsed: function (state, now, marks) {
       var median = medianTaskMs(state, now, marks);
       return [
@@ -3552,35 +3596,23 @@ globalThis.MAESTRO_LOGIC = (function () {
 
     tasks: function (state) {
       var counts = countTasks(state.tasks);
-      var travelled = taskShare(state.tasks);
       return [
-        'How many pieces of work are finished out of the ones that were cut.',
+        'How many pieces of work are finished out of the ones that were cut, with one small square for each.',
         counts.total === 0
           ? 'The work has not been cut into tasks yet — that happens on the plan step.'
           : 'Finished ' + counts.done + ' of ' + counts.total + ', being worked on ' + counts.active
             + ': being written ' + counts.running + ', in review ' + counts.review
             + ', in repair ' + counts.repair
+            + (counts.failed > 0 ? ', failed ' + counts.failed : '')
             + (counts.offContract > 0
               ? ', and ' + counts.offContract + ' more '
                 + (counts.offContract === 1 ? 'task' : 'tasks')
                 + ' written down with a word this page does not know'
               : '') + '.',
-        'Review is when another worker reads and checks what was written. The big figure counts only the pieces of work that were fully accepted, while the bar counts the whole distance: a piece that has been started is already halfway, one being checked is nearly all the way. ' + Math.round(travelled.share * 100) + '% of the way so far. The bar can also fall back: if a check sent a piece of work back to be fixed, part of the distance went with it.'
+        'Review is when another worker reads and checks what was written. The big figure counts only the pieces of work that were fully accepted. Each square is coloured by where its task has got to — an empty one has not started yet — and the line under the squares says the same in words, so nothing is told by colour alone.'
           + (counts.retries > 0
             ? ' Redone ' + counts.retries + ' times. A task that came back unfinished goes to repair rather than being rewritten where it stands.'
             : '')
-      ];
-    },
-
-    debt: function (state) {
-      var debt = debtCounts(state);
-      return [
-        'Debt: what was not finished all the way, and what has been said about it honestly.',
-        debt.total === 0
-          ? 'Nothing is owed.'
-          : 'In all ' + debt.total + ': placeholders ' + debt.placeholders + ', assumptions '
-            + debt.assumptions + ', empty variables ' + debt.emptyEnv + '.',
-        'A placeholder is a spot where your own details were needed and were not there: a phone number, an address, a price. An assumption is something the work decided for you without asking anyone. The empty variables hold names only — the value of a password never reaches any file.'
       ];
     },
 
@@ -3589,23 +3621,28 @@ globalThis.MAESTRO_LOGIC = (function () {
       return [
         'The last check of the code that was written.',
         tests
-          ? 'Passed ' + tests.passed + ', failed ' + tests.failed + '.'
+          ? 'Passed ' + tests.passed + ', failed ' + tests.failed + ' — '
+            + (tests.source === 'run'
+              ? 'every test at once, at acceptance.'
+              : 'the tests of task ' + tests.taskId + (tests.title ? ' “' + tests.title + '”' : '') + '.')
           : 'The tests have not been started yet. Empty is not «none failed»: the page is silent, it is not claiming that all is well.',
-        'A test is a small program that checks that another program does what it promised. The full run is shown, and if there has not been one, the tests of the last task.'
+        'A test is a small program that checks that another program does what it promised. At the very end, at acceptance, every test is run together; before that, you see the tests of the task that finished most recently.'
       ];
     },
 
     requirements: function (state) {
+      var progress = requirementProgressOf(state);
       var counts = countRequirements(state.requirements);
       return [
-        'Everything you asked for, counted by where it has got to.',
-        counts.total === 0
+        'Everything you asked for: how much is already built, how much is still in progress and how much is put off.',
+        progress.live === 0
           ? 'The list of what you asked for has not been written down yet.'
-          : 'In all ' + counts.total + ', live ' + counts.live + ': in the specification '
-            + counts['in-spec'] + ', open ' + counts.open + ', as a placeholder '
-            + counts.placeholder + ', put off ' + counts.deferred + ', dropped '
-            + counts.dropped + '.',
-        'A requirement is one point of what you asked for, under its own number. Not one of them goes missing quietly: a dropped and a put-off one each carry a written reason.'
+          : (progress.verified === null
+            ? 'Built ' + progress.built + ' of ' + progress.live
+            : 'Passed the check ' + progress.verified + ' of ' + progress.live + ' (built ' + progress.built + ')')
+            + ', in progress ' + progress.inProgress + ', put off ' + progress.deferred
+            + '; dropped ' + counts.dropped + ', and those do not count.',
+        'A requirement is one point of what you asked for, under its own number. Built means every task doing this point was accepted. That is not yet «checked»: «Passed the check» appears only after the last check, at acceptance, when the finished work was compared with your own list. What you put off is for later, so it never counts as built.'
       ];
     },
 
@@ -3631,7 +3668,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Waves ' + groupByWave(tasks).length + ', tasks ' + tasks.length
             + ', and the most that went at the same time — ' + peakParallel(tasks, state, now) + '.',
         'A wave is the tasks that could have been started together. How many actually went together is read off the clocks, not off the size of the wave.',
-        'Press a task row to see its files, the saved steps in the project history, the requirements it serves and the tasks it waits for. «Passed to a fresh subagent» is not a mistake: the task was long, and it was handed to a new subagent. The marked tasks are the longest chain not yet finished; «Remaining» is counted along it.'
+        'Press a task row to see its files, the saved steps in the project history, the requirements it serves and the tasks it waits for. «Passed to a fresh subagent» is not a mistake: the task was long, and it was handed to a new subagent. The marked tasks are the longest chain not yet finished; «Remaining» in the header is counted along it.'
       ];
     },
 
@@ -3653,10 +3690,10 @@ globalThis.MAESTRO_LOGIC = (function () {
         'This is what only you can do: fill in the settings named here (only their names are ever written down, never their values), replace the placeholders — stand-in texts where your prices, addresses and descriptions go — look over the changes that cannot be undone, and decide whether you agree with the assumptions.',
         h.total === 0
           ? 'Nothing is waiting on you right now.'
-          : 'Settings without a value ' + h.emptyEnv.length + ', placeholders ' + h.placeholders.length
+          : 'In all ' + h.total + ': settings without a value ' + h.emptyEnv.length + ', placeholders ' + h.placeholders.length
             + ', promised work not yet done ' + h.promised.length + ', changes that cannot be undone '
             + h.oneWayCount + ', assumptions ' + h.assumptions.length + '.',
-        'An assumption is a decision the run made for you because it did not ask. The Debt card counts the same things, so its numbers and this block cannot disagree.'
+        'An assumption is a decision the run made for you because it did not ask. The «In all» line at the top of the block adds up everything waiting on you.'
       ];
     },
 
@@ -3670,6 +3707,8 @@ globalThis.MAESTRO_LOGIC = (function () {
         if (gate.status === 'failed') standing += left; else settled += left;
       });
       var found = settled + standing;
+      var share = coverage(state.requirements);
+      var counts = countRequirements(state.requirements);
       return [
         'The «Checks» block is four checks, each after its own step: G1 after the briefing, G2 after the specification, G3 after the plan, G4 at acceptance.',
         gates.length === 0
@@ -3681,6 +3720,11 @@ globalThis.MAESTRO_LOGIC = (function () {
             + standing + ' under checks that did not. A note under a passed check says what was already'
             + ' put right rather than what is still wrong: a check does not pass while a note is open.'
             + ' That is why such a list is folded and not painted in the colour of a mistake.',
+        share.live === 0
+          ? 'Under the check of the specification — brief coverage: the list of what you asked for has not been written yet.'
+          : 'Under the check of the specification — brief coverage: ' + share.inSpec + ' of ' + share.live
+            + ' points of what you asked for are already described in the specification, that is ' + share.percent + '%. '
+            + counts.dropped + ' were dropped, and those do not count: you cancelled them yourself, so they are not a hole.',
         'A check compares two documents of the work rather than giving an opinion about it. At the last one, the finished work is read against your own list — and the specification is hidden from the reader, so that it cannot confirm itself.'
       ];
     }
@@ -3785,8 +3829,8 @@ globalThis.MAESTRO_LOGIC = (function () {
 
   /** The regions the page must be able to explain, in the order they appear. */
   var EXPLAIN_ORDER = [
-    'dials', 'header', 'estimate', 'coverage', 'elapsed', 'tasks', 'debt',
-    'tests', 'requirements', 'handover', 'stages', 'build', 'requirement-list', 'gates'
+    'dials', 'header', 'estimate', 'requirements', 'tasks', 'tests', 'elapsed',
+    'handover', 'stages', 'build', 'requirement-list', 'gates'
   ];
 
   function explain(key, state, now, marks, register, language) {
@@ -3946,6 +3990,9 @@ globalThis.MAESTRO_LOGIC = (function () {
     countTasks: countTasks,
     taskShare: taskShare,
     countRequirements: countRequirements,
+    REQUIREMENT_PROGRESS_ORDER: REQUIREMENT_PROGRESS_ORDER,
+    requirementProgressOf: requirementProgressOf,
+    taskSquaresOf: taskSquaresOf,
     coverage: coverage,
     overallProgress: overallProgress,
     taskDurations: taskDurations,
@@ -3955,7 +4002,6 @@ globalThis.MAESTRO_LOGIC = (function () {
     estimateMs: estimateMs,
     groupByWave: groupByWave,
     peakParallel: peakParallel,
-    debtCounts: debtCounts,
     testsOf: testsOf,
     contractNotice: contractNotice,
     verificationOf: verificationOf,
@@ -4458,15 +4504,17 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
   function renderCards(state) {
     var now = Date.now();
 
-    // --- покрытие брифа -------------------------------------------------
-    var cover = L.coverage(state.requirements);
-    var circumference = 2 * Math.PI * 34;
-    el('coverage-arc').setAttribute('stroke-dashoffset',
-      String(circumference * (1 - cover.percent / 100)));
-    text('coverage-percent', cover.percent);
-    text('coverage-sub', T.UI.coverageSub(cover));
+    // --- требования -----------------------------------------------------
+    // Built of live until the current G4 has passed, then verified of live:
+    // never «done» on the strength of activity alone.
+    var progress = L.requirementProgressOf(state);
+    var reached = progress.verified === null ? progress.built : progress.verified;
+    text('req-built', progress.live > 0 ? reached : '—');
+    text('req-live', progress.live > 0 ? ' / ' + progress.live : '');
+    el('req-fill').style.width = (progress.live > 0 ? Math.round(reached / progress.live * 100) : 0) + '%';
+    text('req-sub', T.UI.requirementsSub(progress));
 
-    // --- прошло времени -------------------------------------------------
+    // --- рабочее время --------------------------------------------------
     var runClock = el('run-clock');
     runClock.dataset.from = state.startedAt || '';
     runClock.dataset.until = '';
@@ -4488,38 +4536,34 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     }
 
     // --- таски ----------------------------------------------------------
-    var tasks = L.countTasks(state.tasks);
-    var travelled = L.taskShare(state.tasks);
     // The big figure stays the count of *accepted* таски, which is what the
-    // vocabulary says this card names. The bar is where the work in flight is
-    // shown, in a second segment, so the two can no longer contradict.
+    // vocabulary says this card names. The squares show every таск's status
+    // at once, and the band's bar is the one share of the road.
+    var tasks = L.countTasks(state.tasks);
     text('tasks-done', tasks.total > 0 ? tasks.done : '—');
     text('tasks-total', tasks.total > 0 ? ' / ' + tasks.total : '');
-    var settled = tasks.total > 0 ? tasks.done / tasks.total : 0;
-    var share = Math.round(travelled.share * 100);
-    el('tasks-fill').style.width = Math.round(settled * 100) + '%';
-    el('tasks-flight').style.width = Math.max(0, share - Math.round(settled * 100)) + '%';
-    text('tasks-sub', T.UI.tasksSub(tasks, share));
+    var squares = clear(el('task-squares'));
+    L.taskSquaresOf(state).forEach(function (square) {
+      var said = square.id + ' — ' + (square.status === 'off-contract'
+        ? T.SCREEN.offContract : L.label(T.TASK_STATUS, square.status));
+      var item = put(squares, 'li', null, 'sq sq-' + square.status);
+      item.title = said;
+      item.setAttribute('aria-label', said);
+    });
+    var tasksLine = T.UI.tasksSub(tasks);
+    text('tasks-sub', tasksLine);
+    el('tasks-sub').hidden = tasksLine === '';
     var closure = null;
     try { closure = L.closureOf(state); } catch (error) { closure = null; }
     text('tasks-budget', closure ? T.UI.repairBudget(closure.budget) : '');
 
-    // --- долг -----------------------------------------------------------
-    var debt = L.debtCounts(state);
-    text('debt-count', debt.total);
-    text('debt-sub', T.UI.debtSub(debt));
-
     // --- тесты ----------------------------------------------------------
     var tests = L.testsOf(state);
     text('tests-count', tests ? tests.passed : '—');
+    var failed = el('tests-failed');
+    failed.textContent = tests ? T.UI.testsFailed(tests.failed) : '';
+    failed.className = tests && tests.failed > 0 ? 'fail' : '';
     text('tests-sub', T.UI.testsSub(tests));
-
-    // --- требования -----------------------------------------------------
-    var counts = L.countRequirements(state.requirements);
-    text('req-count', counts.total);
-    text('req-sub', L.label(T.REQUIREMENT_STATUS, 'dropped') + ' ' + counts.dropped
-      + ' · ' + L.label(T.REQUIREMENT_STATUS, 'deferred') + ' ' + counts.deferred
-      + ' · ' + L.label(T.REQUIREMENT_STATUS, 'placeholder') + ' ' + counts.placeholder);
   }
 
   function renderStages(state) {
@@ -4711,6 +4755,9 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       empty(host, T.UI.handoverEmpty);
       return;
     }
+    // The whole of what waits on the user, counted by the same function the
+    // groups below are drawn from — the retired Долг card counted part of it.
+    put(host, 'p', T.UI.handoverTotal(handover.total), 'total');
     var again = function () { renderHandover(state); };
     // Names only: S2 keeps every value out of the state, and this list is
     // where a value would be most tempting to show.
@@ -4813,7 +4860,13 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       put(row, 'span', gate.id, 'id');
       put(row, 'span', L.label(T.STAGE_LABEL, L.GATE_AFTER[gate.id]) || '', 'name');
       put(row, 'span', L.label(T.GATE_STATUS, gate.status), 'status');
+      drawFindings(gate);
+      // The brief's coverage belongs to the check after the specification:
+      // that is the gate which asks whether every live требование reached it.
+      if (gate.id === 'G2') put(host, 'p', T.UI.coverageLine(L.coverage(state.requirements)), 'note coverage-line');
+    });
 
+    function drawFindings(gate) {
       var view = L.findingsView(gate);
       if (!view.show) return;
 
@@ -4839,7 +4892,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
         keepingFocus(function () { renderGates(state); });
       });
       if (openFindings[gate.id]) drawList();
-    });
+    }
   }
 
   /**
@@ -4877,9 +4930,9 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
   }
 
   /**
-   * The i beside each region, and the single popover all fourteen fill.
+   * The i beside each region, and the single popover all twelve fill.
    *
-   * One node rather than fourteen. Moving it is what closes the previous
+   * One node rather than twelve. Moving it is what closes the previous
    * explanation, so "at most one open" needs no state to keep it true, and the
    * cards never shift: a reader stays looking at the number while reading about
    * it. Filling it through `put` keeps the textContent rule by construction,

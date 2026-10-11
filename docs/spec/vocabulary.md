@@ -168,20 +168,19 @@ term, and a term with two homes drifts.
 |---|---|---|
 | Что происходит | What is happening | The band at the top of the page: the прогон's condition, the bar, one sentence about the таски, the таски in flight and the strip of stages |
 | Прогресс проекта | Project progress | The bar in the header band: the share of the whole прогон travelled — stages weighted by how long they take, the build subdivided by how far its таски have got |
-| Покрытие брифа | Brief coverage | The share of live требования that reached the specification. A different number from прогресс on purpose: one measures the road, the other the value |
-| Прошло времени | Time worked | Time the прогон has been worked on |
+| Покрытие брифа | Brief coverage | The share of live требования that reached the specification, as a line under G2 in Гейты. A different number from прогресс on purpose: one measures the road, the other the value |
+| Рабочее время | Time worked | Time the прогон has been worked on |
 | Осталось | Remaining | The estimate, always a range, and only once enough таски have finished to build it from |
-| Таски | Tasks | How many таски are accepted out of how many were cut, with the work in flight shown behind them |
-| Долг | Debt | What the прогон owes the user and has not settled, counted as one number |
+| Таски | Tasks | How many таски are accepted out of how many were cut, with one square per таск |
 | Допущения | Assumptions | Decisions the прогон made for the user because nobody was asked |
 | Переменные | Variables | Environment variables the build needs and nobody has filled — names only, never values |
-| Тесты | Tests | The last full suite run |
-| Требования | Requirements | The манифест counted by status |
+| Тесты | Tests | The last suite, and the таск it ran after |
+| Требования | Requirements | Live требования built, in progress and deferred |
 | Этапы | Stages | The stage timeline |
 | Ход разработки | Development progress | The таски as they are being built, grouped by волна |
 | Волна | Wave | One layer of the plan — the таски that may run at the same time |
 | Критический путь | Critical path | The longest remaining chain of blocked таски, which is what the estimate is measured along |
-| Календарных | Calendar | Wall-clock time from the start, pauses included — shown beside Прошло времени, never instead of it |
+| Календарных | Calendar | Wall-clock time from the start, pauses included — shown beside Рабочее время, never instead of it |
 | Объяснения | Wording | Which register the прогон is speaking in — the label that keeps `Обычные` from being read as the depth's `Обычная` |
 | Вне контракта | Off-contract | Таски whose status is not one the contract defines — counted, shown as written, and worth nothing on the bar |
 | Гейты | Checks | The four checks of the прогон, each after its own stage |
@@ -251,6 +250,20 @@ What Is Happening*. The rows are in the order the page lists them, and
 | `waiting` | Ждёт вас | Waiting for you | The прогон is stopped on a question to the user; this outranks a failed стадия |
 | `finished` | Завершён | Finished | The прогон closed with `completed` or `closed_with_exceptions`, or an old one wrote `finishedAt`. It says closed and never verified: whether the work was verified is the run notice's sentence |
 | `failed` | Сбой | Failed | The прогон closed as `stopped_incomplete`, was interrupted, or a стадия failed with nobody asked |
+
+## Requirement Progress
+
+Where a live требование stands, as the Требования card counts it. No field
+holds it: the page derives it from `requirements[]` and `tasks[]`, by the
+table in [`dashboard.md`](dashboard.md) › *Four Cards* (rows P2–P6, grouped
+here as three buckets). The rows are in the order the page lists them, and
+`npm run dashboard` holds the page's words and that order to this table.
+
+| Progress | Label | Label (en) | When |
+|---|---|---|---|
+| `built` | Построено | Built | Not deferred, and every таск naming it is done. Never verified; the card says Прошло проверку only once the current finished-work check passed |
+| `in-progress` | В работе | In progress | Not deferred, and no таск names it, or one that does is running, in review, in repair, queued, failed or off-contract |
+| `deferred` | Отложено | Deferred | The user put it off. Live, so it counts in the denominator, but never built |
 
 ## Plain Words
 
@@ -369,7 +382,7 @@ screen beside a sentence in the chat, so there is nothing there for a label to
 connect to.
 
 **The boundary between the two rules is where this is easiest to get wrong.**
-`Заглушка`, `Волна`, `Долг` and `Критический путь` are **labels**, defined in
+`Заглушка`, `Волна`, `Ваш ход` and `Критический путь` are **labels**, defined in
 the tables above. They stay on the screen in both registers, and `plain`
 explains each of them once. `спека`, `коммит` and `стейт` appear in none of
 those tables — they are not labels, they are shorthand, and this section

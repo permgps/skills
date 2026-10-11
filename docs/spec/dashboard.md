@@ -35,18 +35,16 @@ like to look at it.
 |---|---|---|---|
 | `dials` | Dials | Mode, depth, the register when the state names one, and any mid-run change | `mode`, `depth`, `explain`, `dialChanges[]` |
 | `header` | Что происходит | The run's condition as a colour and a word, the share of the road, one sentence about the таски, the таски in flight by title, and the eight stages as a strip with their clocks | `stages[]`, `tasks[]`, `currentStage`, `awaiting`, `lifecycle`, `outcome`, `interruptedAt` |
-| `coverage` | Покрытие брифа | The share of live требования that reached the specification | `requirements[]` |
-| `elapsed` | Прошло времени | Working time since `startedAt`, the median таск beneath it, and the calendar span when the two differ | every timestamp in the state |
 | `estimate` | Осталось | The estimate as a range, and the critical path it was measured along; shown at the right of the header band | `tasks[]` |
-| `tasks` | Таски | Finished out of cut, with what is in motion and what was retried | `tasks[]` |
-| `debt` | Долг | Заглушки, допущения and переменные as one number and three | `debt` |
-| `tests` | Тесты | The last full suite | `tests`, or the last таск's own |
-| `requirements` | Требования (счёт) | Planning status and separately derived verification results | `requirements[]`, `verification` |
-| `handover` | Ваш ход | What only the user can settle: empty variables by name, placeholders, open promised work, one-way changes by kind, assumptions | `debt`, `verification.promisedWork`, `oneWay` |
+| `requirements` | Требования (счёт) | Live требования built, in progress and deferred, with a bar; verified instead of built once the current G4 passed | `requirements[]`, `tasks[]`, `verification` |
+| `tasks` | Таски | Accepted of cut, one square per таск in its status colour, with what is in motion, failed or retried in words | `tasks[]` |
+| `tests` | Тесты | The last suite's passed count, the failed count beside it, and the таск it ran after or the full suite at acceptance | `tests`, or the own suite of the таск that finished last |
+| `elapsed` | Рабочее время | Working time since `startedAt`, the median таск beneath it, and the calendar span when the two differ | every timestamp in the state |
+| `handover` | Ваш ход | What only the user can settle: empty variables by name, placeholders, open promised work, one-way changes by kind, assumptions, and the total, which the retired Долг card counted | `debt`, `verification.promisedWork`, `oneWay` |
 | `stages` | Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
 | `build` | Ход разработки | The таски grouped by волна, each with its status, phase and clock | `tasks[]` |
 | `requirement-list` | Требования (список) | The манифест one требование at a time, with technical result; a row opens to its chain, and folded below are the words heard but not taken and what was delivered beyond the ask | `requirements[]`, `verification`, `tasks[]`, `additions` |
-| `gates` | Gates | G1–G4 with status, derived G4 evidence, and findings | `gates[]`, `verification`, `lifecycle`, `outcome` |
+| `gates` | Gates | G1–G4 with status, derived G4 evidence, and findings, and, under G2, the share of live требования that reached the specification | `gates[]`, `verification`, `lifecycle`, `outcome`, `requirements[]` |
 
 The `Key` column is the region's name in the page: it is the `data-region`
 attribute in the markup and the entry in `EXPLAIN_ORDER` in the logic block.
@@ -164,6 +162,98 @@ each stage's note, the findings of a failed check, and its own `i`.
 **The band replaced two regions.** `progress` became the bar, and `stage`
 became the strip and the `header` explanation. The `estimate` region moved
 into the band whole, with the same key, `i` and explanation.
+
+## Four Cards
+
+Under the band sit four cards, in this order: Требования, Таски, Тесты,
+Рабочее время. They are one row of four at `62rem` and wider, and two by two
+below it. Every card reads fields every contract already carries — no
+contract change made them.
+
+### Требования: built, never done
+
+The figure is built of live, with a bar of the same share. The line beneath it
+names the other two buckets: «Построено · в работе 5 · отложено 2». *Naming
+таски* are the таски whose `requirementIds` contain the требование's id.
+
+| # | Status | Naming таски | Bucket | Counted in live |
+|---|---|---|---|---|
+| P1 | `dropped` | any | — | no |
+| P2 | `deferred` | any, including all `done` | deferred | yes |
+| P3 | `open`, `in-spec` or `placeholder` | none | in progress | yes |
+| P4 | same | ≥ 1, every one `done` | built | yes |
+| P5 | same | ≥ 1, one `running`, `review`, `repair` or `queued` | in progress | yes |
+| P6 | same | ≥ 1, one `failed` or off-contract | in progress | yes |
+
+The three buckets partition live: **built + in progress + deferred = live**,
+on every state. A deferred требование is live, because the coverage line
+divides by the same number, yet it is never built — the user put it off, and
+work that happens to touch it does not settle it. A placeholder is built once
+its таски are done; the placeholder itself waits in Ваш ход, where the user
+settles it. Activity is not delivery: one таск still in motion, failed or
+off-contract keeps a требование in progress, and so does having no таск at all.
+
+**Verified replaces built only after the current G4.** With contract 4 or later
+and `verificationOf(state).g4 === 'passed'`, the figure counts the требования
+whose derived result is `passed`, and the line leads with «Прошло проверку» /
+"Passed the check" instead of «Построено». The rule reads the derived record,
+never the G4 row in `gates`: the row is what a phase wrote, the record is what
+was checked. A state older than contract 4 has no record and never says
+verified, whatever its G4 row says. The bucket words are owned by
+[`vocabulary.md`](vocabulary.md) › Requirement Progress, and
+`requirementProgressOf` returns the ids of each bucket for the requirement
+list's filter.
+
+### Таски: one square per таск
+
+The figure stays accepted of cut. Below it, one small square per таск in
+`tasks[]` order, in the chip palette: done, running, review, repair and failed
+take their chip colours, a queued square is hollow and an off-contract one is
+dashed. **Status is never colour-only.** Each square carries a title and an
+`aria-label` of «<id> — <status label>», and the line beneath counts what is in
+motion, failed, off-contract or retried in words. The line is hidden when none
+of those is above zero. The card has no bar and no percentage: the band's bar
+is the one share of the road, and a second one here was a second rendering of
+the same number. The repair-attempts line stays.
+
+### Тесты: which suite, from where
+
+| # | State | Figure | Beside it | Line beneath, ru / en |
+|---|---|---|---|---|
+| T1 | no `tests`, no таск with `tests` | — | nothing | Прогон ещё не запускал тесты / The run has not run any tests yet |
+| T2 | no `tests`; таски carry `tests` | passed of the таск that finished last | its failed | После таска 02 «…» / After task 02 “…” |
+| T3 | `tests` set | its passed | its failed | Полный набор на приёмке / Full suite at acceptance |
+| T4 | any suite with `failed > 0` | passed | «упало N», in the fail tone | as T2 or T3 |
+
+The failed count is always shown beside a suite, «упало 0» included. `tests` is
+written by acceptance alone, so when it is there it *is* the full suite. Before
+that the suite is the own suite of the таск with the latest `finishedAt`, not
+the last one in `tasks[]`: parallel таски finish out of plan order, and the
+array tail named a таск that had not run its tests most recently. A таск with
+no `finishedAt` loses to one that has it; between two without it, the later in
+the list wins. A таск with no title is named by its id alone.
+
+### Рабочее время: the median stays
+
+The `elapsed` card is unchanged but for its Russian label: working time with
+the pauses and the waits taken out, and the median таск beneath it. The median
+stays rather than an average: one таск after three repairs does not inflate
+it, and the card and the estimate stay on one figure.
+
+### Where the other cards went
+
+- **Покрытие брифа** became a line under G2 in Гейты, after the row and its
+  findings, at every G2 status: «Покрытие брифа: 8 из 10 требований в
+  спецификации — 80%». The ring is gone; the label stays as the line's caption.
+  No line is drawn when the gates list holds no G2.
+- **Долг** became the total line of Ваш ход (see *Your Move*). The label is
+  retired.
+- **The estimate** moved into the band with *The Header Says What Is
+  Happening*.
+
+Each card's `i` explanation moved with its number: the coverage paragraph
+lives in `gates`, the debt paragraph — including that only variable names are
+kept — in `handover`, in both registers and both languages.
 
 ## The Reader's Own Two Controls
 
@@ -617,8 +707,12 @@ empty environment variables (**names only** — S2), placeholders, open promised
 work, one-way changes grouped by kind, then assumptions. A group longer than five
 lines is folded and opens on a press. An empty region says so in one muted line.
 
-The Долг card keeps its counts, and both read one function, so the card and the
-region cannot disagree about how many placeholders there are. Open promised work
+The region opens with one total line — «Всего N пунктов» / "In all N items" —
+drawn only when something waits. The total is `handoverOf(state).total`, the
+same function the groups are drawn from, so the line and the groups cannot
+disagree. It replaced the Долг card, and it counts more than the card did:
+promised work and one-way changes are in it too, because they also wait on the
+user. Open promised work
 appears only from contract 4, where the verification record carries it. A
 one-way line whose kind the contract does not define is kept in its own group,
 as written — never dropped and never guessed into a known kind.

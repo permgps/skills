@@ -135,8 +135,15 @@ interface Logic {
   estimateMs: (state: unknown, now: number, marks?: number[]) => { low: number; high: number } | null;
   groupByWave: (tasks: unknown) => Array<{ wave: number; tasks: Array<{ id: string }> }>;
   peakParallel: (tasks: unknown, state: unknown, now: number) => number;
-  debtCounts: (state: unknown) => Record<string, number>;
-  testsOf: (state: unknown) => { passed: number; failed: number } | null;
+  testsOf: (state: unknown) => {
+    passed: number; failed: number; source: 'run' | 'task'; taskId?: string; title?: string | null;
+  } | null;
+  REQUIREMENT_PROGRESS_ORDER: string[];
+  requirementProgressOf: (state: unknown) => {
+    live: number; built: number; inProgress: number; deferred: number; verified: number | null;
+    ids: Record<'built' | 'in-progress' | 'deferred', string[]>;
+  };
+  taskSquaresOf: (state: unknown) => Array<{ id: string; title: string | null; status: string }>;
 }
 
 const html = await readFile(ASSET, 'utf8');
@@ -720,7 +727,7 @@ test('an open build with nothing finished still clears its floor', () => {
   assert.equal(progress.percent, 42);
 });
 
-test('both registers of both languages name the share they were built from', () => {
+test('both registers of both languages name the share in the header, and the Таски card names none', () => {
   const state = bare({ stages: BUILDING, tasks: STALLED });
   const marks = L.collectMarks(state);
   const now = AT('2026-08-19T14:00:00.000Z');
@@ -728,12 +735,16 @@ test('both registers of both languages name the share they were built from', () 
 
   for (const language of ['ru', 'en']) {
     for (const register of ['normal', 'plain']) {
-      for (const key of ['header', 'tasks']) {
-        const said = L.explain(key, state, now, marks, register, language).join(' ');
-        assert.match(said, new RegExp(share + '%'),
-          `${language}/${register}/${key} must name the share the region shows`);
+      const header = L.explain('header', state, now, marks, register, language).join(' ');
+      assert.match(header, new RegExp(share + '%'),
+        `${language}/${register}/header must name the share the band shows`);
+      // The band's bar is the one share of the road; a second one on the
+      // Таски card was a second rendering of the same number.
+      const tasks = L.explain('tasks', state, now, marks, register, language).join(' ');
+      assert.doesNotMatch(tasks, /%/, `${language}/${register}/tasks still names a share of the way`);
+      for (const said of [header, tasks]) {
         assert.ok(!/три четверти|three quarters/.test(said),
-          `${language}/${register}/${key} still describes the scale it no longer uses`);
+          `${language}/${register} still describes the scale it no longer uses`);
       }
     }
   }
@@ -895,18 +906,6 @@ test('parallelism is read from the clocks, never from the size of the wave', () 
   assert.equal(L.peakParallel([task('01')], state, now), 0);
 });
 
-test('the debt is three lists counted as one number', () => {
-  const nothing = L.debtCounts(bare({}));
-  assert.equal(nothing['placeholders'], 0);
-  assert.equal(nothing['assumptions'], 0);
-  assert.equal(nothing['emptyEnv'], 0);
-  assert.equal(nothing['total'], 0);
-  const counted = L.debtCounts(bare({
-    debt: { placeholders: ['R05 — цвета'], assumptions: ['SQLite'], emptyEnv: ['TOKEN', 'SHEET_ID'] },
-  }));
-  assert.equal(counted['total'], 4);
-});
-
 test('a прогон with no suite says nothing rather than claiming a green one', () => {
   assert.equal(L.testsOf(bare({})), null);
   assert.equal(L.testsOf(bare({ tests: { passed: 41, failed: 0 } }))?.passed, 41);
@@ -1035,7 +1034,7 @@ const busy = (): Record<string, unknown> => run({
 const NOW = AT('2026-08-19T10:35:00.000Z');
 
 test('the page can explain every region it renders', () => {
-  assert.equal(L.EXPLAIN_ORDER.length, 14);
+  assert.equal(L.EXPLAIN_ORDER.length, 12);
   for (const key of L.EXPLAIN_ORDER) {
     const state = busy();
     const lines = L.explain(key, state, NOW, L.collectMarks(state));
@@ -1073,12 +1072,12 @@ test('an explanation carries this прогон numbers, not a generic sentence',
 
   // Tasks: three cut, one done, one on review, one running.
   assert.match(L.explain('tasks', state, NOW, marks)[1]!, /Готово 1 из 3/);
-  // Coverage: R04 is dropped, so the denominator is three rather than four.
-  assert.match(L.explain('coverage', state, NOW, marks)[1]!, /2 из 3/);
   // Gates: one passed, one failed, out of the two recorded so far.
   assert.match(L.explain('gates', state, NOW, marks)[1]!, /Пройдено 1, провалено 1 из 2/);
-  // Debt: a placeholder and an empty variable, and never the secret's value.
-  assert.match(L.explain('debt', state, NOW, marks)[1]!, /Всего 2/);
+  // The coverage under G2: R04 is dropped, so the denominator is three rather than four.
+  assert.ok(L.explain('gates', state, NOW, marks).some(line => /2 из 3/.test(line)));
+  // Ваш ход: a placeholder and an empty variable, totalled, and never the secret's value.
+  assert.match(L.explain('handover', state, NOW, marks)[1]!, /Всего 2/);
   // Tests: the last таск's own suite, since the прогон recorded no full run.
   assert.match(L.explain('tests', state, NOW, marks)[1]!, /Прошло 35/);
   // Estimate: two таски finished, so a median exists and is named.
@@ -1129,9 +1128,9 @@ test('a plain explanation carries the same numbers as the normal one', () => {
   const state = busy();
   const marks = L.collectMarks(state);
   assert.match(L.explain('tasks', state, NOW, marks, 'plain')[1]!, /Готово 1 из 3/);
-  assert.match(L.explain('coverage', state, NOW, marks, 'plain')[1]!, /2 из 3/);
+  assert.ok(L.explain('gates', state, NOW, marks, 'plain').some(line => /2 из 3/.test(line)));
   assert.match(L.explain('gates', state, NOW, marks, 'plain')[1]!, /Пройдено 1, провалено 1 из 2/);
-  assert.match(L.explain('debt', state, NOW, marks, 'plain')[1]!, /Всего 2/);
+  assert.match(L.explain('handover', state, NOW, marks, 'plain')[1]!, /Всего 2/);
   assert.match(L.explain('tests', state, NOW, marks, 'plain')[1]!, /Прошло 35/);
   // The same figure the normal register calls a median, named in words.
   assert.match(L.explain('estimate', state, NOW, marks, 'plain')[1]!, /при серединном времени/);
@@ -1566,7 +1565,6 @@ test('handover gathers what only the user can settle, and the Долг card coun
     oneWayCount: 4,
     total: 9,
   });
-  assert.deepEqual(plain(L.debtCounts(state)), { placeholders: 1, assumptions: 2, emptyEnv: 1, total: 4 });
 });
 
 test('promised work is read only where the record carries it, from contract 4', () => {
@@ -2139,6 +2137,266 @@ test('the retired progress and stage regions explain nothing any more', () => {
     for (const register of ['normal', 'plain']) {
       for (const key of ['progress', 'stage']) {
         assert.deepEqual(plain(L.explain(key, band(), NOW, [], register, language)), [], `${language}/${register}/${key}`);
+      }
+    }
+  }
+});
+
+// --- the four cards: requirement progress, the test source, the squares ------
+
+/** A требование as the manifest writes it. */
+const requirement = (id: string, status: string): Record<string, unknown> => ({ id, status });
+
+/** A contract-4 state whose current G4 has passed, and the same one with G4 pending. */
+const g4Passed = (): ReturnType<typeof verifiedState> => verifiedState();
+const g4Pending = (): ReturnType<typeof verifiedState> => {
+  const state = verifiedState();
+  state.lifecycle = 'active';
+  delete state.outcome;
+  delete state.finishedAt;
+  state.gates[3]!.status = 'pending';
+  state.verification!.checks[0]!.currentFingerprint.build = 'changed-build';
+  return state;
+};
+
+const progress = (requirements: unknown[], tasks: unknown[] = []): ReturnType<Logic['requirementProgressOf']> =>
+  L.requirementProgressOf(bare({ requirements, tasks }));
+
+const holdsPartition = (value: ReturnType<Logic['requirementProgressOf']>, row: string): void => {
+  assert.equal(value.built + value.inProgress + value.deferred, value.live, `${row}: built + in progress + deferred is live`);
+};
+
+test('P1: a dropped требование is not live and lands in no bucket', () => {
+  const value = progress([requirement('R01', 'dropped')], [task('01', { status: 'done' })]);
+  assert.equal(value.live, 0);
+  assert.deepEqual(plain(value.ids), { built: [], 'in-progress': [], deferred: [] });
+  holdsPartition(value, 'P1');
+});
+
+test('P2: a deferred требование is live and deferred even when every таск naming it is done', () => {
+  const value = progress([requirement('R01', 'deferred')], [task('01', { status: 'done' })]);
+  assert.equal(value.live, 1);
+  assert.equal(value.deferred, 1);
+  assert.equal(value.built, 0);
+  assert.deepEqual(plain(value.ids.deferred), ['R01']);
+  holdsPartition(value, 'P2');
+});
+
+test('P3: a live требование no таск names is in progress, never built', () => {
+  for (const status of ['open', 'in-spec', 'placeholder']) {
+    const value = progress([requirement('R01', status)], [task('01', { status: 'done', requirementIds: ['R02'] })]);
+    assert.equal(value.inProgress, 1, status);
+    assert.equal(value.built, 0, status);
+    holdsPartition(value, 'P3');
+  }
+});
+
+test('P4: a live требование whose naming таски are all done is built, a placeholder included', () => {
+  for (const status of ['open', 'in-spec', 'placeholder']) {
+    const value = progress([requirement('R01', status)], [
+      task('01', { status: 'done' }), task('02', { status: 'done', requirementIds: ['R01', 'R02'] }),
+    ]);
+    assert.equal(value.built, 1, status);
+    assert.deepEqual(plain(value.ids.built), ['R01'], status);
+    holdsPartition(value, 'P4');
+  }
+});
+
+test('P5: one naming таск still in motion or queued keeps a требование in progress', () => {
+  for (const status of ['running', 'review', 'repair', 'queued']) {
+    const value = progress([requirement('R01', 'in-spec')], [task('01', { status: 'done' }), task('02', { status })]);
+    assert.equal(value.inProgress, 1, status);
+    assert.deepEqual(plain(value.ids['in-progress']), ['R01'], status);
+    holdsPartition(value, 'P5');
+  }
+});
+
+test('P6: one naming таск failed or off-contract keeps a требование in progress', () => {
+  for (const status of ['failed', 'teleported']) {
+    const value = progress([requirement('R01', 'in-spec')], [task('01', { status: 'done' }), task('02', { status })]);
+    assert.equal(value.inProgress, 1, status);
+    assert.equal(value.built, 0, status);
+    holdsPartition(value, 'P6');
+  }
+});
+
+test('P7: once the current G4 has passed the figure counts verified требования', () => {
+  const value = L.requirementProgressOf(g4Passed());
+  assert.equal(value.verified, 1);
+  assert.equal(value.live, 1);
+  holdsPartition(value, 'P7');
+});
+
+test('P8: with G4 pending or a contract older than 4 the figure counts built, never verified', () => {
+  const pending = L.requirementProgressOf(g4Pending());
+  assert.equal(pending.verified, null);
+  assert.equal(pending.built, 1);
+  holdsPartition(pending, 'P8');
+  const legacy = L.requirementProgressOf(bare({
+    contractVersion: 3,
+    requirements: [requirement('R01', 'in-spec')],
+    tasks: [task('01', { status: 'done' })],
+    gates: [{ id: 'G4', status: 'passed', findings: [] }],
+  }));
+  assert.equal(legacy.verified, null);
+  assert.equal(legacy.built, 1);
+  holdsPartition(legacy, 'P8');
+});
+
+test('the three buckets partition live требования on a mixed прогон', () => {
+  const value = progress([
+    requirement('R01', 'in-spec'), requirement('R02', 'open'), requirement('R03', 'deferred'),
+    requirement('R04', 'dropped'), requirement('R05', 'placeholder'),
+  ], [
+    task('01', { status: 'done', requirementIds: ['R01', 'R05'] }),
+    task('02', { status: 'running', requirementIds: ['R02'] }),
+  ]);
+  assert.deepEqual([value.live, value.built, value.inProgress, value.deferred], [4, 2, 1, 1]);
+  holdsPartition(value, 'mixed');
+});
+
+test('T1: a прогон with no suite anywhere has no test source', () => {
+  assert.equal(L.testsOf(bare({ tasks: [task('01', { status: 'done' })] })), null);
+});
+
+test('T2: the таск suite shown is the one that finished last, not the one listed last', () => {
+  const value = L.testsOf(bare({ tasks: [
+    task('02', { title: 'Форма', tests: { passed: 7, failed: 1 }, finishedAt: '2026-08-19T11:00:00.000Z' }),
+    task('03', { title: 'Без тестов', finishedAt: '2026-08-19T12:00:00.000Z' }),
+    task('04', { title: 'Меню', tests: { passed: 3, failed: 0 }, finishedAt: '2026-08-19T10:30:00.000Z' }),
+  ] }));
+  assert.deepEqual(plain(value), { passed: 7, failed: 1, source: 'task', taskId: '02', title: 'Форма' });
+});
+
+test('T2: a таск suite with no finishedAt loses to one that has it, and between two without it the later wins', () => {
+  const stamped = L.testsOf(bare({ tasks: [
+    task('01', { tests: { passed: 1, failed: 0 }, finishedAt: '2026-08-19T10:30:00.000Z' }),
+    task('02', { tests: { passed: 2, failed: 0 } }),
+  ] }));
+  assert.equal(stamped?.taskId, '01');
+  const unstamped = L.testsOf(bare({ tasks: [
+    task('01', { tests: { passed: 1, failed: 0 } }),
+    task('02', { tests: { passed: 2, failed: 0 } }),
+  ] }));
+  assert.equal(unstamped?.taskId, '02');
+});
+
+test('T3: a full suite at acceptance outranks every таск suite', () => {
+  const value = L.testsOf(bare({
+    tests: { passed: 41, failed: 2 },
+    tasks: [task('01', { tests: { passed: 1, failed: 0 }, finishedAt: '2026-08-19T10:30:00.000Z' })],
+  }));
+  assert.deepEqual(plain(value), { passed: 41, failed: 2, source: 'run' });
+});
+
+test('T4: the failed count is worded beside the passed one, zero included, in both languages', () => {
+  assert.equal(said('ru', 'testsFailed')(3), '· упало 3');
+  assert.equal(said('ru', 'testsFailed')(0), '· упало 0');
+  assert.equal(said('en', 'testsFailed')(3), '· failed 3');
+});
+
+test('the test source is worded for T1, T2 and T3 in both languages', () => {
+  assert.equal(said('ru', 'testsSub')(null), 'Прогон ещё не запускал тесты');
+  assert.equal(said('en', 'testsSub')(null), 'The run has not run any tests yet');
+  const after = { passed: 7, failed: 1, source: 'task', taskId: '02', title: 'Форма' };
+  assert.equal(said('ru', 'testsSub')(after), 'После таска 02 «Форма»');
+  assert.equal(said('en', 'testsSub')(after), 'After task 02 “Форма”');
+  const untitled = { passed: 7, failed: 1, source: 'task', taskId: '02', title: null };
+  assert.equal(said('ru', 'testsSub')(untitled), 'После таска 02');
+  assert.equal(said('en', 'testsSub')(untitled), 'After task 02');
+  const run = { passed: 41, failed: 0, source: 'run' };
+  assert.equal(said('ru', 'testsSub')(run), 'Полный набор на приёмке');
+  assert.equal(said('en', 'testsSub')(run), 'Full suite at acceptance');
+});
+
+test('a таск square carries its status in tasks[] order, and an unknown status is off-contract', () => {
+  const statuses = ['done', 'running', 'review', 'repair', 'queued', 'failed', 'teleported'];
+  const squares = L.taskSquaresOf(bare({ tasks: tasksOf(statuses, [null]) }));
+  assert.deepEqual(squares.map(square => square.status),
+    ['done', 'running', 'review', 'repair', 'queued', 'failed', 'off-contract']);
+  assert.deepEqual(squares.map(square => square.id), ['01', '02', '03', '04', '05', '06', '07']);
+  assert.equal(squares[0]!.title, null);
+  assert.equal(squares[1]!.title, 'Таск 2');
+  assert.deepEqual(plain(L.taskSquaresOf(bare())), []);
+});
+
+test('the requirement progress words follow their order in both languages', () => {
+  assert.deepEqual([...L.REQUIREMENT_PROGRESS_ORDER], ['built', 'in-progress', 'deferred']);
+  for (const language of ['ru', 'en']) {
+    assert.deepEqual(Object.keys(L.L10N[language]!['REQUIREMENT_PROGRESS']!), [...L.REQUIREMENT_PROGRESS_ORDER], language);
+  }
+  assert.equal(L.L10N.ru['REQUIREMENT_PROGRESS']!['built'], 'Построено');
+  assert.equal(L.L10N.en['REQUIREMENT_PROGRESS']!['built'], 'Built');
+});
+
+test('the requirements sub-line says built, or passed the check once G4 passed, with the other two buckets', () => {
+  const value = { live: 9, built: 2, inProgress: 5, deferred: 2, verified: null };
+  assert.equal(said('ru', 'requirementsSub')(value), 'Построено · в работе 5 · отложено 2');
+  assert.equal(said('en', 'requirementsSub')(value), 'Built · in progress 5 · deferred 2');
+  const verified = { ...value, verified: 1 };
+  assert.equal(said('ru', 'requirementsSub')(verified), 'Прошло проверку · в работе 5 · отложено 2');
+  assert.equal(said('en', 'requirementsSub')(verified), 'Passed the check · in progress 5 · deferred 2');
+  const none = { live: 0, built: 0, inProgress: 0, deferred: 0, verified: null };
+  assert.equal(said('ru', 'requirementsSub')(none), 'Требования ещё не записаны');
+  assert.equal(said('en', 'requirementsSub')(none), 'No requirements written down yet');
+});
+
+test('the brief coverage line under G2 reads the share of live требования, or says none are written', () => {
+  assert.equal(said('ru', 'coverageLine')({ percent: 80, inSpec: 8, live: 10 }),
+    'Покрытие брифа: 8 из 10 требований в спецификации — 80%');
+  assert.equal(said('en', 'coverageLine')({ percent: 80, inSpec: 8, live: 10 }),
+    'Brief coverage: 8 of 10 requirements in the specification — 80%');
+  assert.equal(said('ru', 'coverageLine')({ percent: 0, inSpec: 0, live: 0 }),
+    'Покрытие брифа: требования ещё не записаны');
+  assert.equal(said('en', 'coverageLine')({ percent: 0, inSpec: 0, live: 0 }),
+    'Brief coverage: no requirements written down yet');
+});
+
+test('the Ваш ход total agrees with its number in all three Russian forms', () => {
+  assert.equal(said('ru', 'handoverTotal')(1), 'Всего 1 пункт');
+  assert.equal(said('ru', 'handoverTotal')(3), 'Всего 3 пункта');
+  assert.equal(said('ru', 'handoverTotal')(5), 'Всего 5 пунктов');
+  assert.equal(said('en', 'handoverTotal')(1), 'In all 1 item');
+  assert.equal(said('en', 'handoverTotal')(5), 'In all 5 items');
+});
+
+test('the Таски sub-line names what moves, failed and retried in words, and no share of the way', () => {
+  const counts = L.countTasks([
+    ...tasksOf(['done', 'running', 'review', 'repair', 'failed']), { id: '06', status: 'done', retries: 2 },
+  ]);
+  for (const language of ['ru', 'en']) {
+    const line = said(language, 'tasksSub')(counts);
+    assert.doesNotMatch(line, /%/, language);
+    assert.match(line, language === 'ru' ? /Упал 1/ : /Failed 1/, language);
+  }
+  const still = L.countTasks(tasksOf(['done', 'queued']));
+  assert.equal(said('ru', 'tasksSub')(still), '');
+  assert.equal(said('en', 'tasksSub')(still), '');
+});
+
+test('the four cards, the Ваш ход total and the G2 line are explained in both registers and both languages', () => {
+  const state = busy();
+  const marks = L.collectMarks(state);
+  for (const language of ['ru', 'en']) {
+    for (const register of ['normal', 'plain']) {
+      for (const key of ['requirements', 'tasks', 'tests', 'handover', 'gates']) {
+        const lines = L.explain(key, state, NOW, marks, register, language);
+        assert.ok(lines.length >= 2, `${language}/${register}/${key}`);
+        assert.ok(lines.every(line => line.trim() !== ''), `${language}/${register}/${key} left a blank line`);
+      }
+      const gates = L.explain('gates', state, NOW, marks, register, language).join(' ');
+      assert.match(gates, language === 'ru' ? /2 из 3/ : /2 of 3/, `${language}/${register}`);
+      const handover = L.explain('handover', state, NOW, marks, register, language)[1]!;
+      assert.match(handover, language === 'ru' ? /Всего 2/ : /In all 2/, `${language}/${register}`);
+    }
+  }
+});
+
+test('the retired coverage and debt cards explain nothing any more', () => {
+  for (const language of ['ru', 'en']) {
+    for (const register of ['normal', 'plain']) {
+      for (const key of ['coverage', 'debt']) {
+        assert.deepEqual(plain(L.explain(key, busy(), NOW, [], register, language)), [], `${language}/${register}/${key}`);
       }
     }
   }
