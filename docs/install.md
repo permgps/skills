@@ -355,6 +355,14 @@ mode, the question about it is instead whether to pin it. Both questions are
 asked in `full` too: they are about the tool, not the project, and they are
 asked once in a project's lifetime.
 
+A third question, **the models**, is asked once per project and host: on the
+first run right after the two above, and again the first time a different host
+runs in the same project, or when a pinned model is one the host no longer
+offers. Its options are built from the models your host reports at run time —
+`session/session`, `session/next` (recommended), `session/cheapest`, or your
+own `<strong>/<standard>` pair — and on a host that cannot choose a model per
+subagent (Gemini CLI today) it is not asked at all. It is asked in `full` too.
+
 The answers go to `<project>/.maestro/config.json`, which is **not** part of
 the bundle:
 
@@ -362,11 +370,15 @@ the bundle:
 {
   "configVersion": 1,
   "mode": "full",
-  "explain": "plain"
+  "explain": "plain",
+  "models": { "claude-code": { "strong": "session", "standard": "sonnet" } }
 }
 ```
 
-A `"language": "ru"` or `"en"` key may be added by hand; the skill reads it and
+`models` holds one pin per host. It is the one key a later run changes: the
+helper (`node .maestro/sync.mts --config-models --host <id>`) merges a host's
+pin into the existing file and keeps every other key as it was. A
+`"language": "ru"` or `"en"` key may be added by hand; the skill reads it and
 never writes it. The full precedence is in [the dials specification](spec/dials.md).
 
 That location is the point. `npx skills update` overwrites every file it

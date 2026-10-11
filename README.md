@@ -911,11 +911,11 @@ development dependencies are `typescript` and `@types/node`.
 | `npm run bundle` | Maestro's bundle structure and links |
 | `npm run bundle:scout` | Scout's bundle structure and links |
 | `npm run dashboard` | the dashboard's regions, labels and logic against the specification |
-| `npm run state` | the state contract in code matches the specification |
-| `npm run hosts` | every host degradation is probed and spent, and the memory-file table matches |
+| `npm run state` | the state contract in code matches the specification, and the config keys match `CONFIG_KEYS` |
+| `npm run hosts` | every host degradation is probed and spent, the memory-file table matches, and every host says where it lists its models |
 | `npm run doors` | every entry into repair is defined |
-| `npm run dials` | mode defaults agree across files |
-| `npm run readers` | each gate reader is given and withheld what it should be |
+| `npm run dials` | dial values and defaults agree across files, and the models token rule is stated once on each side |
+| `npm run readers` | each gate reader is given and withheld what it should be, and every brief runs on its tier — judges always `strong` |
 | `npm run report` | the отчёт's sections agree in the bundle and the specification |
 | `npm run view` | the viewer boundary: the run opens only its dashboard |
 | `npm run test` | every `*.test.ts`, including the copied-runtime integration tests and the README reference check |

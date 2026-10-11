@@ -14,8 +14,34 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
-`CONTRACT_VERSION` stays `7`.
+`CONTRACT_VERSION` moves to `8`.
 
+- **A models dial: judges strong, таски by tier.** Two tiers: `strong` runs
+  every judge (the gate readers, the reviewer, the standards, diagnosis,
+  strategy, acceptance and polish readers), every repair and retry, every
+  доводка executor and every таск the plan marks `strong`; `standard` runs
+  the other таски, the existing-code reader and the preflight probe. The
+  orchestrator stays on the session's model. The dial is one bare
+  `<strong>/<standard>` token, a dial only when both halves are model names
+  the host reports; then the per-host pin `models.<host>` in
+  `.maestro/config.json`; then a question asked once per project and host, in
+  `full` too, with options built from what the host reports. Built-in default
+  `session/session`, where `session` passes no model. Claude Code and Codex
+  pass the model and the session's effort per dispatch, and Codex never passes
+  `agent_type`; Gemini CLI degrades to the session's model and the
+  announcement says so. Preflight pins the answer through the new helper
+  command `--config-models`, the one change a прогон makes to an existing
+  config, which keeps every other key and refuses a missing or unreadable file.
+  The plan marks each таск in a `Model` row: a producer in the Seams table and
+  the sole таск of wave 1 are `strong` by rule, and `check-g3` holds that from
+  contract 8, reading the Seams table and the `Model` rows and nothing else;
+  risk and a hard core are `strong` by judgement, and the reviewer still judges
+  every diff whatever the row says. The отчёт's *What was asked* ends with a
+  `Models:` line, and `npm run metrics` counts таски, retries and repairs per
+  tier. `npm run dials`, `readers`, `hosts`, `state` and `bundle` hold the
+  dial, the tier table, the host model lists, the config keys and eleven
+  anchors; `SKILL.md` stays at 551 lines; 1391 tests pass. `CONTRACT_VERSION`
+  is `8`; a contract-7 run keeps running on the session's model.
 - **Existing code is read once, before the spec.** Preflight's `--memory-read`
   also says whether the project already holds code: git is asked for tracked
   and untracked files it does not ignore, and without git the directory is
