@@ -53,6 +53,14 @@ number that claimed more than that would be claiming it falsely.
   number. «Прошло времени» is now «Рабочее время». `npm run dashboard` holds
   the three progress words to the new *Requirement Progress* table in
   `vocabulary.md`. No contract change.
+- **Every таск bar in the build block says why.** Each bar says its status in
+  a word, so no status is told by colour alone. A repair bar quotes what was
+  sent back — the first open defect's `counterexample`, verbatim — once repair
+  has written it. A failed bar names the last repair attempt's outcome, in five
+  words the new `verification.repairAttempts[].outcome` rows of
+  `vocabulary.md` define and `npm run dashboard` holds the page to. A wave
+  that has not started names what it waits for: «Волна 4 · ждёт 04». No
+  contract change.
 - **A wait for the user stops the clocks.** From contract 9 the dashboard cuts
   every closed wait and the open one out of working time, the stage clocks, the
   таск durations, the median and the estimate before the 45-minute ceiling

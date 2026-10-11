@@ -634,7 +634,10 @@ square each, the last tests with the таск they ran after, and working time.
 Brief coverage became a line under G2 in the checks, and the debt became the
 total of «Ваш ход». And the build itself grouped by wave, so the
 parallelism you paid for is the parallelism you can see — measured from the
-clocks rather than claimed from the plan. Every number is computed from the run
+clocks rather than claimed from the plan. Every таск bar says its status in a
+word; a bar in repair quotes what was sent back, a failed bar names how the last
+repair attempt ended, and a wave that has not started names the таски it waits
+for. Every number is computed from the run
 state when the page draws itself, and «осталось» is a range that refuses to be
 sharper than the таски it was measured from.
 

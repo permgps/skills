@@ -125,6 +125,26 @@ The «N тасков параллельно» on a wave is read from the clocks 
 the size of the wave. A layer says what *may* run together; only the timestamps
 say what did.
 
+**Every таск is a bar in its status colour, and every bar says its status in a
+word** — «Готов», «В работе», «На ревью», «На исправлении», «Упал», «В очереди»
+— so no status is told by colour alone. Two kinds of bar carry one more line
+under them:
+
+- **A bar in repair quotes what was sent back**: «Вернули: «…»», the
+  counterexample of the таск's first open defect, word for word. A long one is
+  clipped on screen with an ellipsis, and the whole sentence is in the line's
+  tooltip. Until repair has written the defect down, and on any state before
+  contract 6, there is no line: the page never guesses a reason from a finding.
+- **A failed bar names how the last repair attempt ended**: «Последняя попытка
+  исправления: Всё ещё не проходит». It names the outcome only, never the
+  hypothesis repair was testing.
+
+A review bar carries no such line, because every таск is reviewed.
+
+**A wave that has not started says what it waits for**: «Волна 4 · ждёт 04». It
+lists the blockers outside the wave that are not done yet, at most three and
+then «и ещё N». Once any таск in the wave has started, the list goes away.
+
 **A таск whose status the state contract does not define is shown, not lost.**
 It gets a chip of its own — «Вне контракта» — its status printed in the row as
 it was written, and no share of the bar. A real прогон wrote a таск `pending`,
