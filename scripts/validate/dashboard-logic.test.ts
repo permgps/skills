@@ -12,6 +12,7 @@ import test from 'node:test';
 import { evaluateLogic, scriptBlock } from './dashboard-integrity.ts';
 import { correctedSourceAuditState, controlledState, repairContract6State, strategyReview, v3Attempt, sourceVerifiedState, deferredScopeState, sha256, verifiedState } from '../state/fixtures/verification.ts';
 import { projectState } from '../state/projection.ts';
+import { AWAITING_KINDS } from '../state/contract.ts';
 import { retrospectiveState } from '../state/fixtures/retrospective.ts';
 import { deriveVerification } from '../state/verification.ts';
 
@@ -24,7 +25,9 @@ interface Logic {
   textDigest: (value: string) => string;
   KNOWN_CONTRACT_VERSION: number;
   runDateOf: (state: unknown) => string | null;
-  awaitingOf: (state: unknown) => { since: string } | null;
+  awaitingOf: (state: unknown) => { since: string; kind: string; note: string | null } | null;
+  tabTitle: (state: unknown, language?: string) => string;
+  AWAITING_KINDS: string[];
   STAGE_ORDER: string[];
   L10N: { ru: Words; en: Words } & Record<string, Words>;
   LANGUAGE_ORDER: string[];
@@ -84,6 +87,7 @@ interface Logic {
   collectMarks: (state: unknown) => number[];
   activeSpan: (from: number, to: number, marks: number[]) => number;
   worked: (from: string, state: unknown, now: number, until?: string, marks?: number[]) => number | null;
+  waitSpans: (state: unknown, now: number) => Array<{ from: number; to: number }>;
   stagePosition: (state: unknown) => { position: number; total: number };
   TASK_ORDER: string[];
   SHARE_BY_STATUS: Record<string, number>;
@@ -1775,4 +1779,152 @@ test('the reconstructed domtut_copy run renders through every new reader without
     assert.ok(!line.includes('[object Object]'), `a type name reached the page: ${line}`);
     assert.ok(!line.includes('undefined'), `an absent value reached the page: ${line}`);
   }
+});
+
+// Waiting for the user stops the clocks, from contract 9. The closed waits and
+// the open one are cut out of every span before the marks-and-ceiling rule
+// measures what is left, so a wait is subtracted whole and never capped.
+
+const T = (hhmm: string): string => `2026-08-19T${hhmm}:00.000Z`;
+/** One mark every ten minutes from 10:00 to 11:20, so the ceiling never bites. */
+const DENSE = Array.from({ length: 9 }, (_, i) => AT(T(`1${Math.floor(i / 6)}:${String((i % 6) * 10).padStart(2, '0')}`)));
+
+test('below contract 9 an open wait leaves today\'s arithmetic alone', () => {
+  const state = bare({ contractVersion: 8, awaiting: { kind: 'answer', since: T('10:20') } });
+  assert.deepEqual(plain(L.waitSpans(state, AT(T('11:20')))), []);
+  assert.equal(L.worked(STARTED, state, AT(T('11:20')), undefined, DENSE), 80 * MIN);
+});
+
+test('a contract-9 run that never waited keeps today\'s arithmetic', () => {
+  const state = bare({ contractVersion: 9 });
+  assert.deepEqual(plain(L.waitSpans(state, AT(T('11:20')))), []);
+  assert.equal(L.worked(STARTED, state, AT(T('11:20')), undefined, DENSE), 80 * MIN);
+});
+
+test('a closed wait of twenty minutes inside a stage takes twenty minutes off its clock', () => {
+  const stage = { id: 'build', status: 'done', startedAt: STARTED, finishedAt: T('11:00') };
+  const before = bare({ contractVersion: 9, stages: [stage] });
+  const after = bare({ contractVersion: 9, stages: [stage], waits: [{ since: T('10:20'), until: T('10:40') }] });
+  const now = AT(T('11:20'));
+  assert.equal(L.worked(STARTED, before, now, stage.finishedAt, DENSE), 60 * MIN);
+  assert.equal(L.worked(STARTED, after, now, stage.finishedAt, DENSE), 40 * MIN);
+});
+
+test('a closed wait of fifty minutes is subtracted whole, never capped at the ceiling', () => {
+  const state = bare({ contractVersion: 9, waits: [{ since: T('10:10'), until: T('11:00') }] });
+  assert.equal(L.worked(STARTED, state, AT(T('11:20')), T('11:20'), DENSE), 30 * MIN);
+  // With only its edges for marks, the run shows the ten minutes before the
+  // wait and the twenty after it — the wait's own edges split the long gap.
+  assert.equal(L.worked(STARTED, state, AT(T('11:20')), T('11:20'), [AT(STARTED), AT(T('11:20'))]), 30 * MIN);
+});
+
+test('an open wait freezes the clock from the moment it was asked', () => {
+  const state = bare({ contractVersion: 9, updatedAt: T('10:30'), awaiting: { kind: 'spec-gate', since: T('10:30') } });
+  const marks = L.collectMarks(state);
+  const early = L.worked(STARTED, state, AT(T('10:50')), undefined, marks);
+  const late = L.worked(STARTED, state, AT(T('16:00')), undefined, marks);
+  assert.equal(early, 30 * MIN);
+  assert.equal(late, 30 * MIN);
+  assert.equal(L.elapsed(STARTED, state, AT(T('16:00'))), 6 * 60 * MIN);
+});
+
+test('waits inside two finished таски lower the median and the estimate', () => {
+  const task = (id: string, startedAt: string, finishedAt: string | undefined, status: string): Record<string, unknown> =>
+    ({ id, status, blockedBy: [], startedAt, ...(finishedAt ? { finishedAt } : {}) });
+  const tasks = [task('01', T('10:00'), T('10:30'), 'done'), task('02', T('10:30'), T('11:00'), 'done'),
+    { id: '03', status: 'queued', blockedBy: [] }];
+  const before = bare({ contractVersion: 9, tasks });
+  const after = bare({ contractVersion: 9, tasks, waits: [
+    { since: T('10:10'), until: T('10:20') }, { since: T('10:40'), until: T('10:50') }] });
+  const now = AT(T('11:20'));
+  assert.equal(L.medianTaskMs(before, now, DENSE), 30 * MIN);
+  assert.equal(L.medianTaskMs(after, now, DENSE), 20 * MIN);
+  const was = L.estimateMs(before, now, DENSE)!;
+  const is = L.estimateMs(after, now, DENSE)!;
+  assert.ok(is.low < was.low && is.high < was.high, `${JSON.stringify(is)} vs ${JSON.stringify(was)}`);
+});
+
+test('the spans skip what no reader can parse, run the open wait to the reference time, and merge', () => {
+  const state = bare({ contractVersion: 9, waits: [
+    { since: T('10:10'), until: T('10:20') }, { since: 'after lunch', until: T('10:30') },
+    { since: T('10:50'), until: T('10:40') }, '10:55', { since: T('10:15'), until: T('10:25') }],
+  awaiting: { kind: 'answer', since: T('11:00') } });
+  assert.deepEqual(plain(L.waitSpans(state, AT(T('11:30')))),
+    [{ from: AT(T('10:10')), to: AT(T('10:25')) }, { from: AT(T('11:00')), to: AT(T('11:30')) }]);
+});
+
+test('the working-time card says a wait is not counted, in both languages and registers, and only where it is so', () => {
+  for (const language of ['ru', 'en']) {
+    for (const register of ['plain', 'normal']) {
+      const nine = L.explain('elapsed', bare({ contractVersion: 9 }), NOW, [], register, language).join(' ');
+      const eight = L.explain('elapsed', bare({ contractVersion: 8 }), NOW, [], register, language).join(' ');
+      assert.match(nine, language === 'ru' ? /вашего ответа/ : /your reply/, `${language} ${register}`);
+      assert.doesNotMatch(eight, language === 'ru' ? /вашего ответа/ : /your reply/, `${language} ${register}`);
+    }
+  }
+});
+
+// What the page says a прогон waits for, and what the tab says while it does.
+
+const KIND_LINES: Record<string, { ru: RegExp; en: RegExp }> = {
+  'answer': { ru: /^Ждёт вашего ответа в чате с /, en: /^Waiting for your reply in the chat since / },
+  'briefing-round': { ru: /^Ждёт ваших ответов на вопросы брифинга в чате с /, en: /^Waiting for your answers to the briefing questions in the chat since / },
+  'spec-gate': { ru: /^Ждёт вашего одобрения спецификации в чате с /, en: /^Waiting for your approval of the specification in the chat since / },
+  'plan-gate': { ru: /^Ждёт вашего одобрения плана в чате с /, en: /^Waiting for your approval of the plan in the chat since / },
+  'one-way-action': { ru: /^Ждёт вашего разрешения на необратимое действие в чате с /, en: /^Waiting for your permission for an irreversible action in the chat since / },
+  'repair-limit': { ru: /^Попытки исправления исчерпаны: ждёт вашего решения в чате с /, en: /^Repair attempts are spent: waiting for your decision in the chat since / },
+};
+
+const asked = (awaiting: Record<string, unknown>): Record<string, unknown> =>
+  run({ contractVersion: 9, awaiting: { since: '2026-08-19T10:30:00.000Z', ...awaiting } });
+
+test('each kind of stop says in one sentence what it waits for, in both languages', () => {
+  for (const [kind, line] of Object.entries(KIND_LINES)) {
+    const state = asked({ kind });
+    const marks = L.collectMarks(state);
+    const ru = L.silenceNotice(state, AT('2026-08-19T14:00:00.000Z'), marks, 'plain', 'ru')!;
+    const en = L.silenceNotice(state, AT('2026-08-19T14:00:00.000Z'), marks, 'plain', 'en')!;
+    assert.equal(ru.alarming, false, kind);
+    assert.match(ru.line, line.ru, kind);
+    assert.match(en.line, line.en, kind);
+    assert.match(ru.line, /в чате с 2026-08-19 \d\d:\d\d\. Прогон стоит на вопросе/, kind);
+    assert.match(en.line, /in the chat since 2026-08-19 \d\d:\d\d\. The run is stopped on a question/, kind);
+  }
+});
+
+test('a note is appended after a dash, and one that is not a single line is dropped', () => {
+  const noted = asked({ kind: 'spec-gate', note: 'спецификация на 12 разделов' });
+  assert.deepEqual(plain(L.awaitingOf(noted)), { since: '2026-08-19T10:30:00.000Z', kind: 'spec-gate', note: 'спецификация на 12 разделов' });
+  const line = L.silenceNotice(noted, AT('2026-08-19T14:00:00.000Z'), L.collectMarks(noted), 'plain', 'ru')!.line;
+  assert.match(line, /в чате с 2026-08-19 \d\d:\d\d — спецификация на 12 разделов\. /);
+  for (const note of ['two\nlines', '   ', 42]) {
+    const dropped = asked({ kind: 'spec-gate', note });
+    assert.equal(L.awaitingOf(dropped)!.note, null, JSON.stringify(note));
+    assert.doesNotMatch(L.silenceNotice(dropped, AT('2026-08-19T14:00:00.000Z'), L.collectMarks(dropped))!.line, / — /);
+  }
+});
+
+test('an unknown or absent kind reads as an answer', () => {
+  for (const awaiting of [{ kind: 'deploy' }, {}]) {
+    const state = asked(awaiting);
+    assert.equal(L.awaitingOf(state)!.kind, 'answer');
+    assert.match(L.silenceNotice(state, AT('2026-08-19T14:00:00.000Z'), L.collectMarks(state))!.line, /^Ждёт вашего ответа в чате с /);
+  }
+});
+
+test('the tab says the прогон waits for you exactly while it does', () => {
+  assert.equal(L.tabTitle(asked({ kind: 'plan-gate' }), 'ru'), '● Ждём вас');
+  assert.equal(L.tabTitle(asked({ kind: 'plan-gate' }), 'en'), '● Waiting for you');
+  assert.equal(L.tabTitle(run({ awaiting: { kind: 'answer', since: '2026-08-19T10:30:00.000Z' } }), 'ru'), '● Ждём вас');
+  assert.equal(L.tabTitle(run(), 'ru'), 'Maestro');
+  assert.equal(L.tabTitle(asked({ kind: 'answer', since: 'after lunch' }), 'en'), 'Maestro');
+  assert.equal(L.tabTitle(run({ awaiting: { kind: 'answer', since: '2026-08-19T10:30:00.000Z' }, finishedAt: '2026-08-19T10:40:00.000Z' }), 'ru'), 'Maestro');
+  assert.equal(L.tabTitle(run({ awaiting: { kind: 'answer', since: '2026-08-19T10:30:00.000Z' }, interruptedAt: '2026-08-19T10:40:00.000Z' }), 'en'), 'Maestro');
+  assert.equal(L.tabTitle(null, 'ru'), 'Maestro');
+});
+
+test('the page names exactly the kinds the contract defines', () => {
+  // Two copies of one value set, written by different code: this holds them together.
+  assert.deepEqual(plain(L.AWAITING_KINDS), [...AWAITING_KINDS]);
+  for (const kind of AWAITING_KINDS) assert.equal(L.awaitingOf(asked({ kind }))!.kind, kind);
 });

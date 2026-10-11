@@ -740,10 +740,20 @@ globalThis.MAESTRO_LOGIC = (function () {
             ? 'В последний раз что-то менялось ' + quiet + ' назад.'
             : 'Последняя запись — ' + quiet + ' назад.';
         },
-        awaitingNotice: function (moment) {
-          return L10N.ru.SCREEN.awaiting + ' в чате с ' + moment
+        // One sentence per stop on a question; the note, the прогон's own
+        // line about what it asked, follows a dash.
+        awaitingNotice: function (kind, moment, note) {
+          var head = {
+            briefingRound: 'Ждёт ваших ответов на вопросы брифинга',
+            specGate: 'Ждёт вашего одобрения спецификации',
+            planGate: 'Ждёт вашего одобрения плана',
+            oneWayAction: 'Ждёт вашего разрешения на необратимое действие',
+            repairLimit: 'Попытки исправления исчерпаны: ждёт вашего решения'
+          }[camelKind(kind)] || L10N.ru.SCREEN.awaiting;
+          return head + ' в чате с ' + moment + (note ? ' — ' + note : '')
             + '. Прогон стоит на вопросе и продолжится, когда вы ответите.';
         },
+        tabAwaiting: '● Ждём вас',
         stopReasonLine: function (reason) { return L10N.ru.SCREEN.stopReason + ': ' + reason; },
         holderLine: function (token, moment, plain) {
           return plain
@@ -1071,10 +1081,18 @@ globalThis.MAESTRO_LOGIC = (function () {
             ? 'Something last changed ' + quiet + ' ago.'
             : 'Last write — ' + quiet + ' ago.';
         },
-        awaitingNotice: function (moment) {
-          return L10N.en.SCREEN.awaiting + ' in the chat since ' + moment
+        awaitingNotice: function (kind, moment, note) {
+          var head = {
+            briefingRound: 'Waiting for your answers to the briefing questions',
+            specGate: 'Waiting for your approval of the specification',
+            planGate: 'Waiting for your approval of the plan',
+            oneWayAction: 'Waiting for your permission for an irreversible action',
+            repairLimit: 'Repair attempts are spent: waiting for your decision'
+          }[camelKind(kind)] || L10N.en.SCREEN.awaiting;
+          return head + ' in the chat since ' + moment + (note ? ' — ' + note : '')
             + '. The run is stopped on a question and carries on once you answer.';
         },
+        tabAwaiting: '● Waiting for you',
         stopReasonLine: function (reason) { return L10N.en.SCREEN.stopReason + ': ' + reason; },
         holderLine: function (token, moment, plain) {
           return plain
@@ -1379,14 +1397,64 @@ globalThis.MAESTRO_LOGIC = (function () {
     return total;
   }
 
-  /** `elapsed`, with the pauses taken out. Same arguments, same edges. */
+  /**
+   * The time the прогон spent waiting for the user, as sorted, merged
+   * `{ from, to }` spans: the closed `waits` plus the open `awaiting`, which
+   * runs to the reference time. Only from contract 9 — an older state keeps
+   * today's arithmetic, open `awaiting` and all. A wait no reader can parse,
+   * or one that ends before it begins, is skipped rather than guessed at.
+   */
+  function waitSpans(state, now) {
+    if (!isWaitCounted(state)) return [];
+    var spans = [];
+    var take = function (from, to) { if (!isNaN(from) && !isNaN(to) && to > from) spans.push({ from: from, to: to }); };
+    (Array.isArray(state.waits) ? state.waits : []).forEach(function (wait) {
+      if (!wait || typeof wait !== 'object') return;
+      take(Date.parse(wait.since), Date.parse(wait.until));
+    });
+    var open = awaitingOf(state);
+    if (open) take(Date.parse(open.since), referenceTime(state, now));
+    spans.sort(function (a, b) { return a.from - b.from; });
+    var merged = [];
+    spans.forEach(function (span) {
+      var last = merged[merged.length - 1];
+      if (last && span.from <= last.to) last.to = Math.max(last.to, span.to);
+      else merged.push({ from: span.from, to: span.to });
+    });
+    return merged;
+  }
+
+  /** A kebab-case kind as the camelCase key the sentences are filed under. */
+  function camelKind(kind) {
+    return String(kind).replace(/-([a-z])/g, function (_, letter) { return letter.toUpperCase(); });
+  }
+
+  /** Whether this state's clocks leave out the time spent waiting: contract 9 on. */
+  function isWaitCounted(state) {
+    return !!state && typeof state.contractVersion === 'number' && state.contractVersion >= 9;
+  }
+
+  /**
+   * `elapsed`, with the pauses and the waits taken out. Same arguments, same
+   * edges. A wait is cut out whole before the ceiling measures what is left,
+   * so its edges split a gap and an hour spent waiting is never capped to 45
+   * minutes of work.
+   */
   function worked(fromIso, state, now, untilIso, marks) {
     var from = Date.parse(fromIso);
     if (isNaN(from)) return null;
     var until = untilIso ? Date.parse(untilIso) : NaN;
     var to = isNaN(until) ? referenceTime(state, now) : until;
     if (to < from) return null;
-    return activeSpan(from, to, marks || collectMarks(state));
+    var stamps = marks || collectMarks(state);
+    var total = 0;
+    var cursor = from;
+    waitSpans(state, now).forEach(function (wait) {
+      if (wait.to <= cursor || wait.from >= to) return;
+      total += activeSpan(cursor, Math.min(wait.from, to), stamps);
+      cursor = Math.max(cursor, wait.to);
+    });
+    return total + activeSpan(cursor, to, stamps);
   }
 
   function countTasks(tasks) {
@@ -2063,18 +2131,38 @@ globalThis.MAESTRO_LOGIC = (function () {
   }
 
   /**
-   * The moment an active прогон stopped on a question, or null.
+   * The stops on a question the page names; anything else reads as `answer`.
+   * A copy of the contract's `AWAITING_KINDS`, held to it by dashboard-logic.test.ts.
+   */
+  var AWAITING_KINDS = ['answer', 'briefing-round', 'spec-gate', 'plan-gate', 'one-way-action', 'repair-limit'];
+
+  /**
+   * What an active прогон stopped on a question waits for — `{ since, kind,
+   * note }` — or null.
    *
    * A finished or interrupted run waits for nobody, whatever a stale field
    * says, and a `since` no reader can parse is no wait at all — the ordinary
    * silence rule then applies, exactly as for a state written before the field.
+   * An unknown kind is still a wait, read as an answer; a note that is not one
+   * non-empty line is dropped rather than printed as a paragraph.
    */
   function awaitingOf(state) {
     if (!state || isStopped(state) || state.lifecycle === 'closed') return null;
     var waiting = state.awaiting;
     if (!waiting || typeof waiting !== 'object' || typeof waiting.since !== 'string') return null;
     if (isNaN(Date.parse(waiting.since))) return null;
-    return { since: waiting.since };
+    var kind = AWAITING_KINDS.indexOf(waiting.kind) === -1 ? 'answer' : waiting.kind;
+    var note = typeof waiting.note === 'string' && waiting.note.trim() !== '' && !/[\r\n]/.test(waiting.note)
+      ? waiting.note : null;
+    return { since: waiting.since, kind: kind, note: note };
+  }
+
+  /**
+   * The browser tab's title: «● Ждём вас» exactly while the прогон waits for
+   * its reader, so a background tab says so, and the static `Maestro` otherwise.
+   */
+  function tabTitle(state, language) {
+    return awaitingOf(state) ? words(language).UI.tabAwaiting : 'Maestro';
   }
 
   /** The kinds a one-way line may carry, in the order the region lists them. */
@@ -2434,7 +2522,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     // A прогон stopped on a question is silent on purpose, and however long it
     // waits it is not stalled: the reader, not the run, owes the next move.
     var waiting = awaitingOf(state);
-    if (waiting) return { alarming: false, awaiting: true, line: say.awaitingNotice(formatMoment(waiting.since)) };
+    if (waiting) return { alarming: false, awaiting: true, line: say.awaitingNotice(waiting.kind, formatMoment(waiting.since), waiting.note) };
     var quiet = Math.max(0, now - last);
     var record = longestSilence(marks);
     if (record !== null && quiet > record) {
@@ -2526,7 +2614,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           : 'Медиана на таск — ' + formatMinutes(median) + '.',
         'Пауза между двумя отметками засчитывается не целиком, а не длиннее ' + formatMinutes(IDLE_CEILING_MS)
           + ': прогон, брошенный на ночь, не должен отчитаться за ночь работы.'
-      ];
+      ].concat(isWaitCounted(state) ? ['Время, пока прогон ждал вашего ответа в чате, не засчитывается вовсе.'] : []);
     },
 
     estimate: function (state, now, marks) {
@@ -2767,7 +2855,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         'Если между двумя записями прошло больше ' + formatMinutes(IDLE_CEILING_MS)
           + ', засчитывается только ' + formatMinutes(IDLE_CEILING_MS)
           + ': работа, брошенная на ночь, не должна отчитаться за ночь труда.'
-      ];
+      ].concat(isWaitCounted(state) ? ['Пока прогон ждёт вашего ответа в чате, время не идёт совсем.'] : []);
     },
 
     estimate: function (state, now, marks) {
@@ -3001,7 +3089,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         'A pause between two writes counts, but never for longer than '
           + L10N.en.UI.minutes(IDLE_CEILING_MS)
           + ': a run left overnight must not report a night of work.'
-      ];
+      ].concat(isWaitCounted(state) ? ['Time the run spent waiting for your reply in the chat does not count at all.'] : []);
     },
 
     estimate: function (state, now, marks) {
@@ -3243,7 +3331,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         'If more than ' + L10N.en.UI.minutes(IDLE_CEILING_MS)
           + ' passed between two writes, only ' + L10N.en.UI.minutes(IDLE_CEILING_MS)
           + ' of it counts: work left overnight must not report a night of labour.'
-      ];
+      ].concat(isWaitCounted(state) ? ['While the run waits for your reply in the chat, the clock does not move at all.'] : []);
     },
 
     estimate: function (state, now, marks) {
@@ -3676,7 +3764,10 @@ globalThis.MAESTRO_LOGIC = (function () {
     closureOf: closureOf,
     stopReasonOf: stopReasonOf,
     holderOf: holderOf,
+    AWAITING_KINDS: AWAITING_KINDS,
     awaitingOf: awaitingOf,
+    tabTitle: tabTitle,
+    waitSpans: waitSpans,
     ONE_WAY_ORDER: ONE_WAY_ORDER,
     handoverOf: handoverOf,
     FOLD_AFTER: FOLD_AFTER,
@@ -4086,6 +4177,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     notice.textContent = notices.join('\n');
     notice.hidden = notices.length === 0;
     notice.className = silence && silence.alarming ? 'alarm' : '';
+    document.title = L.tabTitle(state, lang);
 
     var dials = clear(el('dials'));
     put(dials, 'span', L.label(T.MODE, state.mode), 'chip');
