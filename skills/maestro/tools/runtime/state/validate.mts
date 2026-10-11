@@ -251,7 +251,7 @@ export function validateState(value: unknown): StateViolation[] {
     add(field, `${field} arrives with contract 8 — a contract-7 run keeps running on the session's model; remove it`);
   };
   /**
-   * Доводка was retired in contract 8, so its switch is refused from 8 and stays
+   * The finish dial was retired in contract 8, so its switch is refused from 8 and stays
    * a required boolean below it: a contract-7 прогон is still valid under its
    * own rules, and nothing reads the value any more.
    */
@@ -367,7 +367,7 @@ export function validateState(value: unknown): StateViolation[] {
     dialChanges.forEach((entry, index) => {
       const at = `dialChanges[${index}]`;
       if (!isRecord(entry)) return add(at, `${at} must be an object`);
-      // `polish` left with доводка in contract 8; an older прогон may still record a move of it.
+      // `polish` left with the finish dial in contract 8; an older прогон may still record a move of it.
       requireOneOf(`${at}.dial`, entry['dial'], atLeastV8 ? ['mode', 'depth'] : ['mode', 'depth', 'polish']);
       requireString(`${at}.from`, entry['from']);
       requireString(`${at}.to`, entry['to']);

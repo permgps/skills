@@ -162,7 +162,7 @@ const TIER_TABLE_COLUMNS = ['Role', 'Brief', 'Tier'];
 export const JUDGE_BRIEFS: readonly string[] = [
   'manifest-reader.md', 'independent-reader.md', 'reference-reader.md', 'task-reader.md',
   'plan-consistency-reader.md', 'reviewer.md', 'standards-reader.md', 'repair-diagnostician.md',
-  'strategy-reviewer.md', 'acceptance-reader.md', 'polish-reader.md',
+  'strategy-reviewer.md', 'acceptance-reader.md',
 ];
 
 /** Briefs that are not judges and run on `standard`: reading, not deciding. */

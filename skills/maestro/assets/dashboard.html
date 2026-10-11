@@ -456,12 +456,11 @@ globalThis.MAESTRO_LOGIC = (function () {
         full: 'Полный', semi: 'Полуавтомат', interview: 'Интервью', manual: 'Ручной'
       },
       DEPTH: { strict: 'Строгая', normal: 'Обычная', deep: 'Глубокая' },
-      POLISH: { 'true': 'Включена', 'false': 'Выключена' },
       /**
        * The register's two values.
        *
-       * Named REGISTER rather than EXPLAIN, which would have matched MODE/DEPTH/
-       * POLISH: `EXPLAIN`, `EXPLAIN_ORDER` and `explain()` below are the
+       * Named REGISTER rather than EXPLAIN, which would have matched MODE and
+       * DEPTH: `EXPLAIN`, `EXPLAIN_ORDER` and `explain()` below are the
        * i-popover machinery, and two of those three are read by name from
        * scripts/validate/dashboard-integrity.ts and dashboard-logic.test.ts.
        */
@@ -548,7 +547,6 @@ globalThis.MAESTRO_LOGIC = (function () {
       },
       UI: {
         title: function (slug, date) { return 'Прогон: ' + slug + (date ? ' · ' + date : ''); },
-        polishChip: function (value) { return 'Доводка: ' + value; },
         registerChip: function (value) { return 'Объяснения: ' + value; },
         cannotRead: function (file) {
           return 'Не удалось прочитать ' + file + ' рядом с этой страницей.'
@@ -813,7 +811,6 @@ globalThis.MAESTRO_LOGIC = (function () {
         full: 'Full', semi: 'Semi', interview: 'Interview', manual: 'Manual'
       },
       DEPTH: { strict: 'Strict', normal: 'Normal', deep: 'Deep' },
-      POLISH: { 'true': 'On', 'false': 'Off' },
       REGISTER: { plain: 'Plain', normal: 'Normal' },
       STRATEGY_DECISION: {
         change_strategy: 'Change approach', stop_incomplete: 'Stop',
@@ -896,7 +893,6 @@ globalThis.MAESTRO_LOGIC = (function () {
       },
       UI: {
         title: function (slug, date) { return 'Run: ' + slug + (date ? ' · ' + date : ''); },
-        polishChip: function (value) { return 'Polish: ' + value; },
         registerChip: function (value) { return 'Wording: ' + value; },
         cannotRead: function (file) {
           return 'Could not read ' + file + ' beside this page.'
@@ -2468,13 +2464,13 @@ globalThis.MAESTRO_LOGIC = (function () {
     dials: function (state) {
       var changes = (state.dialChanges || []).length;
       return [
-        'Три тумблера, на которых идёт прогон: режим, глубина и доводка.',
-        'Режим «' + label(L10N.ru.MODE, state.mode) + '», глубина «' + label(L10N.ru.DEPTH, state.depth)
-          + '», доводка ' + label(L10N.ru.POLISH, state.polish).toLowerCase() + '.',
+        'Тумблеры, на которых идёт прогон: режим и глубина, а если выбраны — объяснения.',
+        'Режим «' + label(L10N.ru.MODE, state.mode) + '», глубина «' + label(L10N.ru.DEPTH, state.depth) + '»'
+          + (state.explain ? ', объяснения «' + label(L10N.ru.REGISTER, state.explain) + '»' : '') + '.',
         changes > 0
           ? 'По ходу прогона тумблеры меняли: записано изменений ' + changes + '. Смена записывается вместе с фазой, на которой произошла.'
           : 'Тумблеры не меняли с начала прогона.',
-        'Режим решает, сколько спрашивают у пользователя; глубина — насколько глубоко под бриф копать; доводка — идёт ли круг доводки после приёмки. Ни один тумблер не убирает гейт.'
+        'Режим решает, сколько спрашивают у пользователя; глубина — насколько глубоко под бриф копать; объяснения — какими словами с вами говорят. Ни один тумблер не убирает гейт.'
       ];
     },
 
@@ -2701,8 +2697,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     dials: function (state) {
       var changes = (state.dialChanges || []).length;
       var settings = 'Режим «' + label(L10N.ru.MODE, state.mode) + '», глубина «'
-        + label(L10N.ru.DEPTH, state.depth) + '», доводка '
-        + label(L10N.ru.POLISH, state.polish).toLowerCase();
+        + label(L10N.ru.DEPTH, state.depth) + '»';
       if (state.explain) settings += ', объяснения «' + label(L10N.ru.REGISTER, state.explain) + '»';
       return [
         'Настройки, на которых идёт эта работа.',
@@ -2711,7 +2706,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           ? 'По ходу дела настройки меняли — ' + changes + ' '
             + plural(changes, 'раз', 'раза', 'раз') + '. Записано, на каком шаге.'
           : 'Настройки не меняли с самого начала.',
-        'Режим решает, о скольком у вас спрашивают. Глубина — насколько подробно прорабатывать то, что вы просили. Доводка — будет ли в конце круг наведения красоты. Ни одна настройка не отменяет проверок, которые идут после каждого шага.'
+        'Режим решает, о скольком у вас спрашивают. Глубина — насколько подробно прорабатывать то, что вы просили. Ни одна настройка не отменяет проверок, которые идут после каждого шага.'
       ];
     },
 
@@ -2938,15 +2933,15 @@ globalThis.MAESTRO_LOGIC = (function () {
     dials: function (state) {
       var changes = (state.dialChanges || []).length;
       return [
-        'The three settings this run is working under: mode, depth and polish.',
+        'The settings this run is working under: mode and depth, and the wording when one was chosen.',
         'Mode «' + label(L10N.en.MODE, state.mode) + '», depth «'
-          + label(L10N.en.DEPTH, state.depth) + '», polish '
-          + label(L10N.en.POLISH, state.polish).toLowerCase() + '.',
+          + label(L10N.en.DEPTH, state.depth) + '»'
+          + (state.explain ? ', wording «' + label(L10N.en.REGISTER, state.explain) + '»' : '') + '.',
         changes > 0
           ? 'The settings were changed while the run was going: ' + changes
             + ' recorded. Each change is recorded with the stage it took effect at.'
           : 'The settings have not been changed since the run began.',
-        'Mode decides how much is asked of you; depth, how far beneath the brief to work; polish, whether a round of it follows acceptance. No setting removes a check.'
+        'Mode decides how much is asked of you; depth, how far beneath the brief to work; wording, which words the run speaks to you in. No setting removes a check.'
       ];
     },
 
@@ -3176,8 +3171,7 @@ globalThis.MAESTRO_LOGIC = (function () {
     dials: function (state) {
       var changes = (state.dialChanges || []).length;
       var settings = 'Mode «' + label(L10N.en.MODE, state.mode) + '», depth «'
-        + label(L10N.en.DEPTH, state.depth) + '», polish '
-        + label(L10N.en.POLISH, state.polish).toLowerCase();
+        + label(L10N.en.DEPTH, state.depth) + '»';
       if (state.explain) {
         settings += ', wording «' + label(L10N.en.REGISTER, state.explain) + '»';
       }
@@ -3188,7 +3182,7 @@ globalThis.MAESTRO_LOGIC = (function () {
           ? 'The settings were changed along the way — ' + changes + ' '
             + (changes === 1 ? 'time' : 'times') + '. Which step it happened on is written down.'
           : 'The settings have not been changed since the very beginning.',
-        'Mode decides how much you are asked about. Depth decides how thoroughly what you asked for is worked through. Polish decides whether there is a round of tidying at the end. None of them removes the checks that follow each step.'
+        'Mode decides how much you are asked about. Depth decides how thoroughly what you asked for is worked through. None of them removes the checks that follow each step.'
       ];
     },
 
@@ -4094,7 +4088,6 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     var dials = clear(el('dials'));
     put(dials, 'span', L.label(T.MODE, state.mode), 'chip');
     put(dials, 'span', L.label(T.DEPTH, state.depth), 'chip');
-    put(dials, 'span', T.UI.polishChip(L.label(T.POLISH, state.polish)), 'chip');
     // Named, never bare: the depth reads «Обычная» and this reads «Обычные»,
     // and two bare chips a word apart would be read as one setting stated
     // twice. Drawn only when the state carries the field — a прогон written

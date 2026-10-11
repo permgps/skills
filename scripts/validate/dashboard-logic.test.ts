@@ -1137,6 +1137,21 @@ test('the register names the dials chip and nothing else', () => {
   assert.doesNotMatch(L.explain('dials', state, NOW, [], 'plain')[1]!, /объяснения/);
 });
 
+test('a contract-7 state with polish on renders no доводка chip, and no dials text names it', () => {
+  // The finish dial was retired in contract 8; a contract-7 прогон may still
+  // carry `polish: true`, and the page reads nothing of it.
+  const state = { ...busy(), contractVersion: 7, polish: true };
+  for (const language of ['ru', 'en']) {
+    assert.equal(L.L10N[language]!['POLISH'], undefined);
+    assert.equal(L.L10N[language]!['UI']!['polishChip'], undefined);
+    for (const register of ['normal', 'plain']) {
+      const text = L.explain('dials', state, NOW, [], register, language).join('\n');
+      assert.doesNotMatch(text, /доводк|polish/i);
+    }
+  }
+  assert.doesNotMatch(html, /state\.polish/);
+});
+
 test('the silence notice is worded in the register too', () => {
   const state = run({ updatedAt: '2026-08-19T10:00:00.000Z' });
   const quiet = L.silenceNotice(state, NOW, [], 'plain');
@@ -1330,8 +1345,8 @@ test('a стадия the прогон never wrote is explained as waiting, not a
 });
 
 test('an id no registry holds returns nothing rather than throwing', () => {
-  // `polish` is a phase and not a стадия: phases.md marks it `Stage: no`, so
-  // the timeline never draws it and no registry holds it.
+  // `polish` was a phase and never a стадия, and it is retired now: the
+  // timeline never draws it and no registry holds it.
   assert.equal(L.explainStage('polish', run(), NOW, [], 'normal', 'ru').length, 0);
   assert.equal(L.explainStage('', run(), NOW, [], 'plain', 'en').length, 0);
 });

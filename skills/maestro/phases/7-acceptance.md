@@ -148,7 +148,7 @@ does not close the run writes the отчёт here, where the run already is.
 `.maestro/<dir>/report.md`, written **by you**, in the sections below and in
 that order. Cite every run artifact by a path relative to the отчёт's own directory
 (`tasks/03-hero.md`, `evidence/X-1/pointer.png`), never through
-`.maestro/<dir>/`, so a later reopening cannot break a link. A second приёмка — after repair, or after доводка — appends its own
+`.maestro/<dir>/`, so a later reopening cannot break a link. A second приёмка — after repair — appends its own
 sections under its own date rather than replacing what is there:
 
 | Section | Holds |
@@ -301,7 +301,7 @@ asked.
 ## Gates
 
 **G4**, and it is the last one. Mandatory appearance and behavior fidelity
-remain in G4 for every mode, depth, and `polish` setting.
+remain in G4 for every mode and depth.
 
 It passes only when current required evidence and complete coverage pass after
 blind discovery against manifest/additions, with spec withheld. Current failure
@@ -319,10 +319,8 @@ chance to know rather than when it is still cheap to change.
 | `.maestro/state.js` | G4 `passed`, `failed`, or `pending`; stage activity separate; `finishedAt` only at authorized lifecycle closure |
 | project code | unchanged — this phase writes none of it |
 
-The прогон is over unless one of two things is due, and both have rules of their
-own that `SKILL.md` names: **доводка**, if the finish dial asked for it, and then
-the **memory** phase, which runs last because it describes the code as it finally
-is.
+The прогон is over but for the **memory** phase, which has rules of its own that
+`SKILL.md` names and runs last because it describes the code as it finally is.
 
 ## Scope Progress Projection
 
@@ -361,7 +359,7 @@ projection. Initial blind discovery keeps its existing withheld inputs.
 4. Route reproducible startup defects and coverage omissions through repair,
    review, then fresh affected acceptance. Missing capability remains unavailable.
 5. Derive G4 and scope progress, append the actual round, and use that projection
-   for final wording. Full/strict/polish=false keeps every mandatory check.
+   for final wording. Full/strict keeps every mandatory check.
 
 Return: acceptance round identity, execution/finding/coverage IDs, projected G4,
 original/current scope fractions or explicit unknown states, and limitations.

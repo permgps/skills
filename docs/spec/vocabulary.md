@@ -29,7 +29,6 @@ hits the gap cannot even guess what was meant.
 | требование | requirement | One numbered line of the manifest, `R##` | пункт, пожелание |
 | манифест | manifest | The numbered list of requirements | список требований, чеклист |
 | приёмка | acceptance | The final check of the build against the manifest | тестирование, проверка |
-| доводка | polish | The optional polish rounds after acceptance | полировка, вылизывание |
 
 The distinction that carries the most weight is **прогон** versus
 **Разработка**. One word for both the whole and one of its parts breaks the
@@ -104,8 +103,6 @@ half-supported.
 | `depth` | `strict` | Строгая | Strict |
 | `depth` | `normal` | Обычная | Normal |
 | `depth` | `deep` | Глубокая | Deep |
-| `polish` | `true` | Включена | On |
-| `polish` | `false` | Выключена | Off |
 | `explain` | `plain` | Простые | Plain |
 | `explain` | `normal` | Обычные | Normal |
 | `verification.strategyReviews[].decision` | `change_strategy` | Сменить подход | Change approach |
@@ -415,7 +412,6 @@ reason while the previous valid snapshot is hidden from success presentation.
 | тикет | таск |
 | issue | таск |
 | ТЗ | бриф |
-| полировк | доводка |
 | исполнител | субагент |
 | читател | субагент |
 
@@ -457,7 +453,6 @@ here.
 | ticket | task |
 | issue | task |
 | job | task |
-| polishing | polish |
 
 Held against every `Label (en)` column, on word boundaries, for the reason given
 under *Plain Words*: `build` must fail and `rebuilt` must not.

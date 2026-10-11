@@ -1,7 +1,7 @@
 ---
 name: maestro
 description: Turn a dictated idea into a finished, verified project in one dialogue. Use when the user describes something they want built, changed, or finished — a feature, a page, a service, a whole project — rather than asking a question or requesting a single edit.
-argument-hint: "[full|semi|interview|manual] [strict|normal|deep] [polish] <what you want built>"
+argument-hint: "[full|semi|interview|manual] [strict|normal|deep] <what you want built>"
 disable-model-invocation: true
 ---
 
@@ -231,8 +231,8 @@ where the прогон keeps its prose; the state carries what the dashboard sho
 
 ## The Dials
 
-Everything typed after `/maestro` splits into seven parts: the register, the
-language, the mode, the depth, the finish, the models, and the бриф. Bare words,
+Everything typed after `/maestro` splits into six parts: the register, the
+language, the mode, the depth, the models, and the бриф. Bare words,
 no dashes. **Anything not recognised as a dial is бриф text** — a word the user
 meant literally is never stolen by a dial.
 
@@ -275,10 +275,6 @@ project asks which one. An argument always wins over a pinned mode, for that
 | `strict` | only what the requirement cannot work without | not allowed |
 | `normal` | by judgement, in proportion to the feature | allowed, each with a parent требование |
 | `deep` | every dimension of every requirement | encouraged, same two limits |
-
-**Finish** — `polish`, off by default: up to three доводка rounds after приёмка
-([`phases/7-polish.md`](phases/7-polish.md)), comparing the running build
-against the user's own reference.
 
 **Models** — which model each субагент runs on: one bare `<strong>/<standard>`
 word whose halves are names the host reports. Built-in default for `models`:
@@ -425,7 +421,7 @@ fails is not a warning: the phase is redone.**
 <!-- maestro:runtime:node -->
 <!-- maestro:delegation:native-explicit -->
 This skill explicitly requests native subagent delegation for its independent
-roles, including executors, audits, readers, review, polish and diagnosis.
+roles, including executors, audits, readers, review and diagnosis.
 On Codex use the demand-loaded runtime recipe selected by preflight and each
 dispatch phase. Never inherit coordinator history into an independent role.
 Pass each dispatch its tier's model from `models` (`session`, or a contract-7 run with no
@@ -480,7 +476,7 @@ its round to the отчёт.
 
 ## The Safety Rules
 
-Six rules. No mode, depth, or finish removes any of them, and no argument about
+Six rules. No mode or depth removes any of them, and no argument about
 what the user "obviously meant" outranks one. Everything else here is
 calibration; these are not.
 

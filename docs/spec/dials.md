@@ -1,8 +1,7 @@
 # Dials
 
-Everything typed after `/maestro` splits into seven parts: the **register**,
-the **language**, the **mode**, the **depth**, the **finish**, the **models**,
-and the бриф. Bare words, no dashes; the models are one bare
+Everything typed after `/maestro` splits into six parts: the **register**,
+the **language**, the **mode**, the **depth**, the **models**, and the бриф. Bare words, no dashes; the models are one bare
 `<strong>/<standard>` word.
 Anything not recognised as a dial is бриф text — a word the user meant literally
 is never stolen by a dial.
@@ -188,20 +187,17 @@ behaviour no таск was asked for as an `unrequested` observation, and under
 `strict` the orchestrator may send it to repair. The reviewer is never told the
 depth; see [`phases.md`](phases.md), Review.
 
-## Finish
-
-| Finish | Default | Russian triggers | English triggers | Adds |
-|---|---|---|---|---|
-| `polish` | off | доведи до эталона, сравни с образцом | polish | up to three доводка rounds after приёмка, comparing the running build against the user's own reference |
-
-`polish` asks the user nothing and approves nothing with them. It changes no
-mode cell.
-
 Required appearance and interaction parity is part of acceptance whenever the
-user asked to preserve it. It runs in every mode and depth even when `polish`
-is off. The finish dial adds only discretionary refinement; it cannot waive a
-required fidelity check or turn missing evidence into a pass. See
+user asked to preserve it, in every mode and at every depth; no dial waives a
+required fidelity check or turns missing evidence into a pass. See
 [`verification.md`](verification.md).
+
+**There is no finish dial.** It was retired in contract 8, and nothing compares
+the build against a comparable after приёмка. `polish`, «доведи до эталона» and
+«сравни с образцом» are бриф text like any other words; «like X» becomes a
+требование that G4 checks, and a comparable reaches the таски that build what
+it shows through their task files' *References* row. No notice says the dial
+is gone.
 
 ## Models
 
@@ -258,8 +254,6 @@ at that model's default effort.
 | repair diagnostician | `repair-diagnostician.md` | `strong` |
 | strategy reviewer | `strategy-reviewer.md` | `strong` |
 | G4 acceptance reader | `acceptance-reader.md` | `strong` |
-| polish reader | `polish-reader.md` | `strong` |
-| polish executor | `executor.md` | `strong` |
 
 - **A judge never runs `standard`.** A gate rests on its judge being no weaker
   than what it judges; `npm run readers` holds every judge brief to `strong`.
@@ -313,8 +307,9 @@ its own shape:
 | `models` | one `{ strong, standard }` per host id, each half `session` or a model name that host reports | the helper's `--config-models`, in preflight, once per host |
 
 `mode` is one of the four modes or `null`; `explain` is `plain`, `normal` or
-`null`. Unknown keys are ignored, so `depth` and `polish` can be pinned later
-without changing the version — and `explain` arriving after `configVersion 1`
+`null`. Unknown keys are ignored, so `depth` can be pinned later
+without changing the version, and a `polish` key an older file carries is read
+by nothing — and `explain` arriving after `configVersion 1`
 was already in use does not change it either, for the same reason: a file
 written before the register existed simply carries no `explain`, and a run that
 reads one falls through to the built-in default.
@@ -403,7 +398,7 @@ edit of the user's file is exactly the ritual a helper exists to remove.
    ambiguous. In `semi`, `interview` and `manual` the run stops before the
    manifest phase and asks which was meant. In `full` the first token wins and
    the choice is stated in the announcement, because that mode may not ask.
-4. An unset depth or finish takes its default. An unset mode or register
+4. An unset depth takes its default. An unset mode or register
    resolves through the order in *Where An Unset Mode Or Register Comes From*.
    An unset language resolves through *Where An Unset Language Comes From*,
    which ends at the бриф rather than at a built-in value.
@@ -413,7 +408,7 @@ edit of the user's file is exactly the ritual a helper exists to remove.
 ## Announcement
 
 Once resolved, and before the manifest phase begins, the run states in one block:
-the register, the mode, the depth, whether доводка is on, and the one consequence
+the register, the mode, the depth, and the one consequence
 the user is most likely to be surprised by (for `full`: that no questions will be
 asked; for `strict`: that nothing beyond the бриф will be added; for `manual`:
 that the run will wait for approval twice).

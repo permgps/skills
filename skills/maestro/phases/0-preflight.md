@@ -193,7 +193,7 @@ Construct the complete contract-8 candidate in temporary JSON. It carries:
 | `dir` | from step 3: `<YYYY-MM-DD>-<slug>--wip`, the date being the UTC day of `startedAt` |
 | `startedAt` | now, ISO 8601, written once and never again |
 | `updatedAt` | now, and restamped at every write from here on |
-| `mode`, `depth`, `polish` | as resolved by the dials phase |
+| `mode`, `depth` | as resolved by the dials phase |
 | `explain` | as resolved by the dials phase |
 | `language` | as resolved by the dials phase — the бриф's own, unless a token or the config said otherwise |
 | `models` | as resolved by the dials phase: `{ strong, standard }`, `session` for a half that passes no model |
@@ -207,7 +207,7 @@ Construct the complete contract-8 candidate in temporary JSON. It carries:
 | `debt` | three lists, `placeholders`, `assumptions`, `emptyEnv`, empty but for a models mismatch line from step 1b |
 | `additions` | empty |
 | `oneWay` | empty — the review phase appends what is hard to undo |
-| `signals` | empty — build, review, acceptance and polish append what a reader asked for or did beyond its brief |
+| `signals` | empty — build, review and acceptance append what a reader asked for or did beyond its brief |
 | `tests` | `null` — no suite has run |
 
 `existingCode` is not seeded here: it is written in step 4b, by the first
@@ -445,7 +445,7 @@ not retry and do not install anything.
 ### 6. Announce the dials
 
 Show the announcement composed by the dials phase in one block: register, mode,
-depth, whether доводка is on, and the one consequence most likely to surprise.
+depth, and the one consequence most likely to surprise.
 It was composed in the register **and the language** it names; show it as it
 came, and do not translate it here — this phase shows what that one composed.
 
@@ -529,7 +529,8 @@ back to `<YYYY-MM-DD>-<slug>--wip` with the date and slug unchanged. Publication
 moves the folder back and returns the register row to in progress; say in the
 chat that the run was reopened under its original date. A reopened run keeps
 its contract: a contract-7 run gains no `models` and its таски no `model`,
-every субагент runs on the session's model, and the announcement says so. A
+every субагент runs on the session's model, and the announcement says so. Its
+`polish` value is kept as written and read by nothing. A
 models pin the dials resolved is still written in step 4, because it belongs
 to the project and this host, not to the run.
 

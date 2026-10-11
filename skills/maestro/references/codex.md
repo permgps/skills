@@ -36,7 +36,7 @@ session's when you know it.
 ## Preflight Probe
 
 This skill explicitly requests native subagents for executors, source audit,
-independent intent/reference/task readers, review, blind acceptance, polish and
+independent intent/reference/task readers, review, blind acceptance and
 repeat-repair diagnosis. Inspect the available tool schemas; do not assume a
 namespace, argument or tool exists because another client exposed it.
 

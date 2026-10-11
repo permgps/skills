@@ -64,7 +64,6 @@ const VALUE_MAPS: Array<{ field: string; map: string }> = [
   { field: 'gates[].status', map: 'GATE_STATUS' },
   { field: 'mode', map: 'MODE' },
   { field: 'depth', map: 'DEPTH' },
-  { field: 'polish', map: 'POLISH' },
   { field: 'explain', map: 'REGISTER' },
   { field: 'verification.strategyReviews[].decision', map: 'STRATEGY_DECISION' },
   { field: 'verification.readiness[].probes[].result', map: 'READINESS_RESULT' },

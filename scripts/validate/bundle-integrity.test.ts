@@ -1235,7 +1235,7 @@ test('the existing-code reader losing the leaf sentence is the one leaf finding,
 });
 
 test('the shipped bundle carries every models anchor, and the check finds none missing', async () => {
-  assert.equal(MODEL_ANCHORS.length, 13);
+  assert.equal(MODEL_ANCHORS.length, 11);
   await withShippedCopy(async copy => {
     assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'models'), []);
   });
@@ -1255,6 +1255,35 @@ for (const anchor of MODEL_ANCHORS) {
     });
   });
 }
+
+test('the shipped bundle names nothing contract 8 retired', async () => {
+  await withShippedCopy(async copy => {
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'retired'), []);
+  });
+});
+
+test('доводка written back into a shipped phase is the one retired finding, on that file and line', async () => {
+  await withShippedCopy(async copy => {
+    const file = path.join('phases', '7-acceptance.md');
+    const target = path.join(copy, file);
+    const lines = (await readFile(target, 'utf8')).split('\n');
+    lines.splice(3, 0, 'After приёмка, доводка compares the build against the reference.');
+    await writeFile(target, lines.join('\n'), 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'retired');
+    assert.deepEqual(violations.map(v => [v.file, v.line]), [[file, 4]]);
+    assert.match(violations[0]!.message, /^доводка was retired in contract 8 — remove this mention; a comparable now reaches the executor through the task file's References row$/);
+  });
+});
+
+test('a retired name in a shipped runtime module is found too, not only in Markdown', async () => {
+  await withShippedCopy(async copy => {
+    const file = path.join('tools', 'runtime', 'config.mts');
+    const target = path.join(copy, file);
+    await writeFile(target, `${await readFile(target, 'utf8')}\n// see phases/7-polish.md\n`, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'retired');
+    assert.deepEqual(violations.map(v => v.file), [file]);
+  });
+});
 
 test('the runtime confinement check accepts the config module beside the memory module', async () => {
   await withShippedCopy(async copy => {

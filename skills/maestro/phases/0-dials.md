@@ -6,9 +6,8 @@ and none of them re-resolves.
 
 ## What The Arguments Contain
 
-Everything typed after `/maestro` is seven things: a **register**, a
-**language**, a **mode**, a **depth**, a **finish**, the **models**, and the
-бриф. Dials are bare words, no dashes; the models are one bare
+Everything typed after `/maestro` is six things: a **register**, a
+**language**, a **mode**, a **depth**, the **models**, and the бриф. Dials are bare words, no dashes; the models are one bare
 `<strong>/<standard>` word, under *Models* below.
 
 **Anything you do not recognise as a dial is бриф text.** A word the user meant
@@ -99,17 +98,6 @@ Default: `normal`.
 
 A new capability always attaches to a parent требование. Depth buys thoroughness
 beneath the бриф; it never buys a direction away from it.
-
-## Finish
-
-Default: off.
-
-| Finish | Russian triggers | English triggers | Adds |
-|---|---|---|---|
-| `polish` | доведи до эталона, сравни с образцом | polish | up to three доводка rounds after приёмка, comparing the running build against the user's own reference |
-
-`polish` asks nothing and approves nothing with the user. It changes no mode
-cell.
 
 ## Models
 
@@ -288,7 +276,7 @@ the helper.
      which was meant;
    - in `full` — the first token wins, and say so in the announcement, because
      that mode may not ask.
-4. An unset depth or finish takes its default. An unset mode or register comes
+4. An unset depth takes its default. An unset mode or register comes
    from *The Project's Defaults* above. An unset language comes from the бриф,
    through the three steps under *Language*. Unset models come from this host's
    pin, then the question under *When This Host Has No Pin*; on a host with no
@@ -303,7 +291,6 @@ After resolution and before the manifest phase, state in one block:
 - the register,
 - the mode,
 - the depth,
-- whether доводка is on,
 - the one consequence the user is most likely to be surprised by.
 - where the mode or the register came from, whenever it was not typed: the path
   of the config file, or the built-in default. An argument that overrode a
@@ -325,7 +312,6 @@ Use these:
 | `full` | no questions will be asked at any point |
 | `strict` | nothing beyond the бриф will be added |
 | `manual` | the run will wait for your approval twice |
-| `polish` | up to three доводка rounds run after приёмка |
 | models | judges, repairs, the skeleton and producers run on <strong>; every other таск on <standard> |
 | `plain` | всё объясняется простыми словами; сказать «как обычно» — и вернётся обычный язык. In `en`: everything is explained in ordinary words; say «as usual» to go back |
 
@@ -353,7 +339,7 @@ not a question. Do not wait for a reply.
 
 ## Output Of This Phase
 
-- `explain`, `language`, `mode`, `depth`, `polish` and `models`, resolved —
+- `explain`, `language`, `mode`, `depth` and `models`, resolved —
   `models` as `{ strong, standard }`, `session` for a half that passes no model.
 - The announcement text, composed and ready, in the resolved register.
 - The config decision, when this is a first прогон: the values to pin, each of

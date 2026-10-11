@@ -81,7 +81,7 @@ export const MAESTRO_BUNDLE: BundleProfile = {
   other: ['references'],
   // Lowered with every shortening, never raised; raising one is a decision for
   // the roadmap, not a fix.
-  resident: { skillLines: 551, descriptionChars: 256 },
+  resident: { skillLines: 547, descriptionChars: 256 },
   invocation: 'explicit-only',
 };
 
@@ -656,10 +656,6 @@ export const MODEL_ANCHORS: readonly Anchor[] = [
     why: 'the build is where the plan\'s mark is spent' },
   { file: 'phases/8-repair.md', literal: 'Every repair and retry executor runs `strong`',
     why: 'a таск that failed once is not handed back to the tier that failed it' },
-  { file: 'phases/7-polish.md', literal: 'A доводка executor runs `strong`',
-    why: 'a polish round repairs what приёмка passed, so it runs as a repair' },
-  { file: 'phases/7-polish.md', literal: 'with `model: strong`',
-    why: 'from contract 8 the state refuses a таск without its tier, and the plan\'s tier rule never sees a доводка таск' },
   { file: 'phases/4-plan.md', literal: 'A contract-7 run writes no `model`',
     why: 'a reopened contract-7 run is refused every field from 8, so its таски carry no tier and run on the session\'s model' },
   { file: 'prompts/reviewer.md', literal: 'whatever the task file\'s `Model` row says',
@@ -673,7 +669,7 @@ export const MODEL_ANCHORS: readonly Anchor[] = [
  * reads».
  *
  * Matched literally for the reason `MEMORY_ANCHORS` is. Preflight seeds
- * `signals`; build, review, acceptance and polish each append the line for the
+ * `signals`; build, review and acceptance each append the line for the
  * signal they used to be told only to "record" — a reader asking for an input it
  * is denied, a reviewer returning a patch, a таск writing outside its files. The
  * line's grammar is held by the state validator, and the kinds by
@@ -681,7 +677,7 @@ export const MODEL_ANCHORS: readonly Anchor[] = [
  * judgement, so no anchor stands for it.
  */
 export const SIGNAL_ANCHORS: readonly Anchor[] = [
-  { file: 'phases/0-preflight.md', literal: '| `signals` | empty — build, review, acceptance and polish append',
+  { file: 'phases/0-preflight.md', literal: '| `signals` | empty — build, review and acceptance append',
     why: 'an unseeded list cannot tell "nothing recorded" from "never recorded"' },
   { file: 'phases/5-build.md', literal: '`SIG-<n> withheld-request — spec.md — executor <taskId>` to `signals`',
     why: 'an executor asking for the spec is the plan\'s signal, and a signal with no field is never read' },
@@ -695,9 +691,6 @@ export const SIGNAL_ANCHORS: readonly Anchor[] = [
   { file: 'phases/7-acceptance.md',
     literal: '`SIG-<n> withheld-request — <spec.md or brief.md> — acceptance-reader G4` to `signals`',
     why: 'the blind reader asking for what it is denied is the gate\'s own signal' },
-  { file: 'phases/7-polish.md',
-    literal: '`SIG-<n> withheld-request — <manifest.md or report.md> — polish-reader round <k>` to `signals`',
-    why: 'the polish reader asking for the требования turns its comparison into another one' },
 ];
 
 /**
@@ -723,6 +716,47 @@ export const STOP_ANCHORS: readonly Anchor[] = [
   { file: 'prompts/executor.md', literal: 'Do no irreversible or outward-facing action',
     why: 'S4 binds the orchestrator, and the executor doing real integration work is the one holding the shell' },
 ];
+
+/**
+ * Names of what contract 8 retired, held out of every shipped file.
+ *
+ * A dead Markdown link to a deleted phase is already the link pass's finding;
+ * a prose mention is not, and it is how a retired mode lives on — a phase that
+ * still says "after доводка" sends a model looking for a phase that is gone.
+ * Matched case-insensitively on the stem, so every inflection is caught. The
+ * bare word `polish` is not on the list: the runtime must still name the
+ * contract-7 field it refuses from 8.
+ */
+export const RETIRED_NAMES: readonly RegExp[] = [/7-polish/i, /polish-reader/i, /доводк/i];
+
+const RETIRED_MESSAGE = 'доводка was retired in contract 8 — remove this mention; a comparable now reaches the executor through the task file\'s References row';
+
+/** Every line of every shipped file under `bundleDir` that names a retired thing. */
+export async function checkRetiredNames(bundleDir: string): Promise<Violation[]> {
+  const files: string[] = [];
+  const walk = async (relative: string): Promise<void> => {
+    const entries = await readdir(path.join(bundleDir, relative), { withFileTypes: true });
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const child = path.join(relative, entry.name);
+      if (entry.isDirectory()) await walk(child);
+      else if (entry.isFile()) files.push(child);
+    }
+  };
+  await walk('');
+  const found: Violation[] = [];
+  for (const file of files) {
+    const lines = (await readFile(path.join(bundleDir, file), 'utf8')).split('\n');
+    let hits = 0;
+    lines.forEach((text, index) => {
+      if (!RETIRED_NAMES.some(name => name.test(text))) return;
+      hits += 1;
+      found.push({ check: 'retired', file, line: index + 1, message: RETIRED_MESSAGE });
+    });
+    log.debug('retired', 'file scanned', { file, hits });
+  }
+  log.info('retired', 'retired names scanned', { files: files.length, hits: found.length });
+  return found;
+}
 
 /** A phase file's hand-off to the next phase, which must be the last thing read in it. */
 const HANDOFF_LINE = /^Then read the .+ phase file\.\s*$/;
@@ -1103,6 +1137,12 @@ export async function checkBundle(
   // Only a bundle with an executor brief builds and stops; Scout has none.
   if (byFile.has('prompts/executor.md')) {
     for (const v of missingAnchors(byFile, STOP_ANCHORS, 'stops')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- what contract 8 retired stays out of the shipped bundle -----------------
+  // Only the bundle that once shipped доводка can still carry a mention of it.
+  if (byFile.has('phases/7-acceptance.md')) {
+    for (const v of await checkRetiredNames(bundleDir)) add(v.check, v.file, v.line, v.message);
   }
 
   // --- the hand-off is the last line a phase file holds ------------------------

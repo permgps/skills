@@ -57,7 +57,7 @@ export const README_SECTIONS: readonly string[] = [
 
 /** Every value of every dial, as `docs/spec/dials.md` defines them. */
 export const DIAL_VALUES: readonly string[] = [
-  'plain', 'normal', 'ru', 'en', 'full', 'semi', 'interview', 'manual', 'strict', 'deep', 'polish',
+  'plain', 'normal', 'ru', 'en', 'full', 'semi', 'interview', 'manual', 'strict', 'deep',
   'session/session', 'session/next', 'session/cheapest', '<strong>/<standard>',
 ];
 

@@ -118,7 +118,7 @@ export async function checkCodexRuntime(bundleDir: string): Promise<Violation[]>
     }
   }
   const sites = ['0-preflight', '1-manifest', '3-spec', '4-plan', '5-build', '6-review',
-    '7-acceptance', '7-polish', '8-repair'];
+    '7-acceptance', '8-repair'];
   for (const site of sites) {
     const file = `phases/${site}.md`;
     const body = await read(file);

@@ -31,7 +31,6 @@ const VOCABULARY = `# Vocabulary
 | \`gates[].status\` | \`pending\` | Ожидает | Waiting |
 | \`mode\` | \`semi\` | Полуавтомат | Semi |
 | \`depth\` | \`normal\` | Обычная | Normal |
-| \`polish\` | \`false\` | Выключена | Off |
 | \`explain\` | \`plain\` | Простые | Plain |
 | \`verification.strategyReviews[].decision\` | \`stop_incomplete\` | Остановить | Stop |
 | \`verification.readiness[].probes[].result\` | \`passed\` | Пройдена | Passed |
@@ -128,7 +127,6 @@ const RU = {
   GATE_STATUS: "{ pending: 'Ожидает' }",
   MODE: "{ semi: 'Полуавтомат' }",
   DEPTH: "{ normal: 'Обычная' }",
-  POLISH: "{ 'false': 'Выключена' }",
   REGISTER: "{ plain: 'Простые' }",
   STRATEGY_DECISION: "{ stop_incomplete: 'Остановить' }",
   READINESS_RESULT: "{ passed: 'Пройдена' }",
@@ -154,7 +152,6 @@ const EN = {
   GATE_STATUS: "{ pending: 'Waiting' }",
   MODE: "{ semi: 'Semi' }",
   DEPTH: "{ normal: 'Normal' }",
-  POLISH: "{ 'false': 'Off' }",
   REGISTER: "{ plain: 'Plain' }",
   STRATEGY_DECISION: "{ stop_incomplete: 'Stop' }",
   READINESS_RESULT: "{ passed: 'Passed' }",

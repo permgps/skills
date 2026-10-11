@@ -572,8 +572,14 @@ test('a shipped brief no list classifies is reported on the brief itself', async
   assert.match(found[0]!.message, /in none of JUDGE_BRIEFS, STANDARD_BRIEFS or TIERED_BRIEFS/);
 });
 
-test('the shipped tier table runs every shipped brief, and the eleven judges on strong', async () => {
+test('a polish-reader.md shipped again is reported, because no tier row runs it and no list classifies it', async () => {
+  const found = await tiersFor(TIER_ROWS, ['existing-code-reader.md', 'executor.md', 'reviewer.md', 'polish-reader.md']);
+  assert.ok(found.length > 0);
+  assert.ok(found.every(v => /polish-reader\.md/.test(v.message) || /polish-reader\.md$/.test(v.file)), JSON.stringify(found));
+});
+
+test('the shipped tier table runs every shipped brief, and the ten judges on strong', async () => {
   const root = path.resolve(import.meta.dirname, '..', '..');
-  assert.equal(JUDGE_BRIEFS.length, 11);
+  assert.equal(JUDGE_BRIEFS.length, 10);
   assert.deepEqual(await checkModelTiers(path.join(root, 'docs', 'spec'), path.join(root, 'skills', 'maestro')), []);
 });
