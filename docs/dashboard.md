@@ -54,6 +54,14 @@ sources and independent returns before passing new gates.
 
 ![The dashboard during the build stage](assets/dashboard-running.png)
 
+![The same run in a pane 500 pixels wide](assets/dashboard-pane.png)
+
+The page usually sits in a pane beside the chat, so below `62rem` (992 pixels)
+it is dense: tighter padding, smaller headline numbers, the four cards two by
+two, and the strip of stages wrapped into as many cells as fit. The regions are
+the same and in the same order, nothing is hidden, and nothing scrolls
+sideways. See [the specification](spec/dashboard.md#a-narrow-pane).
+
 The page opens with a band that says what is happening. On its left, the
 прогон's condition as one word and a colour — «Идёт работа», «Ждёт вас»,
 «Завершён» or «Сбой». Under the word is a bar, one sentence about the таски
@@ -383,6 +391,21 @@ cp docs/assets/state-finished.fixture.js /tmp/shot/state.js
   --virtual-time-budget=4000 --window-size=1280,3400 \
   --screenshot=docs/assets/dashboard-finished.png file:///tmp/shot/dashboard.html
 ```
+
+The pane capture is the running fixture in a window 500 pixels wide:
+
+```bash
+cp docs/assets/state-running.fixture.js /tmp/shot/state.js
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --headless --disable-gpu --hide-scrollbars --allow-file-access-from-files \
+  --virtual-time-budget=4000 --window-size=500,1800 \
+  --screenshot=docs/assets/dashboard-pane.png file:///tmp/shot/dashboard.html
+```
+
+It is 500 wide because headless Chrome lays out no narrower: a smaller
+`--window-size` still gives an `innerWidth` of 500.
+A width inside the pane range below that, such as 380, is looked at by framing
+the page in an `<iframe>` of that width.
 
 The window is 3400 pixels tall, up from 2500 when the requirement list gained
 its chips, so the capture holds the whole page down to the checks: «Все 20»

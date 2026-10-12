@@ -84,6 +84,18 @@ number that claimed more than that would be claiming it falsely.
   before «Показать все N», and a deferred, placeholder or dropped row shows its
   reason inline. The chosen chip stays in the browser and never reaches the
   run. No contract change.
+- **The status chips keep their pill and their colour again.** The mode and
+  depth chips in the header and the build-status chips over the waves had
+  lost their round shape and their status border to the requirement filter's
+  chips, which were styled under the same class; the filter's rule is now
+  scoped to its own row.
+- **A narrow pane gets a dense layout.** Below `62rem` the page uses tighter
+  padding, smaller headline numbers and the cards two by two, and the stage
+  strip wraps into as many `6rem` cells as fit instead of breaking labels
+  mid-word. The regions, their order and the full-width page are unchanged.
+  The stylesheet is narrow-first, and `npm run dashboard` holds its width
+  queries to the new breakpoint table in `docs/spec/dashboard.md` › *A Narrow
+  Pane*. No contract change.
 - **A wait for the user stops the clocks.** From contract 9 the dashboard cuts
   every closed wait and the open one out of working time, the stage clocks, the
   таск durations, the median and the estimate before the 45-minute ceiling

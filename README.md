@@ -637,7 +637,8 @@ parallelism you paid for is the parallelism you can see — measured from the
 clocks rather than claimed from the plan. Every таск bar says its status in a
 word; a bar in repair quotes what was sent back, a failed bar names how the last
 repair attempt ended, and a wave that has not started names the таски it waits
-for. Every number is computed from the run
+for. In a pane narrower than 992 pixels the page turns dense — the same
+regions, tighter, the cards two by two — and never scrolls sideways. Every number is computed from the run
 state when the page draws itself, and «осталось» is a range, review and acceptance
 included, that refuses to be sharper than the прогоны it was measured from.
 
