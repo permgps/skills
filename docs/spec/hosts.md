@@ -18,7 +18,7 @@ parallelism, isolation and convenience — not correctness, and never silently.
 | worktree isolation | two таски of one wave editing the project at once | yes | waves narrow to one таск, which is what a wave of one already does |
 | a skills directory | installing the bundle at all | no | the host is not supported |
 | file writes | `.maestro/`, the project code, the memory file | no | the host is not supported |
-| version control | one commit per finished таск with its `Maestro-Run:` and `Requirements:` trailers, the history the review phase reads, and the closing commit preflight finds the last closure by | yes | the прогон runs and says in the announcement that it cannot commit; the review phase reads the working tree instead of a diff, and says that it did; the memory run makes no closing commit and says so once |
+| version control | one commit per finished таск with its `Maestro-Run:` and `Requirements:` trailers, the history the review phase reads, and the closing commit preflight finds the last closure by | yes | the прогон runs and says in the announcement that it cannot commit; the review phase reads the working tree instead of a diff, and says that it did; the memory run makes no closing commit and says so once; a resume's commit check has no history to read, reports `unavailable`, and resets nothing |
 | model per subagent | the models dial | yes | the models question is not asked, every субагент runs on the session's model, and the announcement says so |
 | browser verification | real pointer/keyboard and rendered-state checks on the integrated local app | yes | affected required UI checks are unavailable and their requirements incomplete; unrelated checks continue, but completion cannot be claimed |
 

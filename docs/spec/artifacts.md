@@ -192,6 +192,13 @@ what is not, and what the next executor needs in order to continue the same
 whose plan cut таски too large, and the handoff is the symptom rather than the
 remedy.
 
+The one other handoff is headed `## Lost Commit`: a resume found that a таск's
+commit is no longer on `HEAD`'s history, and the таск is relaunched. It names
+the lost shas, the rewritten twin when the check found one, and the zone, and it
+says that nothing in it is verified finished — the zone is the starting point,
+not a record of done work. It does not count as a handoff in `handoffs`. See
+[`phases.md`](phases.md) › *Recovery*.
+
 `report.md` is append-only rather than written once, and that is a consequence
 of a failed G4 routing to repair. A прогон whose disagreements were repaired
 reaches приёмка a second time, against a build that has changed. The second

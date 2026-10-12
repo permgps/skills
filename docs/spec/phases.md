@@ -222,6 +222,41 @@ stop — «продолжай», a question, a correction — reads the state fi
 at `currentStage`. Starting over would charge the user again for стадии already
 paid for, over a directory that already holds their answers.
 
+**A resumed прогон checks its commits are still there before it writes.** A
+reset, a rebase or a checkout between sessions can take a таск's commit off
+`HEAD`'s history while `tasks[].commits` still names it, and a прогон that
+builds on it reviews code that is not there. So the first thing any recovery
+does after reading the state — a new session, the return after a compaction, the
+reopening of a closed run — is `node .maestro/sync.mts --commits-check`. The
+helper classifies every recorded sha as `ancestor`, `not-ancestor` or
+`missing`, and changes nothing; what a lost commit means is the orchestrator's
+to decide, and it writes that through an ordinary `--publish`.
+
+- **A checkout is asked about.** When every lost commit sits on one local branch
+  other than the current one (`onBranch`), the work may be one branch switch
+  away. The прогон names the branch and the таски in one line and stops on an
+  `answer` question, resetting nothing until the user replies.
+- **Otherwise each таск that lost a commit is named in one line, reset and
+  relaunched at once.** The lost shas move to `tasks[].lostCommits`, and the
+  таск goes back to `queued` — a `failed` таск stays `failed` and is only
+  named, since its budget is spent. A `running` dependent goes back with it. No
+  counter moves: a relaunch is not a retry and not a repair, because nothing
+  was found wrong with the work.
+- **The relaunch happens in the current стадия**, on the таск's own tier, with a
+  handoff headed `## Lost Commit` that names the lost shas, the rewritten twin
+  if the check found one (same subject, same `Maestro-Run:` trailer), and the
+  zone. The code may still be in the zone under a new hash, and the executor
+  finishes from it; nothing in that handoff is verified finished. If it changes
+  nothing and a twin was named, the twin is appended to `commits`; if it
+  changes nothing and none was, the таск lands an empty commit with the usual
+  trailers, so the требование stays traceable. Then review, as for a repaired
+  таск, and acceptance from the start if the прогон resumed there.
+- **History is never rewritten to bring a commit back.** No reset, cherry-pick,
+  rebase or checkout is run to restore one. A `git revert` keeps the commit an
+  ancestor, so this check cannot see it; the review and acceptance gates do.
+- **A git that cannot answer resets nothing.** `result: "unavailable"` is said
+  once and the прогон continues, as no прогон stops on its history.
+
 **And it says who is holding the прогон before it drives one.** `heldBy` in
 [`state-contract.md`](state-contract.md) carries the token of the session that
 claimed the run. A session opening a прогон that carries none mints one and keeps
@@ -524,6 +559,12 @@ time a repair lands, the waves that followed the original are in the tree and
 always will be; waiting for a quiet tree would serialise the build, which is the
 one thing the wave order exists to avoid. Only the range changes; the diff was
 already what the review read.
+
+**A commit a resume found lost is moved, never dropped.** It leaves `commits`
+for `tasks[].lostCommits` (see *Recovery*), so the review never reads a sha
+`HEAD` no longer holds and the таск's own history is not rewritten either. A
+lost sha never comes back into `commits`; the relaunched work lands in a new
+commit.
 
 **Every commit the прогон makes carries a `Maestro-Run:` trailer.** A таск
 commit and a repair commit carry two, after a blank line under the subject:

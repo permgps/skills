@@ -14,6 +14,19 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **A resumed прогон checks its commits are still there.** Every recovery —
+  a new session, the return after a compaction, a reopened run — first runs
+  `sync.mts --commits-check`, a read-only command that classifies each
+  recorded sha against `HEAD` as `ancestor`, `not-ancestor` or `missing`,
+  names the rewritten twin a rebase left and the local branches a checkout left
+  it on. A таск that lost a commit is named in one line, its sha moved to the
+  new optional `tasks[].lostCommits`, and relaunched with a `## Lost Commit`
+  handoff that makes the zone the starting point; a checkout onto one branch is
+  asked about first. The publish refuses a sha dropped from `commits` without
+  that move, and a finished таск sent back to `queued` without a lost commit.
+  A git that cannot answer resets nothing. `npm run check` holds it through
+  eight `resume` anchors in `npm run bundle` and fixture-repository tests
+  over a real reset, rebase and checkout.
 - **Commits a later session can trace.** Every таск and repair commit carries
   `Maestro-Run: <dir>` and `Requirements: R01, R02` trailers, because таск
   numbers and requirement ids restart every прогон. The memory phase now runs

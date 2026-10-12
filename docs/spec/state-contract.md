@@ -26,7 +26,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `dialChanges[]` | list of `{ dial, from, to, atPhase }`; `dial` is `mode` \| `depth`, and `polish` too below contract 8 | preflight | dashboard |
 | `stages[]` | list of `{ id, status, startedAt?, finishedAt?, note? }` | preflight | dashboard |
 | `currentStage` | stage id | preflight | dashboard |
-| `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], model, retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
+| `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], model, retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[], lostCommits?[] }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason?, title? }` | manifest | dashboard |
 | `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
 | `lifecycle` | `active` \| `closed` in contracts 4–10 | preflight | dashboard |
@@ -198,6 +198,17 @@ the tree: it carries every foreign commit between the two. See
 Each of these commits carries the `Maestro-Run:` and `Requirements:` trailers
 (`phases.md`, *Commits*), so the history ties it to its run and its
 требования even where the state is no longer at hand.
+
+**`tasks[].lostCommits` holds what a resume found `HEAD` no longer contains.**
+Optional and unseeded: absent means nothing was lost. A sha leaves `commits`
+only into this list, and it never leaves the list, so `commits` stays exactly
+the union review reads and the таск's history is kept. A sha in both lists, or
+twice in `lostCommits`, is refused. The publish also refuses three
+transitions: a sha that was in `commits` and is now in neither list; a sha that
+leaves `lostCommits`; and a таск going from `review`, `done` or `repair` back
+to `queued` in a write that adds nothing to its `lostCommits` — a lost commit
+is the only thing that sends a finished таск back. A repair attempt's
+`commit` may be in either list. See [`phases.md`](phases.md) › *Recovery*.
 
 **The whole `tasks[]` array is written when the таски are cut**, every entry
 `queued`, with its `blockedBy`, `wave`, `zone`, and the three counters at zero.
@@ -603,7 +614,9 @@ saying what it built. The dashboard's `KNOWN_CONTRACT_VERSION` moves with it;
 a contract-9 state renders as it did, with no result line. **`leftovers` arrived later
 within version 10 and raised nothing**: it is optional, widens no existing value
 set, and the dashboard does not render it. A contract-7, 8 or 9 run may carry it,
-because its keys need only a contract-7 run directory.
+because its keys need only a contract-7 run directory. **`tasks[].lostCommits`
+arrived the same way and raised nothing**: optional at every version, it widens
+no value set, and the dashboard ignores it — a reset таск shows as `queued`.
 
 **Version 9** widens the value set `awaiting.kind` and adds two optional
 fields, `awaiting.note` and `waits`. The value set is what raises it: a
@@ -767,6 +780,25 @@ exit codes.
   - Exit 2: the host is missing or unknown, or no body was piped.
   - Canonical module: `tools/runtime/memory.mts`. `scripts/memory/markers.ts`
     is its facade.
+- `--commits-check` reads `state.js` and checks every sha in every
+  `tasks[].commits` against `HEAD`, without writing anything. It reports
+  `{ result: "checked", head, run, checked, lost, onBranch?, unrecorded? }`:
+  `checked` counts the shas read, `lost` lists `{ taskId, status, commits }`
+  for each таск with a lost commit, each commit `{ sha, state, rewritten?,
+  branches? }` with `state` `not-ancestor` or `missing`. `rewritten` is the
+  newest commit on `HEAD`'s history with the same subject and the same
+  `Maestro-Run:` trailer that no таск records; `branches` are the local
+  branches that still hold a `not-ancestor` commit. `onBranch` is the one
+  branch every lost commit is on, set only when none is `missing`.
+  `unrecorded` counts таски of a contract below 3, which carry no list.
+  `lostCommits` already recorded are not checked again.
+  - Exit 0: nothing lost, or `{ result: "unavailable", reason }` when git could
+    not answer at all — a partial answer is never given, since a reset could
+    act on it.
+  - Exit 1: something is lost.
+  - Exit 2: no readable `state.js` beside the helper (`{ error }`).
+  - Canonical module: `tools/runtime/commits-check.mts`, over the bounded
+    calls in `tools/runtime/history.mts`.
 
 Strict `--publish <candidate> [--expect <revision>] [--holder <token>]`
 requires a matching expected revision whenever state exists, checks both prior

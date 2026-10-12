@@ -471,7 +471,12 @@ instead.
 
 - **Resume.** Say anything — «продолжай», a question, a correction — in a
   session opened in the same project. The run reads `.maestro/state.js` and
-  resumes at the stage that is still open. It never restarts.
+  resumes at the stage that is still open. It never restarts. Before its first
+  write it runs `node .maestro/sync.mts --commits-check`: a таск whose commit a
+  reset or a rebase took off `HEAD`'s history is named in one line, reset and
+  relaunched from what its zone still holds. If the commits sit on another local
+  branch, the run names the branch and asks before it rebuilds anything. History
+  is never rewritten to bring a commit back.
 - **Add, withdraw or reword a requirement**, at any point. Your words are
   appended verbatim, in the language you said them, to the dated additions
   block of `brief.md` with one English line naming the `R##` and what changed;
