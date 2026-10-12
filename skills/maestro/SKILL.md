@@ -4,7 +4,7 @@ description: Turn a dictated idea into a finished, verified project in one dialo
 argument-hint: "[full|semi|interview|manual] [strict|normal|deep] <what you want built>"
 disable-model-invocation: true
 metadata:
-  version: "0.0.13-alpha"
+  version: "0.0.14-alpha"
 ---
 
 # Maestro

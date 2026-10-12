@@ -12,7 +12,16 @@ a finished отчёт with all four gates passed, but one of the four modes has 
 been run at all and two findings about concurrent orchestrators stand open. A
 number that claimed more than that would be claiming it falsely.
 
-## Unreleased
+## v0.0.14-alpha — 2026-10-12
+
+The work between прогоны, and a dashboard that says what is happening.
+`CONTRACT_VERSION` moves from `7` to `10` in three steps, each recorded below
+where it happened. A прогон now leaves `.maestro/PROGRESS.md` for the next one,
+its commits carry the run and the requirements they serve, and a resumed прогон
+checks those commits are still there. The page opens with a band naming what is
+happening, four cards, a feed, and a report once the run is closed. Reviewers,
+the existing-code reader and a models dial with two tiers arrive before them,
+and доводка is retired.
 
 - **A resumed прогон checks its commits are still there.** Every recovery —
   a new session, the return after a compaction, a reopened run — first runs
