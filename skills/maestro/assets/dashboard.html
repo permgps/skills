@@ -307,14 +307,15 @@
   .untraced-fail { color: var(--fail); }
   .untraced-quiet { color: var(--muted); }
   /* The requirement filter: the look of the view switches, wrapping, because
-     five chips with their counts do not fit one line on a phone. */
+     five chips with their counts do not fit one line on a phone. Scoped to
+     .chips, so the status chips keep their own look. */
   .chips { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0 .4rem; }
-  .chip {
+  .chips .chip {
     font: inherit; font-size: .78rem; line-height: 1;
     padding: .3rem .55rem; border: 1px solid var(--line); border-radius: 6px;
     background: none; color: var(--muted); cursor: pointer;
   }
-  .chip[aria-pressed="true"] { background: var(--ghost); color: var(--ink); }
+  .chips .chip[aria-pressed="true"] { background: var(--ghost); color: var(--ink); }
   .row .name .reason { display: block; color: var(--muted); font-size: .85rem; }
 
   /* --- what only the user can settle --- */
