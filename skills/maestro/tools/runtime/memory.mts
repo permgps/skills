@@ -22,6 +22,12 @@
 // summary, which arrives on a second call (decision D8), so `prior.md` is still
 // written exactly once.
 //
+// The block ends with a tail the helper writes itself, on every write: how to
+// make a small fix between прогоны and which slice of the history to read. It
+// names the closing commit's subject and the trailers, which `history.mts` and
+// the phase files must spell the same way, so it is code rather than prose an
+// agent retypes each run and lets drift (decision D4).
+//
 // The read also says whether the project holds code, because preflight calls it
 // exactly once, at the point the answer is needed. The rule lives in
 // `existing-code.mts`; this module only passes it the memory file and project
@@ -335,6 +341,49 @@ export async function replaceKeepingMode(link: string, body: string): Promise<vo
   }
 }
 
+/** The heading the helper's tail opens with; a body is cut at the first line that is exactly this. */
+export const TAIL_HEADING = '## Working Between Runs';
+
+/**
+ * The fixed tail of the memory block. Short, because the block is read before
+ * anyone has decided what they are doing. The requirement slice names the run
+ * with the requirement, because `R02` restarts every run (decision D5).
+ */
+export function historyTail(): string {
+  return [
+    TAIL_HEADING,
+    '',
+    'Written by the Maestro helper on every write; an edit here is replaced.',
+    '',
+    '### A Small Fix Without Maestro',
+    '',
+    "1. Read `.maestro/PROGRESS.md` and the commits since the last closure, whose commit `git log -1 --format=%H --grep='^maestro: close '` finds.",
+    '2. After the fix, add one line under *Fixes Without Maestro* in `.maestro/PROGRESS.md`.',
+    '3. Commit with the trailer `Maestro-Run: <dir>` (the run whose requirement the fix touches, else the last closed one) and, when it touches one, `Requirements: R##`.',
+    '',
+    '### Which Slice Of The History',
+    '',
+    "- Since the last closure: `git log <closing>..HEAD -- . ':(exclude).maestro'`",
+    "- By requirement: `git log -E --all-match --grep='^Maestro-Run: <dir>$' --grep='^Requirements: (.*, )?R02(,|$)'`",
+    "- By file: `git log --follow -- <path>`; by fragment: `git log -S'<text>'`; by line: `git log -L <start>,<end>:<path>`",
+    '',
+    'Never the whole log.',
+  ].join('\n');
+}
+
+/**
+ * The body with the helper's tail as its last part. Whatever follows a line
+ * that is exactly {@link TAIL_HEADING} is dropped first: a body copied from
+ * `prior.md` carries the previous tail, and an edited one must not survive.
+ */
+export function withTail(body: string): string {
+  const lines = body.split(/\r?\n/);
+  const cut = lines.findIndex(line => line.trim() === TAIL_HEADING);
+  if (cut !== -1) log.debug('write', 'tail stripped from the body', { carried: true });
+  const own = (cut === -1 ? lines : lines.slice(0, cut)).join('\n').trim();
+  return own === '' ? historyTail() : `${own}\n\n${historyTail()}`;
+}
+
 export interface WriteResult {
   path: string;
   file: string;
@@ -355,7 +404,14 @@ export interface WriteResult {
  */
 export async function writeMemoryBlock(projectRoot: string, body: string, host: string): Promise<WriteResult> {
   const resolution = await resolveMemoryFile(projectRoot, host);
-  const next = spliceBlock(resolution.text, body);
+  // An empty body is the call after a closure that learned nothing: the block
+  // already there stays, and only its tail is refreshed.
+  let own = body;
+  if (body.trim() === '') {
+    own = resolution.hadBlock ? findBlock(resolution.text)?.body ?? '' : '';
+    log.debug('write', 'empty body keeps the block', { hadBlock: resolution.hadBlock });
+  }
+  const next = spliceBlock(resolution.text, withTail(own));
   const bytes = Buffer.byteLength(next, 'utf8');
   const action: WriteResult['action'] = !resolution.exists ? 'created' : resolution.hadBlock ? 'replaced' : 'appended';
 
@@ -367,7 +423,7 @@ export async function writeMemoryBlock(projectRoot: string, body: string, host: 
   await replaceKeepingMode(resolution.path, next);
 
   log.info('write', 'memory block written', {
-    file: resolution.file, action, loadedByHost: resolution.loadedByHost, bytes,
+    file: resolution.file, action, loadedByHost: resolution.loadedByHost, bytes, tail: true,
   });
   return {
     path: resolution.path,
@@ -938,7 +994,7 @@ async function readCommand(args: string[], runRoot: string, now: Date, readInput
 /**
  * `--memory-write --host <id>`, block body on stdin. Exit 0 written; 1 when the
  * files refuse it (the block in two files, malformed markers, a body carrying a
- * marker); 2 when the host or the body could not be used.
+ * marker); 2 when the host is missing or unknown, or no stdin was piped.
  */
 async function writeCommand(args: string[], runRoot: string, readInput: () => Promise<string | null>): Promise<CommandOutcome> {
   const host = optionOf(args, '--host');
@@ -950,10 +1006,9 @@ async function writeCommand(args: string[], runRoot: string, readInput: () => Pr
   if (body === null) {
     return { result: { error: 'pipe the block body on stdin' }, code: 2 };
   }
-  if (body.trim() === '') {
-    // An empty block would erase the one already there. Writing nothing is done by not calling.
-    return { result: { error: 'the block body is empty — when there is nothing to write, do not call --memory-write' }, code: 2 };
-  }
+  // An empty body is not refused (decision D8). It used to be, because it would
+  // have erased the block already there; `writeMemoryBlock` now keeps that
+  // block's own part and refreshes only the tail, so the erasure cannot happen.
   try {
     const written = await writeMemoryBlock(path.dirname(runRoot), body, host);
     return { result: { ...written }, code: 0 };

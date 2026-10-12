@@ -142,7 +142,7 @@ test('the installed memory write resolves the project from its own copy, not fro
     });
     assert.equal(written.status, 0, written.stdout + written.stderr);
     assert.equal(JSON.parse(written.stdout).path, path.join(await realpath(target.target), 'AGENTS.md'));
-    assert.match(await readFile(path.join(target.target, 'AGENTS.md'), 'utf8'), /<!-- maestro:begin -->\nA fact\.\n<!-- maestro:end -->/);
+    assert.match(await readFile(path.join(target.target, 'AGENTS.md'), 'utf8'), /<!-- maestro:begin -->\nA fact\.\n\n## Working Between Runs\n[^]*<!-- maestro:end -->/);
     assert.deepEqual(await readdir(target.cwd), []);
   } finally { await target.dispose(); }
 });

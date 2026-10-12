@@ -11,15 +11,21 @@ import {
   MarkerError,
   MemoryFileConflictError,
   MemoryFileMarkerError,
+  TAIL_HEADING,
   UnknownHostError,
+  historyTail,
   resolveMemoryFile,
   findBlock,
   renderBlock,
   spliceBlock,
+  withTail,
   writeMemoryBlock,
 } from './markers.ts';
 
 const wrap = (body: string): string => `${BEGIN_MARKER}\n${body}\n${END_MARKER}`;
+
+/** What `writeMemoryBlock` leaves between the markers: the body, a blank line, the helper's tail. */
+const written = (body: string): string => wrap(`${body}\n\n${historyTail()}`);
 
 async function withDir(body: (dir: string) => Promise<void>): Promise<void> {
   const dir = await mkdtemp(path.join(tmpdir(), 'memory-markers-'));
@@ -124,7 +130,7 @@ test('writeMemoryBlock creates the host\'s own file when the project has no memo
       assert.equal(result.path, path.join(dir, expected));
       assert.equal(result.action, 'created');
       assert.equal(result.loadedByHost, true);
-      assert.equal(await readFile(result.path, 'utf8'), `${wrap('A fact.')}\n`);
+      assert.equal(await readFile(result.path, 'utf8'), `${written('A fact.')}\n`);
       assert.deepEqual(await readdir(dir), [expected], 'one file created, nothing else');
     });
   }
@@ -143,7 +149,7 @@ test('writeMemoryBlock leaves an existing file untouched outside the block', asy
     assert.equal(second.action, 'replaced');
 
     const text = await readFile(target, 'utf8');
-    assert.equal(text, `# Their file\n\nTheir paragraph.\n\n${wrap('A different fact.')}\n`);
+    assert.equal(text, `# Their file\n\nTheir paragraph.\n\n${written('A different fact.')}\n`);
     assert.equal((await readdir(dir)).length, 1, 'no temporary file left behind');
   });
 });
@@ -219,7 +225,7 @@ test('the file that already carries the block keeps it, whichever host writes ne
     assert.equal(result.action, 'replaced');
     assert.equal(result.loadedByHost, false, 'CLAUDE.md shadows AGENTS.md on Claude Code');
     assert.equal(await readFile(path.join(dir, 'CLAUDE.md'), 'utf8'), 'Claude notes.\n');
-    assert.equal(await readFile(path.join(dir, 'AGENTS.md'), 'utf8'), `Team.\n\n${wrap('new')}\n`);
+    assert.equal(await readFile(path.join(dir, 'AGENTS.md'), 'utf8'), `Team.\n\n${written('new')}\n`);
   });
 });
 
@@ -265,7 +271,7 @@ test('a memory file reached through a symlink is written through it, and the lin
     await symlink('AGENTS.md', path.join(dir, 'CLAUDE.md'));
     await writeMemoryBlock(dir, 'A fact.', 'claude-code');
     assert.ok((await lstat(path.join(dir, 'CLAUDE.md'))).isSymbolicLink(), 'the link was replaced by a file');
-    assert.equal(await readFile(path.join(dir, 'AGENTS.md'), 'utf8'), `Team.\n\n${wrap('A fact.')}\n`);
+    assert.equal(await readFile(path.join(dir, 'AGENTS.md'), 'utf8'), `Team.\n\n${written('A fact.')}\n`);
     assert.deepEqual((await readdir(dir)).sort(), ['AGENTS.md', 'CLAUDE.md'], 'no temporary file left behind');
   });
 });
@@ -277,7 +283,7 @@ test('one file under two names is one memory file, so a second write replaces it
     await writeMemoryBlock(dir, 'A fact.', 'claude-code');
     const second = await writeMemoryBlock(dir, 'A different fact.', 'claude-code');
     assert.equal(second.action, 'replaced');
-    assert.equal(await readFile(path.join(dir, 'AGENTS.md'), 'utf8'), `Team.\n\n${wrap('A different fact.')}\n`);
+    assert.equal(await readFile(path.join(dir, 'AGENTS.md'), 'utf8'), `Team.\n\n${written('A different fact.')}\n`);
   });
 });
 
@@ -287,7 +293,7 @@ test('a symlinked memory file outside the known names is written through, not re
     await symlink('docs/agents.md', path.join(dir, 'CLAUDE.md'));
     await writeMemoryBlock(dir, 'A fact.', 'claude-code');
     assert.ok((await lstat(path.join(dir, 'CLAUDE.md'))).isSymbolicLink());
-    assert.equal(await readFile(path.join(dir, 'docs/agents.md'), 'utf8'), `Team.\n\n${wrap('A fact.')}\n`);
+    assert.equal(await readFile(path.join(dir, 'docs/agents.md'), 'utf8'), `Team.\n\n${written('A fact.')}\n`);
   });
 });
 
@@ -298,4 +304,81 @@ test('a memory file that is a symlink to nothing is refused, not replaced by a n
     assert.ok((await lstat(path.join(dir, 'CLAUDE.md'))).isSymbolicLink(), 'the dangling link was replaced');
     assert.deepEqual(await readdir(dir), ['CLAUDE.md'], 'nothing else was created');
   });
+});
+
+// --- the tail the helper writes after the block's own part --------------------
+// One test per row of the tail table in the plan "Commits A Later Session Can
+// Trace": what the incoming body is, what is already in the file, and what ends
+// up between the markers. Outside the markers every byte stays as it was.
+
+const tailCount = (text: string): number => text.split('\n').filter(line => line === TAIL_HEADING).length;
+
+test('the tail is short, opens with its own heading, and names the closing subject and the trailers', () => {
+  const tail = historyTail();
+  assert.equal(tail.split('\n')[0], TAIL_HEADING);
+  assert.ok(tail.split('\n').length < 20, `the tail is ${tail.split('\n').length} lines; the block is read before anyone decides what to do`);
+  for (const literal of ['### A Small Fix Without Maestro', '### Which Slice Of The History', "--grep='^maestro: close '", 'Maestro-Run: <dir>', 'Requirements: R##', 'Never the whole log.']) {
+    assert.ok(tail.includes(literal), `the tail lost ${literal}`);
+  }
+});
+
+test('a body without the tail gets it after a blank line, last inside the markers, and the user text stays byte for byte', async () => {
+  await withDir(async dir => {
+    await put(dir, 'CLAUDE.md', '# Theirs\n\nBefore.\n');
+    await writeMemoryBlock(dir, 'A fact.\n', 'claude-code');
+    const text = await readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
+    assert.equal(text, `# Theirs\n\nBefore.\n\n${written('A fact.')}\n`);
+    assert.equal(tailCount(text), 1);
+  });
+});
+
+test('a body that carries the tail, as prior.md hands it on, ends with one tail, never two', async () => {
+  await withDir(async dir => {
+    await put(dir, 'CLAUDE.md', `Before.\n\n${written('Old fact.')}\n\nAfter.\n`);
+    await writeMemoryBlock(dir, `Old fact.\nNew fact.\n\n${historyTail()}\n`, 'claude-code');
+    const text = await readFile(path.join(dir, 'CLAUDE.md'), 'utf8');
+    assert.equal(text, `Before.\n\n${written('Old fact.\nNew fact.')}\n\nAfter.\n`);
+    assert.equal(tailCount(text), 1);
+  });
+});
+
+test('an edited tail is dropped and the canonical one written in its place', async () => {
+  await withDir(async dir => {
+    await writeMemoryBlock(dir, `A fact.\n\n  ${TAIL_HEADING}  \n\nRun git log with no range, it is fine.\n`, 'codex');
+    const text = await readFile(path.join(dir, 'AGENTS.md'), 'utf8');
+    assert.equal(text, `${written('A fact.')}\n`);
+    assert.doesNotMatch(text, /it is fine/);
+  });
+});
+
+test('an empty body keeps the block already there and refreshes its tail', async () => {
+  for (const empty of ['', '  \n\t\n']) {
+    await withDir(async dir => {
+      await put(dir, 'AGENTS.md', `Team.\n\n${wrap(`Kept fact.\n\n${TAIL_HEADING}\n\nan old tail`)}\n\nAfter.\n`);
+      const result = await writeMemoryBlock(dir, empty, 'codex');
+      assert.equal(result.action, 'replaced');
+      assert.equal(await readFile(path.join(dir, 'AGENTS.md'), 'utf8'), `Team.\n\n${written('Kept fact.')}\n\nAfter.\n`);
+    });
+  }
+});
+
+test('an empty body where no block is yet writes the tail alone', async () => {
+  await withDir(async dir => {
+    await put(dir, 'AGENTS.md', 'Team.\n');
+    const appended = await writeMemoryBlock(dir, '', 'codex');
+    assert.equal(appended.action, 'appended');
+    assert.equal(await readFile(path.join(dir, 'AGENTS.md'), 'utf8'), `Team.\n\n${wrap(historyTail())}\n`);
+  });
+  await withDir(async dir => {
+    const created = await writeMemoryBlock(dir, '\n', 'gemini-cli');
+    assert.equal(created.action, 'created');
+    assert.equal(await readFile(path.join(dir, 'GEMINI.md'), 'utf8'), `${wrap(historyTail())}\n`);
+  });
+});
+
+test('only a line that is the tail heading cuts the body; the words inside a sentence or a deeper heading do not', () => {
+  const body = `See ${TAIL_HEADING} below.\n\n#${TAIL_HEADING}\n\nStill ours.`;
+  assert.equal(withTail(body), `${body}\n\n${historyTail()}`);
+  assert.equal(withTail(`${TAIL_HEADING}\nanything`), historyTail());
+  assert.equal(withTail(''), historyTail());
 });

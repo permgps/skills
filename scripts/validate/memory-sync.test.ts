@@ -14,7 +14,7 @@ import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from '
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { BEGIN_MARKER, END_MARKER } from '../memory/markers.ts';
+import { BEGIN_MARKER, END_MARKER, TAIL_HEADING, historyTail } from '../memory/markers.ts';
 import { CAPTURES, SOURCE_MANIFEST, activeContract7State, contract7State } from '../state/fixtures/verification.ts';
 import type { RunState } from '../state/contract.ts';
 
@@ -189,7 +189,7 @@ test('phase 9\'s write splices the block from stdin into the file the host loads
     assert.equal(written['action'], 'appended');
     assert.equal(written['loadedByHost'], true);
     assert.equal(await readFile(path.join(project.root, 'CLAUDE.md'), 'utf8'),
-      `# Team\n\nTheir words.\n\n${wrap('Prices live in menu.json.')}\n`);
+      `# Team\n\nTheir words.\n\n${wrap(`Prices live in menu.json.\n\n${historyTail()}`)}\n`);
   } finally { await project.dispose(); }
 });
 
@@ -226,19 +226,60 @@ test('the block in two files and malformed markers each stop the write with exit
   } finally { await project.dispose(); }
 });
 
-test('an unknown host or an empty body is refused with exit 2 and touches nothing', async () => {
+test('a missing or unknown host is refused with exit 2 and touches nothing', async () => {
   const project = await target();
   try {
     for (const [args, input] of [
       [['--memory-write'], 'A fact.'],
       [['--memory-write', '--host', 'cursor'], 'A fact.'],
-      [['--memory-write', '--host', 'codex'], '  \n'],
     ] as const) {
       const outcome = project.sync([...args], input);
       assert.equal(outcome.code, 2, `${args.join(' ')}: ${outcome.stdout}`);
       assert.equal(typeof outcome['error'], 'string');
     }
     assert.deepEqual(await readdir(project.root), ['.maestro']);
+  } finally { await project.dispose(); }
+});
+
+// An empty body used to be exit 2, because it would have erased the block. The
+// helper now keeps that block's own part and only refreshes its tail (D8), so
+// the call after every closure can be made even when the run learned nothing.
+test('an empty body keeps the block there and refreshes its tail, exit 0', async () => {
+  const project = await target();
+  try {
+    await writeFile(path.join(project.root, 'AGENTS.md'), `Team.\n\n${wrap('Kept fact.')}\n`, 'utf8');
+    const kept = project.sync(['--memory-write', '--host', 'codex'], '  \n');
+    assert.equal(kept.code, 0, kept.stdout);
+    assert.equal(kept['action'], 'replaced');
+    assert.equal(await readFile(path.join(project.root, 'AGENTS.md'), 'utf8'), `Team.\n\n${wrap(`Kept fact.\n\n${historyTail()}`)}\n`);
+  } finally { await project.dispose(); }
+});
+
+test('an empty body in a project with no memory file creates the host\'s file holding the tail alone', async () => {
+  const project = await target();
+  try {
+    const created = project.sync(['--memory-write', '--host', 'claude-code'], '');
+    assert.equal(created.code, 0, created.stdout);
+    assert.equal(created['action'], 'created');
+    assert.equal(created['file'], 'CLAUDE.md');
+    assert.equal(await readFile(path.join(project.root, 'CLAUDE.md'), 'utf8'), `${wrap(historyTail())}\n`);
+  } finally { await project.dispose(); }
+});
+
+test('prior.md carries the tail on, and the next write that copies it still leaves one tail', async () => {
+  const project = await target();
+  try {
+    assert.equal(project.sync(['--memory-write', '--host', 'codex'], 'Prices live in menu.json.').code, 0);
+    await mkdir(path.join(project.maestro, CURRENT));
+    const read = project.sync(['--memory-read', '--run-dir', CURRENT]);
+    assert.equal(read.code, 0, read.stdout);
+    const prior = await readFile(path.join(project.maestro, CURRENT, 'prior.md'), 'utf8');
+    assert.ok(prior.includes(`Prices live in menu.json.\n\n${historyTail()}`), 'prior.md lost the tail');
+    const again = project.sync(['--memory-write', '--host', 'codex'], `Prices live in menu.json.\nTaxes too.\n\n${historyTail()}\n`);
+    assert.equal(again.code, 0, again.stdout);
+    const text = await readFile(path.join(project.root, 'AGENTS.md'), 'utf8');
+    assert.equal(text, `${wrap(`Prices live in menu.json.\nTaxes too.\n\n${historyTail()}`)}\n`);
+    assert.equal(text.split('\n').filter(line => line === TAIL_HEADING).length, 1);
   } finally { await project.dispose(); }
 });
 
