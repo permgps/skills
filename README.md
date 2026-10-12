@@ -19,10 +19,10 @@ proposes edits to your ТЗ one at a time in your own words, and prints a бри
 paste after `/maestro`. It writes nothing a прогон reads and starts no run of
 its own.
 
-**Neither skill needs the other.** Maestro runs exactly as it did before Scout
-existed. Scout ends at a block of text.
+**Neither skill needs the other.** Each runs without the other, and Scout ends
+at a block of text.
 
-**Status: `0.0.8-alpha`.** Four прогона have carried a бриф to a finished отчёт
+**Status: `0.0.14-alpha`.** Four прогона have carried a бриф to a finished отчёт
 with all four gates passed on Claude Code. One of the four modes has never been
 run, Codex and Gemini CLI are unverified, and Scout has not yet run in front of
 a real прогон — see [Limitations](#limitations) and
@@ -41,6 +41,7 @@ a real прогон — see [Limitations](#limitations) and
 - [Four Gates](#four-gates)
 - [Six Rules Nothing Turns Off](#six-rules-nothing-turns-off)
 - [What A Run Leaves In Your Project](#what-a-run-leaves-in-your-project)
+- [Between Runs](#between-runs) — closing, memory, the next run, resuming, fixing by hand
 - [The Dashboard](#the-dashboard)
 - [Scout](#scout)
 - [Hosts](#hosts)
@@ -95,9 +96,12 @@ If the session is interrupted, open a new one in the same project and say
   version control, and a host decides at session start whether it can raise
   worktrees — a `git init` afterwards narrows every wave to one таск for the
   rest of that session.
-- Nothing else: no Python, no compiler, no `npm install` in your project, and
-  Maestro needs no network after installation (Scout does — it reads the web). Browser checks use a headless browser when one
-  is available; without one, the checks that need it stay incomplete.
+- Nothing else: no Python, no compiler, no `npm install` in your project.
+  After installation Maestro's only network call is the update check — one GET
+  per run, which `MAESTRO_NO_UPDATE_CHECK=1` turns off (see
+  [Updating And Removing](#updating-and-removing)); Scout reads the web by
+  design. Browser checks use a headless browser when one is available; without
+  one, the checks that need it stay incomplete.
 
 ## Installation
 
@@ -110,8 +114,8 @@ npx skills add permgps/skills -s scout -y    # only Scout
 ```
 
 **Not yet measured against GitHub itself:** the two-skill install was verified
-against a publish-shaped export of this repository, and no push has yet carried
-both bundles to the default branch (finding F14 in `docs/install.md`).
+against a publish-shaped export of this repository. The default branch now
+carries both bundles, but an install from it has not yet been run and recorded.
 
 The `-y` matters: with two skills in the package, the CLI stops on a picker
 with **nothing pre-selected**, so pressing enter installs nothing. For Claude
@@ -284,7 +288,7 @@ it.
 Required visual or interaction fidelity — "make it look like this page" — is
 checked at acceptance in every mode and at every depth. There is no polish
 dial: «like X» in your бриф is a requirement, and the page you name reaches the
-executors before they build (see *What A Run Does*).
+executors before they build (see [What A Run Does](#what-a-run-does)).
 
 ### Models — Which Model Builds What
 
@@ -411,6 +415,16 @@ decide. G3 refuses a plan that leaves an available visual reference or example
 uncited. «Make it like X» is a requirement, so acceptance checks it; nothing
 else compares the build against X afterwards.
 
+**Your existing code is read once, before the spec.** Preflight checks whether
+the project already holds code; Maestro's own files, the host's skill installs,
+memory files, your project glossary, a root README or licence, and anything git
+ignores do not count. If it does, the specification phase sends one fresh
+reader through the repository, which changes nothing and writes down where
+things live, the conventions, the exact run, test and lint commands, the names
+the work will touch, and what not to touch, into `codebase.md`. The spec and the
+plan name things after it — the Terms table gains a *Name in code* column — and
+every executor reads it before exploring. The blind readers never see it.
+
 Two more phases run outside that sequence:
 
 - **Repair** — a таск reaches it through one of six doors: it came back not
@@ -424,11 +438,10 @@ Two more phases run outside that sequence:
   or ask you to raise the total limit. Only your words raise it. When the
   build shows that something cannot be built as specified, the scope
   amendment is your decision.
-- **Memory** — runs during the build and after acceptance and asks nothing. It
-  writes what should outlive the run into the instruction file your host loads
-  and appends to `decisions.md`; the next run's preflight reads both back into
-  `prior.md`, with the progress file the last closure wrote, and its briefing
-  says when a recommendation follows or contradicts an earlier decision.
+- **Memory** — runs once during the build and again after every closure,
+  acceptance's or repair's, and asks nothing. It writes what should outlive the
+  run into the instruction file your host loads, appends to `decisions.md`, and
+  ends the closure with one commit — see [Between Runs](#between-runs).
 
 Before any broad, browser or integrated check, the run records **readiness**
 against a disposable source-only copy of the project, so a broken setup is
@@ -470,13 +483,9 @@ instead.
 ## Talking To A Run In Progress
 
 - **Resume.** Say anything — «продолжай», a question, a correction — in a
-  session opened in the same project. The run reads `.maestro/state.js` and
-  resumes at the stage that is still open. It never restarts. Before its first
-  write it runs `node .maestro/sync.mts --commits-check`: a таск whose commit a
-  reset or a rebase took off `HEAD`'s history is named in one line, reset and
-  relaunched from what its zone still holds. If the commits sit on another local
-  branch, the run names the branch and asks before it rebuilds anything. History
-  is never rewritten to bring a commit back.
+  session opened in the same project. The run resumes at the stage that is
+  still open and never restarts; see
+  [Resuming An Interrupted Run](#resuming-an-interrupted-run).
 - **Add, withdraw or reword a requirement**, at any point. Your words are
   appended verbatim, in the language you said them, to the dated additions
   block of `brief.md` with one English line naming the `R##` and what changed;
@@ -492,10 +501,8 @@ instead.
   yourself.
 - **Stop.** There is no stop command; tell the run to stop and it closes as
   `stopped_incomplete` with your reason recorded.
-- **A closed run can be reopened.** A new бриф aimed at it brings its directory back to `--wip` under its original date. A бриф dictated
-  on a later day goes into a new `<date>-brief.md` under that day's date rather
-  than being appended to the old one. A second run started the same day with the
-  same name gets a numeric suffix. Nothing earlier is deleted.
+- **A closed run can be reopened** with a new бриф aimed at it; see
+  [Reopening A Closed Run](#reopening-a-closed-run).
 
 ## Four Gates
 
@@ -504,7 +511,7 @@ a warning: the phase is redone.
 
 | Gate | After | Passes when |
 |---|---|---|
-| G1 | briefing | every requirement has a status/reason; every question in `answers.md` records its recommended option and the option chosen; v5 also requires a fresh independent source audit and frozen agreement |
+| G1 | briefing | every requirement has a status/reason; every question in `answers.md` records its recommended option and the option chosen; a fresh independent source audit has run and the initial agreement is frozen |
 | G2 | specification | intent and independent raw-reference readers find no unresolved mandatory gap |
 | G3 | plan | each required obligation has an implementation owner, each check has an execution owner, the task reader finds the handoff executable, and the plan-consistency reader, seeing every task file at once, finds no two таски sharing a file without an order between them |
 | G4 | acceptance | all current required checks and coverage pass; missing evidence remains pending |
@@ -565,7 +572,7 @@ your-project/.maestro/
 │   └── amendments.md               specification changes the build forced
 ├── README.md                       the register: one row per run and how it ended
 ├── PROGRESS.md                     where the work stands: what is settled, not done, known broken, fixed by hand
-├── config.json                     your pinned mode and register
+├── config.json                     your pinned mode and register, and each host's models
 ├── state.js, dashboard.html        the run state and the page that reads it
 └── sync.mts, runtime/              the helper copied in at preflight
 ```
@@ -583,66 +590,116 @@ your-project/.maestro/
   `closed_with_exceptions` (you accepted a residual set; the underlying failure
   is preserved), or `stopped_incomplete` (with its reason). Activity reaching
   100% does not establish conformance.
-- **Project memory.** A short block between `<!-- maestro:begin -->` and
-  `<!-- maestro:end -->` in the instruction file your host loads at session
-  start, so the next session reads it first. Your own text outside the markers is
-  never edited. The block always ends with *Working Between Runs*, which the
-  helper writes itself on every write: how to make a small fix without Maestro
-  (read `.maestro/PROGRESS.md`, add a line under *Fixes Without Maestro*,
-  commit with the `Maestro-Run:` trailer) and which slice of the history to read
-  — since the last closure, by requirement, by file, by fragment, by line, never
-  the whole log. Edit it and the next write puts it back.
+- **What carries over to the next run** — `PROGRESS.md`, the memory block in
+  your instruction file, your project glossary — is in
+  [Between Runs](#between-runs). Every file a run writes is listed in
+  [the artifacts specification](docs/spec/artifacts.md).
 
-  | Host | Loads at session start | Creates when none exists |
-  |---|---|---|
-  | Claude Code | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`; else `AGENTS.md` | `CLAUDE.md` |
-  | Codex | `AGENTS.override.md`; else `AGENTS.md` | `AGENTS.md` |
-  | Gemini CLI | `GEMINI.md` | `GEMINI.md` |
+## Between Runs
 
-  The file it writes is, in order: the one already carrying the block; else the
-  first file your host loads that exists; else any other existing file from the
-  table (`AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md`, `GEMINI.md`) — and then
-  it tells you the host does not load it; else it creates the file in the last
-  column. A project never gains a second memory file because you switched
-  hosts. It never writes `CLAUDE.local.md` or `AGENTS.override.md`. The same
-  block in two files, or broken markers, stop the memory phase instead of
-  guessing. Details in [the hosts specification](docs/spec/hosts.md).
-- **Your project glossary is read, never written.** If the project root has a
-  `GLOSSARY.md` or `CONTEXT.md`, or a `GLOSSARY-MAP.md` or `CONTEXT-MAP.md`
-  linking to one such file per context, preflight reads it into `prior.md`. The
-  plan names things with your words and your words to avoid. Where the
-  манифест uses one of your terms in another meaning, the манифест wins for
-  that run, and the отчёт asks you under Assumptions to fix the project
-  glossary or the бриф. All of it together is read up to 32 KiB; past that,
-  none of it is read, and the run says so. Terms your project glossary already
-  defines are not repeated in the memory block.
-- **Where the work stands.** Every run that closes rewrites
-  `.maestro/PROGRESS.md` from what it left: what you settled (requirements you
-  dropped, leftovers you dismissed), what is not done (deferred, waiting on you,
-  incomplete, failed таски), and known bugs, each keyed by the run it came from.
-  The header names the commit the run closed at. Add your own lines under
-  *Fixes Without Maestro*; nothing else in it is yours to edit. Each closure
-  ends with one more commit, `maestro: close <dir>`, holding `.maestro/` and the
-  memory file and nothing you had staged. The next run's preflight copies the
-  file into `prior.md` with the commits over code since that closure and the
-  paths they changed. It reads from the commit the header names; if a rebase
-  rewrote it, from the closing commit, found by its subject; failing both, from
-  the closure's date — and says which — past thirty commits, a reader on the
-  cheaper model sums them up in at most ten lines. In `semi`, `interview` and
-  `manual` its first round of questions offers the open items once: leave them,
-  take some, or say they no longer matter. `full` never asks and takes nothing.
-  The changed paths go to the existing-code reader first; the blind readers
-  never see any of it.
-- **Your existing code is read once, before the spec.** Preflight checks
-  whether the project already holds code; Maestro's own files, the host's
-  skill installs, memory files, your project glossary, a root README or
-  licence, and anything git ignores do not count. If it does, the
-  specification phase sends one fresh reader through the repository, which
-  changes nothing and writes down where things live, the conventions, the
-  exact run, test and lint commands, the names the work will touch, and what
-  not to touch, into `codebase.md`. The spec and the plan name things after
-  it — the Terms table gains a *Name in code* column — and every executor
-  reads it before exploring. The blind readers never see it.
+A прогон ends with a file and a commit the next one reads first, and a session
+that picks up an interrupted one checks its commits before it writes.
+
+### Closing A Run
+
+Every run that closes — through acceptance or through repair — rewrites
+`.maestro/PROGRESS.md` from what it left:
+
+- *Settled By The User* — requirements you dropped, leftovers you dismissed;
+- *Not Done* — deferred, waiting on you, incomplete, failed таски;
+- *Known Bugs*;
+- *Fixes Without Maestro* — your own lines, the one part of the file that is
+  yours to edit.
+
+Each item is keyed by the run it came from, and the header names the commit the
+run closed at. The memory phase then writes the memory block, and the closure
+ends with one more commit, `maestro: close <dir>`, holding `.maestro/` and the
+memory file and nothing you had staged.
+
+### Project Memory
+
+A short block between `<!-- maestro:begin -->` and `<!-- maestro:end -->` in
+the instruction file your host loads at session start, so the next session
+reads it first. Your own text outside the markers is never edited. Alongside
+it, `decisions.md` in the run directory records what was decided, what instead,
+and why. The block always ends with *Working Between Runs*, which the helper
+writes itself on every write: how to make a small fix without Maestro (see
+[Fixing Something By Hand](#fixing-something-by-hand)) and which slice of the
+history to read — since the last closure, by requirement, by file, by fragment,
+by line, never the whole log. Edit it and the next write puts it back.
+
+| Host | Loads at session start | Creates when none exists |
+|---|---|---|
+| Claude Code | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`; else `AGENTS.md` | `CLAUDE.md` |
+| Codex | `AGENTS.override.md`; else `AGENTS.md` | `AGENTS.md` |
+| Gemini CLI | `GEMINI.md` | `GEMINI.md` |
+
+The file it writes is, in order: the one already carrying the block; else the
+first file your host loads that exists; else any other existing file from the
+table (`AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md`, `GEMINI.md`) — and then
+it tells you the host does not load it; else it creates the file in the last
+column. A project never gains a second memory file because you switched hosts.
+It never writes `CLAUDE.local.md` or `AGENTS.override.md`. The same block in two
+files, or broken markers, stop the memory phase instead of guessing. Details in
+[the hosts specification](docs/spec/hosts.md).
+
+### Your Project Glossary
+
+Read, never written. If the project root has a `GLOSSARY.md` or `CONTEXT.md`,
+or a `GLOSSARY-MAP.md` or `CONTEXT-MAP.md` linking to one such file per
+context, preflight reads it into `prior.md`. The plan names things with your
+words and avoids the words you mark to avoid. Where the manifest uses one of
+your terms in another meaning, the manifest wins for that run, and the отчёт
+asks you under Assumptions to fix the project glossary or the бриф. All of it
+together is read up to 32 KiB; past that, none of it is read, and the run says
+so. Terms your project glossary already defines are not repeated in the memory
+block.
+
+### The Next Run
+
+Preflight copies the memory block, the `decisions.md` of every earlier run and
+`PROGRESS.md` into `prior.md`, with the commits over code since the last closure and the paths
+they changed. It reads from the commit `PROGRESS.md`'s header names; if a
+rebase rewrote it, from the closing commit, found by its subject; failing both,
+from the closure's date — and says which. Past thirty commits, a reader on the
+`standard` model sums them up in at most ten lines.
+
+- **Leftovers are offered once.** In `semi`, `interview` and `manual` the first
+  round of briefing questions offers the open items: leave them, take some, or
+  say they no longer matter. `full` never asks and takes nothing.
+- **Earlier decisions are named.** Briefing says when a recommendation follows
+  or contradicts an earlier decision.
+- **The changed paths go to the existing-code reader first.** The blind readers
+  never see `PROGRESS.md`, `prior.md` or any of it.
+
+### Resuming An Interrupted Run
+
+Say anything — «продолжай», a question, a correction — in a session opened in
+the same project. The run reads `.maestro/state.js` and resumes at the stage
+that is still open. It never restarts. Before its first write it runs
+`node .maestro/sync.mts --commits-check`: a таск whose commit a reset or a
+rebase took off `HEAD`'s history is named in one line, reset and relaunched from
+what its zone still holds. If the commits sit on another local branch, the run
+names the branch and asks before it rebuilds anything. History is never
+rewritten to bring a commit back.
+
+### Fixing Something By Hand
+
+A small fix does not need a прогон. Read `.maestro/PROGRESS.md`, add a line
+under *Fixes Without Maestro*, and commit with the trailers a run uses. Every
+таск and repair commit carries two, `Maestro-Run: <dir>` and
+`Requirements: R01, R02`, because таск numbers and requirement ids restart
+every run; `git log -E --all-match --grep='^Maestro-Run: <dir>$'
+--grep='^Requirements: (.*, )?R02(,|$)'` finds every change one requirement of
+one run caused, yours included.
+
+### Reopening A Closed Run
+
+A new бриф aimed at a closed run brings its directory back to `--wip` under its
+original date. A бриф dictated on a later day goes into a new `<date>-brief.md`
+under that day's date rather than being appended to the old one. A second run
+started the same day with the same name gets a numeric suffix. Nothing earlier
+is deleted.
 
 ## The Dashboard
 
@@ -910,12 +967,9 @@ nobody is driving. So you are asked.
 reads the ordered union of that таск's own commits, one diff per commit — never
 a range, which would carry every foreign commit between them, and never the
 tree. Paths those commits touched outside the таск's files are listed beside the
-diffs, not filtered away. Every таск and repair commit carries two trailers,
-`Maestro-Run: <dir>` and `Requirements: R01, R02`, because таск numbers and
-requirement ids restart every run; `git log -E --all-match
---grep='^Maestro-Run: <dir>$' --grep='^Requirements: (.*, )?R02(,|$)'` finds
-every change one requirement of one run caused. Give a fix you make by hand the
-same trailers.
+diffs, not filtered away. Every таск and repair commit carries the
+`Maestro-Run:` and `Requirements:` trailers described in
+[Fixing Something By Hand](#fixing-something-by-hand).
 
 **The contract is versioned, and old runs stay readable.**
 

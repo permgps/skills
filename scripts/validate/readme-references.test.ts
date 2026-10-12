@@ -9,7 +9,9 @@ import {
   DIAL_VALUES,
   extractLinks,
   findBrokenLinks,
+  findContentsDrift,
   findOutlineDrift,
+  findStaleVersion,
   findUnknownNpmScripts,
   findUnknownSyncFlags,
   headingSlugs,
@@ -122,11 +124,59 @@ test('a missing section, a reordered section and an unnamed dial value are each 
 
 test('the real README links only to files and headings that exist, and names only real scripts and sync flags', async () => {
   const violations = await checkReadme();
-  const references = violations.filter(v => v.check !== 'outline' && v.check !== 'dials');
+  const outline = new Set(['outline', 'dials', 'contents', 'version']);
+  const references = violations.filter(v => !outline.has(v.check));
   assert.deepEqual(references, []);
 });
 
 test('the real README carries the planned sections in order and names every dial value', async () => {
   const markdown = await readFile('README.md', 'utf8');
   assert.deepEqual(findOutlineDrift(markdown), []);
+});
+
+function contentsReadme(entries: readonly string[], sections: readonly string[]): string {
+  return [
+    '# Maestro', '', '## Contents', '',
+    ...entries.map(name => `- [${name}](#${name.toLowerCase().replace(/\s/g, '-')}) — blurb`),
+    '- [Changelog](CHANGELOG.md)',
+    '', ...sections.flatMap(name => [`## ${name}`, '', 'Text.', '']),
+    '## License', '', 'MIT.',
+  ].join('\n');
+}
+
+test('a Contents list that links every section after it, in order, reports nothing, and the licence may stay out', () => {
+  assert.deepEqual(findContentsDrift(contentsReadme(['Quick Start', 'Between Runs'], ['Quick Start', 'Between Runs'])), []);
+});
+
+test('a section Contents leaves out is reported by name with the link to add', () => {
+  const drift = findContentsDrift(contentsReadme(['Quick Start'], ['Quick Start', 'Between Runs']));
+  assert.deepEqual(drift.map(v => v.check), ['contents']);
+  assert.match(drift[0]?.message ?? '', /\[Between Runs\]\(#between-runs\)/);
+});
+
+test('a Contents entry pointing at no section is reported on its own line', () => {
+  const drift = findContentsDrift(contentsReadme(['Quick Start', 'Gone Section'], ['Quick Start']));
+  assert.deepEqual(drift.map(v => [v.check, v.line]), [['contents', 6]]);
+  assert.match(drift[0]?.message ?? '', /#gone-section/);
+});
+
+test('Contents entries in an order the sections are not in are reported once', () => {
+  const drift = findContentsDrift(contentsReadme(['Between Runs', 'Quick Start'], ['Quick Start', 'Between Runs']));
+  assert.deepEqual(drift.map(v => v.check), ['contents']);
+  assert.match(drift[0]?.message ?? '', /out of order/);
+});
+
+test('a status line naming another version than package.json is reported; the same version or no status line is not', () => {
+  const pkg = JSON.stringify({ version: '0.0.14-alpha' });
+  const stale = findStaleVersion('intro\n**Status: `0.0.8-alpha`.** Four runs.', pkg);
+  assert.deepEqual(stale.map(v => [v.check, v.line]), [['version', 2]]);
+  assert.match(stale[0]?.message ?? '', /0\.0\.8-alpha.*0\.0\.14-alpha/);
+  assert.deepEqual(findStaleVersion('**Status: `0.0.14-alpha`.**', pkg), []);
+  assert.deepEqual(findStaleVersion('No status here.', pkg), []);
+});
+
+test('the real README lists every section in Contents and names the version package.json carries', async () => {
+  const markdown = await readFile('README.md', 'utf8');
+  const packageJson = await readFile('package.json', 'utf8');
+  assert.deepEqual([...findContentsDrift(markdown), ...findStaleVersion(markdown, packageJson)], []);
 });

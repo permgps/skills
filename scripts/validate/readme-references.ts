@@ -12,7 +12,9 @@
 // - every `npm run <name>` is a script `package.json` defines;
 // - every `--flag` on a line naming `sync.mts` is one the helper's source parses;
 // - the README's sections are the outline the plan fixed, in that order, and the
-//   Dials section names every dial value.
+//   Dials section names every dial value;
+// - the Contents list links every section after it, in order, and nothing else;
+// - the `Status:` line names the version `package.json` carries.
 //
 // It does not hold whether a sentence is true. Facts about behavior are checked
 // by reading them against `docs/spec/`, by hand. It runs inside `npm run test`
@@ -44,6 +46,7 @@ export const README_SECTIONS: readonly string[] = [
   'Four Gates',
   'Six Rules Nothing Turns Off',
   'What A Run Leaves In Your Project',
+  'Between Runs',
   'The Dashboard',
   'Scout',
   'Hosts',
@@ -103,6 +106,12 @@ export function extractLinks(markdown: string): Link[] {
   return links;
 }
 
+/** The anchor GitHub gives one heading's text, before any repeat suffix. */
+function headingSlug(heading: string): string {
+  const text = heading.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1');
+  return text.toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
+}
+
 /**
  * The anchors GitHub gives a file's headings: lowercase, every character that
  * is not a letter, digit, space, `-` or `_` removed, spaces turned into
@@ -121,8 +130,7 @@ export function headingSlugs(markdown: string): string[] {
     if (fenced) continue;
     const match = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
     if (!match) continue;
-    const text = (match[1] ?? '').replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1');
-    const base = text.toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');
+    const base = headingSlug(match[1] ?? '');
     const count = seen.get(base) ?? 0;
     seen.set(base, count + 1);
     slugs.push(count === 0 ? base : `${base}-${count}`);
@@ -271,6 +279,75 @@ export function findOutlineDrift(markdown: string, file = 'README.md'): Violatio
   return violations;
 }
 
+/** Sections the Contents list does not link: itself, and the licence at the foot. */
+const CONTENTS_OMITS: readonly string[] = ['Contents', 'License'];
+
+/**
+ * Contents entries that point at no section, sections Contents leaves out, and
+ * entries in an order the sections are not in. Only `#anchor` links count; a
+ * link to another file under Contents is not an entry.
+ */
+export function findContentsDrift(markdown: string, file = 'README.md'): Violation[] {
+  const lines = markdown.split('\n');
+  const start = lines.findIndex(line => line.trim() === '## Contents');
+  if (start === -1) return [];
+  const after = lines.slice(start + 1).findIndex(line => /^##\s/.test(line));
+  const end = after === -1 ? lines.length : start + 1 + after;
+
+  const entries = extractLinks(markdown)
+    .filter(link => link.target === '' && link.anchor !== null && link.line > start + 1 && link.line <= end);
+  const headings = sectionHeadings(markdown);
+  const sections = headings.slice(headings.indexOf('Contents') + 1)
+    .filter(name => !CONTENTS_OMITS.includes(name))
+    .map(name => ({ name, slug: headingSlug(name) }));
+  const slugs = sections.map(section => section.slug);
+  const linked = entries.map(entry => entry.anchor ?? '');
+
+  const violations: Violation[] = [];
+  for (const entry of entries) {
+    if (slugs.includes(entry.anchor ?? '')) continue;
+    violations.push({
+      check: 'contents', file, line: entry.line,
+      message: `Contents links #${entry.anchor}, which is no section — point it at a "## " heading or drop the entry`,
+    });
+  }
+  for (const section of sections) {
+    if (linked.includes(section.slug)) continue;
+    violations.push({
+      check: 'contents', file, line: start + 1,
+      message: `Contents leaves out "## ${section.name}" — add [${section.name}](#${section.slug}) where the section stands`,
+    });
+  }
+  const listed = linked.filter(slug => slugs.includes(slug));
+  const ordered = slugs.filter(slug => listed.includes(slug));
+  if (listed.join('\n') !== ordered.join('\n')) {
+    violations.push({
+      check: 'contents', file, line: start + 1,
+      message: `Contents lists the sections out of order: found ${listed.join(' › ')}; the README has ${ordered.join(' › ')}`,
+    });
+  }
+  log.debug('contents', 'contents compared', { file, found: linked, expected: slugs });
+  return violations;
+}
+
+/** A `Status:` line naming a version other than the one `package.json` carries. */
+export function findStaleVersion(markdown: string, packageJson: string, file = 'README.md'): Violation[] {
+  const expected = (JSON.parse(packageJson) as { version?: string }).version ?? '';
+  const violations: Violation[] = [];
+  markdown.split('\n').forEach((line, index) => {
+    const match = /Status:\**\s*`([^`]+)`/.exec(line);
+    if (!match) return;
+    const found = match[1] ?? '';
+    log.debug('version', 'status version compared', { file, found, expected });
+    if (found === expected) return;
+    violations.push({
+      check: 'version', file, line: index + 1,
+      message: `the status line names ${found}, but package.json is at ${expected} — name the version that ships`,
+    });
+  });
+  return violations;
+}
+
 /** Every source file of the helper: `sync.mts` and the runtime it imports. */
 async function helperSource(toolsDir: string): Promise<string> {
   const entries = await readdir(path.join(toolsDir, 'runtime'), { recursive: true });
@@ -295,6 +372,8 @@ export async function checkReadme(options: CheckOptions = {}): Promise<Violation
 
   const violations = [
     ...findOutlineDrift(markdown, readme),
+    ...findContentsDrift(markdown, readme),
+    ...findStaleVersion(markdown, packageJson, readme),
     ...await findBrokenLinks(readme, markdown),
     ...findUnknownNpmScripts(markdown, packageJson, readme),
     ...findUnknownSyncFlags(markdown, source, readme),
