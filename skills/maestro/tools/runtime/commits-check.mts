@@ -125,13 +125,15 @@ function unavailable(reason: string): { result: Record<string, unknown>; code: n
 }
 
 /**
- * The one local branch every lost commit is on: what a checkout looks like. A
- * missing commit sits on no branch, so any missing one rules a checkout out.
+ * A local branch every lost commit is on: what a checkout looks like. When
+ * several hold them all, any one of them gives the work back, so the first by
+ * name is named. A missing commit sits on no branch, so any missing one rules a
+ * checkout out.
  */
 function singleBranch(lost: readonly LostTask[]): string | undefined {
   const commits = lost.flatMap(task => task.commits);
   if (commits.length === 0 || commits.some(commit => commit.state === 'missing')) return undefined;
   const [first, ...rest] = commits.map(commit => new Set(commit.branches ?? []));
-  const common = [...first!].filter(branch => rest.every(set => set.has(branch)));
-  return common.length === 1 ? common[0] : undefined;
+  // `branches` arrives sorted, so the first common one is the first by name.
+  return [...first!].find(branch => rest.every(set => set.has(branch)));
 }

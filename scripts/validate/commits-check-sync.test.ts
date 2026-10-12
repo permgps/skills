@@ -190,6 +190,22 @@ test('a checkout that left every lost commit on one branch names that branch as 
   } finally { await target.dispose(); }
 });
 
+test('a checkout that left every lost commit on two branches still names one, the first by name', needsGit, async () => {
+  const target = await project();
+  try {
+    const base = target.taskCommit('00', 'base');
+    const branch = target.git('symbolic-ref', '--short', 'HEAD').trim();
+    const sha = target.taskCommit('01', 'Implement menu');
+    target.git('branch', 'backup');
+    target.git('checkout', '-q', '-b', 'elsewhere', base);
+    const outcome = await checked(target, building([sha]));
+    assert.equal(outcome.code, 1, outcome.stderr);
+    const both = ['backup', branch].sort();
+    assert.deepEqual(lostOf(outcome)[0]!.commits, [{ sha, state: 'not-ancestor', branches: both }]);
+    assert.equal(outcome['onBranch'], both[0]);
+  } finally { await target.dispose(); }
+});
+
 test('lost commits split across two branches name no single branch', needsGit, async () => {
   const target = await project();
   try {

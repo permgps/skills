@@ -788,8 +788,9 @@ exit codes.
   branches? }` with `state` `not-ancestor` or `missing`. `rewritten` is the
   newest commit on `HEAD`'s history with the same subject and the same
   `Maestro-Run:` trailer that no таск records; `branches` are the local
-  branches that still hold a `not-ancestor` commit. `onBranch` is the one
-  branch every lost commit is on, set only when none is `missing`.
+  branches that still hold a `not-ancestor` commit. `onBranch` is a
+  branch every lost commit is on, the first by name when several are, set only
+  when none is `missing`.
   `unrecorded` counts таски of a contract below 3, which carry no list.
   `lostCommits` already recorded are not checked again.
   - Exit 0: nothing lost, or `{ result: "unavailable", reason }` when git could

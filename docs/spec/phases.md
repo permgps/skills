@@ -232,9 +232,9 @@ helper classifies every recorded sha as `ancestor`, `not-ancestor` or
 `missing`, and changes nothing; what a lost commit means is the orchestrator's
 to decide, and it writes that through an ordinary `--publish`.
 
-- **A checkout is asked about.** When every lost commit sits on one local branch
-  other than the current one (`onBranch`), the work may be one branch switch
-  away. The прогон names the branch and the таски in one line and stops on an
+- **A checkout is asked about.** When every lost commit sits on a local branch
+  other than the current one (`onBranch`, the first by name when several hold
+  them all), the work may be one branch switch away. The прогон names the branch and the таски in one line and stops on an
   `answer` question, resetting nothing until the user replies.
 - **Otherwise each таск that lost a commit is named in one line, reset and
   relaunched at once.** The lost shas move to `tasks[].lostCommits`, and the

@@ -19,8 +19,8 @@ history, and a прогон that builds on them reviews code that is not there.
   with the same subject and the same `Maestro-Run:` trailer that no таск
   records: most likely what a rebase made of it. A hint, never a substitute.
 - **`branches`** — the local branches that still hold a `not-ancestor` commit.
-- **`onBranch`** — the one branch every lost commit is on, set only when no
-  lost commit is `missing`. That is what a checkout looks like.
+- **`onBranch`** — a branch every lost commit is on (the first by name when
+  several are), set only when no lost commit is `missing`. That is what a checkout looks like.
 
 `result: "unavailable"` means git did not answer. Say so once, reset nothing,
 and continue: no прогон stops on its history.
