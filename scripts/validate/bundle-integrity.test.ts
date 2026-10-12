@@ -19,6 +19,7 @@ import {
   CODEBASE_ANCHORS,
   STOP_ANCHORS,
   TRACE_ANCHORS,
+  RESUME_ANCHORS,
   textAfterHandoff,
   bundleProfileFor,
   carriesLeafRule,
@@ -1518,6 +1519,39 @@ for (const anchor of TRACE_ANCHORS) {
     });
   });
 }
+
+test('every resume anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(RESUME_ANCHORS.length > 0, 'RESUME_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of RESUME_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'resume'), []);
+  });
+});
+
+for (const anchor of RESUME_ANCHORS) {
+  test(`${anchor.file} losing "${anchor.literal}" is the one resume finding, named on that file`, async () => {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, anchor.file);
+      const flat = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal), `${anchor.file} carries no "${anchor.literal}"`);
+      await writeFile(target, flat.split(anchor.literal).join('removed'), 'utf8');
+      const violations = (await checkBundle(copy)).filter(v => v.check === 'resume');
+      assert.deepEqual(violations.map(v => v.file), [anchor.file.split('/').join(path.sep)]);
+      assert.ok((violations[0]?.message ?? '').includes(anchor.literal), violations[0]?.message);
+    });
+  });
+}
+
+test('the flag SKILL.md runs on resume is the one sync.mts dispatches', async () => {
+  const skill = await readFile(fileURLToPath(new URL('../../skills/maestro/SKILL.md', import.meta.url)), 'utf8');
+  const sync = await readFile(fileURLToPath(new URL('../../skills/maestro/tools/sync.mts', import.meta.url)), 'utf8');
+  assert.ok(skill.includes('node .maestro/sync.mts --commits-check'), 'SKILL.md › Recovery runs no --commits-check');
+  assert.ok(sync.includes("args[0] === '--commits-check'"), 'sync.mts dispatches no --commits-check; the resume check would fall through to a refresh');
+  assert.ok(RESUME_ANCHORS.some(anchor => anchor.file === 'SKILL.md' && anchor.literal === '--commits-check'));
+});
 
 test('the closing subject the memory phase commits with is the one the helper greps for', async () => {
   const memory = await readFile(fileURLToPath(new URL('../../skills/maestro/phases/9-memory.md', import.meta.url)), 'utf8');

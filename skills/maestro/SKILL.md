@@ -98,14 +98,11 @@ obligations and checks.
 
 After a compaction, re-read **the state, not the rules**: the run state,
 `manifest.md`, `interfaces.md`, and the file of the phase you are actually in.
-Re-opening earlier phase files to recover the thread spends context on rules
-already executed, and the thread was never in them.
 
 For contract-4 recovery, reconstruct the current target revision, obligations,
 check fingerprints and effective executions, open findings, bounded decisions,
 coverage reviews, and promised work from `verification`. Keep superseded
-executions as history and replay stale checks before claiming conformance. The
-dashboard and report derive their verdicts from this same record.
+executions as history and replay stale checks before claiming conformance.
 
 If `contractVersion` is below 4, open
 [`references/legacy-recovery.md`](references/legacy-recovery.md) before
@@ -116,7 +113,10 @@ restarted.** If the user says anything at all to a run that is not at one of its
 stops — «продолжай», a question, a correction — read `.maestro/state.js` first
 and resume at `currentStage`. Its стадия is open with a `startedAt` and no
 `finishedAt`, its artifacts say how far that стадия actually got, and both are
-truer than your memory of it.
+truer than your memory of it. Before the first write of any recovery, run
+`node .maestro/sync.mts --commits-check`; when it reports `lost` or `onBranch`,
+open [`references/lost-commits.md`](references/lost-commits.md) before writing
+anything. `unavailable` is said once, and the прогон continues.
 
 **Claim the прогон, then check the claim before every write.**
 

@@ -589,4 +589,11 @@ every субагент runs on the session's model, and the announcement says so
 models pin the dials resolved is still written in step 4, because it belongs
 to the project and this host, not to the run.
 
+After the publish that reopens it, run `node .maestro/sync.mts --commits-check`
+as *Recovery* in `SKILL.md` says: a reopened run trusts the commits its таски
+recorded, and the history may have moved since it closed. When it reports
+`lost` or `onBranch`, open
+[`../references/lost-commits.md`](../references/lost-commits.md) before the
+next write.
+
 Then read the manifest phase file.

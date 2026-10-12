@@ -845,6 +845,34 @@ export const TRACE_ANCHORS: readonly Anchor[] = [
 ];
 
 /**
+ * The literal text that makes a resumed прогон check its commits are still there.
+ *
+ * A reset, a rebase or a checkout between sessions takes a таск's commit off
+ * `HEAD`'s history, and nothing in the state says so: `tasks[].commits` still
+ * names it. Only `sync.mts --commits-check` asks git, and only the prose calls
+ * it, so a phase that loses the call or the reference fails silently — the
+ * прогон resumes and reviews code that is not there.
+ */
+export const RESUME_ANCHORS: readonly Anchor[] = [
+  { file: 'SKILL.md', literal: '--commits-check',
+    why: 'a resumed прогон that never runs the check builds on a commit HEAD no longer holds' },
+  { file: 'SKILL.md', literal: 'references/lost-commits.md',
+    why: 'a lost commit with no reference opened is reset by guesswork, or not at all' },
+  { file: 'references/lost-commits.md', literal: 'lostCommits',
+    why: 'a reset that drops the lost sha instead of moving it is refused by the publish, and the прогон stalls' },
+  { file: 'references/lost-commits.md', literal: '## Lost Commit',
+    why: 'the relaunched executor tells a lost-commit handoff from a record of finished work by this heading' },
+  { file: 'references/lost-commits.md', literal: 'awaiting.kind: "answer"',
+    why: 'a checkout answered by rebuilding the таски here duplicates work that is one branch switch away' },
+  { file: 'references/lost-commits.md', literal: 'onBranch',
+    why: 'without the branch the check named, a checkout cannot be told apart from a reset' },
+  { file: 'prompts/executor.md', literal: '## Lost Commit',
+    why: 'an executor that reads a lost-commit handoff as finished work skips what the zone no longer holds' },
+  { file: 'phases/0-preflight.md', literal: '--commits-check',
+    why: 'a reopened run trusts the commits it recorded when it closed, and the history may have moved since' },
+];
+
+/**
  * Names of what contract 8 retired, held out of every shipped file.
  *
  * A dead Markdown link to a deleted phase is already the link pass's finding;
@@ -1306,6 +1334,17 @@ export async function checkBundle(
   // Only a bundle with a memory phase closes a прогон with a commit; Scout has none.
   if (byFile.has('phases/9-memory.md')) {
     for (const v of missingAnchors(byFile, TRACE_ANCHORS, 'trace')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- a resumed прогон checks its commits are still there --------------------
+  // Only a bundle with a memory phase records commits a resume could lose; Scout
+  // has none. The reference lives under references/, which the link pass never
+  // reads, so it is read for this check alone, as the procedures are above.
+  if (byFile.has('phases/9-memory.md')) {
+    const resume = new Map(byFile);
+    const lostCommits = 'references/lost-commits.md';
+    resume.set(lostCommits, await readFile(path.join(bundleDir, lostCommits), 'utf8').catch(() => ''));
+    for (const v of missingAnchors(resume, RESUME_ANCHORS, 'resume')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- what contract 8 retired stays out of the shipped bundle -----------------

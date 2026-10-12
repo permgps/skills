@@ -193,7 +193,7 @@ Then take whatever became launchable and go back to step 3.
 
 **Write each transition into `tasks[]` as it happens**, not in a batch at the
 end. `running` and `startedAt` go in **before** the executor goes out; `files`,
-`tests`, `commit` and `finishedAt` when it returns. `retries`, `repairs` and
+`tests`, the commit appended to `commits` and `finishedAt` when it returns. `retries`, `repairs` and
 `handoffs` are incremented when they are spent. A таск left `queued` while its
 executor is flying makes the screen a lie, and one left `running` through its
 whole review does the same thing more quietly.
