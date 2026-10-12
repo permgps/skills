@@ -889,6 +889,14 @@ their answer, and only then is the отчёт written. Whatever the order, the �
 cites run artifacts by paths relative to its own directory. A round that does
 not close the run writes its отчёт where the run already is.
 
+**The closing candidate says what now exists.** From contract 10 it carries
+`result` ([`state-contract.md`](state-contract.md), *Version 10 Extension*):
+one sentence of at most 200 characters, in the прогон's language, naming what
+was built for the user to use. It says "verified" only when the outcome is
+`completed`, repeats no count the page already shows, and holds no value the
+user would not paste into a chat. The shape is checked at publication; the
+claim is not, and cannot be.
+
 ### When G4 Disagrees
 
 The отчёт is written either way. It is the record of what disagreed, so

@@ -972,6 +972,12 @@ test('every report anchor names a file the shipped bundle has, and the bundle ca
   });
 });
 
+test('closure writing what now exists, and a reopened run dropping it, are anchored on their phases', () => {
+  const literals = REPORT_ANCHORS.map(anchor => `${anchor.file}: ${anchor.literal}`);
+  assert.ok(literals.includes('phases/7-acceptance.md: In the same closing candidate write `result`'), JSON.stringify(literals));
+  assert.ok(literals.includes('phases/0-preflight.md: drops `outcome`, `finishedAt` and `result`'), JSON.stringify(literals));
+});
+
 test('the отчёт losing one question per idea is the one finding, named on the acceptance phase', async () => {
   await withShippedCopy(async copy => {
     const acceptance = path.join(copy, 'phases', '7-acceptance.md');

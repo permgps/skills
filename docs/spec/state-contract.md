@@ -29,17 +29,18 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], model, retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[] }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason?, title? }` | manifest | dashboard |
 | `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
-| `lifecycle` | `active` \| `closed` in contracts 4–9 | preflight | dashboard |
+| `lifecycle` | `active` \| `closed` in contracts 4–10 | preflight | dashboard |
 | `outcome` | `completed` \| `closed_with_exceptions` \| `stopped_incomplete`, only when closed | acceptance | dashboard |
 | `stopReason` | string, required for `stopped_incomplete` | acceptance | dashboard |
-| `verification` | versioned verification index, required in contracts 4–9 | preflight | dashboard |
+| `result` | one line of at most 200 characters saying what now exists, required once closed from contract 10 | acceptance | dashboard |
+| `verification` | versioned verification index, required in contracts 4–10 | preflight | dashboard |
 | `debt` | `{ placeholders[], assumptions[], emptyEnv[] }`, three lists of strings | preflight | dashboard |
 | `additions` | list of strings | preflight | dashboard |
 | `oneWay` | optional list of strings, one inward one-way change each | review | acceptance, dashboard |
 | `signals` | optional list of strings, one recorded signal each, appended by build, review and acceptance | preflight | metrics |
 | `existingCode` | optional boolean, whether the project held code at preflight | preflight | spec |
 | `tests` | `{ passed, failed }` | build | dashboard |
-| `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–9 | acceptance | dashboard |
+| `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–10 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
 | `awaiting` | optional `{ kind, since, note? }`, set by every stop on a question from the манифест on; `note` from contract 9 | manifest | dashboard |
 | `waits` | optional list of `{ since, until }`, the closed waits, from contract 9; appended by `sync.mts --publish` when `awaiting` ends, never by the orchestrator | manifest | dashboard |
@@ -401,9 +402,9 @@ from one that was met.
   resumed run passes its next phase boundary. A stop on a question is not one:
   it writes `awaiting` instead. It is what lets the dashboard show
   an interrupted прогон as interrupted rather than as frozen.
-- **Four fields are written in the прогон's language; every other one is
-  English.** `gates[].findings`, `tasks[].title`, `stages[].note` and
-  `awaiting.note` are the
+- **Five fields are written in the прогон's language; every other one is
+  English.** `gates[].findings`, `tasks[].title`, `stages[].note`,
+  `awaiting.note` and `result` are the
   прогон's own sentences to the user — the page has labels for everything else
   and no vocabulary at all for a line somebody composed — so these carry
   `language`. The boundary is who is speaking, not whether the page shows the
@@ -548,7 +549,24 @@ wait for the user stop the clocks:
 
 All three are refused below 9, as `models` is below 8: a contract-8 run
 reopened under 8 keeps waiting for an `answer` only, keeps today's
-arithmetic, and is never migrated. A new run writes 9.
+arithmetic, and is never migrated.
+
+## Version 10 Extension
+
+Contract 10 keeps verification version 3 and every contract-9 rule, and makes
+closure say what now exists:
+
+- **`result`** is one line of at most 200 characters, in the прогон's
+  language, written by acceptance in the closing candidate. It names what was
+  built and says "verified" only when the outcome is `completed`; no check
+  can read that claim, so that half of the rule is prose only.
+- A **closed** contract-10 state requires it (V3), and an empty, blank,
+  multi-line or longer value is refused (V5).
+- An **active** contract-10 state must not carry it (V2): a reopened run drops
+  `result` together with `outcome` and `finishedAt`.
+- It is refused **below 10** whatever the lifecycle (V6), as `models` is below
+  8: a contract-9 run closes without it and is never migrated. A new run
+  writes 10.
 
 ## Versioning
 
@@ -562,6 +580,12 @@ arithmetic, and is never migrated. A new run writes 9.
 - The contract is changed in `scripts/state/` before it is changed on either
   side. That is what makes the single integration point real rather than
   aspirational.
+
+**Version 10** requires a new field at closure, `result`. A required field
+is what raises it, as `dir` did at 7 and `models` at 8: an optional sentence
+would raise nothing, and a closing прогон that left it out would end without
+saying what it built. The dashboard's `KNOWN_CONTRACT_VERSION` moves with it;
+a contract-9 state renders as it did, with no result line.
 
 **Version 9** widens the value set `awaiting.kind` and adds two optional
 fields, `awaiting.note` and `waits`. The value set is what raises it: a
@@ -652,8 +676,8 @@ The sole installed command is `node .maestro/sync.mts`; its relative
 exports are compatibility facades. The installed helper imports only its own
 modules and `node:*` built-ins. It resolves the run directory from the copied
 entrypoint and the project root from that directory's parent, irrespective of
-cwd or the target's package type. It publishes contracts 4, 5, 6, 7 and 8; each keeps its own verification version,
-and contracts 7 and 8 share verification 3 with contract 6. The contract version of a
+cwd or the target's package type. It publishes contracts 4 through 10; each keeps its own verification version,
+and contracts 7 to 10 share verification 3 with contract 6. The contract version of a
 run does not change between two published states except through the legacy
 resume conversion.
 

@@ -16,6 +16,7 @@ import {
   GATE_STATUSES,
   LANGUAGES,
   LIFECYCLES,
+  RESULT_MAX,
   MODEL_TIERS,
   MODES,
   ONE_WAY_KINDS,
@@ -27,6 +28,7 @@ import {
   TASK_STATUSES,
   isAwaitingNote,
   isMoment,
+  isResultLine,
   type RunState,
 } from './contract.mts';
 import { validateClosureRecord } from './closure.mts';
@@ -124,6 +126,43 @@ function checkRunDir(value: Record<string, unknown>, add: (field: string, messag
     add('dir', `dir must end in ${WIP_SUFFIX} while the прогон is active — write "${expected}"`);
   } else {
     add('dir', `dir must not end in ${WIP_SUFFIX} once the прогон is closed — write "${expected}"`);
+  }
+}
+
+/**
+ * The sentence a closed прогон leaves, against the contract and lifecycle that
+ * carry it.
+ *
+ * From contract 10 a closed run must say what now exists and an active one has
+ * nothing to say yet — a reopened run drops the sentence, and this is what holds
+ * it to that. Below 10 the field is refused rather than ignored, as `models` is
+ * below 8: a contract-9 run closes without it, and a sentence it carried would be
+ * one its own rules never asked for.
+ */
+function checkResult(value: Record<string, unknown>, add: (field: string, message: string) => void): void {
+  const version = value['contractVersion'];
+  const result = value['result'];
+  const lifecycle = value['lifecycle'];
+  // A newer contract is refused as a whole, exactly as checkRunDir does.
+  if (typeof version === 'number' && version > CONTRACT_VERSION) return;
+  const refuse = (problem: 'active' | 'missing' | 'shape', message: string): void => {
+    log.debug('closure-result', 'result refused', { version, lifecycle, present: result !== undefined, problem });
+    add('result', message);
+  };
+  if (typeof version !== 'number' || version < 10) {
+    if (result === undefined) return;
+    log.debug('version-gate', 'field refused for its contract version', { version, field: 'result' });
+    add('result', `result arrives with contract 10 — a contract-${String(version)} run closes without it; remove it`);
+    return;
+  }
+  if (lifecycle !== 'closed') {
+    if (result !== undefined) refuse('active', 'an active прогон has no result yet — remove it; a reopened run drops it');
+    return;
+  }
+  if (result === undefined) {
+    refuse('missing', 'contract 10 requires result once the прогон is closed — write one line saying what now exists');
+  } else if (!isResultLine(result)) {
+    refuse('shape', `result must be one non-empty line of at most ${RESULT_MAX} characters — say what now exists`);
   }
 }
 
@@ -842,6 +881,7 @@ export function validateState(value: unknown): StateViolation[] {
     }
   }
   checkRunDir(value, add);
+  checkResult(value, add);
 
   // The models each tier runs on. Each half is `session` or a name the host
   // reported; which names the host reports is the dials phase's question, never

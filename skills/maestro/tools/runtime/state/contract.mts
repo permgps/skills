@@ -21,6 +21,10 @@
  * against. The dashboard has no handling to add because it never read the field
  * under either name, but it does carry its own copy of this number, and
  * `scripts/validate/state-matches-spec.ts` holds the two together.
+ * Version 10 requires `result` at closure: one line in the прогон's language
+ * saying what now exists, absent while the run is active and refused below 10.
+ * Requiring a field raises the number, as `dir` did at 7 and `models` at 8;
+ * a contract-9 run keeps closing without it. It keeps verification 3.
  * Version 9 widens `awaiting.kind` to the six stops on a question and adds
  * `awaiting.note` and `waits`, the closed waits `sync.mts` keeps. A wider value
  * set raises the number; it keeps verification 3.
@@ -36,7 +40,7 @@
  * readable without inferred verification; validateState enforces the version
  * boundary rather than narrowing this reader-facing interface.
  */
-export const CONTRACT_VERSION = 9;
+export const CONTRACT_VERSION = 10;
 
 /** The stage ids from docs/spec/phases.md, in run order. */
 export type StageId =
@@ -134,6 +138,21 @@ export const AWAITING_NOTE_MAX = 160;
 /** One non-empty line of at most {@link AWAITING_NOTE_MAX} characters. */
 export function isAwaitingNote(raw: unknown): raw is string {
   return typeof raw === 'string' && raw.trim() !== '' && !/[\r\n]/.test(raw) && raw.length <= AWAITING_NOTE_MAX;
+}
+
+/**
+ * The longest `result` a closed state may carry.
+ *
+ * The sentence should name what was built and say "verified" only when the
+ * outcome is `completed`. No check can read a sentence's claim, so that half
+ * of the rule is prose only (`phases/7-acceptance.md` step 5); the shape below
+ * is all `validateState` holds.
+ */
+export const RESULT_MAX = 200;
+
+/** One non-empty line of at most {@link RESULT_MAX} characters. */
+export function isResultLine(raw: unknown): raw is string {
+  return typeof raw === 'string' && raw.trim() !== '' && !/[\r\n]/.test(raw) && raw.length <= RESULT_MAX;
 }
 
 /**
@@ -907,6 +926,13 @@ export interface RunState {
   outcome?: ClosureOutcome;
   /** Required for a stopped incomplete run. */
   stopReason?: string;
+  /**
+   * The прогон's own sentence about what now exists, written by acceptance in
+   * the прогон's language and read by the dashboard. Required on a closed
+   * contract-10 state, absent while active, refused below 10. It claims nothing
+   * it cannot back, which is prose only: see {@link RESULT_MAX}.
+   */
+  result?: string;
   /** Required for contract 4; records and verdicts publish atomically. */
   verification?: VerificationRecord;
   debt?: Debt;

@@ -523,10 +523,10 @@ sentence, and never leave a word untranslated because no label existed — if a
 word the user must read has no English twin in `vocabulary.md`, that is a gap in
 the vocabulary and it is filled there.
 
-**The exception is four fields of `state.js`, and it is the panel that makes
-it one.** `gates[].findings`, `tasks[].title`, `stages[].note` and
-`awaiting.note` are the прогон's own sentences to the user, printed on the
-дашборд word for word, so those four carry the dial's language. Every other field stays English, even
+**The exception is five fields of `state.js`, and it is the panel that makes
+it one.** `gates[].findings`, `tasks[].title`, `stages[].note`,
+`awaiting.note` and `result` are the прогон's own sentences to the user, printed on the
+дашборд word for word, so those five carry the dial's language. Every other field stays English, even
 where the page shows it as written: `debt` and `oneWay` lines, `additions`,
 `stopReason`, a требование's `title` and the verification record's text are
 record lines the отчёт and the gates read too, and the page quotes them in

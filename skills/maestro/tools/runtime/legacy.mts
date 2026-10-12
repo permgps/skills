@@ -44,6 +44,10 @@ export function languageViolations(state: unknown): StateViolation[] {
   if (record(state['awaiting']) && unspoken(state['awaiting']['note'])) {
     errors.push({ field: 'awaiting.note', message: 'has no Russian in it — this прогон speaks ru' });
   }
+  // The fifth sentence the panel prints as written: what a closed run left behind.
+  if (unspoken(state['result'])) {
+    errors.push({ field: 'result', message: 'has no Russian in it — this прогон speaks ru' });
+  }
   return errors;
 }
 export const FOLDED = {
@@ -55,11 +59,15 @@ export function legacyReports(state: unknown): string[] {
   if (messages.length) messages.push('      The page cannot count a status it cannot name: it shows such an entry as written, and the entry counts towards no progress at all.');
   const foreign = languageViolations(state);
   for (const error of foreign) messages.push(`sync: ${error.field} ${error.message}`);
-  // Historical refresh quotes only the four public display fields, as before.
+  // Historical refresh quotes only the five public display fields.
   if (foreign.length && record(state)) {
     for (const error of foreign) {
       if (error.field === 'awaiting.note') {
         messages.push('      ' + JSON.stringify(String((state['awaiting'] as Record<string, unknown>)['note']).slice(0, 100)));
+        continue;
+      }
+      if (error.field === 'result') {
+        messages.push('      ' + JSON.stringify(String(state['result']).slice(0, 100)));
         continue;
       }
       const match = /^(\w+)\[(\d+)\]\.(\w+)(?:\[(\d+)\])?$/.exec(error.field)!;
@@ -68,7 +76,7 @@ export function legacyReports(state: unknown): string[] {
       const line = match[4] === undefined ? value : (value as unknown[])[Number(match[4])];
       messages.push('      ' + JSON.stringify(String(line).slice(0, 100)));
     }
-    messages.push("      These four fields are the прогон's own sentences on the panel, so they carry the dial's language: gates[].findings, tasks[].title, stages[].note, awaiting.note. Every other field stays English, even where the panel quotes it as written.");
+    messages.push("      These five fields are the прогон's own sentences on the panel, so they carry the dial's language: gates[].findings, tasks[].title, stages[].note, awaiting.note, result. Every other field stays English, even where the panel quotes it as written.");
   }
   return messages;
 }

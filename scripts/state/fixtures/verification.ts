@@ -383,3 +383,27 @@ export const contract9State = (): ReturnType<typeof contract6State> => asContrac
 
 /** The contract-9 run while it is still building. */
 export const activeContract9State = (): ReturnType<typeof contract6State> => asContract9(activeContract8State());
+
+/**
+ * Contract 10 is contract 9 plus the прогон's own sentence about what now
+ * exists, required once it is closed and absent while it is active. The
+ * sentence is in the fixture's language, which is English when it names none.
+ */
+export function asContract10<T extends RunState>(state: T): T {
+  const nine = state.contractVersion >= 9 ? state : asContract9(state);
+  const ten: T = { ...nine, contractVersion: 10 };
+  if (ten.lifecycle === 'closed') {
+    ten.result = ten.language === 'ru'
+      ? 'Меню собрано и проверено: оно открывается по наведению и хранит не больше трёх пунктов.'
+      : 'The menu is built and verified: it opens on hover and keeps at most three entries.';
+  } else {
+    delete ten.result;
+  }
+  return ten;
+}
+
+/** The closed contract-10 delivery, with its result line. */
+export const contract10State = (): ReturnType<typeof contract6State> => asContract10(contract9State());
+
+/** The contract-10 run while it is still building: no result yet. */
+export const activeContract10State = (): ReturnType<typeof contract6State> => asContract10(activeContract9State());

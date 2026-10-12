@@ -239,6 +239,16 @@ moves the folder and returns `relocated`; from then on every path, the отчё�
 included, is under the new name. Record any promised further round before offering
 closure; a promise left open blocks every outcome.
 
+In the same closing candidate write `result`: one sentence, in the прогон's
+language, of at most 200 characters, saying what now exists for the user to use.
+It names what was built. It says "verified" only when the outcome is
+`completed` — a `closed_with_exceptions` or `stopped_incomplete` run says
+what it built and stops there. It repeats no count the page already shows, and
+it holds no value the user would not paste into a chat: the page prints it under
+the condition word, word for word. Publication refuses a closed contract-10
+candidate without it; no check can read what the sentence claims, so that half
+is yours.
+
 Then say, in the прогон's language, what the отчёт contains — what was asked
 and what was delivered, what disagreed, what was assumed. Labels are resolved
 from the словарь at that moment, out of the column that language owns; the
@@ -316,7 +326,7 @@ chance to know rather than when it is still cheap to change.
 | Artifact | State |
 |---|---|
 | `.maestro/<dir>/report.md` | its sections for this round, appended; findings quoted as they came back |
-| `.maestro/state.js` | G4 `passed`, `failed`, or `pending`; stage activity separate; `finishedAt` only at authorized lifecycle closure |
+| `.maestro/state.js` | G4 `passed`, `failed`, or `pending`; stage activity separate; `finishedAt` and `result` only at authorized lifecycle closure |
 | project code | unchanged — this phase writes none of it |
 
 The прогон is over but for the **memory** phase, which has rules of its own that

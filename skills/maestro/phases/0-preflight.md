@@ -183,11 +183,11 @@ run artifacts, `serve.json` and `opened.json`. Verify the copied runtime with
 publication. Only after it succeeds, remove the obsolete copied `.maestro/sync.py`
 file, if present; remove no other target file. The helper and runtime are one
 self-contained installation, without npm install, package.json or a build.
-Construct the complete contract-9 candidate in temporary JSON. It carries:
+Construct the complete contract-10 candidate in temporary JSON. It carries:
 
 | Field | Value at preflight |
 |---|---|
-| `contractVersion` | `9` for a new run; never auto-upgrade a historical state |
+| `contractVersion` | `10` for a new run; never auto-upgrade a historical state |
 | `runId` | stable for the whole прогон |
 | `slug` | from step 2 |
 | `dir` | from step 3: `<YYYY-MM-DD>-<slug>--wip`, the date being the UTC day of `startedAt` |
@@ -202,7 +202,7 @@ Construct the complete contract-9 candidate in temporary JSON. It carries:
 | `currentStage` | `preflight` |
 | `tasks`, `requirements` | empty |
 | `gates` | all four — `G1`, `G2`, `G3`, `G4` — `pending`, with no findings |
-| `lifecycle`, `outcome`, `finishedAt` | `active`, with no terminal outcome or closure timestamp |
+| `lifecycle`, `outcome`, `finishedAt`, `result` | `active`, with no terminal outcome, closure timestamp or result |
 | `verification` | `version: 3`, `targetRevision: 1`, provisional acceptance input digest, `manifestDigest` as SHA-256 of empty draft, empty existing record arrays plus `sourceSnapshots`, `sourceClauses`, `manifestAudits`, `scopeMappings`, `journeys`, `negativeControls`; no invented `scopeBaseline`, `repairLimits: { perFinding: 2, total: 8 }`, and the verification-3 lists `readiness`, `defects`, `strategyReviews`, `inheritedExecutionIds`, `inheritedAttemptIds`, all empty |
 | `debt` | three lists, `placeholders`, `assumptions`, `emptyEnv`, empty but for a models mismatch line from step 1b |
 | `additions` | empty |
@@ -522,7 +522,7 @@ when actually available, and the user's authorized current target.
 
 1. Read historical conformance using its original contract. Do not rewrite it.
 2. On explicit resume of a run written before contract 7, prepare an active
-   candidate under the contract the resume conversion targets (never 7, 8 or 9): the
+   candidate under the contract the resume conversion targets (never 7, 8, 9 or 10): the
    run keeps its undated slug directory, gets no `dir` and no register row.
    Reconstruct obligations, unresolved findings, planning, debt, and additions
    from actual artifacts; leave G1 and G4 pending. Preserve published v4 graph,
@@ -543,9 +543,9 @@ capability leaves relevant guarantees not established and G1/G4 pending.
 
 Next action: fresh source audit and agreement, then the ordinary phase sequence.
 
-**Reopening a closed contract-7, contract-8 or contract-9 run** — a бриф the user directs into a run
+**Reopening a closed contract-7, contract-8, contract-9 or contract-10 run** — a бриф the user directs into a run
 that already landed — is not a conversion. Publish an active candidate that
-keeps every published record, drops `outcome` and `finishedAt`, and sets `dir`
+keeps every published record, drops `outcome`, `finishedAt` and `result`, and sets `dir`
 back to `<YYYY-MM-DD>-<slug>--wip` with the date and slug unchanged. Publication
 moves the folder back and returns the register row to in progress; say in the
 chat that the run was reopened under its original date. A reopened run keeps

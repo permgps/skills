@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { validateState, isValidState, type StateViolation } from './validate.ts';
 import { CONTRACT_VERSION, type RunState, type VerificationRecordV3 } from './contract.ts';
-import { activeContract7State, activeContract8State, activeContract9State, contract6State, contract7State, contract8State, contract9State, sourceVerifiedState } from './fixtures/verification.ts';
+import { activeContract10State, activeContract7State, activeContract8State, activeContract9State, contract10State, contract6State, contract7State, contract8State, contract9State, sourceVerifiedState } from './fixtures/verification.ts';
 import { validateStateTransition } from './closure.ts';
 import { prepareLegacyResume } from './projection.ts';
 
@@ -1098,7 +1098,6 @@ test('a state without a title, an awaiting reply or a closed wait validates, at 
   assert.deepEqual(validateState(activeContract8State()), []);
   assert.deepEqual(validateState(activeContract9State()), []);
   assert.deepEqual(validateState(contract9State()), []);
-  assert.equal(CONTRACT_VERSION, 9);
 });
 
 test('a requirement title is one line of text, and an empty or non-string one is reported', () => {
@@ -1229,4 +1228,63 @@ test('a second task, requirement, gate or стадия under an id already taken
   const violations = validateState(state);
   assert.deepEqual(fields(violations), ['stages[1].id', 'tasks[1].id', 'requirements[1].id', 'gates[4].id']);
   assert.match(violations[1]!.message, /tasks\[0\] already carries id "01"/);
+});
+
+// What a closed прогон says it left behind. Contract 10 requires the sentence
+// once the run is closed, refuses it while the run is active, and refuses it
+// below 10 — a contract-9 run keeps closing without one, under its own rules.
+
+test('the contract is 10, and its closed and active deliveries validate clean', () => {
+  assert.equal(CONTRACT_VERSION, 10);
+  assert.deepEqual(validateState(contract10State()), []);
+  assert.deepEqual(validateState(activeContract10State()), []);
+  assert.deepEqual(validateState(contract9State()), []);
+});
+
+test('an active contract-10 прогон without a result validates (V1)', () => {
+  assert.equal('result' in activeContract10State(), false);
+  assert.deepEqual(validateState(activeContract10State()), []);
+});
+
+test('an active contract-10 прогон carrying a result is refused, because a reopened run drops it (V2)', () => {
+  const violations = validateState({ ...activeContract10State(), result: 'The menu is built.' });
+  assert.deepEqual(fields(violations), ['result']);
+  assert.match(violations[0]!.message, /an active прогон has no result yet/);
+});
+
+test('a closed contract-10 прогон without a result is refused (V3)', () => {
+  const closed = contract10State();
+  delete closed.result;
+  const violations = validateState(closed);
+  assert.deepEqual(fields(violations), ['result']);
+  assert.match(violations[0]!.message, /contract 10 requires result once the прогон is closed/);
+});
+
+test('a closed contract-10 прогон with one line of up to 200 characters validates (V4)', () => {
+  assert.deepEqual(validateState({ ...contract10State(), result: 'x' }), []);
+  assert.deepEqual(validateState({ ...contract10State(), result: 'x'.repeat(200) }), []);
+});
+
+test('a result that is empty, blank, two lines, too long or not a string is refused (V5)', () => {
+  for (const bad of ['', '   ', 'two\nlines', 'a carriage\rreturn', 'x'.repeat(201), 42, null]) {
+    const violations = validateState({ ...contract10State(), result: bad } as unknown as RunState);
+    assert.deepEqual(fields(violations), ['result'], JSON.stringify(bad));
+    assert.match(violations[0]!.message, /one non-empty line of at most 200 characters/);
+  }
+});
+
+test('a result below contract 10 is refused, whatever the lifecycle (V6)', () => {
+  for (const state of [contract9State(), activeContract9State()]) {
+    const violations = validateState({ ...state, result: 'The menu is built.' });
+    assert.deepEqual(fields(violations), ['result']);
+    assert.match(violations[0]!.message, /result arrives with contract 10/);
+  }
+});
+
+test('a state newer than this build is refused as a whole, not by the result rule (V7)', () => {
+  const newer = { ...contract10State(), contractVersion: CONTRACT_VERSION + 1 };
+  delete newer.result;
+  const found = fields(validateState(newer));
+  assert.ok(found.includes('contractVersion'));
+  assert.equal(found.includes('result'), false);
 });

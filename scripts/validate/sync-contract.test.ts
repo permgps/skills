@@ -18,13 +18,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { request as httpRequest } from 'node:http';
 import { mkdtemp, mkdir, writeFile, copyFile, readFile, rm, unlink, cp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, sha256, planningOwnershipState, correctedSourceAuditState, deferredScopeState, sourceVerifiedState, controlledState, verifiedState, contract6State, activeContract6State, activeContract9State, contract9State } from '../state/fixtures/verification.ts';
+import { CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, sha256, planningOwnershipState, correctedSourceAuditState, deferredScopeState, sourceVerifiedState, controlledState, verifiedState, contract6State, activeContract6State, activeContract9State, contract9State, activeContract10State, contract10State } from '../state/fixtures/verification.ts';
 import type { RunState } from '../state/contract.ts';
 import { prepareLegacyResume } from '../state/projection.ts';
 
@@ -511,6 +511,16 @@ test('a note on what the прогон waits for is held to the same rule, and qu
       language: 'ru',
       awaiting: { kind: 'spec-gate', since: '2026-08-19T11:50:00.000Z', note: 'спецификация ждёт в чате' },
     });
+    assert.equal(spoken.status, 0, spoken.out);
+  });
+
+test('the sentence a closed прогон leaves is held to the same rule, quoted, and counted as the fifth', async () => {
+    const done = await sync({ ...STATE, language: 'ru', result: 'The landing page is built and verified' });
+    assert.equal(done.status, 1, done.out);
+    assert.match(done.out, /result has no Russian in it/);
+    assert.match(done.out, /The landing page is built and verified/);
+    assert.match(done.out, /These five fields .*awaiting\.note, result\./);
+    const spoken = await sync({ ...STATE, language: 'ru', result: 'Лендинг собран и проверен' });
     assert.equal(spoken.status, 0, spoken.out);
   });
 
@@ -1558,5 +1568,53 @@ test('reopening a closed contract-9 run keeps its waits, and a new run over it s
     const succeeded = target.publish(next, '2026-09-29T10:10:00Z', 'ab12c');
     assert.equal(succeeded.code, 0, JSON.stringify(succeeded));
     assert.equal('waits' in (await target.published()), false);
+  } finally { await target.dispose(); }
+});
+
+// What publication does with the sentence a closed прогон leaves. The closing
+// publish is the one that relocates the folder, so a refusal must leave it put.
+
+const CLOSED_DIR = '2026-09-29-synthetic-menu';
+
+test('a closing contract-10 candidate with its result publishes and moves the folder off --wip', async () => {
+  const target = await waitingProject();
+  try {
+    assert.equal(target.publish(activeContract10State()).code, 0);
+    const done = target.publish(contract10State(), activeContract10State().updatedAt);
+    assert.equal(done.code, 0, JSON.stringify(done));
+    const relocated = done['relocated'] as { from: string; to: string };
+    assert.deepEqual([relocated.from, relocated.to], [WAIT_WIP, CLOSED_DIR]);
+    assert.equal((await target.published()).result, contract10State().result);
+  } finally { await target.dispose(); }
+});
+
+test('a closing contract-10 candidate without a result is refused, and the folder stays where it was', async () => {
+  const target = await waitingProject();
+  try {
+    assert.equal(target.publish(activeContract10State()).code, 0);
+    const closing = contract10State();
+    delete closing.result;
+    const done = target.publish(closing, activeContract10State().updatedAt);
+    assert.equal(done.code, 1, JSON.stringify(done));
+    assert.ok((done['violations'] as { field: string }[]).some(item => item.field === 'result'));
+    assert.equal(existsSync(path.join(target.maestro, WAIT_WIP)), true);
+    assert.equal(existsSync(path.join(target.maestro, CLOSED_DIR)), false);
+  } finally { await target.dispose(); }
+});
+
+test('reopening a closed contract-10 run that keeps its result is refused', async () => {
+  const target = await waitingProject();
+  try {
+    assert.equal(target.publish(activeContract10State()).code, 0);
+    const closing = contract10State();
+    assert.equal(target.publish(closing, activeContract10State().updatedAt).code, 0);
+    const reopened: RunState = { ...closing, lifecycle: 'active', dir: WAIT_WIP, updatedAt: '2026-09-29T10:00:00Z' };
+    delete reopened.outcome; delete reopened.finishedAt;
+    const kept = target.publish(reopened, closing.updatedAt);
+    assert.equal(kept.code, 1, JSON.stringify(kept));
+    assert.ok((kept['violations'] as { field: string }[]).some(item => item.field === 'result'));
+    delete reopened.result;
+    const dropped = target.publish(reopened, closing.updatedAt);
+    assert.equal(dropped.code, 0, JSON.stringify(dropped));
   } finally { await target.dispose(); }
 });

@@ -570,6 +570,10 @@ export const DIAGNOSIS_ANCHORS: readonly Anchor[] = [
  * for it.
  */
 export const REPORT_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/7-acceptance.md', literal: 'In the same closing candidate write `result`',
+    why: 'a closed contract-10 run publishes only with the sentence saying what now exists, and the page prints it' },
+  { file: 'phases/0-preflight.md', literal: 'drops `outcome`, `finishedAt` and `result`',
+    why: 'a reopened run that kept its result would be refused as an active run with a closing sentence' },
   { file: 'phases/3-spec.md', literal: 'The `debt.placeholders` entry is one line with fixed labels',
     why: 'a bare placeholder line gives the questionnaire nothing to ask and no reason to give' },
   { file: 'phases/3-spec.md', literal: '`matters:` is what stays a placeholder until they do',
