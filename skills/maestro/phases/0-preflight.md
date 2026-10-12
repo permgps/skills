@@ -274,6 +274,36 @@ after step 4 because the helper is copied there. Phase 9 of an earlier прог�
 wrote these files so that this one would not rediscover what was already
 settled. Until this step, nothing read them.
 
+**`prior.md` also holds where the work stands.** The helper copies
+`.maestro/PROGRESS.md`, which the last closing publish wrote, under *Where The
+Work Stands*, and lists the commits over code since that closure under *Since
+The Last Closure*, with the paths they changed. The JSON line reports both:
+`progress` (`absent` or `read`) and `commits` — its `state`, `basis`,
+`range`, `count` and `paths`. Commits that touched only `.maestro/` and the
+memory files are not code and are not counted.
+
+**Past thirty commits the first read writes nothing** and answers
+`action: "summary-needed"`, with the range in `commits.range`. Dispatch the
+commit reader once, on the `standard` model, with
+[`../prompts/commit-reader.md`](../prompts/commit-reader.md), the project root
+and that range, and nothing else. Then call the read again with its lines on
+stdin:
+
+```text
+node .maestro/sync.mts --memory-read --run-dir <dir> --commit-summary
+```
+
+One to ten non-empty lines are written in place of the list; any other count is
+exit 1 and nothing is written, so trim the reader's answer to its lines and call
+once more. When the reader failed or returned nothing usable, call with
+`--no-commit-summary` instead: the newest thirty subjects are written with a
+count of the rest. That is a decision taken on the user's behalf, so append one
+line to `debt.assumptions` in the same publish that records `existingCode`:
+
+```text
+commits since the last closure not summarised: <reason>
+```
+
 **The project glossary is the user's own file of words.** The helper reads
 `GLOSSARY.md` or `CONTEXT.md` at the project root, and a `GLOSSARY-MAP.md`
 or `CONTEXT-MAP.md` together with every file the map links to. Nothing in
@@ -496,7 +526,7 @@ nothing yet to check against the user's words.
 | `.maestro/<dir>/` | `<YYYY-MM-DD>-<slug>--wip`, created with a zero-byte provisional `manifest.md`; no source agreement yet |
 | `.maestro/README.md` | the register, with this run's row in progress — written by the first publish, never by hand |
 | `.maestro/config.json` | `models.<host>` set by `--config-models` when the dials handed a pin; nothing else in it changed |
-| `.maestro/<dir>/prior.md` | the memory block, the project glossary and earlier runs' decisions, written once by `--memory-read` |
+| `.maestro/<dir>/prior.md` | the memory block, the project glossary, earlier runs' decisions, the progress file and the commits since the last closure, written once by `--memory-read` |
 | `.maestro/state.js` | written, `preflight` active, `existingCode` recorded |
 | `.maestro/dashboard.html` | copied, mirrored, and opened |
 | `.maestro/sync.mts`, `runtime/`, `index.html` | complete helper copied and index placed when available |

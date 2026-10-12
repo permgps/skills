@@ -103,8 +103,8 @@ beneath the бриф; it never buys a direction away from it.
 
 Which model each субагент runs on. There are two tiers: **`strong`** runs every
 judge, every `strong` таск and every repair; **`standard`** runs `standard`
-таски, the existing-code reader and the preflight probe. You stay on the
-session's model. Who is dispatched on which tier is the delegation rule in
+таски, the existing-code reader, the commit reader and the preflight probe.
+You stay on the session's model. Who is dispatched on which tier is the delegation rule in
 `SKILL.md`; this section only resolves which model each tier names.
 
 Built-in default for `models`: `session/session`.

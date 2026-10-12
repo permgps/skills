@@ -29,6 +29,14 @@ export const OWN_ANSWER = 'own answer';
 /** The `Answer:` value for a fork the прогон settled itself. */
 export const SELF_BRIEFED = 'self-briefed';
 
+/**
+ * The one heading accepted without an `R##`: the question that offers work an
+ * earlier прогон left open (`### Leftovers — <gist>`). It belongs to no
+ * требование, because the items it lists are in no манифест yet. Every other
+ * rule — options, one recommended, `Answer:`, `Chosen:` — still holds.
+ */
+export const LEFTOVERS_HEADING = 'Leftovers';
+
 const RECOMMENDED_MARKER = '(recommended';
 
 export interface AnswerOption {
@@ -45,6 +53,8 @@ export interface AnswerEntry {
   requirementId: string;
   /** The heading text after the id and its separator. */
   gist: string;
+  /** The entry is the leftovers question, which names no требование by design. */
+  leftovers: boolean;
   asked: string;
   /** `null` when the entry has no `Options:` block at all. */
   options: AnswerOption[] | null;
@@ -76,11 +86,17 @@ function toOption(raw: string): AnswerOption {
   return { text: collapse(raw.slice(0, index)), recommended: true };
 }
 
-function headingParts(heading: string): { requirementId: string; gist: string } {
+const LEFTOVERS = new RegExp(`^\\s*${LEFTOVERS_HEADING}(?:\\s*[—–:-]+\\s*(.*))?$`);
+
+function headingParts(heading: string): { requirementId: string; gist: string; leftovers: boolean } {
+  // Checked first: a gist may mention an R## it lists, and that must not make the
+  // question belong to one требование.
+  const leftovers = LEFTOVERS.exec(heading);
+  if (leftovers) return { requirementId: '', gist: collapse(leftovers[1] ?? ''), leftovers: true };
   const match = REQUIREMENT_ID.exec(heading);
-  if (!match) return { requirementId: '', gist: collapse(heading) };
+  if (!match) return { requirementId: '', gist: collapse(heading), leftovers: false };
   const rest = heading.slice(match.index + match[0].length);
-  return { requirementId: match[0], gist: collapse(rest.replace(/^\s*[—–:-]+\s*/, '')) };
+  return { requirementId: match[0], gist: collapse(rest.replace(/^\s*[—–:-]+\s*/, '')), leftovers: false };
 }
 
 /**
@@ -184,7 +200,13 @@ function entryFindings(entry: AnswerEntry): Array<{ rule: string; message: strin
   const options = entry.options ?? [];
   const where = `answers.md line ${entry.line}`;
 
-  if (entry.requirementId === '') {
+  if (entry.leftovers) {
+    log.debug('rule', 'heading exception applies', { heading: 'leftovers', line: entry.line });
+    if (entry.gist === '') {
+      findings.push({ rule: 'heading', message:
+        `${where}: ${LEFTOVERS_HEADING} travels alone — add a short gist after it, "### ${LEFTOVERS_HEADING} — <gist>"` });
+    }
+  } else if (entry.requirementId === '') {
     findings.push({ rule: 'heading', message:
       `${where}: the entry names no требование — head it "### R## — <gist>", so the answer arrives attached to something` });
   } else if (entry.gist === '') {

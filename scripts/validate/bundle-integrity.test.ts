@@ -693,6 +693,22 @@ test('the answers.md template the briefing phase ships passes the G1 answers che
   assert.deepEqual(checkAnswers(entries), []);
 });
 
+/** The fenced leftovers entry step 4 of the shipped briefing phase prescribes. */
+async function shippedLeftoversTemplate(): Promise<string> {
+  const body = await readFile(SHIPPED_BRIEFING, 'utf8');
+  const match = /```markdown\n(### Leftovers —[\s\S]*?)```/.exec(body);
+  assert.ok(match, 'phases/2-briefing.md carries no fenced leftovers entry');
+  return match[1]!;
+}
+
+test('the leftovers template the briefing phase ships passes the G1 answers check with no требование', async () => {
+  const entries = parseAnswers(await shippedLeftoversTemplate());
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0]?.leftovers, true);
+  assert.equal(entries[0]?.requirementId, '');
+  assert.deepEqual(checkAnswers(entries), []);
+});
+
 test('the shipped template without its Chosen line is exactly one G1 finding', async () => {
   const template = await shippedAnswersTemplate();
   const withoutChosen = template.split('\n').filter(line => !line.startsWith('Chosen:')).join('\n');

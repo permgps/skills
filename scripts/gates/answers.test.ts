@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { checkAnswers, chosenText, parseAnswers, OWN_ANSWER } from './answers.ts';
+import { LEFTOVERS_HEADING, checkAnswers, chosenText, parseAnswers, OWN_ANSWER } from './answers.ts';
 
 const OPTION_ONE = 'Оплата картой на сайте';
 const OPTION_TWO = 'Оплата при получении';
@@ -224,4 +224,43 @@ test('every entry in a file is checked, not just the first', () => {
 test('a level-two heading ends an entry, so its text does not leak into the next one', () => {
   const markdown = `${entry({ chosen: null })}\n## Round 2\nChosen: ${OPTION_ONE}\n`;
   assert.equal(findingsFor(markdown).length, 1);
+});
+
+// --- the leftovers question: the one heading without a требование ----------------
+
+test('a well-formed leftovers entry passes with no требование named', () => {
+  const entries = parseAnswers(entry({ heading: 'Leftovers — работа прошлых прогонов' }));
+  assert.equal(entries[0]?.leftovers, true);
+  assert.equal(entries[0]?.gist, 'работа прошлых прогонов');
+  assert.deepEqual(checkAnswers(entries), []);
+});
+
+test('a leftovers entry with no recommended option fails with the ordinary message', () => {
+  const findings = findingsFor(entry({ heading: `${LEFTOVERS_HEADING} — прошлые прогоны`, recommended: [false, false] }));
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]!.message, /0 options are marked "\(recommended — …\)"/);
+});
+
+test('a leftovers entry with no Chosen line still fails, because only the heading is excepted', () => {
+  const findings = findingsFor(entry({ heading: 'Leftovers — прошлые прогоны', chosen: null }));
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]!.message, /no "Chosen:" line/);
+});
+
+test('a misspelt leftovers heading still fails as naming no требование', () => {
+  const findings = findingsFor(entry({ heading: 'Leftover — прошлые прогоны' }));
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]!.message, /names no требование/);
+});
+
+test('a leftovers heading with no gist is a finding, as a bare R## is', () => {
+  const findings = findingsFor(entry({ heading: 'Leftovers' }));
+  assert.equal(findings.length, 1);
+  assert.match(findings[0]!.message, /add a short gist/);
+});
+
+test('a requirement id inside the leftovers gist does not turn the entry into that требование', () => {
+  const entries = parseAnswers(entry({ heading: 'Leftovers — R03 и баг меню' }));
+  assert.equal(entries[0]?.leftovers, true);
+  assert.equal(entries[0]?.requirementId, '');
 });

@@ -216,7 +216,7 @@ specification says it narrows — or the reverse — is the same defect seen fro
 the reference side.
 
 `gate-readers` proves that every independent reader — the gate readers of G1,
-G2, G3 and G4, and the standards and existing-code readers that gate nothing —
+G2, G3 and G4, and the standards, existing-code and commit readers that gate nothing —
 is handed exactly
 what [`gates.md`](gates.md) says it is. That
 list lives in five places: the gate table, the phase table, the phase file, the

@@ -426,7 +426,7 @@ On Codex use the demand-loaded runtime recipe selected by preflight and each
 dispatch phase. Never inherit coordinator history into an independent role.
 Pass each dispatch its tier's model from `models` (`session`, or a contract-7 run with no
 `models`, passes none), effort as the session's: judges and repairs `strong`, a build executor
-its таск's tier, the existing-code reader and the probe `standard`. A judge never runs `standard`.
+its таск's tier, the existing-code reader, the commit reader and the probe `standard`. A judge never runs `standard`.
 
 An independent reader, reviewer, or executor is a separate agent dispatch with
 its own bounded inputs and a returned result. A summary you write yourself is

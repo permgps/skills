@@ -185,7 +185,7 @@ export const JUDGE_BRIEFS: readonly string[] = [
 ];
 
 /** Briefs that are not judges and run on `standard`: reading, not deciding. */
-export const STANDARD_BRIEFS: readonly string[] = ['existing-code-reader.md'];
+export const STANDARD_BRIEFS: readonly string[] = ['existing-code-reader.md', 'commit-reader.md'];
 
 /** The one brief whose tier is the таск's own, marked by the plan. */
 export const TIERED_BRIEFS: readonly string[] = ['executor.md'];

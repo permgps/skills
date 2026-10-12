@@ -19,6 +19,7 @@ discovered only when the build fails. Your text is written verbatim into
 | `manifest.md` | the numbered requirement list, `R01`…, which says what the work is |
 | `answers.md` | every briefing question with the option it ended on, including forks settled by reading code |
 | the repository | the project root, at the absolute path you are handed |
+| changed since the last closure | the paths that changed in code since the last прогон closed, or "none" |
 
 ## What You Are Not Given
 
@@ -40,6 +41,10 @@ commands that only describe themselves; there is nothing to open.
 
 **What does the repository already hold that this work will touch, and what
 does it call it?**
+
+Read the paths changed since the last closure first, when you are handed any.
+They changed outside Maestro, so they are where an earlier прогон's names are
+most likely to have moved. You are not asked to judge those changes.
 
 You report what exists, never what to build. A recommendation, a design, or a
 judgement of the code's quality is outside this brief.

@@ -302,7 +302,7 @@ and the skeleton laid first, and, by the planner's judgement with a one-line
 reason, a таск touching sign-in, money, deletion, secrets or outgoing
 messages, or one whose core is hard.
 **`standard`** runs the ordinary таски, the
-existing-code reader and one preflight probe. The orchestrator itself stays on
+existing-code reader, the commit reader and one preflight probe. The orchestrator itself stays on
 your session's model. `session` means no model is passed at all.
 
 A slash word counts as this dial only when both halves are model names your

@@ -203,7 +203,7 @@ is gone.
 
 Which model each субагент runs on. There are two **tiers**: `strong` runs every
 judge, every `strong` таск and every repair; `standard` runs `standard`
-таски, the existing-code reader and the preflight probe. The orchestrator stays
+таски, the existing-code reader, the commit reader and the preflight probe. The orchestrator stays
 on the session's model.
 
 | Models | Strong | Standard | Default | Note |
@@ -243,6 +243,7 @@ at that model's default effort.
 | preflight probe | — | `standard` |
 | G1 source reader | `manifest-reader.md` | `strong` |
 | existing-code reader | `existing-code-reader.md` | `standard` |
+| commit reader | `commit-reader.md` | `standard` |
 | G2 intent reader | `independent-reader.md` | `strong` |
 | G2 reference reader | `reference-reader.md` | `strong` |
 | G3 task reader | `task-reader.md` | `strong` |

@@ -236,7 +236,10 @@ repair budget uses `stopped_incomplete` with a reason. Stamp `finishedAt` only
 at that closure transition, and in the same candidate set `dir` to the name
 without `--wip` — every closure takes it off, whichever outcome. Publication
 moves the folder and returns `relocated`; from then on every path, the отчёт's
-included, is under the new name. Record any promised further round before offering
+included, is under the new name. The same closing publish rewrites
+`.maestro/PROGRESS.md` from the closed state and reports `progress`: `written`,
+or `failed`, which you say to the user in one line and which is not a stop — the
+next closing publish rewrites the file. Record any promised further round before offering
 closure; a promise left open blocks every outcome.
 
 In the same closing candidate write `result`: one sentence, in the прогон's
