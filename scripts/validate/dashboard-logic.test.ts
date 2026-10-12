@@ -2767,6 +2767,30 @@ test('E10: after a failed acceptance the repair chain is counted, and no second 
   assert.equal(L.estimateCaption(estimate, 1, 'ru'), 'Критический путь: 1 таск в цепочке');
 });
 
+test('E1: with both stages ahead but fewer than two finished таски, the shares never stand in for the missing median', () => {
+  const state = ahead([task('01', { status: 'done', startedAt: T('10:00'), finishedAt: T('10:20') }), task('02', { status: 'queued' })], [
+    { id: 'build', status: 'active', startedAt: T('10:00') },
+    { id: 'review', status: 'pending' },
+    { id: 'acceptance', status: 'pending' }]);
+  assert.equal(L.estimateMs(state, AHEAD_NOW, DENSE), null);
+  assert.match(L.explain('estimate', state, AHEAD_NOW, DENSE)[1]!, /^Пока не из чего считать/);
+});
+
+test('E9: the recorded finished прогон adds no stage, and every explanation says there is nothing left to estimate', async () => {
+  const state = parseStateSource(await readFile('docs/assets/state-finished.fixture.js', 'utf8')) as Record<string, unknown>;
+  assert.ok(state['finishedAt'], 'the finished fixture must carry finishedAt');
+  const now = AT(String(state['finishedAt']));
+  const estimate = plain(L.estimateMs(state, now, L.collectMarks(state))) as Estimate | null;
+  assert.ok(estimate === null || estimate.stages.length === 0, `a finished прогон still adds ${JSON.stringify(estimate)}`);
+  for (const register of ['normal', 'plain']) {
+    for (const language of ['ru', 'en']) {
+      const lines = L.explain('estimate', state, now, L.collectMarks(state), register, language);
+      assert.equal(lines.length, 2, `${register}/${language} explains a finished estimate in more than its two lines`);
+      assert.match(lines[1]!, /оценивать больше нечего|nothing left to estimate/);
+    }
+  }
+});
+
 test('the recorded running прогон: development and review overlap, and the range still runs to acceptance', async () => {
   const state = parseStateSource(await readFile('docs/assets/state-running.fixture.js', 'utf8')) as Record<string, unknown>;
   const now = AT(String(state['updatedAt']));

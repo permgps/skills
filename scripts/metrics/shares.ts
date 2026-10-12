@@ -86,7 +86,11 @@ export function stageShares(runs: readonly RecordedRun[]): StageShares {
     const share = shareOf(run.stages);
     if (share.review === null && share.acceptance === null) {
       excluded += 1;
-      log.warn('shares', 'run gives no share and is left out', { runId: run.runId, reason: 'no build span to divide by' });
+      // Two different gaps end here, and the fix for each lives in a different
+      // stamp, so the warning names the one this run actually has.
+      const build = stageSpan(run.stages, 'build');
+      const reason = build === null || build <= 0 ? 'no build span to divide by' : 'neither review nor acceptance has a span';
+      log.warn('shares', 'run gives no share and is left out', { runId: run.runId, reason });
       continue;
     }
     usable += 1;

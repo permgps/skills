@@ -56,6 +56,24 @@ test('a run that cannot give a ratio is excluded and counted, never averaged in 
   assert.deepEqual(shares.acceptance, { low: 0.3, high: 0.5 });
 });
 
+test('a left-out run is logged with the reason it gave no share, not always a missing build', () => {
+  const lines: string[] = [];
+  const original = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((chunk: string | Uint8Array): boolean => { lines.push(String(chunk)); return true; }) as typeof process.stderr.write;
+  const noBuild: RecordedRun = { runId: 'no-build', contractVersion: 1, stages: [{ id: 'review', startedAt: at(0), finishedAt: at(9) }] };
+  const buildOnly: RecordedRun = { runId: 'build-only', contractVersion: 2, stages: [{ id: 'build', startedAt: at(0), finishedAt: at(100) }] };
+  let shares: ReturnType<typeof stageShares>;
+  try { shares = stageShares([noBuild, buildOnly]); } finally { process.stderr.write = original; }
+  assert.equal(shares.excluded, 2);
+  const warning = (runId: string): string => {
+    const line = lines.find(entry => entry.startsWith('WARN') && entry.includes(`"runId":"${runId}"`));
+    assert.ok(line, `no WARN for ${runId} in:\n${lines.join('')}`);
+    return line;
+  };
+  assert.match(warning('no-build'), /"reason":"no build span to divide by"/);
+  assert.match(warning('build-only'), /"reason":"neither review nor acceptance has a span"/);
+});
+
 test('the six recorded прогоны give the shares the specification states', () => {
   const shares = stageShares(RECORDED_STAGES);
   assert.equal(shares.runs, 6);
