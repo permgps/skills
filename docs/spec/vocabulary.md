@@ -225,6 +225,11 @@ term, and a term with two homes drifts.
 | Вид не распознан | Kind not recognised | The group of one-way changes whose kind the contract does not define, kept as written |
 | Показать ещё | Show more | The press that opens a folded group, with the number of lines behind it |
 | Свернуть | Fold | The press that folds an opened group again |
+| Фильтр требований | Filter the requirements | The group of chips over the requirement list, as a screen reader names it |
+| Все | All | The chip that shows every требование, with their count; the other chips add up to it |
+| Показать все | Show all | The press under the requirement list, with the count of the chosen chip — the whole group, not the part still hidden |
+| В этой группе требований нет | No requirements in this group | The one muted line of a chosen chip that holds nothing |
+| Причина | Reason | The muted line under a deferred, placeholder or dropped требование: its `reason`, as the прогон wrote it |
 | G1 | G1 | The gate after брифинг, shown as a row of Гейты |
 | G2 | G2 | The gate after спецификация |
 | G3 | G3 | The gate after план |
@@ -276,6 +281,10 @@ here as three buckets). The rows are in the order the page lists them, and
 | `built` | Построено | Built | Not deferred, and every таск naming it is done. Never verified; the card says Прошло проверку only once the current finished-work check passed |
 | `in-progress` | В работе | In progress | Not deferred, and no таск names it, or one that does is running, in review, in repair, queued, failed or off-contract |
 | `deferred` | Отложено | Deferred | The user put it off. Live, so it counts in the denominator, but never built |
+
+The requirement list's filter uses these three words for its chips, beside
+«Все» from *Screen Labels* and the status word «Снято» from *Value Labels* —
+[`dashboard.md`](dashboard.md) › *Your Words, Filtered*.
 
 ## Feed
 

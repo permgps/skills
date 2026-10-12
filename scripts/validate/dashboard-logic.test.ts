@@ -162,6 +162,16 @@ interface Logic {
     live: number; built: number; inProgress: number; deferred: number; verified: number | null;
     ids: Record<'built' | 'in-progress' | 'deferred', string[]>;
   };
+  REQUIREMENT_FILTER_ORDER: string[];
+  REQUIREMENTS_SHOWN: number;
+  requirementFilterOf: (state: unknown) => {
+    counts: Record<string, number>; ids: Record<string, string[]>; chips: string[];
+  };
+  requirementListOf: (state: unknown, filter: unknown, open: boolean) => {
+    filter: string; ids: string[]; total: number; hidden: number; folds: boolean;
+  };
+  requirementReasonOf: (requirement: unknown) => string | null;
+  filterChipLabel: (key: string, count: number, language?: string) => string;
   taskSquaresOf: (state: unknown) => Array<{ id: string; title: string | null; status: string }>;
   taskReasonOf: (state: unknown, id: string) =>
     { kind: 'sent-back'; text: string } | { kind: 'repair-outcome'; outcome: string } | null;
@@ -3220,6 +3230,300 @@ test('the plain feed explanation, composed from live data, says no shorthand', a
       for (const word of banned) {
         const says = wordwise ? new RegExp(`\\b${word}\\b`).test(said) : said.includes(word);
         assert.ok(!says, `${language}: the plain feed explanation says "${word}"`);
+      }
+    }
+  }
+});
+
+// --- the requirement list's filter -------------------------------------------
+
+/** A требование with a reason, as the manifest writes one for a deferral or a drop. */
+const reasoned = (id: string, status: string, reason: unknown): Record<string, unknown> => ({ id, status, reason });
+
+/** `count` in-spec требования, R01 upward, every one named by a single done таск. */
+const builtList = (count: number): Record<string, unknown> => {
+  const ids = Array.from({ length: count }, (_, index) => `R${String(index + 1).padStart(2, '0')}`);
+  return bare({
+    requirements: ids.map(id => requirement(id, 'in-spec')),
+    tasks: [task('01', { status: 'done', requirementIds: ids })],
+  });
+};
+
+const holdsListPartition = (state: unknown, where: string): void => {
+  const { counts } = L.requirementFilterOf(state);
+  assert.equal(counts['built']! + counts['in-progress']! + counts['deferred']! + counts['dropped']!, counts['all'],
+    `${where}: built + in progress + deferred + dropped is all`);
+};
+
+test('the filter\'s order is all, the card\'s three buckets in the card\'s order, then dropped', () => {
+  assert.deepEqual(plain(L.REQUIREMENT_FILTER_ORDER), ['all', ...L.REQUIREMENT_PROGRESS_ORDER, 'dropped']);
+  assert.equal(L.REQUIREMENTS_SHOWN, 10);
+});
+
+test('L1: a state with no требования gives zero counts and the four chips, and never throws', () => {
+  for (const state of [{}, null, bare(), bare({ requirements: undefined })]) {
+    const filter = plain(L.requirementFilterOf(state)) as ReturnType<Logic['requirementFilterOf']>;
+    assert.deepEqual(filter.chips, ['all', 'built', 'in-progress', 'deferred']);
+    for (const key of L.REQUIREMENT_FILTER_ORDER) {
+      assert.equal(filter.counts[key], 0, key);
+      assert.deepEqual(filter.ids[key], [], key);
+    }
+    assert.deepEqual(plain(L.requirementListOf(state, null, false)),
+      { filter: 'all', ids: [], total: 0, hidden: 0, folds: false });
+  }
+});
+
+test('L2 and L4: no stored filter, or one this page does not know, reads as all', () => {
+  const state = builtList(3);
+  for (const stored of [null, undefined, 'verified', 'R01', 7]) {
+    const list = L.requirementListOf(state, stored, false);
+    assert.equal(list.filter, 'all', String(stored));
+    assert.deepEqual(plain(list.ids), ['R01', 'R02', 'R03'], String(stored));
+  }
+});
+
+test('L3: a stored dropped with nothing dropped reads as all, and dropped is not a chip', () => {
+  const state = bare({ requirements: [requirement('R01', 'in-spec'), requirement('R02', 'deferred')] });
+  assert.deepEqual(plain(L.requirementFilterOf(state).chips), ['all', 'built', 'in-progress', 'deferred']);
+  const list = L.requirementListOf(state, 'dropped', false);
+  assert.equal(list.filter, 'all');
+  assert.deepEqual(plain(list.ids), ['R01', 'R02']);
+});
+
+test('dropped becomes a chip as soon as one требование is dropped, and a stored dropped holds again', () => {
+  const state = bare({ requirements: [requirement('R01', 'in-spec'), reasoned('R02', 'dropped', 'duplicate of R01')] });
+  const filter = L.requirementFilterOf(state);
+  assert.deepEqual(plain(filter.chips), ['all', 'built', 'in-progress', 'deferred', 'dropped']);
+  assert.deepEqual(plain(filter.ids['dropped']), ['R02']);
+  const list = L.requirementListOf(state, 'dropped', false);
+  assert.deepEqual([list.filter, plain(list.ids), list.total], ['dropped', ['R02'], 1]);
+  holdsListPartition(state, 'one dropped');
+});
+
+test('L5: a drawn chip at zero can be chosen and holds no rows', () => {
+  const state = bare({ requirements: [requirement('R01', 'in-spec')] });
+  const list = L.requirementListOf(state, 'built', false);
+  assert.deepEqual(plain(list), { filter: 'built', ids: [], total: 0, hidden: 0, folds: false });
+});
+
+test('L6: a chip holding ten rows or fewer shows them all and folds nothing', () => {
+  for (const count of [1, 10]) {
+    const list = L.requirementListOf(builtList(count), 'built', false);
+    assert.deepEqual([list.ids.length, list.total, list.hidden, list.folds], [count, count, 0, false], String(count));
+  }
+});
+
+test('L7: a chip holding more than ten shows ten folded and every row opened', () => {
+  const state = builtList(14);
+  const folded = L.requirementListOf(state, 'built', false);
+  assert.deepEqual(plain(folded.ids), ['R01', 'R02', 'R03', 'R04', 'R05', 'R06', 'R07', 'R08', 'R09', 'R10']);
+  assert.deepEqual([folded.total, folded.hidden, folded.folds], [14, 4, true]);
+  const opened = L.requirementListOf(state, 'built', true);
+  assert.deepEqual([opened.ids.length, opened.total, opened.hidden, opened.folds], [14, 14, 0, true]);
+});
+
+test('L8: the total is the chosen chip\'s count, so the press always counts the chip in view', () => {
+  const state = builtList(12);
+  (state['requirements'] as unknown[]).push(requirement('R13', 'deferred'), requirement('R14', 'open'));
+  assert.deepEqual([L.requirementListOf(state, 'all', false).total, L.requirementListOf(state, 'all', false).hidden], [14, 4]);
+  assert.deepEqual([L.requirementListOf(state, 'built', false).total, L.requirementListOf(state, 'built', false).hidden], [12, 2]);
+  assert.deepEqual(plain(L.requirementListOf(state, 'deferred', false)),
+    { filter: 'deferred', ids: ['R13'], total: 1, hidden: 0, folds: false });
+});
+
+test('L9: a deferred, placeholder or dropped требование gives its reason, trimmed', () => {
+  for (const status of ['deferred', 'placeholder', 'dropped']) {
+    assert.equal(L.requirementReasonOf(reasoned('R01', status, '  waiting for the domain  ')), 'waiting for the domain', status);
+  }
+});
+
+test('L10: an absent, blank or non-string reason gives no line', () => {
+  for (const reason of [undefined, null, '', '   ', 7, { text: 'x' }]) {
+    assert.equal(L.requirementReasonOf(reasoned('R01', 'deferred', reason)), null, JSON.stringify(reason));
+  }
+  assert.equal(L.requirementReasonOf(null), null);
+  assert.equal(L.requirementReasonOf('R01'), null);
+});
+
+test('L11: an open or in-spec требование gives no reason line even when it carries one', () => {
+  for (const status of ['open', 'in-spec', 'teleported']) {
+    assert.equal(L.requirementReasonOf(reasoned('R01', status, 'not yet briefed')), null, status);
+  }
+});
+
+test('L12: after G4 passes the bucket is still built, because the chip sorts by build progress', () => {
+  const filter = L.requirementFilterOf(verifiedState());
+  assert.deepEqual(plain(filter.ids['built']), ['R01']);
+  assert.ok(!filter.chips.includes('verified'));
+  holdsListPartition(verifiedState(), 'L12');
+});
+
+test('L13: the list carries no open rows of its own, so a row one chip hides comes back under the chip that holds it', () => {
+  const state = bare({ requirements: [requirement('R01', 'in-spec'), requirement('R02', 'deferred')] });
+  const deferred = L.requirementListOf(state, 'deferred', false);
+  assert.deepEqual(Object.keys(deferred).sort(), ['filter', 'folds', 'hidden', 'ids', 'total']);
+  assert.ok(!deferred.ids.includes('R01'));
+  assert.ok(L.requirementListOf(state, 'in-progress', false).ids.includes('R01'));
+});
+
+test('L15: an off-contract status is in progress, and shows under all and in progress', () => {
+  const state = bare({ requirements: [requirement('R01', 'teleported')] });
+  const filter = L.requirementFilterOf(state);
+  assert.deepEqual(plain(filter.ids['in-progress']), ['R01']);
+  assert.deepEqual(plain(filter.ids['all']), ['R01']);
+  holdsListPartition(state, 'L15');
+});
+
+test('a требование with no string id is counted by no chip and drawn by none', () => {
+  const state = bare({ requirements: [requirement('R01', 'in-spec'), { status: 'dropped' }, null, 7] });
+  const filter = L.requirementFilterOf(state);
+  assert.deepEqual(plain(filter.ids['all']), ['R01']);
+  assert.equal(filter.counts['dropped'], 0);
+});
+
+test('the chips reuse the card\'s own ids and never recompute them', () => {
+  const state = bare({
+    requirements: [requirement('R01', 'in-spec'), requirement('R02', 'open'), requirement('R03', 'deferred'),
+      reasoned('R04', 'dropped', 'gone'), requirement('R05', 'placeholder')],
+    tasks: [task('01', { status: 'done', requirementIds: ['R01', 'R05'] }), task('02', { status: 'running', requirementIds: ['R02'] })],
+  });
+  const card = L.requirementProgressOf(state);
+  const filter = L.requirementFilterOf(state);
+  for (const key of L.REQUIREMENT_PROGRESS_ORDER) {
+    assert.deepEqual(plain(filter.ids[key]), plain(card.ids[key as 'built']), key);
+    assert.equal(filter.counts[key], card.ids[key as 'built'].length, key);
+  }
+  holdsListPartition(state, 'mixed');
+});
+
+test('the four chips add up to all on both recorded прогоны and on the verification fixtures', async () => {
+  for (const name of ['finished', 'running']) {
+    holdsListPartition(parseStateSource(await readFile(`docs/assets/state-${name}.fixture.js`, 'utf8')), name);
+  }
+  holdsListPartition(deferredScopeState(), 'deferredScopeState');
+  holdsListPartition(verifiedState(), 'verifiedState');
+});
+
+test('the recorded finished прогон counts 20, 11, 4, 2 and 3, draws all five chips, and folds «Все» after R10', async () => {
+  const state = parseStateSource(await readFile('docs/assets/state-finished.fixture.js', 'utf8'));
+  const filter = plain(L.requirementFilterOf(state)) as ReturnType<Logic['requirementFilterOf']>;
+  assert.deepEqual(plain(L.REQUIREMENT_FILTER_ORDER.map(key => filter.counts[key])), [20, 11, 4, 2, 3]);
+  assert.deepEqual(filter.chips, ['all', 'built', 'in-progress', 'deferred', 'dropped']);
+  assert.deepEqual(filter.ids['in-progress'], ['R11', 'R12', 'R13', 'R20']);
+  assert.deepEqual(filter.ids['deferred'], ['R15', 'R16']);
+  assert.deepEqual(filter.ids['dropped'], ['R17', 'R18', 'R19']);
+  const list = L.requirementListOf(state, 'all', false);
+  assert.deepEqual(plain(list.ids), ['R01', 'R02', 'R03', 'R04', 'R05', 'R06', 'R07', 'R08', 'R09', 'R10']);
+  assert.deepEqual([list.total, list.hidden], [20, 10]);
+});
+
+test('the recorded running прогон counts 20, 6, 9, 2 and 3, and folds «Все» after R10', async () => {
+  const state = parseStateSource(await readFile('docs/assets/state-running.fixture.js', 'utf8'));
+  const filter = L.requirementFilterOf(state);
+  assert.deepEqual(plain(L.REQUIREMENT_FILTER_ORDER.map(key => filter.counts[key])), [20, 6, 9, 2, 3]);
+  const list = L.requirementListOf(state, 'all', false);
+  assert.deepEqual([list.ids[0], list.ids[9], list.total], ['R01', 'R10', 20]);
+});
+
+test('seven rows of the recorded прогон carry a reason inline, and R20, open, carries none', async () => {
+  const state = parseStateSource(await readFile('docs/assets/state-finished.fixture.js', 'utf8')) as { requirements: Array<{ id: string }> };
+  const reasons = state.requirements.filter(each => L.requirementReasonOf(each) !== null).map(each => each.id);
+  assert.deepEqual(reasons, ['R13', 'R14', 'R15', 'R16', 'R17', 'R18', 'R19']);
+  assert.equal(L.requirementReasonOf(state.requirements.find(each => each.id === 'R14')), 'the copy for the contact form');
+});
+
+test('every chip is its word and its count in both languages, each word taken from its one owner', () => {
+  const rows: Array<[string, number, string, string]> = [
+    ['all', 20, 'Все 20', 'All 20'],
+    ['built', 11, 'Построено 11', 'Built 11'],
+    ['in-progress', 4, 'В работе 4', 'In progress 4'],
+    ['deferred', 2, 'Отложено 2', 'Deferred 2'],
+    ['dropped', 3, 'Снято 3', 'Dropped 3'],
+  ];
+  for (const [key, count, ru, en] of rows) {
+    assert.equal(L.filterChipLabel(key, count, 'ru'), ru, key);
+    assert.equal(L.filterChipLabel(key, count, 'en'), en, key);
+  }
+  for (const language of ['ru', 'en']) {
+    const said = L.L10N[language]!;
+    assert.ok(L.filterChipLabel('dropped', 0, language).startsWith(said['REQUIREMENT_STATUS']!['dropped']!), language);
+    assert.ok(L.filterChipLabel('deferred', 0, language).startsWith(said['REQUIREMENT_PROGRESS']!['deferred']!), language);
+  }
+});
+
+type UiWords = Record<string, unknown> & {
+  filterAll: string; foldAll: (count: number) => string; filterEmpty: string;
+  requirementReason: (text: string) => string; requirementFilterAria: string;
+};
+const filterUi = (language: string): UiWords => L.L10N[language]!['UI'] as unknown as UiWords;
+
+test('the press names the whole chip, and the reason, the empty chip and the group have their words', () => {
+  assert.equal(filterUi('ru').foldAll(20), 'Показать все 20');
+  assert.equal(filterUi('en').foldAll(20), 'Show all: 20');
+  assert.equal(filterUi('ru').requirementReason('the copy for the contact form'), 'Причина: the copy for the contact form');
+  assert.equal(filterUi('en').requirementReason('the copy for the contact form'), 'Reason: the copy for the contact form');
+  assert.equal(filterUi('ru').filterEmpty, 'В этой группе требований нет.');
+  assert.equal(filterUi('en').filterEmpty, 'No requirements in this group.');
+  assert.equal(filterUi('ru').requirementFilterAria, 'Фильтр требований');
+  assert.equal(filterUi('en').requirementFilterAria, 'Filter the requirements');
+});
+
+test('no word of the filter, composed from live data, says a word the vocabulary calls shorthand', async () => {
+  const tables = parseTables(await readFile('docs/spec/vocabulary.md', 'utf8'));
+  const finished = parseStateSource(await readFile('docs/assets/state-finished.fixture.js', 'utf8')) as { requirements: unknown[] };
+  for (const [language, column, wordwise] of [['ru', 'Shorthand', false], ['en', 'Shorthand (en)', true]] as const) {
+    const table = tables.find(each => each.columns.includes(column))!;
+    const banned = table.rows.flatMap(row => cleanCell(row[column]).split(',')).map(word => word.trim().toLowerCase()).filter(Boolean);
+    const filter = L.requirementFilterOf(finished);
+    const said = [
+      ...filter.chips.map(key => L.filterChipLabel(key, filter.counts[key]!, language)),
+      filterUi(language).foldAll(20), filterUi(language).filterAll, filterUi(language).filterEmpty, filterUi(language).requirementFilterAria,
+      ...finished.requirements.map(L.requirementReasonOf).filter((reason): reason is string => reason !== null)
+        .map(reason => filterUi(language).requirementReason(reason)),
+    ];
+    for (const line of said.map(each => each.toLowerCase())) {
+      for (const word of banned) {
+        const says = wordwise ? new RegExp(`\\b${word}\\b`).test(line) : line.includes(word);
+        assert.ok(!says, `${language}: "${line}" says "${word}"`);
+      }
+    }
+  }
+});
+
+test('the requirement list explains its chips in every register and language: each drawn chip with its live count, and dropped only when drawn', async () => {
+  const finished = parseStateSource(await readFile('docs/assets/state-finished.fixture.js', 'utf8'));
+  const nothingDropped = bare({ requirements: [requirement('R01', 'in-spec'), requirement('R02', 'deferred')] });
+  for (const register of ['normal', 'plain']) {
+    for (const language of ['ru', 'en']) {
+      const where = `${register}/${language}`;
+      const lines = L.explain('requirement-list', finished, NOW, [], register, language);
+      assert.equal(lines.length, 5, where);
+      for (const [key, count] of [['all', 20], ['built', 11], ['in-progress', 4], ['deferred', 2], ['dropped', 3]] as const) {
+        assert.ok(lines[3]!.includes(L.filterChipLabel(key, count, language)), `${where}: ${key} ${count} in "${lines[3]}"`);
+      }
+      assert.match(lines[3]!, /\b10\b/, `${where}: the ten rows`);
+      const dropped = L.L10N[language]!['REQUIREMENT_STATUS']!['dropped']!;
+      const quiet = L.explain('requirement-list', nothingDropped, NOW, [], register, language);
+      assert.equal(quiet.length, 5, where);
+      assert.ok(!quiet[3]!.includes(dropped), `${where}: "${quiet[3]}" names ${dropped}`);
+      const none = L.explain('requirement-list', bare(), NOW, [], register, language);
+      assert.equal(none.length, 5, where);
+      assert.ok(none[3]!.trim() !== '', where);
+    }
+  }
+});
+
+test('the plain requirement-list explanation, composed from live data, says no shorthand', async () => {
+  const tables = parseTables(await readFile('docs/spec/vocabulary.md', 'utf8'));
+  const finished = parseStateSource(await readFile('docs/assets/state-finished.fixture.js', 'utf8'));
+  for (const [language, column, wordwise] of [['ru', 'Shorthand', false], ['en', 'Shorthand (en)', true]] as const) {
+    const table = tables.find(each => each.columns.includes(column))!;
+    const banned = table.rows.flatMap(row => cleanCell(row[column]).split(',')).map(word => word.trim().toLowerCase()).filter(Boolean);
+    for (const state of [finished, bare(), deferredScopeState()]) {
+      const said = L.explain('requirement-list', state, NOW, [], 'plain', language).join(' ').toLowerCase();
+      for (const word of banned) {
+        const says = wordwise ? new RegExp(`\\b${word}\\b`).test(said) : said.includes(word);
+        assert.ok(!says, `${language}: the plain requirement-list explanation says "${word}"`);
       }
     }
   }

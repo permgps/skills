@@ -44,7 +44,7 @@ like to look at it.
 | `feed` | Лента | What just happened, newest first, each event with its age; fifteen shown, the rest folded | `stages[]`, `tasks[]`, `gates[]`, `verification.repairAttempts`, `verification.acceptanceRounds` |
 | `stages` | Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
 | `build` | Ход разработки | The таски grouped by волна, each a bar in its status colour with its status in a word and its clock; a repair bar quotes what was sent back, a failed bar names the last repair outcome, and a wave not yet started names what it waits for | `tasks[]`, `verification` |
-| `requirement-list` | Требования (список) | The манифест one требование at a time, with technical result; a row opens to its chain, and folded below are the words heard but not taken and what was delivered beyond the ask | `requirements[]`, `verification`, `tasks[]`, `additions` |
+| `requirement-list` | Требования (список) | The манифест one требование at a time, with technical result, filtered by chips that partition the list; ten rows show before «Показать все N», a deferred, placeholder or dropped row shows its reason inline, a row opens to its chain, and folded below are the words heard but not taken and what was delivered beyond the ask | `requirements[]`, `verification`, `tasks[]`, `additions` |
 | `gates` | Gates | G1–G4 with status, derived G4 evidence, and findings, and, under G2, the share of live требования that reached the specification | `gates[]`, `verification`, `lifecycle`, `outcome`, `requirements[]` |
 
 The `Key` column is the region's name in the page: it is the `data-region`
@@ -202,8 +202,8 @@ never the G4 row in `gates`: the row is what a phase wrote, the record is what
 was checked. A state older than contract 4 has no record and never says
 verified, whatever its G4 row says. The bucket words are owned by
 [`vocabulary.md`](vocabulary.md) › Requirement Progress, and
-`requirementProgressOf` returns the ids of each bucket for the requirement
-list's filter.
+`requirementProgressOf` returns the ids of each bucket, which the requirement
+list's chips reuse — *Your Words, Filtered*.
 
 ### Таски: one square per таск
 
@@ -1038,6 +1038,73 @@ stale when its fingerprint moved — so the chain cannot say «passed» beside a
 A live требование that no таск names is marked «Не покрыто тасками». That mark
 takes the failure tone only while G3 has not passed; after it, the plan gate has
 already ruled on it and the mark is a record.
+
+## Your Words, Filtered
+
+Above the rows of `requirement-list` sits a row of chips, each with its count:
+«Все», «Построено», «В работе», «Отложено», and «Снято» when at least one
+требование is dropped. Pressing one shows only the требования it holds.
+
+**The chips partition the list: built + in progress + deferred + dropped =
+all, on every state.** Built, in progress and deferred are the card's three
+buckets (*Four Cards*, rows P2–P6), and `requirementFilterOf` reuses
+`requirementProgressOf`'s ids rather than recomputing them, so the card and the
+chips cannot disagree. Those three add up to live, not to the list, so dropped
+is a fourth chip — the user's choice of 2026-10-12, made so that the chips add
+up to the number the reader sees under «Все». The card's three chips are drawn
+even at zero, because a zero there is news; «Снято» is drawn only when
+something is dropped. A требование without a string id is in no chip.
+
+**The chip says built, never verified.** The filter sorts rows by build
+progress. Only the current G4 makes a требование verified, the card alone
+switches its word, and each row's result column already says where a check
+passed.
+
+**The effective chip.** A stored key that is not a drawn chip reads as «Все»:
+a stored «Снято» once nothing is dropped, a key from an older page, nothing
+stored at all. It is read so and never written back, so the next time something
+is dropped the reader's own choice returns.
+
+**Ten rows, then the whole group.** The chosen chip shows its first ten rows in
+manifest order (`REQUIREMENTS_SHOWN`), then «Показать все N» / "Show all: N",
+where N is the chip's count — the size of the group the reader chose, not the
+part still hidden. Opened, the press reads «Свернуть». Pressing another chip
+folds the list again, so the press always counts the chip in view. There is no
+search box and no sort.
+
+**The reason, inline.** A deferred, placeholder or dropped row shows its
+`reason`, trimmed, on a muted line under the user's words: «Причина: …» /
+"Reason: …". There the reason says what became of the words. An `open` row's
+reason at G1 is "not yet briefed", a note about the stage, so `open` and
+`in-spec` rows keep theirs for the opened row. The reason is the прогон's own
+text and is drawn as text, never as markup.
+
+**The choice is a view preference.** It is kept in this browser under
+`maestro.requirementFilter`, one key for every прогон, like the theme and the
+language (*The Reader's Own Two Controls*). It never reaches the state, and
+`contractVersion` does not move for it. Where storage throws, the choice holds
+for this view only.
+
+| # | State or action | List |
+|---|---|---|
+| L1 | `requirements` empty or absent | no chips; the existing «Требования ещё не записаны.» line |
+| L2 | no stored filter | «Все» is pressed |
+| L3 | stored `dropped`, nothing dropped | no «Снято» chip; «Все» is pressed and shown; the storage keeps `dropped` |
+| L4 | stored value not in the order list | read as nothing stored, so «Все» |
+| L5 | a drawn chip at zero is chosen | one muted line, «В этой группе требований нет.» |
+| L6 | the chip holds ≤ 10 rows | all of them, no press |
+| L7 | the chip holds > 10 rows | 10 rows, then «Показать все N»; opened, every row, then «Свернуть» |
+| L8 | another chip is pressed | the list folds again, so the press counts the chip in view |
+| L9 | a deferred, placeholder or dropped row with a reason | «Причина: …» under the words |
+| L10 | the same row with no reason, or a blank one | no line |
+| L11 | an `open` or `in-spec` row with a reason | no line |
+| L12 | contract ≥ 4 and the current G4 passed | the chip still says «Построено»; rows keep their result column |
+| L13 | an opened row that the chosen chip hides | it stays opened, and comes back opened when its chip is chosen again |
+| L14 | storage throws | the choice holds for this view only |
+| L15 | a требование with an off-contract status | in progress, shown under «Все» and «В работе» |
+
+Heard but not taken and delivered beyond the ask keep their own folds below the
+list; the filter does not touch them.
 
 ## Heard But Not Taken
 

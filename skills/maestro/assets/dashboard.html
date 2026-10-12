@@ -306,6 +306,16 @@
   .untraced { margin-left: .5rem; font-size: .8rem; }
   .untraced-fail { color: var(--fail); }
   .untraced-quiet { color: var(--muted); }
+  /* The requirement filter: the look of the view switches, wrapping, because
+     five chips with their counts do not fit one line on a phone. */
+  .chips { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0 .4rem; }
+  .chip {
+    font: inherit; font-size: .78rem; line-height: 1;
+    padding: .3rem .55rem; border: 1px solid var(--line); border-radius: 6px;
+    background: none; color: var(--muted); cursor: pointer;
+  }
+  .chip[aria-pressed="true"] { background: var(--ghost); color: var(--ink); }
+  .row .name .reason { display: block; color: var(--muted); font-size: .85rem; }
 
   /* --- what only the user can settle --- */
   .group-name {
@@ -906,6 +916,11 @@ globalThis.MAESTRO_LOGIC = (function () {
         oneWayUnknown: 'Вид не распознан',
         foldMore: function (count) { return 'Показать ещё ' + count; },
         foldLess: 'Свернуть',
+        foldAll: function (count) { return 'Показать все ' + count; },
+        filterAll: 'Все',
+        filterEmpty: 'В этой группе требований нет.',
+        requirementReason: function (text) { return 'Причина: ' + text; },
+        requirementFilterAria: 'Фильтр требований',
         detail: function (name, value) { return name + ': ' + value; },
         taskTests: function (tests) { return 'прошло ' + tests.passed + ', упало ' + tests.failed; },
         taskAria: function (id) { return 'Подробности таска ' + id; },
@@ -1302,6 +1317,11 @@ globalThis.MAESTRO_LOGIC = (function () {
         oneWayUnknown: 'Kind not recognised',
         foldMore: function (count) { return 'Show more: ' + count; },
         foldLess: 'Fold',
+        foldAll: function (count) { return 'Show all: ' + count; },
+        filterAll: 'All',
+        filterEmpty: 'No requirements in this group.',
+        requirementReason: function (text) { return 'Reason: ' + text; },
+        requirementFilterAria: 'Filter the requirements',
         detail: function (name, value) { return name + ': ' + value; },
         taskTests: function (tests) { return tests.passed + ' passed, ' + tests.failed + ' failed'; },
         taskAria: function (id) { return 'Details of task ' + id; },
@@ -1800,6 +1820,107 @@ globalThis.MAESTRO_LOGIC = (function () {
       out.verified = Object.keys(results).filter(function (key) { return results[key] === 'passed'; }).length;
     }
     return out;
+  }
+
+  /**
+   * The chips over the requirement list: all, the card's three buckets in the
+   * card's order, and dropped.
+   *
+   * Dropped is a fifth chip by the user's choice of 2026-10-12. The card's
+   * buckets add up to live, not to the list, so without it three rows on each
+   * recorded прогон would sit under «Все» and under no other chip, and the
+   * counts would not add up to the number the reader sees.
+   */
+  var REQUIREMENT_FILTER_ORDER = ['all'].concat(REQUIREMENT_PROGRESS_ORDER, ['dropped']);
+
+  /** How many rows of the chosen chip show before «Показать все N». */
+  var REQUIREMENTS_SHOWN = 10;
+
+  /**
+   * The chips and what each one holds: `{ counts, ids, chips }`, keyed by
+   * REQUIREMENT_FILTER_ORDER. Built, in progress and deferred are
+   * `requirementProgressOf`'s own ids, reused rather than recomputed, so the
+   * card and the chips cannot disagree.
+   *
+   * The card's three chips are drawn even at zero, because they are the card's
+   * own words and a zero there is news. Dropped is drawn only when something is
+   * dropped: a run that dropped nothing has no such group to offer.
+   *
+   * The chip says built, never verified, after G4 passes. The filter sorts rows
+   * by build progress; only the current G4 makes a требование verified, the card
+   * alone says so, and each row's result column already says where it passed.
+   */
+  function requirementFilterOf(state) {
+    var progress = requirementProgressOf(state);
+    var ids = { all: [], built: progress.ids.built, 'in-progress': progress.ids['in-progress'],
+                deferred: progress.ids.deferred, dropped: [] };
+    ((state && state.requirements) || []).forEach(function (requirement) {
+      var id = requirement && requirement.id;
+      if (typeof id !== 'string') return;
+      ids.all.push(id);
+      if (requirement.status === 'dropped') ids.dropped.push(id);
+    });
+    var counts = {};
+    REQUIREMENT_FILTER_ORDER.forEach(function (key) { counts[key] = ids[key].length; });
+    var chips = REQUIREMENT_FILTER_ORDER.filter(function (key) { return key !== 'dropped' || counts.dropped > 0; });
+    return { counts: counts, ids: ids, chips: chips };
+  }
+
+  /**
+   * The rows the chosen chip shows: `{ filter, ids, total, hidden, folds }`.
+   *
+   * A key that is not a drawn chip reads as «Все» — a stored dropped once
+   * nothing is dropped, a key from an older page, nothing stored at all. It is
+   * read so and never written back, so the next time something is dropped the
+   * reader's own choice returns. `total` is the chip's count rather than the
+   * hidden count, so the press names the size of the group the reader chose.
+   */
+  function requirementListOf(state, filter, open) {
+    var chosen = requirementFilterOf(state);
+    var key = chosen.chips.indexOf(filter) !== -1 ? filter : 'all';
+    var fold = foldOf(chosen.ids[key], open, REQUIREMENTS_SHOWN);
+    return { filter: key, ids: fold.shown, total: chosen.counts[key], hidden: fold.hidden, folds: fold.folds };
+  }
+
+  /**
+   * The reason a row shows under the user's words, trimmed, or null.
+   *
+   * Only a deferred, placeholder or dropped требование shows one: there the
+   * reason says what became of the words. An `open` reason at G1 is "not yet
+   * briefed", a note about the stage, so it stays in the opened row.
+   */
+  function requirementReasonOf(requirement) {
+    if (!requirement || typeof requirement !== 'object') return null;
+    if (['deferred', 'placeholder', 'dropped'].indexOf(requirement.status) === -1) return null;
+    if (typeof requirement.reason !== 'string') return null;
+    var reason = requirement.reason.trim();
+    return reason === '' ? null : reason;
+  }
+
+  /**
+   * A chip's text: its word, a space, its count. Each word is borrowed from the
+   * map that already owns it — the card's buckets, the status word for
+   * dropped, «Все» from the UI — so renaming one renames it everywhere.
+   */
+  function filterChipLabel(key, count, language) {
+    var say = words(language);
+    var word = key === 'all' ? say.UI.filterAll
+      : key === 'dropped' ? say.REQUIREMENT_STATUS.dropped
+      : label(say.REQUIREMENT_PROGRESS, key);
+    return word + ' ' + count;
+  }
+
+  /**
+   * The drawn chips as the explainer names them, «Все 20», «Построено 11», …,
+   * from the same function the page draws them with, or null when no
+   * требование is written and so no chip is drawn.
+   */
+  function chipsSaid(state, language) {
+    var filter = requirementFilterOf(state);
+    if (filter.counts.all === 0) return null;
+    return filter.chips.map(function (key) {
+      return '«' + filterChipLabel(key, filter.counts[key], language) + '»';
+    }).join(', ');
   }
 
   /**
@@ -3499,6 +3620,9 @@ globalThis.MAESTRO_LOGIC = (function () {
           ? 'Требования ещё не записаны.'
           : 'Живых ' + counts.live + ' из ' + counts.total + '.',
         'Это тот же манифест, что и в карточке наверху: там счёт, здесь строки.',
+        chipsSaid(state, 'ru') === null
+          ? 'Фильтр над строками появится вместе с первым требованием.'
+          : 'Над строками фильтр: ' + chipsSaid(state, 'ru') + '. Группы вместе дают «Все». Видны первые ' + REQUIREMENTS_SHOWN + ' строк, остальные за «Показать все». Выбор хранится в этом браузере и в прогон не попадает.',
         'Строка требования нажимается: слова пользователя, из которых оно выросло (с контракта 5), его таски, проверки с результатом и причиной сбоя, открытые замечания и дефекты. Не покрыто тасками: ' + untracedOf(state).ids.length + '. Ниже свёрнуты «Услышано, но не взято» (' + contextClausesOf(state).length + ') и «Сверх запрошенного» (' + additionsOf(state).length + ').'
       ];
     },
@@ -3762,6 +3886,9 @@ globalThis.MAESTRO_LOGIC = (function () {
           ? 'Список ещё не записан.'
           : 'Живых ' + counts.live + ' из ' + counts.total + '.',
         'Это тот же список, что и в карточке наверху: там счёт, здесь строки.',
+        chipsSaid(state, 'ru') === null
+          ? 'Кнопки над списком появятся вместе с первым пунктом.'
+          : 'Кнопки над списком показывают его часть: ' + chipsSaid(state, 'ru') + '. Вместе они дают «Все». Сначала видно ' + REQUIREMENTS_SHOWN + ' пунктов, остальные откроет «Показать все». Какую кнопку вы нажали, помнит только этот браузер — прогон об этом не узнаёт.',
         'Строку можно нажать: откроются ваши собственные слова, из которых выросло требование, таски, которые его делают, и как его проверяли. Ниже свёрнуты ваши слова, которые не стали требованиями, с причиной (' + contextClausesOf(state).length + '), и то, что сделали сверх просьбы (' + additionsOf(state).length + ').'
       ];
     },
@@ -4010,6 +4137,9 @@ globalThis.MAESTRO_LOGIC = (function () {
           ? 'No requirements written down yet.'
           : 'Live ' + counts.live + ' of ' + counts.total + '.',
         'This is the same manifest as the card above: there it is counted, here it is listed.',
+        chipsSaid(state, 'en') === null
+          ? 'The filter above the rows appears with the first requirement.'
+          : 'Chips above the rows filter them: ' + chipsSaid(state, 'en') + '. Together the groups add up to «All». The first ' + REQUIREMENTS_SHOWN + ' rows show, the rest wait behind «Show all». The choice stays in this browser and never reaches the run.',
         'A requirement row opens on a press: the user\'s words it grew from (from contract 5), its tasks, its checks with result and failure cause, open findings and defects. No task covers ' + untracedOf(state).ids.length + '. Folded below: «Heard, not taken» (' + contextClausesOf(state).length + ') and «Beyond the ask» (' + additionsOf(state).length + ').'
       ];
     },
@@ -4274,6 +4404,9 @@ globalThis.MAESTRO_LOGIC = (function () {
           ? 'The list has not been written down yet.'
           : 'Live ' + counts.live + ' of ' + counts.total + '.',
         'This is the same list as the card above: there it is counted, here it is spelled out.',
+        chipsSaid(state, 'en') === null
+          ? 'The buttons above the list appear with the first point.'
+          : 'Buttons above the list show one part of it: ' + chipsSaid(state, 'en') + '. Together they add up to «All». The first ' + REQUIREMENTS_SHOWN + ' points show, and «Show all» opens the rest. Only this browser remembers which button you pressed — the run never learns of it.',
         'Press a row to see your own words it grew from, the tasks that make it, and how it was checked. Folded below are your words that did not become requirements, each with the reason (' + contextClausesOf(state).length + '), and what was made beyond what you asked (' + additionsOf(state).length + ').'
       ];
     },
@@ -4599,6 +4732,12 @@ globalThis.MAESTRO_LOGIC = (function () {
     countRequirements: countRequirements,
     REQUIREMENT_PROGRESS_ORDER: REQUIREMENT_PROGRESS_ORDER,
     requirementProgressOf: requirementProgressOf,
+    REQUIREMENT_FILTER_ORDER: REQUIREMENT_FILTER_ORDER,
+    REQUIREMENTS_SHOWN: REQUIREMENTS_SHOWN,
+    requirementFilterOf: requirementFilterOf,
+    requirementListOf: requirementListOf,
+    requirementReasonOf: requirementReasonOf,
+    filterChipLabel: filterChipLabel,
     taskSquaresOf: taskSquaresOf,
     coverage: coverage,
     overallProgress: overallProgress,
@@ -4756,6 +4895,15 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
    */
   var THEME_KEY = 'maestro.theme';
   var THEMES = ['light', 'dark'];
+
+  /**
+   * The requirement list's chosen chip lives here for the theme's reason: it is
+   * how one reader looks at the list, not a fact about the прогон, so it never
+   * reaches the state. It is read once at boot, and a stored chip this run does
+   * not draw reads as «Все» in the logic without being overwritten here.
+   */
+  var REQUIREMENT_FILTER_KEY = 'maestro.requirementFilter';
+  var requirementFilter = kept(REQUIREMENT_FILTER_KEY, L.REQUIREMENT_FILTER_ORDER) || 'all';
 
   function kept(key, allowed) {
     try {
@@ -5471,18 +5619,52 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
   }
 
   /**
-   * One row per требование, opening to its chain, then the two folded records
-   * below the list. Redrawn on its own when a row opens, so the counts above
-   * and the explainer beside the heading are left where they are.
+   * One pressable chip per group the list can show. Pressing one keeps the
+   * choice in this browser and folds the list again, so the press under the
+   * rows always counts the chip in view rather than the one left behind.
+   */
+  function drawChips(host, filter, chosen, redraw) {
+    var group = put(host, 'div', null, 'chips');
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', T.UI.requirementFilterAria);
+    filter.chips.forEach(function (key) {
+      var chip = put(group, 'button', L.filterChipLabel(key, filter.counts[key], lang), 'chip');
+      focusKey(chip, 'filter:' + key);
+      chip.type = 'button';
+      chip.setAttribute('aria-pressed', key === chosen ? 'true' : 'false');
+      chip.addEventListener('click', function () {
+        keep(REQUIREMENT_FILTER_KEY, key);
+        requirementFilter = key;
+        if (openRows['group:requirements']) openRows = L.toggled(openRows, 'group:requirements');
+        keepingFocus(redraw);
+      });
+    });
+  }
+
+  /**
+   * The chips, then one row per требование the chosen chip holds, opening to
+   * its chain, then the two folded records below the list. Redrawn on its own
+   * when a row opens or a chip is pressed, so the counts above and the
+   * explainer beside the heading are left where they are.
    */
   function renderRequirementRows(state) {
     var rows = clear(el('requirement-rows'));
     var folds = clear(el('requirement-folds'));
     var again = function () { renderRequirementRows(state); };
     var untraced = L.untracedOf(state);
-
+    var filter = L.requirementFilterOf(state);
+    var list = L.requirementListOf(state, requirementFilter, !!openRows['group:requirements']);
+    var byId = {};
     (state.requirements || []).forEach(function (requirement) {
-      if (!requirement || !requirement.id) return;
+      if (requirement && typeof requirement.id === 'string' && !byId[requirement.id]) byId[requirement.id] = requirement;
+    });
+
+    // No требования, no chips: the line above already says none were written.
+    if (filter.counts.all > 0) drawChips(rows, filter, list.filter, again);
+    if (filter.counts.all > 0 && list.total === 0) empty(rows, T.UI.filterEmpty);
+
+    list.ids.forEach(function (id) {
+      var requirement = byId[id];
       var detail = L.requirementDetailOf(state, requirement.id);
       var row = put(rows, 'div', null, 'row req req-' + L.lineOf(requirement.status));
       opener(row, 'req:' + requirement.id, T.UI.requirementAria(requirement.id), again);
@@ -5497,14 +5679,29 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       if (untraced.ids.indexOf(requirement.id) !== -1) {
         put(words, 'span', T.SCREEN.untraced, 'untraced untraced-' + untraced.tone);
       }
+      // The run's own text, so through put and never as markup.
+      var reason = L.requirementReasonOf(requirement);
+      if (reason !== null) put(words, 'span', T.UI.requirementReason(reason), 'reason');
       put(row, 'span', L.label(T.REQUIREMENT_STATUS, requirement.status), 'status');
       put(row, 'span', detail && detail.result ? L.label(T.REQUIREMENT_RESULT, detail.result) : '', 'status');
 
       if (openRows['req:' + requirement.id]) {
-        var list = put(rows, 'ul', null, 'detail');
-        L.describeRequirement(state, requirement.id, lang).forEach(function (line) { put(list, 'li', line); });
+        var lines = put(rows, 'ul', null, 'detail');
+        L.describeRequirement(state, requirement.id, lang).forEach(function (line) { put(lines, 'li', line); });
       }
     });
+
+    if (list.folds) {
+      var open = !!openRows['group:requirements'];
+      var toggle = put(rows, 'button', open ? T.UI.foldLess : T.UI.foldAll(list.total), 'findings-toggle');
+      toggle.type = 'button';
+      focusKey(toggle, 'fold:requirements');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      toggle.addEventListener('click', function () {
+        openRows = L.toggled(openRows, 'group:requirements');
+        keepingFocus(again);
+      });
+    }
 
     drawFolded(folds, 'context', T.SCREEN.context,
       L.contextClausesOf(state).map(function (item) { return T.UI.contextLine(item); }), again);
