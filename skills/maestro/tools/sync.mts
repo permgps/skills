@@ -11,6 +11,7 @@ import { FOLDED, spoken, legacyReports, movedMessage } from './runtime/legacy.mt
 import { configCommand } from './runtime/config.mts';
 import { memoryCommand } from './runtime/memory.mts';
 import { updateCommand } from './runtime/update-check.mts';
+import { commitsCheckCommand } from './runtime/commits-check.mts';
 import { openPage, openingMessage } from './runtime/opener.mts';
 import { ensureViewer, serveDirectory } from './runtime/server.mts';
 import { extractStateLiteral } from './runtime/state/read.mts';
@@ -91,6 +92,11 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
   }
   if (args[0] === '--update-check') {
     const outcome = await updateCommand(args, RUN_DIR);
+    process.stdout.write(JSON.stringify(outcome.result) + '\n');
+    return outcome.code;
+  }
+  if (args[0] === '--commits-check') {
+    const outcome = await commitsCheckCommand(args, RUN_DIR);
     process.stdout.write(JSON.stringify(outcome.result) + '\n');
     return outcome.code;
   }

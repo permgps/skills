@@ -52,7 +52,7 @@ the target, without replacing the populated run directory:
     shared/log.mts
     shared/owned-block.mts
     publication.mts, relocation.mts, register.mts, legacy.mts, dashboard.mts, server.mts, opener.mts
-    config.mts, memory.mts, existing-code.mts, update-check.mts, progress.mts, history.mts
+    config.mts, memory.mts, existing-code.mts, update-check.mts, progress.mts, history.mts, commits-check.mts
   dashboard.html
   state.js, validation.js
   serve.json, opened.json
