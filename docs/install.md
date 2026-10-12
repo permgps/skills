@@ -145,9 +145,10 @@ tree GitHub serves — exit code `0`:
 │    → ./.claude/skills/scout    │
 ```
 
-**Against the export, not against `permgps/skills`.** No push has yet carried two
-bundles to the default branch, so the run above proves what the CLI does with two
-`SKILL.md` files and not what GitHub is currently serving. It is recorded as
+**Against the export, not against `permgps/skills`.** The default branch now
+carries both bundles, but no install from it has yet been run and recorded, so
+the run above proves what the CLI does with two `SKILL.md` files and not what
+GitHub is currently serving. It is recorded as
 **F14** in `.ai-factory/dogfood-findings.md` with all four runs it took to
 establish, including the difference between an agent session — which installs
 non-interactively and never sees the picker — and a person at a terminal, who
@@ -345,14 +346,14 @@ through the settings above. This record pipes the payload by hand, and
 `npm run check` proves only what the guard decides, through
 `scripts/validate/guard-git.test.ts`.
 
-## The First Run Asks Two Things
+## The First Run Asks Three Things
 
 A прогон starts only when you type `/maestro`. Claude Code does not start the
 skill on its own, however much a request sounds like a build: the frontmatter
 declares `disable-model-invocation: true`.
 
 Installing settles nothing about how a прогон behaves. The first `/maestro` in a
-project asks two questions, in this order:
+project asks three questions. The first two come in this order:
 
 1. **How it should explain things** — `plain` (*по-простому*) or `normal`
    (*обычный*), with `normal` marked as the built-in default.

@@ -349,7 +349,7 @@ instead. A third question, **the models**, is asked once per project and host â€
 on the first run after the two above, and again the first time another host
 runs here, or when a pinned model is no longer offered. These questions are
 asked in `full` too. See
-[the first run](docs/install.md#the-first-run-asks-two-things).
+[the first run](docs/install.md#the-first-run-asks-three-things).
 
 ### `.maestro/config.json`
 
