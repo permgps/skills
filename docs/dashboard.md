@@ -367,7 +367,7 @@ explanation is built by calling the same functions the region draws itself with,
 so it cannot tell you a story the number above it disagrees with.
 
 **In which words depends on how you answered the first question of the project.**
-If you chose *по-простому*, every one of the twenty-two explanations — fourteen
+If you chose *по-простому*, every one of the twenty-one explanations — thirteen
 regions and eight стадии — is written for someone who has never built software:
 «Осталось» stops saying *медиана* and says *серединное время*, the block called
 «Гейты» opens with what the four checks actually are, and Ревью says a субагент

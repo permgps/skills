@@ -33,7 +33,7 @@ const log = createLogger('dashboard-integrity');
 const REQUIRED_REGIONS = [
   'run-clock', 'dials',
   'band', 'strip', 'cards', 'task-squares',
-  'stages', 'tasks', 'requirements', 'gates', 'handover',
+  'stages', 'tasks', 'requirements', 'gates', 'handover', 'feed',
   'requirement-rows', 'requirement-folds',
 ];
 
@@ -759,14 +759,18 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
         [cleanCell(row[table.column]).replace(/`/g, '').trim(), cleanCell(row[label])] as const));
       const held = branchMap(language, table.mapName);
       const missing = [...owned.keys()].filter(key => !(key in held));
+      for (const [key, spec] of owned) {
+        log.debug(table.check, 'label row compared',
+          { table: table.mapName, key, language, page: held[key] ?? null, spec });
+      }
       log.debug(table.check, `${table.noun} map compared`, { map: `${table.mapName} (${language})`, missing });
       compare(table.check, `${table.noun} (${language})`, owned, held);
       const keys = [...owned.keys()];
       if (keys.join(',') !== order.join(',')) {
         add(table.check, 0,
           `vocabulary.md lists the ${table.nouns} [${keys.join(', ')}] and the page's ${table.orderName} `
-          + `is [${order.join(', ')}] — keep the ${table.section} rows in the order ${table.orderName} `
-          + `lists them, and no ${table.noun} the page cannot return`);
+          + `is [${order.join(', ')}] — keep the vocabulary.md › ${table.section} rows in the order `
+          + `${table.orderName} in dashboard.html lists them, and no ${table.noun} the page cannot return`);
       }
       log.info(table.check, table.logLine, { language, [table.counted]: keys.length, missing: missing.length });
     }
@@ -782,6 +786,26 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
     orderName: 'REQUIREMENT_PROGRESS_ORDER', section: 'Requirement Progress',
     noun: 'requirement progress', nouns: 'requirement progress buckets', counted: 'progress',
     logLine: 'requirement progress checked',
+  });
+
+  // The feed's words. Its kinds, and the kinds it never shows, are derived like
+  // the two above; the checks named in words are what the plain register says
+  // instead of G1–G4. Each map is held to its vocabulary.md › Feed table and to
+  // the order list the page returns its keys from.
+  holdLabelTable({
+    check: 'feed', column: 'Kind', mapName: 'FEED_KIND', orderName: 'FEED_KIND_ORDER',
+    section: 'Feed', noun: 'feed kind', nouns: 'feed kinds', counted: 'kinds',
+    logLine: 'feed kinds checked',
+  });
+  holdLabelTable({
+    check: 'feed', column: 'Unstamped', mapName: 'FEED_UNSTAMPED', orderName: 'FEED_UNSTAMPED_ORDER',
+    section: 'Feed', noun: 'unstamped kind', nouns: 'unstamped kinds', counted: 'unstamped',
+    logLine: 'unstamped kinds checked',
+  });
+  holdLabelTable({
+    check: 'feed', column: 'Gate', mapName: 'GATE_NAME', orderName: 'GATE_ORDER',
+    section: 'Feed', noun: 'check name', nouns: 'check names', counted: 'checks',
+    logLine: 'check names checked',
   });
 
   // --- the plain register says nothing only the trade understands -----------

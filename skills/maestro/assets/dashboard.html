@@ -315,6 +315,12 @@
   #handover .group-name:first-child { margin-top: 0; }
   .group { margin: 0 0 .3rem 1rem; padding-left: 1rem; font-size: .9rem; }
   .group li { overflow-wrap: anywhere; }
+
+  /* --- what just happened: the sentence, and its age at the far edge --- */
+  .feed { margin: 0; padding: 0; list-style: none; font-size: .9rem; }
+  .feed li { display: flex; justify-content: space-between; gap: .75rem; padding: .1rem 0; }
+  .feed .line { min-width: 0; overflow-wrap: anywhere; }
+  .feed .age { flex: none; color: var(--muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
   /* The two view controls: the reader's own, and nothing to do with the прогон. */
   #controls {
     display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
@@ -407,6 +413,8 @@
   </section>
 
   <section data-region="handover"><h2 data-label="handover"></h2><div id="handover"></div></section>
+
+  <section data-region="feed"><h2 data-label="feed"></h2><div id="feed"></div></section>
 
   <section data-region="stages"><h2 data-label="stages"></h2><div id="stages"></div></section>
 
@@ -558,6 +566,26 @@ globalThis.MAESTRO_LOGIC = (function () {
        * check may say it was — the card then says REQUIREMENT_RESULT.passed.
        */
       REQUIREMENT_PROGRESS: { built: 'Построено', 'in-progress': 'В работе', deferred: 'Отложено' },
+      /**
+       * The four checks, named in words. The feed's lines and the plain
+       * register need them, because G1–G4 are shorthand to a reader who has
+       * never built software (vocabulary.md › Plain Words gives these phrases).
+       */
+      GATE_NAME: {
+        G1: 'проверка требований', G2: 'проверка спецификации',
+        G3: 'проверка плана', G4: 'проверка готовой работы'
+      },
+      /** The feed's five kinds, as its `i` lists them; vocabulary.md › Feed owns the words. */
+      FEED_KIND: {
+        gate: 'итог проверки', 'repair-attempt': 'попытка исправления',
+        'task-handed-in': 'таск сдан на ревью', 'stage-started': 'начало этапа',
+        'task-started': 'таск взят в работу'
+      },
+      /** What the feed never shows, because it leaves no stamp. */
+      FEED_UNSTAMPED: {
+        accepted: 'таск принят ревью', 'sent-back': 'таск отправлен на исправление',
+        retry: 'перезапуск таска', handoff: 'передача таска свежему субагенту'
+      },
       /** The words on screen that are the value of no field. */
       SCREEN: {
         dials: 'Тумблеры прогона',
@@ -585,6 +613,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         strategy: 'Решение по стратегии',
         readiness: 'Готовность к проверке',
         handover: 'Ваш ход',
+        feed: 'Лента',
         placeholders: 'Заглушки',
         promised: 'Обещано доделать',
         oneWay: 'Необратимые изменения',
@@ -851,6 +880,29 @@ globalThis.MAESTRO_LOGIC = (function () {
         },
         handoffNote: ' — это не дефект',
         handoverEmpty: 'Сейчас от вас ничего не ждут.',
+        // The feed's lines are facts, so one wording serves both registers;
+        // only a check differs, and only by its id, which comes from the data.
+        feedTask: function (id, title) { return 'Таск ' + id + (title ? ' «' + title + '»' : ''); },
+        feedStageStarted: function (name) { return 'Начался этап «' + name + '»'; },
+        feedTaskStarted: function (id, title) { return L10N.ru.UI.feedTask(id, title) + ' взят в работу'; },
+        feedHandedIn: function (id, title) { return L10N.ru.UI.feedTask(id, title) + ' сдан на ревью'; },
+        feedTests: function (tests) {
+          var line = ' · ' + tests.passed + ' '
+            + plural(tests.passed, 'тест пройден', 'теста пройдено', 'тестов пройдено');
+          if (tests.failed > 0) line += ', ' + tests.failed + ' ' + plural(tests.failed, 'упал', 'упало', 'упало');
+          return line;
+        },
+        feedRepair: function (id, title, outcome) {
+          return L10N.ru.UI.feedTask(id, title) + ': попытка исправления — ' + outcome;
+        },
+        feedGate: function (id, name, passed, plain) {
+          var said = (passed ? 'пройдена ' : 'не пройдена ') + name;
+          return plain ? said.charAt(0).toUpperCase() + said.slice(1) : id + ' · ' + said;
+        },
+        feedOutdated: ' · устарела',
+        feedEmpty: 'Пока ничего не произошло.',
+        feedJustNow: 'только что',
+        feedAgo: function (span) { return span + ' назад'; },
         oneWayUnknown: 'Вид не распознан',
         foldMore: function (count) { return 'Показать ещё ' + count; },
         foldLess: 'Свернуть',
@@ -949,6 +1001,19 @@ globalThis.MAESTRO_LOGIC = (function () {
         working: 'Working', waiting: 'Waiting for you', finished: 'Finished', failed: 'Failed'
       },
       REQUIREMENT_PROGRESS: { built: 'Built', 'in-progress': 'In progress', deferred: 'Deferred' },
+      GATE_NAME: {
+        G1: 'the requirements check', G2: 'the specification check',
+        G3: 'the plan check', G4: 'the finished-work check'
+      },
+      FEED_KIND: {
+        gate: 'a check\'s result', 'repair-attempt': 'a repair attempt',
+        'task-handed-in': 'a task handed in to review', 'stage-started': 'a stage started',
+        'task-started': 'a task started'
+      },
+      FEED_UNSTAMPED: {
+        accepted: 'a task accepted by review', 'sent-back': 'a task sent back for repair',
+        retry: 'a task restarted', handoff: 'a task passed to a fresh subagent'
+      },
       SCREEN: {
         dials: 'Dials',
         header: 'What is happening',
@@ -975,6 +1040,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         strategy: 'Strategy decision',
         readiness: 'Readiness',
         handover: 'Your move',
+        feed: 'Feed',
         placeholders: 'Placeholders',
         promised: 'Promised work',
         oneWay: 'One-way changes',
@@ -1214,6 +1280,25 @@ globalThis.MAESTRO_LOGIC = (function () {
         },
         handoffNote: ' — not a defect',
         handoverEmpty: 'Nothing is waiting on you right now.',
+        feedTask: function (id, title) { return 'Task ' + id + (title ? ' "' + title + '"' : ''); },
+        feedStageStarted: function (name) { return name + ' started'; },
+        feedTaskStarted: function (id, title) { return L10N.en.UI.feedTask(id, title) + ' started'; },
+        feedHandedIn: function (id, title) { return L10N.en.UI.feedTask(id, title) + ' handed in to review'; },
+        feedTests: function (tests) {
+          if (tests.failed > 0) return ' · ' + tests.passed + ' passed, ' + tests.failed + ' failed';
+          return ' · ' + tests.passed + ' ' + (tests.passed === 1 ? 'test' : 'tests') + ' passed';
+        },
+        feedRepair: function (id, title, outcome) {
+          return L10N.en.UI.feedTask(id, title) + ': repair attempt — ' + outcome;
+        },
+        feedGate: function (id, name, passed, plain) {
+          var said = name + (passed ? ' passed' : ' did not pass');
+          return plain ? said.charAt(0).toUpperCase() + said.slice(1) : id + ' · ' + said;
+        },
+        feedOutdated: ' · since outdated',
+        feedEmpty: 'Nothing has happened yet.',
+        feedJustNow: 'just now',
+        feedAgo: function (span) { return span + ' ago'; },
         oneWayUnknown: 'Kind not recognised',
         foldMore: function (count) { return 'Show more: ' + count; },
         foldLess: 'Fold',
@@ -2670,10 +2755,192 @@ globalThis.MAESTRO_LOGIC = (function () {
    * Decided here rather than in the view so the rule a test reads is the rule
    * the page draws by.
    */
-  function foldOf(lines, open) {
-    var folds = lines.length > FOLD_AFTER;
-    var shown = open || !folds ? lines.slice() : lines.slice(0, FOLD_AFTER);
+  function foldOf(lines, open, after) {
+    var limit = typeof after === 'number' ? after : FOLD_AFTER;
+    var folds = lines.length > limit;
+    var shown = open || !folds ? lines.slice() : lines.slice(0, limit);
     return { shown: shown, hidden: lines.length - shown.length, folds: folds };
+  }
+
+  /**
+   * The feed's five kinds, in the order they happen at one instant: a check
+   * closes a stage, repair reports back, a таск is handed in, the next stage
+   * opens, and its first таск goes out. The feed lists newest first, so at a
+   * shared instant it reads this list backwards — the step that came later in
+   * the run is the one a reader should meet first.
+   */
+  var FEED_KIND_ORDER = ['gate', 'repair-attempt', 'task-handed-in', 'stage-started', 'task-started'];
+
+  /**
+   * What happens in a прогон and is never in the feed, because it leaves no
+   * stamp: review's two verdicts move a status and date nothing, a restart
+   * re-sets `running` over the old start, and a relay to a fresh context
+   * writes a count. The `i` names these so their absence reads as a rule.
+   */
+  var FEED_UNSTAMPED_ORDER = ['accepted', 'sent-back', 'retry', 'handoff'];
+
+  /** How many feed lines show before the rest fold: a screen's worth, not a group's five. */
+  var FEED_SHOWN = 15;
+
+  /**
+   * What just happened, newest first, read from the stamps the state already
+   * carries and from nothing else.
+   *
+   * Derived rather than logged. A feed written into the state would be a
+   * second account of the прогон beside the stamps, and the first forgotten
+   * write would leave the two disagreeing with no way to tell which lied. So
+   * the feed says exactly what the stamps still say: a таск sent out again
+   * shows only its latest start and hand-in, and review's verdicts, which
+   * change a status and write no stamp, are not events at all — the user's
+   * choice of 2026-10-12 over adding a field for them.
+   *
+   * A check carries no stamp of its own, so G1–G3 take the finish of the stage
+   * they follow. G4 does too below contract 4. From contract 4 every
+   * acceptance round carries its own `performedAt` and `g4`, and acceptance's
+   * stage stamps keep their first-pass values when a failed round sends the
+   * прогон round again, so the rounds are read instead: one event each.
+   *
+   * Never throws. Each record is read on its own, so a malformed one drops its
+   * own events and leaves the rest, the rule `taskReasonOf` follows.
+   */
+  function feedOf(state) {
+    if (!state || typeof state !== 'object') return [];
+    var events = [];
+    var push = function (kind, stamp, id, subject) {
+      var at = Date.parse(stamp);
+      if (typeof stamp !== 'string' || isNaN(at)) return;
+      events.push({ kind: kind, at: at, id: String(id), subject: subject });
+    };
+    var each = function (list, read) {
+      if (!Array.isArray(list)) return;
+      list.forEach(function (item) {
+        if (!item || typeof item !== 'object') return;
+        try { read(item); } catch (error) { /* this record only */ }
+      });
+    };
+    var titles = {};
+    var titleOf = function (id) {
+      return Object.prototype.hasOwnProperty.call(titles, id) ? titles[id] : null;
+    };
+
+    each(state.stages, function (stage) {
+      push('stage-started', stage.startedAt, stage.id, {});
+    });
+    each(state.tasks, function (task) {
+      var title = typeof task.title === 'string' && task.title.trim() !== '' ? task.title : null;
+      titles[task.id] = title;
+      push('task-started', task.startedAt, task.id, { title: title });
+      var tests = task.tests && typeof task.tests.passed === 'number' && typeof task.tests.failed === 'number'
+        ? { passed: task.tests.passed, failed: task.tests.failed } : null;
+      push('task-handed-in', task.finishedAt, task.id, { title: title, tests: tests });
+    });
+
+    var record = state.contractVersion >= 4 ? state.verification : null;
+    var finishes = {};
+    each(state.stages, function (stage) { finishes[stage.id] = stage.finishedAt; });
+    each(state.gates, function (gate) {
+      if (gate.status !== 'passed' && gate.status !== 'failed') return;
+      if (gate.id === 'G4' && state.contractVersion >= 4) return;
+      if (!Object.prototype.hasOwnProperty.call(GATE_AFTER, gate.id)) return;
+      push('gate', finishes[GATE_AFTER[gate.id]], gate.id, { status: gate.status, outdated: false });
+    });
+
+    if (record && typeof record === 'object') {
+      each(record.repairAttempts, function (attempt) {
+        if (typeof attempt.taskId !== 'string') return;
+        push('repair-attempt', attempt.at, attempt.taskId,
+          { title: titleOf(attempt.taskId), outcome: lineOf(attempt.outcome) });
+      });
+      feedRoundsOf(state, record).forEach(function (event) { events.push(event); });
+    }
+
+    return events.sort(function (a, b) {
+      if (a.at !== b.at) return b.at - a.at;
+      var rank = FEED_KIND_ORDER.indexOf(b.kind) - FEED_KIND_ORDER.indexOf(a.kind);
+      if (rank !== 0) return rank;
+      return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+    });
+  }
+
+  /**
+   * The finished-work check from contract 4: one event per settled round.
+   *
+   * A round's verdict is history and stays as written. Only the latest passed
+   * round can mislead — it reads as "verified now" — so when the derived
+   * record no longer counts it current, because an input moved after it, its
+   * event says so. A record the page cannot derive cannot vouch for it either,
+   * and that reads as outdated too. An earlier round needs no such word: the
+   * later round's own event follows it.
+   */
+  function feedRoundsOf(state, record) {
+    if (!Array.isArray(record.acceptanceRounds)) return [];
+    var events = [];
+    record.acceptanceRounds.forEach(function (round) {
+      if (!round || (round.g4 !== 'passed' && round.g4 !== 'failed')) return;
+      var at = Date.parse(round.performedAt);
+      if (typeof round.performedAt !== 'string' || isNaN(at)) return;
+      events.push({ kind: 'gate', at: at, id: 'G4', round: round.id,
+        subject: { status: round.g4, outdated: false } });
+    });
+    var latest = null;
+    events.forEach(function (event) { if (!latest || !(event.at < latest.at)) latest = event; });
+    if (latest && latest.subject.status === 'passed') {
+      var current;
+      try { current = verificationOf(state).currentRoundId; } catch (error) { current = undefined; }
+      latest.subject.outdated = current !== latest.round;
+    }
+    return events.map(function (event) {
+      return { kind: event.kind, at: event.at, id: event.id, subject: event.subject };
+    });
+  }
+
+  /**
+   * One feed event as the sentence a reader sees.
+   *
+   * Every line but a check's reads the same in both registers: each is a fact,
+   * and the terms it uses are defined in the vocabulary. A check carries its
+   * id first in `normal` and drops it in `plain`, where G1–G4 are shorthand —
+   * the name in words is what both registers share. An unknown value renders
+   * as itself, the rule `label` keeps everywhere else.
+   */
+  function feedLine(event, register, language) {
+    var say = words(language);
+    var subject = (event && event.subject) || {};
+    var title = subject.title || null;
+    switch (event && event.kind) {
+      case 'stage-started':
+        return say.UI.feedStageStarted(label(say.STAGE_LABEL, event.id));
+      case 'task-started':
+        return say.UI.feedTaskStarted(event.id, title);
+      case 'task-handed-in':
+        return say.UI.feedHandedIn(event.id, title) + (subject.tests ? say.UI.feedTests(subject.tests) : '');
+      case 'repair-attempt':
+        return say.UI.feedRepair(event.id, title, label(say.REPAIR_OUTCOME, subject.outcome));
+      case 'gate':
+        return say.UI.feedGate(event.id, label(say.GATE_NAME, event.id), subject.status === 'passed',
+          register === 'plain') + (subject.outdated ? say.UI.feedOutdated : '');
+      default:
+        return '';
+    }
+  }
+
+  /**
+   * How long ago an event was, on the calendar rather than in worked time:
+   * the question is "when", and a pause did happen. A minute or less, or a
+   * stamp ahead of this clock, is just now; under a day it is minutes and
+   * hours through `UI.minutes`, the page's one way to print an hour; from a
+   * day on, the moment itself, because "31 h ago" makes the reader do the
+   * sum. A closed прогон is measured from now as well, so its feed honestly
+   * says yesterday.
+   */
+  var FEED_AGE_LIMIT_MS = 24 * 60 * 60 * 1000;
+
+  function feedAge(at, now, language) {
+    var say = words(language).UI;
+    var ms = now - at;
+    if (!isFinite(ms) || ms < 60000) return say.feedJustNow;
+    if (ms < FEED_AGE_LIMIT_MS) return say.feedAgo(say.minutes(ms));
+    return formatMoment(at);
   }
 
   /**
@@ -3249,6 +3516,19 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
+    feed: function (state) {
+      var n = feedOf(state).length;
+      var hidden = Math.max(0, n - FEED_SHOWN);
+      return [
+        'События прогона, новые сверху: каждое прочитано из отметки времени, которую хранит состояние прогона, а возраст — календарное время с неё. '
+          + (n === 0 ? 'Событий пока нет.'
+            : 'Сейчас их ' + n + (hidden > 0 ? ': показаны ' + FEED_SHOWN + ', ещё ' + hidden + ' свёрнуты.' : '.')),
+        'Не показываются: ' + FEED_UNSTAMPED_ORDER.map(function (key) { return label(L10N.ru.FEED_UNSTAMPED, key); }).join(', ')
+          + '. Они не оставляют отметки времени, а лента показывает только то, что отметку оставило.',
+        'Отметки хранят только последнее: таск, ушедший в работу заново, виден по последнему старту и последней сдаче. У гейта своей отметки нет: G1–G3 датированы концом этапа перед ними; G4 с контракта 4 датирован своим заходом приёмки, а раньше — концом приёмки.'
+      ];
+    },
+
     gates: function (state) {
       var gates = (state.gates || []).filter(Boolean);
       var passed = 0, failed = 0, settled = 0, standing = 0;
@@ -3281,7 +3561,7 @@ globalThis.MAESTRO_LOGIC = (function () {
   };
 
   /**
-   * The same twelve regions, for a reader who has never built software.
+   * The same thirteen regions, for a reader who has never built software.
    *
    * Built from the same functions as the entries above, for the same reason:
    * an explanation that recomputed its own numbers could disagree with the one
@@ -3499,6 +3779,19 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
+    feed: function (state) {
+      var n = feedOf(state).length;
+      var hidden = Math.max(0, n - FEED_SHOWN);
+      return [
+        'Что произошло в работе, новое сверху. Каждое событие прочитано из отметки времени, которую записывает прогон, а рядом — сколько времени прошло с тех пор. '
+          + (n === 0 ? 'Пока ничего не произошло.'
+            : 'Сейчас событий ' + n + (hidden > 0 ? ': видны ' + FEED_SHOWN + ', ещё ' + hidden + ' свёрнуты.' : '.')),
+        'Здесь не бывает: ' + FEED_UNSTAMPED_ORDER.map(function (key) { return label(L10N.ru.FEED_UNSTAMPED, key); }).join(', ')
+          + '. Они не оставляют отметки времени, а лента показывает только то, что отметку оставило.',
+        'Отметка хранит только последний момент: если таск — один кусок работы одного субагента — запускали заново, видны только его последний старт и последняя сдача. У проверки своей отметки нет, поэтому её время — конец этапа перед ней; проверка готовой работы в новых прогонах датирована своим заходом.'
+      ];
+    },
+
     gates: function (state) {
       var gates = (state.gates || []).filter(Boolean);
       var passed = 0, failed = 0, settled = 0, standing = 0;
@@ -3532,7 +3825,7 @@ globalThis.MAESTRO_LOGIC = (function () {
   };
 
   /**
-   * The same twelve regions in English, in the normal register.
+   * The same thirteen regions in English, in the normal register.
    *
    * Built from the same functions as the Russian entries above and returning
    * the same shape: a first paragraph saying what the region is, then what it
@@ -3734,6 +4027,19 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
+    feed: function (state) {
+      var n = feedOf(state).length;
+      var hidden = Math.max(0, n - FEED_SHOWN);
+      return [
+        'What happened in this run, newest first: each event is read from a stamp the run keeps, and its age is calendar time since that stamp. '
+          + (n === 0 ? 'Nothing has happened yet.'
+            : 'There are ' + n + ' now' + (hidden > 0 ? ': ' + FEED_SHOWN + ' shown, ' + hidden + ' folded.' : '.')),
+        'Never shown: ' + FEED_UNSTAMPED_ORDER.map(function (key) { return label(L10N.en.FEED_UNSTAMPED, key); }).join(', ')
+          + '. They leave no stamp, and the feed shows only what did.',
+        'Stamps keep only the latest: a task sent out again shows only its latest start and hand-in. A gate has no stamp of its own: G1–G3 take the end of the stage before them; from contract 4, G4 takes its own acceptance round, and before that the end of acceptance.'
+      ];
+    },
+
     gates: function (state) {
       var gates = (state.gates || []).filter(Boolean);
       var passed = 0, failed = 0, settled = 0, standing = 0;
@@ -3768,7 +4074,7 @@ globalThis.MAESTRO_LOGIC = (function () {
   };
 
   /**
-   * The same twelve regions in English, for a reader who has never built
+   * The same thirteen regions in English, for a reader who has never built
    * software.
    *
    * The two rules of docs/spec/vocabulary.md apply here as they do to the
@@ -3985,6 +4291,19 @@ globalThis.MAESTRO_LOGIC = (function () {
       ];
     },
 
+    feed: function (state) {
+      var n = feedOf(state).length;
+      var hidden = Math.max(0, n - FEED_SHOWN);
+      return [
+        'What happened in this work, newest first. Each event is read from a moment the run wrote down, and beside it is how long ago that was. '
+          + (n === 0 ? 'Nothing has happened yet.'
+            : 'There are ' + n + ' events now' + (hidden > 0 ? ': ' + FEED_SHOWN + ' shown, ' + hidden + ' folded.' : '.')),
+        'Never here: ' + FEED_UNSTAMPED_ORDER.map(function (key) { return label(L10N.en.FEED_UNSTAMPED, key); }).join(', ')
+          + '. They leave no moment written down, and the feed shows only what did.',
+        'Only the latest moment is kept: if a task — one piece of work done by one subagent — was started over, only its latest start and hand-in show. A check has no moment of its own, so it is dated by the end of the stage before it; in newer runs the finished-work check is dated by its own round.'
+      ];
+    },
+
     gates: function (state) {
       var gates = (state.gates || []).filter(Boolean);
       var passed = 0, failed = 0, settled = 0, standing = 0;
@@ -4118,7 +4437,7 @@ globalThis.MAESTRO_LOGIC = (function () {
   /** The regions the page must be able to explain, in the order they appear. */
   var EXPLAIN_ORDER = [
     'dials', 'header', 'estimate', 'requirements', 'tasks', 'tests', 'elapsed',
-    'handover', 'stages', 'build', 'requirement-list', 'gates'
+    'handover', 'feed', 'stages', 'build', 'requirement-list', 'gates'
   ];
 
   function explain(key, state, now, marks, register, language) {
@@ -4312,6 +4631,12 @@ globalThis.MAESTRO_LOGIC = (function () {
     handoverOf: handoverOf,
     FOLD_AFTER: FOLD_AFTER,
     foldOf: foldOf,
+    FEED_KIND_ORDER: FEED_KIND_ORDER,
+    FEED_UNSTAMPED_ORDER: FEED_UNSTAMPED_ORDER,
+    FEED_SHOWN: FEED_SHOWN,
+    feedOf: feedOf,
+    feedLine: feedLine,
+    feedAge: feedAge,
     taskDetailOf: taskDetailOf,
     taskReasonOf: taskReasonOf,
     requirementDetailOf: requirementDetailOf,
@@ -4749,6 +5074,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     renderRequirements(state);
     renderGates(state);
     renderHandover(state);
+    renderFeed(state);
     refillOpenExplainer();
     tick();
   }
@@ -5083,6 +5409,42 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     drawGroup(host, 'assumptions', T.SCREEN.assumptions, handover.assumptions, again);
   }
 
+  /**
+   * What just happened, newest first, each line with its age.
+   *
+   * Every decision — which events, in what order, in which words, how many
+   * before the fold — is made in the logic block; this only applies it. An
+   * age carries its moment in data-at so tick() moves it with the clocks,
+   * and every line goes through put, because таск titles are the user's words.
+   */
+  function renderFeed(state) {
+    var host = clear(el('feed'));
+    var events = L.feedOf(state);
+    if (events.length === 0) {
+      empty(host, T.UI.feedEmpty);
+      return;
+    }
+    var register = L.registerOf(state);
+    var open = !!openRows['group:feed'];
+    var fold = L.foldOf(events, open, L.FEED_SHOWN);
+    var list = put(host, 'ul', null, 'feed');
+    var now = Date.now();
+    fold.shown.forEach(function (event) {
+      var item = put(list, 'li');
+      put(item, 'span', L.feedLine(event, register, lang), 'line');
+      put(item, 'span', L.feedAge(event.at, now, lang), 'age').setAttribute('data-at', String(event.at));
+    });
+    if (!fold.folds) return;
+    var toggle = put(host, 'button', open ? T.UI.foldLess : T.UI.foldMore(fold.hidden), 'findings-toggle');
+    toggle.type = 'button';
+    focusKey(toggle, 'fold:feed');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.addEventListener('click', function () {
+      openRows = L.toggled(openRows, 'group:feed');
+      keepingFocus(function () { renderFeed(state); });
+    });
+  }
+
   function renderRequirements(state) {
     var host = clear(el('requirements'));
     var counts = L.countRequirements(state.requirements);
@@ -5225,6 +5587,13 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
       node.textContent = L.formatDuration(L.worked(from, lastGood, now, until, marks));
     }
 
+    // The feed's ages are calendar time, not worked time, so they read their
+    // own moment and nothing else; they move here, with the clocks.
+    var ages = document.querySelectorAll('[data-at]');
+    for (var j = 0; j < ages.length; j += 1) {
+      ages[j].textContent = L.feedAge(Number(ages[j].dataset.at), now, lang);
+    }
+
     var span = L.elapsed(lastGood.startedAt, lastGood, now);
     var active = L.worked(lastGood.startedAt, lastGood, now, undefined, marks);
     var calendar = el('run-calendar');
@@ -5239,9 +5608,9 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
   }
 
   /**
-   * The i beside each region, and the single popover all twelve fill.
+   * The i beside each region, and the single popover all thirteen fill.
    *
-   * One node rather than twelve. Moving it is what closes the previous
+   * One node rather than thirteen. Moving it is what closes the previous
    * explanation, so "at most one open" needs no state to keep it true, and the
    * cards never shift: a reader stays looking at the number while reading about
    * it. Filling it through `put` keeps the textContent rule by construction,

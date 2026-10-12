@@ -10,7 +10,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { evaluateLogic, scriptBlock } from './dashboard-integrity.ts';
-import { correctedSourceAuditState, controlledState, defect, repairContract6State, strategyReview, v3Attempt, sourceVerifiedState, deferredScopeState, sha256, verifiedState } from '../state/fixtures/verification.ts';
+import { contract9State, correctedSourceAuditState, controlledState, defect, repairContract6State, strategyReview, v3Attempt, sourceVerifiedState, deferredScopeState, sha256, verifiedState } from '../state/fixtures/verification.ts';
 import { projectState } from '../state/projection.ts';
 import { parseStateSource } from '../state/read.ts';
 import { AWAITING_KINDS } from '../state/contract.ts';
@@ -21,6 +21,16 @@ import { cleanCell, parseTables } from './spec-integrity.ts';
 const ASSET = 'skills/maestro/assets/dashboard.html';
 
 type Words = Record<string, Record<string, string>>;
+
+interface FeedEvent {
+  kind: string;
+  at: number;
+  id: string;
+  subject: {
+    title?: string | null; tests?: { passed: number; failed: number } | null;
+    outcome?: string; status?: string; outdated?: boolean;
+  };
+}
 
 interface Logic {
   scopeProgressOf: (state: unknown) => unknown;
@@ -60,7 +70,7 @@ interface Logic {
   } | null;
   verificationOf: (state: unknown) => {
     legacy: boolean; g4: string; outcome?: string; requirementResults: Record<string, string>;
-    failedIds: string[]; incompleteIds: string[]; verificationEstablished: boolean;
+    failedIds: string[]; incompleteIds: string[]; verificationEstablished: boolean; currentRoundId?: string;
   };
   formatGap: (ms: unknown, language?: string) => string;
   longestSilence: (marks: number[]) => number | null;
@@ -115,7 +125,13 @@ interface Logic {
   holderOf: (state: unknown) => { token: string; since: string } | null;
   ONE_WAY_ORDER: string[];
   FOLD_AFTER: number;
-  foldOf: (lines: string[], open: boolean) => { shown: string[]; hidden: number; folds: boolean };
+  foldOf: (lines: string[], open: boolean, after?: number) => { shown: string[]; hidden: number; folds: boolean };
+  FEED_KIND_ORDER: string[];
+  FEED_UNSTAMPED_ORDER: string[];
+  FEED_SHOWN: number;
+  feedOf: (state: unknown) => FeedEvent[];
+  feedLine: (event: FeedEvent, register?: string, language?: string) => string;
+  feedAge: (at: number, now: number, language?: string) => string;
   handoverOf: (state: unknown) => {
     emptyEnv: string[]; placeholders: string[]; promised: string[];
     oneWay: Record<string, string[]>; unknownOneWay: string[]; assumptions: string[];
@@ -1040,7 +1056,8 @@ const busy = (): Record<string, unknown> => run({
 const NOW = AT('2026-08-19T10:35:00.000Z');
 
 test('the page can explain every region it renders', () => {
-  assert.equal(L.EXPLAIN_ORDER.length, 12);
+  assert.equal(L.EXPLAIN_ORDER.length, 13);
+  assert.equal(L.EXPLAIN_ORDER.indexOf('feed'), L.EXPLAIN_ORDER.indexOf('handover') + 1);
   for (const key of L.EXPLAIN_ORDER) {
     const state = busy();
     const lines = L.explain(key, state, NOW, L.collectMarks(state));
@@ -2837,6 +2854,373 @@ test('the estimate\'s explanation says what is left once every таск is done'
       assert.doesNotMatch(ahead1, /цепочке в 0|chain of 0/, where);
       const closed = L.explain('estimate', closing, AHEAD_NOW, DENSE, register, language)[1] ?? '';
       assert.match(closed, language === 'ru' ? /закрыть прогон/ : /closing the run/, where);
+    }
+  }
+});
+
+// --- the feed --------------------------------------------------------------
+
+const F = (time: string): string => `2026-08-19T${time}:00.000Z`;
+/** The feed, carried out of the vm so its arrays compare as this realm's arrays. */
+const feed = (state: unknown): FeedEvent[] => plain(L.feedOf(state)) as FeedEvent[];
+const kinds = (events: FeedEvent[]): string[] => events.map(event => `${event.kind} ${event.id}`);
+
+/** A small прогон with one of each stamp below contract 4. */
+const feedState = (extra: Record<string, unknown> = {}): Record<string, unknown> => bare({
+  stages: [
+    { id: 'plan', status: 'done', startedAt: F('10:00'), finishedAt: F('10:10') },
+    { id: 'build', status: 'active', startedAt: F('10:10') },
+  ],
+  tasks: [
+    task('01', { status: 'done', startedAt: F('10:11'), finishedAt: F('10:20'), tests: { passed: 4, failed: 0 } }),
+    task('02', { status: 'running', startedAt: F('10:21') }),
+  ],
+  gates: [{ id: 'G3', status: 'passed', findings: [] }],
+  ...extra,
+});
+
+test('F1: a state with no stamps has an empty feed', () => {
+  assert.deepEqual(plain(feed({})), []);
+  assert.deepEqual(plain(feed(bare())), []);
+  assert.deepEqual(plain(feed(bare({ stages: [{ id: 'plan', status: 'pending' }], tasks: [task('01')] }))), []);
+});
+
+test('the feed never throws, whatever it is handed', () => {
+  assert.deepEqual(plain(feed(null)), []);
+  assert.deepEqual(plain(feed(undefined)), []);
+  assert.deepEqual(plain(feed({ stages: 7, tasks: 'x', gates: null })), []);
+  const odd = feedState({ contractVersion: 6, verification: 7 });
+  assert.deepEqual(kinds(feed(odd)), kinds(feed(feedState())));
+  const old = feedState({ verification: 7 });
+  assert.deepEqual(kinds(feed(old)), kinds(feed(feedState())));
+});
+
+test('F2: below contract 4 the feed reads stages, таски and every check by the stage it follows, and no repair attempt', () => {
+  const state = feedState({
+    stages: [
+      { id: 'plan', status: 'done', startedAt: F('10:00'), finishedAt: F('10:10') },
+      { id: 'acceptance', status: 'done', startedAt: F('10:30'), finishedAt: F('10:40') },
+    ],
+    gates: [{ id: 'G3', status: 'passed', findings: [] }, { id: 'G4', status: 'failed', findings: [] }],
+    verification: { repairAttempts: [{ taskId: '01', at: F('10:35'), outcome: 'still_failing' }] },
+  });
+  const events = feed(state);
+  assert.deepEqual(kinds(events), [
+    'gate G4', 'stage-started acceptance', 'task-started 02', 'task-handed-in 01',
+    'task-started 01', 'gate G3', 'stage-started plan',
+  ]);
+  const g4 = events[0]!;
+  assert.equal(g4.at, AT(F('10:40')));
+  assert.equal(g4.subject.status, 'failed');
+});
+
+test('F3: from contract 4 each repair attempt is an event, with its таск and outcome and nothing of its notes', () => {
+  const state = repairContract6State();
+  state.verification!.repairAttempts = [
+    v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:20:00Z', { outcome: 'defect_verified' }),
+    v3Attempt('RA-2', 'F-1', 'DF-1', '2026-09-29T09:40:00Z'),
+  ];
+  const attempts = feed(state).filter(event => event.kind === 'repair-attempt');
+  assert.equal(attempts.length, 2);
+  assert.deepEqual(attempts.map(event => [event.id, event.at, event.subject.outcome]),
+    [['01', AT('2026-09-29T09:40:00Z'), 'still_failing'], ['01', AT('2026-09-29T09:20:00Z'), 'defect_verified']]);
+  assert.equal(attempts[0]!.subject.title, state.tasks[0]!.title);
+  const said = JSON.stringify(plain(attempts));
+  assert.doesNotMatch(said, /hover handler|listener|Bind the pointer/);
+  const old = structuredClone(state) as unknown as Record<string, unknown>;
+  old['contractVersion'] = 3;
+  assert.equal(feed(old).filter(event => event.kind === 'repair-attempt').length, 0);
+});
+
+test('F3: an attempt from verification 1–2 keeps its own outcome word, repaired included', () => {
+  const state = feedState({ contractVersion: 4, verification: { repairAttempts: [{ taskId: '01', at: F('10:25'), outcome: 'repaired' }] } });
+  const attempt = feed(state).find(event => event.kind === 'repair-attempt')!;
+  assert.equal(attempt.subject.outcome, 'repaired');
+});
+
+test('F4: from contract 4 the finished-work check is one event per acceptance round, at the round, never at the stage', () => {
+  const state = contract9State();
+  state.stages = [{ id: 'acceptance', status: 'done', startedAt: '2026-09-29T09:10:00Z', finishedAt: '2026-09-29T09:30:00Z' }];
+  const passed = state.verification!.acceptanceRounds[0]!;
+  state.verification!.acceptanceRounds = [
+    { ...structuredClone(passed), id: 'AR-0', g4: 'failed', performedAt: '2026-09-29T09:12:00Z' },
+    passed,
+  ];
+  assert.equal(L.verificationOf(state).currentRoundId, 'AR-1');
+  const g4 = feed(state).filter(event => event.kind === 'gate' && event.id === 'G4');
+  assert.deepEqual(g4.map(event => [event.at, event.subject.status, event.subject.outdated]), [
+    [AT('2026-09-29T09:19:00Z'), 'passed', false],
+    [AT('2026-09-29T09:12:00Z'), 'failed', false],
+  ]);
+  assert.ok(!g4.some(event => event.at === AT('2026-09-29T09:30:00Z')));
+});
+
+test('a pending acceptance round is no event', () => {
+  const state = contract9State();
+  state.verification!.acceptanceRounds[0]!.g4 = 'pending';
+  assert.equal(feed(state).filter(event => event.id === 'G4').length, 0);
+});
+
+test('F5: the latest passed round that is no longer current says so, and an earlier round does not', () => {
+  const state = contract9State();
+  const passed = state.verification!.acceptanceRounds[0]!;
+  state.verification!.acceptanceRounds = [
+    { ...structuredClone(passed), id: 'AR-0', g4: 'passed', performedAt: '2026-09-29T09:12:00Z' },
+    passed,
+  ];
+  state.verification!.checks[0]!.currentFingerprint.build = 'changed-build';
+  assert.equal(L.verificationOf(state).currentRoundId, undefined);
+  const g4 = feed(state).filter(event => event.id === 'G4');
+  assert.deepEqual(g4.map(event => [event.subject.status, event.subject.outdated]), [['passed', true], ['passed', false]]);
+});
+
+test('F6: a check passed while its stage is still open has no event yet', () => {
+  const state = feedState({ gates: [{ id: 'G4', status: 'passed', findings: [] }],
+    stages: [{ id: 'acceptance', status: 'active', startedAt: F('10:30') }] });
+  assert.equal(feed(state).filter(event => event.kind === 'gate').length, 0);
+});
+
+test('F7: a pending check is no event', () => {
+  const state = feedState({ gates: [{ id: 'G3', status: 'pending', findings: [] }] });
+  assert.equal(feed(state).filter(event => event.kind === 'gate').length, 0);
+});
+
+test('F8 and F9: the recorded running прогон gives both overlapping starts, and a таск in review with no hand-in only its start', async () => {
+  const state = parseStateSource(await readFile('docs/assets/state-running.fixture.js', 'utf8'));
+  const events = feed(state);
+  const said = kinds(events);
+  assert.equal(events.length, 18);
+  assert.ok(said.includes('stage-started build') && said.includes('stage-started review'));
+  assert.ok(said.includes('task-started 05') && !said.includes('task-handed-in 05'));
+  assert.ok(!said.some(line => line.startsWith('gate G4')));
+  assert.deepEqual([events[0]!.kind, events[0]!.id, events[0]!.at, events[0]!.subject.tests],
+    ['task-handed-in', '03', AT('2026-08-19T10:08:00Z'), { passed: 41, failed: 0 }]);
+});
+
+test('F10: a stamp that does not parse drops that one event and leaves the rest', () => {
+  const state = feedState();
+  (state['tasks'] as Array<Record<string, unknown>>)[0]!['finishedAt'] = 'yesterday-ish';
+  assert.deepEqual(kinds(feed(state)),
+    ['task-started 02', 'task-started 01', 'stage-started build', 'gate G3', 'stage-started plan']);
+});
+
+test('F10: a malformed record drops its own events and leaves the rest', () => {
+  const state = feedState();
+  (state['tasks'] as unknown[]).push(7, null);
+  (state['stages'] as unknown[]).push('review');
+  (state['gates'] as unknown[]).push(null);
+  assert.deepEqual(kinds(feed(state)), kinds(feed(feedState())));
+});
+
+test('F11: the feed shows fifteen and folds the rest, while every other group still folds at five', () => {
+  const lines = Array.from({ length: 24 }, (_, index) => String(index));
+  assert.equal(L.FEED_SHOWN, 15);
+  const feed = plain(L.foldOf(lines, false, L.FEED_SHOWN)) as { shown: string[]; hidden: number; folds: boolean };
+  assert.deepEqual([feed.shown.length, feed.hidden, feed.folds], [15, 9, true]);
+  const group = plain(L.foldOf(lines, false)) as { shown: string[]; hidden: number };
+  assert.deepEqual([group.shown.length, group.hidden], [5, 19]);
+  assert.equal((plain(L.foldOf(lines, true, L.FEED_SHOWN)) as { hidden: number }).hidden, 0);
+});
+
+test('F12: a repair attempt for a таск the state does not hold is shown by its id alone', () => {
+  const state = repairContract6State();
+  state.verification!.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:20:00Z', { taskId: '07' })];
+  const attempt = feed(state).find(event => event.kind === 'repair-attempt')!;
+  assert.deepEqual([attempt.id, attempt.subject.title], ['07', null]);
+});
+
+test('at one instant the later step of the run comes first: таск start, stage start, then the check that closed the stage before', () => {
+  assert.deepEqual(plain(L.FEED_KIND_ORDER), ['gate', 'repair-attempt', 'task-handed-in', 'stage-started', 'task-started']);
+  const state = feedState({
+    stages: [
+      { id: 'plan', status: 'done', startedAt: F('10:00'), finishedAt: F('10:10') },
+      { id: 'build', status: 'active', startedAt: F('10:10') },
+    ],
+    tasks: [task('01', { status: 'running', startedAt: F('10:10') }), task('02', { status: 'running', startedAt: F('10:10') })],
+  });
+  assert.deepEqual(kinds(feed(state)),
+    ['task-started 02', 'task-started 01', 'stage-started build', 'gate G3', 'stage-started plan']);
+});
+
+test('at one instant a таск handed in comes before the repair attempt and the check, and after the next таск start', () => {
+  const state = feedState({
+    contractVersion: 4,
+    stages: [{ id: 'plan', status: 'done', startedAt: F('10:00'), finishedAt: F('10:20') }],
+    tasks: [task('01', { status: 'done', startedAt: F('10:11'), finishedAt: F('10:20') }), task('02', { status: 'running', startedAt: F('10:20') })],
+    verification: { repairAttempts: [{ taskId: '01', at: F('10:20'), outcome: 'still_failing' }] },
+  });
+  assert.deepEqual(kinds(feed(state)).slice(0, 4),
+    ['task-started 02', 'task-handed-in 01', 'repair-attempt 01', 'gate G3']);
+});
+
+test('the kinds the feed never shows are named, in order, because they leave no stamp', () => {
+  assert.deepEqual(plain(L.FEED_UNSTAMPED_ORDER), ['accepted', 'sent-back', 'retry', 'handoff']);
+});
+
+test('the recorded finished прогон gives twenty-four events, newest first, and folds nine of them', async () => {
+  const state = parseStateSource(await readFile('docs/assets/state-finished.fixture.js', 'utf8'));
+  const events = feed(state);
+  assert.equal(events.length, 24);
+  assert.deepEqual([events[0]!.kind, events[0]!.id, events[0]!.at, events[0]!.subject.status],
+    ['gate', 'G4', AT('2026-08-19T11:06:00Z'), 'passed']);
+  assert.deepEqual([events[1]!.kind, events[1]!.id, events[1]!.at], ['stage-started', 'acceptance', AT('2026-08-19T10:55:00Z')]);
+  assert.deepEqual(kinds(events).slice(-1), ['stage-started preflight']);
+  const at = (time: string): string[] => kinds(events.filter(event => event.at === AT(`2026-08-19T${time}:00Z`)));
+  assert.deepEqual(at('09:41'), ['task-started 01', 'stage-started build', 'gate G3']);
+  assert.deepEqual(at('09:52'), ['task-started 02', 'task-handed-in 01']);
+  for (let index = 1; index < events.length; index += 1) assert.ok(events[index - 1]!.at >= events[index]!.at, `event ${index} is out of order`);
+  const folded = plain(L.foldOf(events.map(event => event.id), false, L.FEED_SHOWN)) as { shown: string[]; hidden: number };
+  assert.deepEqual([folded.shown.length, folded.hidden], [15, 9]);
+});
+
+const event = (kind: string, id: string, subject: FeedEvent['subject'] = {}): FeedEvent =>
+  ({ kind, at: AT(F('10:00')), id, subject });
+const prices = 'Блок с ценами';
+
+test('every kind of event is worded in Russian and English, the same in both registers except the check', () => {
+  const rows: Array<[FeedEvent, string, string]> = [
+    [event('stage-started', 'build'), 'Начался этап «Разработка»', 'Development started'],
+    [event('task-started', '03', { title: prices }), `Таск 03 «${prices}» взят в работу`, `Task 03 "${prices}" started`],
+    [event('task-handed-in', '03', { title: prices, tests: { passed: 41, failed: 0 } }),
+      `Таск 03 «${prices}» сдан на ревью · 41 тест пройден`, `Task 03 "${prices}" handed in to review · 41 tests passed`],
+    [event('repair-attempt', '03', { title: prices, outcome: 'still_failing' }),
+      `Таск 03 «${prices}»: попытка исправления — Всё ещё не проходит`, `Task 03 "${prices}": repair attempt — Still failing`],
+  ];
+  for (const [item, ru, en] of rows) {
+    for (const register of ['normal', 'plain']) {
+      assert.equal(L.feedLine(item, register, 'ru'), ru, `${item.kind}/${register}`);
+      assert.equal(L.feedLine(item, register, 'en'), en, `${item.kind}/${register}`);
+    }
+  }
+});
+
+test('a check is named in words, with its id first in the normal register and no id in the plain one', () => {
+  const passed = event('gate', 'G2', { status: 'passed', outdated: false });
+  const failed = event('gate', 'G3', { status: 'failed', outdated: false });
+  assert.equal(L.feedLine(passed, 'normal', 'ru'), 'G2 · пройдена проверка спецификации');
+  assert.equal(L.feedLine(passed, 'normal', 'en'), 'G2 · the specification check passed');
+  assert.equal(L.feedLine(passed, 'plain', 'ru'), 'Пройдена проверка спецификации');
+  assert.equal(L.feedLine(passed, 'plain', 'en'), 'The specification check passed');
+  assert.equal(L.feedLine(failed, 'normal', 'ru'), 'G3 · не пройдена проверка плана');
+  assert.equal(L.feedLine(failed, 'normal', 'en'), 'G3 · the plan check did not pass');
+  assert.equal(L.feedLine(failed, 'plain', 'ru'), 'Не пройдена проверка плана');
+  assert.equal(L.feedLine(failed, 'plain', 'en'), 'The plan check did not pass');
+  for (const [id, ru, en] of [['G1', 'проверка требований', 'the requirements check'],
+    ['G4', 'проверка готовой работы', 'the finished-work check']]) {
+    const line = event('gate', id!, { status: 'passed' });
+    assert.equal(L.feedLine(line, 'normal', 'ru'), `${id} · пройдена ${ru}`);
+    assert.equal(L.feedLine(line, 'normal', 'en'), `${id} · ${en} passed`);
+  }
+});
+
+test('F5: a passed round that is no longer current ends with the outdated suffix in both languages', () => {
+  const stale = event('gate', 'G4', { status: 'passed', outdated: true });
+  assert.equal(L.feedLine(stale, 'normal', 'ru'), 'G4 · пройдена проверка готовой работы · устарела');
+  assert.equal(L.feedLine(stale, 'plain', 'en'), 'The finished-work check passed · since outdated');
+});
+
+test('the test count takes all three Russian forms, names a failure, and is left off when the таск carried none', () => {
+  const handed = (tests: { passed: number; failed: number } | null, language = 'ru'): string =>
+    L.feedLine(event('task-handed-in', '01', { title: null, tests }), 'normal', language);
+  assert.equal(handed({ passed: 1, failed: 0 }), 'Таск 01 сдан на ревью · 1 тест пройден');
+  assert.equal(handed({ passed: 2, failed: 0 }), 'Таск 01 сдан на ревью · 2 теста пройдено');
+  assert.equal(handed({ passed: 5, failed: 0 }), 'Таск 01 сдан на ревью · 5 тестов пройдено');
+  assert.equal(handed({ passed: 40, failed: 1 }), 'Таск 01 сдан на ревью · 40 тестов пройдено, 1 упал');
+  assert.equal(handed({ passed: 40, failed: 3 }), 'Таск 01 сдан на ревью · 40 тестов пройдено, 3 упало');
+  assert.equal(handed(null), 'Таск 01 сдан на ревью');
+  assert.equal(handed({ passed: 1, failed: 0 }, 'en'), 'Task 01 handed in to review · 1 test passed');
+  assert.equal(handed({ passed: 40, failed: 1 }, 'en'), 'Task 01 handed in to review · 40 passed, 1 failed');
+  assert.equal(handed(null, 'en'), 'Task 01 handed in to review');
+});
+
+test('F12: a repair attempt for an unknown таск is worded by its id alone, and an unknown outcome as written', () => {
+  const line = event('repair-attempt', '07', { title: null, outcome: 'gave_up' });
+  assert.equal(L.feedLine(line, 'normal', 'ru'), 'Таск 07: попытка исправления — gave_up');
+  assert.equal(L.feedLine(line, 'normal', 'en'), 'Task 07: repair attempt — gave_up');
+});
+
+test('an age is just now under a minute or when the clocks disagree, minutes and hours up to a day, and the moment after', () => {
+  const at = AT(F('10:00'));
+  for (const language of ['ru', 'en']) {
+    const just = language === 'ru' ? 'только что' : 'just now';
+    assert.equal(L.feedAge(at, at, language), just);
+    assert.equal(L.feedAge(at, at + 59_000, language), just);
+    assert.equal(L.feedAge(at, at - 5_000, language), just);
+  }
+  assert.equal(L.feedAge(at, at + 61_000, 'ru'), '1 мин назад');
+  assert.equal(L.feedAge(at, at + 125 * MIN, 'ru'), '2 ч 05 мин назад');
+  assert.equal(L.feedAge(at, at + (23 * 60 + 59) * MIN, 'ru'), '23 ч 59 мин назад');
+  assert.equal(L.feedAge(at, at + 24 * 60 * MIN, 'ru'), L.formatMoment(F('10:00')));
+  assert.equal(L.feedAge(at, at + 61_000, 'en'), '1 min ago');
+  assert.equal(L.feedAge(at, at + 125 * MIN, 'en'), '2 h 05 min ago');
+  assert.equal(L.feedAge(at, at + 24 * 60 * MIN, 'en'), L.formatMoment(F('10:00')));
+});
+
+test('no feed line, composed from live data in the plain register, says a word the vocabulary calls shorthand', async () => {
+  const tables = parseTables(await readFile('docs/spec/vocabulary.md', 'utf8'));
+  const finished = parseStateSource(await readFile('docs/assets/state-finished.fixture.js', 'utf8'));
+  const repairs = repairContract6State();
+  repairs.verification!.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T09:20:00Z')];
+  const stale = event('gate', 'G4', { status: 'passed', outdated: true });
+  const failed = { ...event('task-handed-in', '01', { title: null, tests: { passed: 2, failed: 1 } }) };
+  const events = [...feed(finished), ...feed(repairs), stale, failed];
+  for (const [language, column, wordwise] of [['ru', 'Shorthand', false], ['en', 'Shorthand (en)', true]] as const) {
+    const table = tables.find(each => each.columns.includes(column))!;
+    const banned = table.rows.flatMap(row => cleanCell(row[column]).split(',')).map(word => word.trim().toLowerCase()).filter(Boolean);
+    for (const item of events) {
+      const line = L.feedLine(item, 'plain', language).toLowerCase();
+      for (const word of banned) {
+        const says = wordwise ? new RegExp(`\\b${word}\\b`).test(line) : line.includes(word);
+        assert.ok(!says, `${language}: "${line}" says "${word}"`);
+      }
+    }
+  }
+});
+
+test('the feed explains itself in three lines in every register and language: what it is with its count, what it never shows, what the stamps cannot say', () => {
+  const state = busy();
+  const count = L.feedOf(state).length;
+  assert.equal(count, 8);
+  for (const register of ['normal', 'plain']) {
+    for (const language of ['ru', 'en']) {
+      const where = `${register}/${language}`;
+      const lines = L.explain('feed', state, NOW, L.collectMarks(state), register, language);
+      assert.equal(lines.length, 3, where);
+      assert.match(lines[0]!, /\b8\b/, `${where}: the live count`);
+      const unstamped = L.L10N[language]!['FEED_UNSTAMPED']!;
+      for (const key of L.FEED_UNSTAMPED_ORDER) assert.ok(lines[1]!.includes(unstamped[key]!), `${where}: ${key}`);
+    }
+  }
+});
+
+test('the feed explanation counts what is folded on a long прогон and says nothing has happened on an empty one', async () => {
+  const finished = parseStateSource(await readFile('docs/assets/state-finished.fixture.js', 'utf8'));
+  for (const register of ['normal', 'plain']) {
+    for (const language of ['ru', 'en']) {
+      const where = `${register}/${language}`;
+      const long = L.explain('feed', finished, NOW, [], register, language)[0]!;
+      assert.match(long, /\b24\b/, where);
+      assert.match(long, /\b15\b/, where);
+      assert.match(long, /\b9\b/, where);
+      const quiet = L.explain('feed', {}, NOW, [], register, language);
+      assert.equal(quiet.length, 3, where);
+      assert.ok(quiet.every(line => line.trim() !== ''), where);
+    }
+  }
+});
+
+test('the plain feed explanation, composed from live data, says no shorthand', async () => {
+  const tables = parseTables(await readFile('docs/spec/vocabulary.md', 'utf8'));
+  const finished = parseStateSource(await readFile('docs/assets/state-finished.fixture.js', 'utf8'));
+  for (const [language, column, wordwise] of [['ru', 'Shorthand', false], ['en', 'Shorthand (en)', true]] as const) {
+    const table = tables.find(each => each.columns.includes(column))!;
+    const banned = table.rows.flatMap(row => cleanCell(row[column]).split(',')).map(word => word.trim().toLowerCase()).filter(Boolean);
+    for (const state of [busy(), finished, {}]) {
+      const said = L.explain('feed', state, NOW, [], 'plain', language).join(' ').toLowerCase();
+      for (const word of banned) {
+        const says = wordwise ? new RegExp(`\\b${word}\\b`).test(said) : said.includes(word);
+        assert.ok(!says, `${language}: the plain feed explanation says "${word}"`);
+      }
     }
   }
 });

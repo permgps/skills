@@ -63,6 +63,23 @@ const VOCABULARY = `# Vocabulary
 | \`in-progress\` | В работе | In progress | anything else live |
 | \`deferred\` | Отложено | Deferred | the user put it off |
 
+## Feed
+
+| Kind | Label | Label (en) |
+|---|---|---|
+| \`gate\` | итог проверки | a check's result |
+| \`task-started\` | таск взят в работу | a task started |
+
+| Unstamped | Label | Label (en) |
+|---|---|---|
+| \`accepted\` | таск принят ревью | a task accepted by review |
+| \`retry\` | перезапуск таска | a task restarted |
+
+| Gate | Label | Label (en) |
+|---|---|---|
+| \`G1\` | проверка требований | the requirements check |
+| \`G2\` | проверка спецификации | the specification check |
+
 ## Plain Words
 
 | Shorthand | Say instead |
@@ -137,6 +154,9 @@ const LOGIC = {
   EXPLAIN_ORDER: "['progress', 'gates']",
   CONDITION_ORDER: "['working', 'waiting']",
   REQUIREMENT_PROGRESS_ORDER: "['built', 'in-progress', 'deferred']",
+  FEED_KIND_ORDER: "['gate', 'task-started']",
+  FEED_UNSTAMPED_ORDER: "['accepted', 'retry']",
+  GATE_ORDER: "['G1', 'G2']",
   STAGE_SHARE: '{ review: { low: 0.09, high: 1.11 }, acceptance: { low: 0.09, high: 0.39 } }',
   explain: "function (key) { return key === 'nothing' ? [] : ['what it is', 'what it holds']; }",
   explainStage: "function (id) { return id === 'nothing' ? [] : ['what it does', 'where it is']; }",
@@ -165,6 +185,9 @@ const RU = {
   REQUIREMENT_RESULT: "{ incomplete: 'Не проверено до конца' }",
   CONDITION: "{ working: 'Идёт работа', waiting: 'Ждёт вас' }",
   REQUIREMENT_PROGRESS: "{ built: 'Построено', 'in-progress': 'В работе', deferred: 'Отложено' }",
+  FEED_KIND: "{ gate: 'итог проверки', 'task-started': 'таск взят в работу' }",
+  FEED_UNSTAMPED: "{ accepted: 'таск принят ревью', retry: 'перезапуск таска' }",
+  GATE_NAME: "{ G1: 'проверка требований', G2: 'проверка спецификации' }",
   EXPLAIN: "{ progress: function () { return ['что это', 'что показывает']; } }",
   STAGE_EXPLAIN: "{ preflight: function () { return ['подготовка заводит прогон']; },"
     + " build: function () { return ['разработка пишет код']; } }",
@@ -193,6 +216,9 @@ const EN = {
   REQUIREMENT_RESULT: "{ incomplete: 'Not fully checked' }",
   CONDITION: "{ working: 'Working', waiting: 'Waiting for you' }",
   REQUIREMENT_PROGRESS: "{ built: 'Built', 'in-progress': 'In progress', deferred: 'Deferred' }",
+  FEED_KIND: "{ gate: \"a check's result\", 'task-started': 'a task started' }",
+  FEED_UNSTAMPED: "{ accepted: 'a task accepted by review', retry: 'a task restarted' }",
+  GATE_NAME: "{ G1: 'the requirements check', G2: 'the specification check' }",
   EXPLAIN: "{ progress: function () { return ['what it is', 'what it holds']; } }",
   STAGE_EXPLAIN: "{ preflight: function () { return ['setup opens the run']; },"
     + " build: function () { return ['development writes the code']; } }",
@@ -218,7 +244,7 @@ const EXPLAINED = ['progress', 'gates'];
 
 const REGIONS = [
   'run-clock', 'dials', 'band', 'strip', 'cards', 'task-squares',
-  'stages', 'tasks', 'requirements', 'gates', 'handover',
+  'stages', 'tasks', 'requirements', 'gates', 'handover', 'feed',
   'requirement-rows', 'requirement-folds',
 ];
 
@@ -984,4 +1010,30 @@ test('requirement progress rows out of the page\'s order are reported', () => {
 test('a page with no squares to draw the таски into is reported', () => {
   const found = messages(page({ regions: REGIONS.filter(id => id !== 'task-squares') }));
   assert.match(found, /no element with id "task-squares"/);
+});
+
+test('a feed kind the page words differently from the vocabulary is reported with both wordings', () => {
+  const found = messages(page({ ru: { FEED_KIND: "{ gate: 'проверка', 'task-started': 'таск взят в работу' }" } }));
+  assert.match(found, /feed kind \(ru\) "gate" is labelled "проверка" in the page and "итог проверки" in the specification/);
+});
+
+test('a feed kind the vocabulary lists and the page cannot return is reported, naming both files', () => {
+  const found = messages(page({ logic: { FEED_KIND_ORDER: "['gate']" } }));
+  assert.match(found, /vocabulary\.md lists the feed kinds \[gate, task-started\] and the page's FEED_KIND_ORDER is \[gate\]/);
+  assert.match(found, /dashboard\.html/);
+});
+
+test('an unstamped kind the page lacks is reported', () => {
+  const found = messages(page({ en: { FEED_UNSTAMPED: "{ accepted: 'a task accepted by review' }" } }));
+  assert.match(found, /unstamped kind \(en\) "retry" has a label in the specification and none in the page/);
+});
+
+test('a check the page names differently in words is reported with both wordings', () => {
+  const found = messages(page({ en: { GATE_NAME: "{ G1: 'the brief check', G2: 'the specification check' }" } }));
+  assert.match(found, /check name \(en\) "G1" is labelled "the brief check" in the page and "the requirements check" in the specification/);
+});
+
+test('a page without the feed region is reported', () => {
+  const found = messages(page({ regions: REGIONS.filter(id => id !== 'feed') }));
+  assert.match(found, /no element with id "feed"/);
 });

@@ -41,6 +41,7 @@ like to look at it.
 | `tests` | Тесты | The last suite's passed count, the failed count beside it, and the таск it ran after or the full suite at acceptance | `tests`, or the own suite of the таск that finished last |
 | `elapsed` | Рабочее время | Working time since `startedAt`, the median таск beneath it, and the calendar span when the two differ | every timestamp in the state |
 | `handover` | Ваш ход | What only the user can settle: empty variables by name, placeholders, open promised work, one-way changes by kind, assumptions, and the total, which the retired Долг card counted | `debt`, `verification.promisedWork`, `oneWay` |
+| `feed` | Лента | What just happened, newest first, each event with its age; fifteen shown, the rest folded | `stages[]`, `tasks[]`, `gates[]`, `verification.repairAttempts`, `verification.acceptanceRounds` |
 | `stages` | Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
 | `build` | Ход разработки | The таски grouped by волна, each a bar in its status colour with its status in a word and its clock; a repair bar quotes what was sent back, a failed bar names the last repair outcome, and a wave not yet started names what it waits for | `tasks[]`, `verification` |
 | `requirement-list` | Требования (список) | The манифест one требование at a time, with technical result; a row opens to its chain, and folded below are the words heard but not taken and what was delivered beyond the ask | `requirements[]`, `verification`, `tasks[]`, `additions` |
@@ -807,6 +808,116 @@ user. Open promised work
 appears only from contract 4, where the verification record carries it. A
 one-way line whose kind the contract does not define is kept in its own group,
 as written — never dropped and never guessed into a known kind.
+
+## A Feed Derived From The State
+
+The `feed` region sits under «Ваш ход» and above «Этапы», so "what just
+happened" is read before the detailed blocks. It lists events in words, newest
+first, each with its age.
+
+**Derived, not logged.** `feedOf(state)` reads `stages[]`, `tasks[]`, `gates[]`
+and `verification`, and nothing else. No field is written for it, and the
+contract does not change. A feed written into the state would be a second
+account of the прогон beside the stamps, and the first forgotten write would
+leave the two disagreeing with no way to tell which one lied. So the feed says
+exactly what the stamps still say, and an event with no stamp is not shown.
+
+| Kind | Read from | Present when | Line (ru, normal) | Line (en) |
+|---|---|---|---|---|
+| `stage-started` | `stages[].startedAt` | the stamp parses | Начался этап «Разработка» | Development started |
+| `task-started` | `tasks[].startedAt` | the stamp parses | Таск 03 «Title» взят в работу | Task 03 "Title" started |
+| `task-handed-in` | `tasks[].finishedAt`, `tasks[].tests` | the stamp parses | Таск 03 «Title» сдан на ревью · 41 тест пройден | Task 03 "Title" handed in to review · 41 tests passed |
+| `repair-attempt` | `verification.repairAttempts[].at`, `.outcome`, `.taskId` | contract 4 or later, the list is an array, the stamp parses | Таск 03 «Title»: попытка исправления — `REPAIR_OUTCOME` | Task 03 "Title": repair attempt — `REPAIR_OUTCOME` |
+| `gate` (G1–G3, and G4 below contract 4) | `gates[].status`; the `finishedAt` of the stage `GATE_AFTER` names | status `passed` or `failed`, and that stage has a `finishedAt` that parses | G2 · пройдена проверка спецификации | G2 · the specification check passed |
+| `gate` (G4 from contract 4) | `verification.acceptanceRounds[].performedAt`, `.g4` | the round's `g4` is `passed` or `failed` | G4 · пройдена проверка готовой работы [· устарела] | G4 · the finished-work check passed [· since outdated] |
+
+- A failed check reads «не пройдена» / "did not pass".
+- With `tests.failed > 0` the hand-in line reads «· 40 тестов пройдено, 1
+  упал» / "· 40 passed, 1 failed". With no `tests` it has no suffix. Russian
+  counts take all three plural forms.
+- In the `plain` register a check's line drops its id — «Пройдена проверка
+  спецификации» — because G1–G4 are shorthand there
+  ([`vocabulary.md`](vocabulary.md) › *Plain Words*). Every other line reads the
+  same in both registers: each is a fact, in terms the vocabulary defines.
+- A таск title comes from `tasks[]`. A repair attempt for an id `tasks[]` does
+  not hold is shown by its id alone: «Таск 07: попытка исправления — …». Only an
+  attempt's outcome is shown, never its hypothesis, diagnosis or action
+  (`8-repair.md` › 2a), the same rule as the таск row's reason.
+
+**The order.** Events are sorted by their moment, newest first. At one instant
+the event that happens later in the run comes first. The order in which events
+happen, earliest to latest, is `gate` → `repair-attempt` → `task-handed-in` →
+`stage-started` → `task-started`: a check closes a stage, then the next stage
+opens, then its first таск goes out. Ties within one kind go by id, descending.
+`FEED_KIND_ORDER` in the page holds the five kinds in that order, and
+[`vocabulary.md`](vocabulary.md) › *Feed* holds their words in the same order.
+
+**The age** is calendar time since the stamp, not worked time, because it
+answers "how long ago". Under a minute, or a stamp ahead of the reader's clock,
+it is «только что» / "just now". Under a day it is «N мин назад» or «Ч ч ММ мин
+назад», printed through the page's one minutes formatter. From a day on it is
+the moment itself, with no "ago". A closed прогон is measured from now as well,
+so its feed honestly says it was yesterday. Ages move with the clocks, every
+second.
+
+**Fifteen lines show**, and the rest fold behind one «Показать ещё N»; the open
+state is remembered like every other group's. Every other group still folds at
+five: `foldOf` takes the limit as an optional third argument.
+
+**What the feed never shows, and why.** The region's `i` names four kinds of
+event that leave no stamp:
+
+- **A таск accepted by review, and a таск sent back for repair.** Review's
+  verdicts (`6-review.md`) move a таск to `done` or `repair` and date nothing.
+  Adding a `reviewedAt` field was considered and declined: the user's choice of
+  2026-10-12 was no contract field. The hand-in, `finishedAt`, carries the test
+  count instead.
+- **A restart.** A retry re-sets `running`, and `startedAt` and `finishedAt`
+  move. A `finishedAt` earlier than the current `startedAt` is still shown,
+  because it is a true past hand-in.
+- **A relay to a fresh context.** A handoff writes a count, not a stamp.
+
+**What the stamps cannot say.** A таск sent out again shows only its latest
+start and hand-in. A check carries no stamp of its own: G1–G3 take the finish
+of the stage they follow, and so does G4 below contract 4. A stage's finish is
+not an event of its own, because under the chain rule
+([`state-contract.md`](state-contract.md)) it is the next stage's start, and
+the check after the stage is dated by that same finish.
+
+**G4 by round, from contract 4.** Every acceptance round carries its own
+`performedAt` and `g4` (`7-acceptance.md`), and acceptance's stage stamps keep
+their first-pass values when a failed round sends the прогон round again. So
+from contract 4 G4 gives one event per settled round, at its `performedAt`,
+with that round's verdict — the user's choice of 2026-10-12. A `pending` round
+gives none. Below contract 4, G4 follows `GATE_AFTER` like G1–G3.
+
+**A passed round that is no longer current says so.** A round's verdict is
+history and keeps its word. But when the latest round says `passed` and
+`verificationOf(state).currentRoundId` is not that round, because an input
+moved after it, its line ends «· устарела» / "· since outdated": the page never
+says "verified" from a stored row the derived record disagrees with. An earlier
+round superseded by a later one needs no suffix, because the later round's own
+event follows it.
+
+| # | State | Feed |
+|---|---|---|
+| F1 | `{}`, or no stamps at all | Empty: «Пока ничего не произошло.» / "Nothing has happened yet." |
+| F2 | contract 1–3, no `verification` | Stages, таски, and G1–G4 by `GATE_AFTER`; no repair attempts |
+| F3 | contract 4 or later, repair attempts present | One `repair-attempt` per attempt, with its outcome label (`repaired` included for verification 1–2) |
+| F4 | contract 4 or later, two acceptance rounds, failed then passed | Two G4 events at their `performedAt`; the acceptance stage's `finishedAt` is not used for G4 |
+| F5 | the latest round passed but is not current | Its event ends «· устарела» |
+| F6 | a check `passed` while its stage is still `active` (no `finishedAt`) | No event yet |
+| F7 | a check `pending` | No event |
+| F8 | build and review both `active` | Both `stage-started` events |
+| F9 | a таск `running` with no `finishedAt`, or in `review` with only `startedAt` | Only `task-started` |
+| F10 | a stamp that does not parse, or a malformed record | That event, or that record's events, only; the others stand |
+| F11 | more than fifteen events | Fifteen shown, «Показать ещё N», the open state remembered under `group:feed` |
+| F12 | a repair attempt whose `taskId` is not in `tasks[]` | «Таск 07: попытка исправления — …», with no title |
+
+The decisions — which events, in what order, in which words, how old, how many
+before the fold — are pure functions in the logic block (`feedOf`, `feedLine`,
+`feedAge`, `foldOf`), each called by `scripts/validate/dashboard-logic.test.ts`,
+including against both recorded fixtures.
 
 ## Таск Rows Say Why
 

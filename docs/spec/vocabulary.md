@@ -197,6 +197,7 @@ term, and a term with two homes drifts.
 | Решение по стратегии | Strategy decision | Contract 6: the latest strategy review's decision, beside the repair attempts |
 | Готовность к проверке | Readiness | Contract 6: whether the current candidate's latest readiness record passed, failed in setup, or lacks a capability, with the probe kinds that did not pass |
 | Ваш ход | Your move | What only the user can settle, gathered in one region |
+| Лента | Feed | What just happened, newest first, each event read from a stamp the state carries |
 | Заглушки | Placeholders | Visible stand-ins for facts only the user has — prices, addresses, texts |
 | Обещано доделать | Promised work | Work the прогон promised and has not finished — contract 4 and later |
 | Необратимые изменения | One-way changes | Inward changes the user should know about before building on top: deletions, renames, migrations, major upgrades |
@@ -220,6 +221,7 @@ term, and a term with two homes drifts.
 | На критическом пути | On the critical path | The marker on a таск that sits on the chain the estimate is measured along |
 | Ждёт вашего ответа | Waiting for your reply | The notice that replaces the silence line while the прогон is stopped on a question |
 | Сейчас от вас ничего не ждут | Nothing is waiting on you right now | The one muted line of an empty Ваш ход |
+| Пока ничего не произошло | Nothing has happened yet | The one muted line of an empty Лента |
 | Вид не распознан | Kind not recognised | The group of one-way changes whose kind the contract does not define, kept as written |
 | Показать ещё | Show more | The press that opens a folded group, with the number of lines behind it |
 | Свернуть | Fold | The press that folds an opened group again |
@@ -274,6 +276,47 @@ here as three buckets). The rows are in the order the page lists them, and
 | `built` | Построено | Built | Not deferred, and every таск naming it is done. Never verified; the card says Прошло проверку only once the current finished-work check passed |
 | `in-progress` | В работе | In progress | Not deferred, and no таск names it, or one that does is running, in review, in repair, queued, failed or off-contract |
 | `deferred` | Отложено | Deferred | The user put it off. Live, so it counts in the denominator, but never built |
+
+## Feed
+
+The words of the «Лента» region. No field holds them: the page derives every
+event from a stamp the state already carries, by the rule in
+[`dashboard.md`](dashboard.md) › *A Feed Derived From The State*. Each table is
+in the order the page lists its keys — `FEED_KIND_ORDER`,
+`FEED_UNSTAMPED_ORDER` and `GATE_ORDER` — and `npm run dashboard` holds the
+page's words and those orders to these tables.
+
+The kinds of event, in the order they happen at one instant. The region's `i`
+names them.
+
+| Kind | Label | Label (en) |
+|---|---|---|
+| `gate` | итог проверки | a check's result |
+| `repair-attempt` | попытка исправления | a repair attempt |
+| `task-handed-in` | таск сдан на ревью | a task handed in to review |
+| `stage-started` | начало этапа | a stage started |
+| `task-started` | таск взят в работу | a task started |
+
+What happens in a прогон and is never in the feed, because it leaves no stamp.
+The `i` names these too, so their absence reads as a rule rather than a gap.
+
+| Unstamped | Label | Label (en) |
+|---|---|---|
+| `accepted` | таск принят ревью | a task accepted by review |
+| `sent-back` | таск отправлен на исправление | a task sent back for repair |
+| `retry` | перезапуск таска | a task restarted |
+| `handoff` | передача таска свежему субагенту | a task passed to a fresh subagent |
+
+The four checks named in words. The feed's lines use them in both registers,
+and the plain register uses them alone, since G1–G4 are shorthand there
+(*Plain Words* below).
+
+| Gate | Label | Label (en) |
+|---|---|---|
+| `G1` | проверка требований | the requirements check |
+| `G2` | проверка спецификации | the specification check |
+| `G3` | проверка плана | the plan check |
+| `G4` | проверка готовой работы | the finished-work check |
 
 ## Plain Words
 
