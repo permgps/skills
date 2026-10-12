@@ -755,6 +755,7 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
         add(table.check, 0, `vocabulary.md has no table with columns ${table.column} and ${label}`);
         continue;
       }
+      const before = violations.length;
       const owned = new Map(rows.rows.map(row =>
         [cleanCell(row[table.column]).replace(/`/g, '').trim(), cleanCell(row[label])] as const));
       const held = branchMap(language, table.mapName);
@@ -772,7 +773,12 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
           + `is [${order.join(', ')}] — keep the vocabulary.md › ${table.section} rows in the order `
           + `${table.orderName} in dashboard.html lists them, and no ${table.noun} the page cannot return`);
       }
-      log.info(table.check, table.logLine, { language, [table.counted]: keys.length, missing: missing.length });
+      // Three tables share the feed check, so the line names its table; the
+      // count is what this table added, not the run's total so far.
+      log.info(table.check, table.logLine, {
+        table: table.mapName, language, [table.counted]: keys.length,
+        missing: missing.length, violations: violations.length - before,
+      });
     }
   };
 

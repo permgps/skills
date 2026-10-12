@@ -11,6 +11,7 @@ import {
   type SpecSources,
 } from './dashboard-integrity.ts';
 import { RUN_DIR_PATTERN } from '../state/paths.ts';
+import { LEVELS, resolveLevel } from '../shared/log.ts';
 
 const VOCABULARY = `# Vocabulary
 
@@ -1036,4 +1037,31 @@ test('a check the page names differently in words is reported with both wordings
 test('a page without the feed region is reported', () => {
   const found = messages(page({ regions: REGIONS.filter(id => id !== 'feed') }));
   assert.match(found, /no element with id "feed"/);
+});
+
+test('each label table logs which table it held and how many violations it found', (t) => {
+  if (LEVELS[resolveLevel(process.env['LOG_LEVEL'])] > LEVELS.INFO) {
+    t.skip('LOG_LEVEL hides INFO');
+    return;
+  }
+  const lines: string[] = [];
+  const write = t.mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
+    lines.push(String(chunk));
+    return true;
+  });
+  try {
+    checkDashboard(page({ ru: { FEED_KIND: "{ gate: 'проверка', 'task-started': 'таск взят в работу' }" } }), SPEC);
+  } finally {
+    write.mock.restore();
+  }
+  const info = (table: string, language: string): Record<string, unknown> => {
+    const line = lines.find(text => text.startsWith('INFO [dashboard-integrity.')
+      && text.includes(`"table":"${table}"`) && text.includes(`"language":"${language}"`));
+    assert.ok(line, `no INFO line names the table ${table} (${language})`);
+    return JSON.parse(line.slice(line.indexOf('{'))) as Record<string, unknown>;
+  };
+  assert.equal(info('FEED_KIND', 'ru')['violations'], 1);
+  assert.equal(info('FEED_KIND', 'en')['violations'], 0);
+  assert.equal(info('GATE_NAME', 'ru')['violations'], 0);
+  assert.equal(info('CONDITION', 'ru')['violations'], 0);
 });
