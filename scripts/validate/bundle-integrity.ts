@@ -23,6 +23,7 @@ import { formatViolation, type Violation } from '../shared/violation.ts';
 // The helper's own reader, so the field held equal to `package.json` here is
 // exactly the field the прогон reads to say a newer Maestro is out.
 import { metadataVersion } from '../../skills/maestro/tools/runtime/update-check.mts';
+import { closingSubject } from '../../skills/maestro/tools/runtime/history.mts';
 import { KNOWN_MEMORY_FILES } from '../memory/markers.ts';
 import { PROGRESS_FILE } from '../memory/progress.ts';
 
@@ -812,6 +813,38 @@ export const STOP_ANCHORS: readonly Anchor[] = [
 ];
 
 /**
+ * The literal text that makes a прогон's commits traceable from the history.
+ *
+ * Each таск and repair commit carries `Maestro-Run:` and `Requirements:`
+ * trailers, and the memory run ends every closure with a commit whose subject
+ * preflight greps for when a rebase has rewritten the commit the progress
+ * file's header names. Nothing reads a trailer mechanically, so a phase that
+ * loses one fails silently: the commits are made, and a later session cannot
+ * tie them to a требование. The closing subject comes from `history.mts`, so
+ * the phase file and the grep cannot spell it two ways.
+ */
+export const TRACE_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/5-build.md', literal: 'Maestro-Run: <dir without --wip>',
+    why: 'таск numbers restart every прогон; without the run trailer a commit cannot be tied back to its run' },
+  { file: 'phases/5-build.md', literal: 'Requirements: R01, R02',
+    why: 'the requirement trailer is how a later session finds every change one требование caused' },
+  { file: 'phases/8-repair.md', literal: 'Maestro-Run:',
+    why: 'a repair commit without the run trailer drops out of the slice by requirement' },
+  { file: 'phases/8-repair.md', literal: 'Requirements:',
+    why: 'a repair commit without the requirement trailer drops out of the slice by requirement' },
+  { file: 'phases/9-memory.md', literal: closingSubject('<dir>'),
+    why: 'preflight finds the last closure by this exact subject when a rebase rewrote the commit the progress file names' },
+  { file: 'phases/9-memory.md', literal: 'Maestro-Run: <dir>',
+    why: 'the closing commit is a прогон commit like any other, and carries the run trailer' },
+  { file: 'phases/9-memory.md', literal: '-- .maestro <memory file>',
+    why: 'the closing commit takes .maestro/ and the memory file only; without the pathspec it takes whatever the user staged' },
+  { file: 'phases/0-preflight.md', literal: 'closing-commit',
+    why: 'preflight has to know the read can start from the closing commit, or it reads a rebased history by date' },
+  { file: 'SKILL.md', literal: 'once after every closure',
+    why: 'a closure on the repair path runs the memory phase too, or it never makes its closing commit' },
+];
+
+/**
  * Names of what contract 8 retired, held out of every shipped file.
  *
  * A dead Markdown link to a deleted phase is already the link pass's finding;
@@ -1267,6 +1300,12 @@ export async function checkBundle(
   // Only a bundle with an executor brief builds and stops; Scout has none.
   if (byFile.has('prompts/executor.md')) {
     for (const v of missingAnchors(byFile, STOP_ANCHORS, 'stops')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- commits a later session can trace ---------------------------------------
+  // Only a bundle with a memory phase closes a прогон with a commit; Scout has none.
+  if (byFile.has('phases/9-memory.md')) {
+    for (const v of missingAnchors(byFile, TRACE_ANCHORS, 'trace')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- what contract 8 retired stays out of the shipped bundle -----------------

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { metadataVersion } from '../../skills/maestro/tools/runtime/update-check.mts';
+import { closingSubject } from '../../skills/maestro/tools/runtime/history.mts';
 
 import {
   BRIEFING_ANCHORS,
@@ -17,6 +18,7 @@ import {
   SIGNAL_ANCHORS,
   CODEBASE_ANCHORS,
   STOP_ANCHORS,
+  TRACE_ANCHORS,
   textAfterHandoff,
   bundleProfileFor,
   carriesLeafRule,
@@ -1488,4 +1490,38 @@ test('the runtime confinement check accepts the config module beside the memory 
     assert.ok((await readFile(path.join(copy, 'tools', 'runtime', 'config.mts'), 'utf8')).includes("from './memory.mts'"));
     assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'runtime'), []);
   });
+});
+
+// --- commits a later session can trace -----------------------------------------
+
+test('every trace anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(TRACE_ANCHORS.length > 0, 'TRACE_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of TRACE_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'trace'), []);
+  });
+});
+
+for (const anchor of TRACE_ANCHORS) {
+  test(`${anchor.file} losing "${anchor.literal}" is the one trace finding, named on that file`, async () => {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, anchor.file);
+      const flat = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal), `${anchor.file} carries no "${anchor.literal}"`);
+      await writeFile(target, flat.split(anchor.literal).join('removed'), 'utf8');
+      const violations = (await checkBundle(copy)).filter(v => v.check === 'trace');
+      assert.deepEqual(violations.map(v => v.file), [anchor.file.split('/').join(path.sep)]);
+      assert.ok((violations[0]?.message ?? '').includes(anchor.literal), violations[0]?.message);
+    });
+  });
+}
+
+test('the closing subject the memory phase commits with is the one the helper greps for', async () => {
+  const memory = await readFile(fileURLToPath(new URL('../../skills/maestro/phases/9-memory.md', import.meta.url)), 'utf8');
+  assert.ok(memory.includes(`git commit -m "${closingSubject('<dir>')}"`),
+    `9-memory.md commits with a subject other than ${closingSubject('<dir>')}; preflight would never find the closure`);
+  assert.ok(TRACE_ANCHORS.some(anchor => anchor.file === 'phases/9-memory.md' && anchor.literal === closingSubject('<dir>')));
 });
