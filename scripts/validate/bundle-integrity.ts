@@ -23,6 +23,7 @@ import { formatViolation, type Violation } from '../shared/violation.ts';
 // The helper's own reader, so the field held equal to `package.json` here is
 // exactly the field the прогон reads to say a newer Maestro is out.
 import { metadataVersion } from '../../skills/maestro/tools/runtime/update-check.mts';
+import { KNOWN_MEMORY_FILES } from '../memory/markers.ts';
 import { PROGRESS_FILE } from '../memory/progress.ts';
 
 export type { Violation };
@@ -302,6 +303,14 @@ export const MEMORY_ANCHORS: readonly Anchor[] = [
     why: 'the existing-code reader reads first what changed outside Maestro, handed as paths, never as prior.md' },
   { file: 'phases/7-acceptance.md', literal: 'PROGRESS.md',
     why: 'the closing publish writes where the work stands, and a failure is said to the user' },
+  // The commit reader summarises what the helper would have listed, so it has to
+  // read the same history: the range string carries no `--no-merges` and no
+  // pathspec, and the reader adds both itself. The excluded names come from the
+  // runtime's own list, so a memory file added there is a finding here.
+  { file: 'prompts/commit-reader.md', literal: '--no-merges',
+    why: 'the range it is handed still holds merge commits, which the listed form leaves out; tell the reader to pass --no-merges itself' },
+  ...KNOWN_MEMORY_FILES.map(name => ({ file: 'prompts/commit-reader.md', literal: `\`${name}\``,
+    why: 'the helper leaves the memory files out of the commits over code; name each one so the reader leaves it out too' })),
 ];
 
 /**

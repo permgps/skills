@@ -36,6 +36,7 @@ import {
   type BundleProfile,
   type Violation,
 } from './bundle-integrity.ts';
+import { KNOWN_MEMORY_FILES } from '../memory/markers.ts';
 import { checkAnswers, parseAnswers } from '../gates/answers.ts';
 import { checkExecutionReturns, parseExecutionReturns } from '../gates/execution-return.ts';
 
@@ -601,6 +602,24 @@ test('a brief that hands its субагент PROGRESS.md is reported, while wit
     const violations = (await checkBundle(copy)).filter(v => v.check === 'memory');
     assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'executor.md')]);
     assert.match(violations[0]?.message ?? '', /PROGRESS\.md outside/);
+  });
+});
+
+const COMMIT_READER_ANCHORS = MEMORY_ANCHORS.filter(anchor => anchor.file === 'prompts/commit-reader.md');
+
+test('the commit reader is anchored to drop merges and every memory file the helper leaves out', () => {
+  assert.deepEqual(COMMIT_READER_ANCHORS.map(anchor => anchor.literal),
+    ['--no-merges', ...KNOWN_MEMORY_FILES.map(name => `\`${name}\``)]);
+});
+
+test('a commit reader brief that says merges are already gone, and names no memory file, is reported on that brief', async () => {
+  await withShippedCopy(async copy => {
+    const reader = path.join(copy, 'prompts', 'commit-reader.md');
+    let body = await readFile(reader, 'utf8');
+    for (const anchor of COMMIT_READER_ANCHORS) body = body.split(anchor.literal).join('removed');
+    await writeFile(reader, body, 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'memory');
+    assert.deepEqual(violations.map(v => v.file), COMMIT_READER_ANCHORS.map(() => path.join('prompts', 'commit-reader.md')));
   });
 });
 

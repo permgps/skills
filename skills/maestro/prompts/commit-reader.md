@@ -30,7 +30,9 @@ read them to know what the code looks like now.
 | `codebase.md` | the existing-code reading, made later from the repository itself |
 
 **That is all of it, and you must not ask for more.** If you are offered one of
-these, decline it and say so in your output.
+these, decline it and leave the refusal out of your lines: they are piped as
+they stand into `prior.md`, and a sentence about a declined file would take the
+place of one about the code.
 
 <!-- maestro:view:no-viewer -->
 **Nothing you do shows; start no server.** You read the history git prints;
@@ -49,9 +51,14 @@ this brief.
 At most ten lines of plain English text, nothing before them and nothing after.
 Each line names one area of the code — a directory, a module or a file, as
 `path` — and says what changed there: added, removed, renamed, rewritten,
-moved. Merge commits are already left out of the range; leave out `.maestro/`
-and the memory files too, which are Maestro's own record. When more than ten
-areas changed, keep the ten with the most change and say so on the last line.
+moved. When more than ten areas changed, keep the ten with the most change and
+say so on the last line.
+
+Read the history the list would have shown, which is less than the range: the
+range still holds merge commits and commits to files that are not code. Pass
+`--no-merges` to every `git log`, and leave out `.maestro/` and the memory
+files `AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md` and `GEMINI.md`, which are
+Maestro's own record.
 
 ## Three Rules That Still Hold
 
