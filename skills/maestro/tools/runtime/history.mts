@@ -57,16 +57,32 @@ export interface CommitLine {
   subject: string;
 }
 
+/**
+ * The subject of the commit the memory run makes after every closure. Preflight
+ * finds the last closure by this exact subject when the commit the progress
+ * file's header names is gone from `HEAD`'s history, so the phase file that
+ * makes the commit and this grep share one spelling (a trace anchor holds it).
+ */
+export const CLOSING_SUBJECT_PREFIX = 'maestro: close ';
+
+export const closingSubject = (dir: string): string => CLOSING_SUBJECT_PREFIX + dir;
+
+export type HistoryBasis = 'commit' | 'closing-commit' | 'date';
+
 export interface CommitsSince {
   state: 'listed' | 'unavailable';
   /**
    * `commit` when the recorded closure commit is an ancestor of `HEAD`;
-   * `date` when it is not (a reset, a rebase, another branch) or none was
-   * recorded, and the read falls back to the closure's moment.
+   * `closing-commit` when it is not, or none was recorded, but the closing
+   * commit of that run is on `HEAD`'s history (a rebase rewrote both, and the
+   * subject survived); `date` when neither holds, and the read falls back to
+   * the closure's moment.
    */
-  basis?: 'commit' | 'date';
+  basis?: HistoryBasis;
   /** What was read: `<sha>..HEAD`, or `--since=<moment>`. */
   range?: string;
+  /** The closing commit the read started from; only on `closing-commit`. */
+  closingCommit?: string;
   /** Newest first, merges excluded. */
   commits: CommitLine[];
   /** Every path those commits changed, unique and sorted. */
@@ -93,36 +109,67 @@ function parseLog(stdout: string): { commits: CommitLine[]; paths: string[] } {
 }
 
 /**
+ * The newest commit on `HEAD`'s history whose subject is exactly the closing
+ * subject of `dir`. `--grep` also matches a commit body and a longer run
+ * directory name that starts with this one, so the subject is compared whole
+ * here rather than trusted to the grep. Null when there is none or git cannot say.
+ */
+export async function findClosingCommit(projectRoot: string, dir: string, gitBinary = 'git'): Promise<{ sha: string } | null> {
+  const subject = closingSubject(dir);
+  const outcome = await runGit(projectRoot, ['log', '--fixed-strings', `--grep=${subject}`, `--format=%H${FIELD}%s`, 'HEAD'], gitBinary);
+  if ('unavailable' in outcome) {
+    log.debug('basis', 'closing commit searched', { dir, found: false, candidates: 0 });
+    return null;
+  }
+  const candidates = outcome.stdout.split('\n').filter(line => line !== '');
+  const match = candidates.map(line => line.split(FIELD)).find(([, found]) => found === subject);
+  log.debug('basis', 'closing commit searched', { dir, found: match !== undefined, candidates: candidates.length });
+  return match ? { sha: match[0]! } : null;
+}
+
+/**
  * The commits over code since the last closure. `since.commit` is what the
- * progress file's header recorded, `since.at` the closure's moment; `excluded`
- * are root-relative paths that are not code — `.maestro/` and the memory files,
- * so the memory block's own commit and the closing commit never count.
+ * progress file's header recorded, `since.at` the closure's moment and
+ * `since.dir` the run it closed; `excluded` are root-relative paths that are
+ * not code — `.maestro/` and the memory files, so the memory block's own
+ * commit and the closing commit never count.
+ *
+ * The basis is tried in order (decision D2): the header's commit, then the
+ * closing commit of that run found by its subject, then the date. The middle
+ * step is what survives a rebase, which rewrites both shas but not the subject.
  */
 export async function commitsSince(
   projectRoot: string,
-  since: { commit: string | null; at: string },
+  since: { commit: string | null; at: string; dir: string },
   excluded: readonly string[],
   gitBinary = 'git',
 ): Promise<CommitsSince> {
   const head = await headCommit(projectRoot, gitBinary);
   if ('unavailable' in head) return { state: 'unavailable', commits: [], paths: [], reason: head.unavailable };
-  let basis: 'commit' | 'date' = 'date';
+  let basis: HistoryBasis = 'date';
+  let from: string | null = null;
   if (since.commit !== null) {
     const ancestor = await runGit(projectRoot, ['merge-base', '--is-ancestor', since.commit, 'HEAD'], gitBinary);
-    if (!('unavailable' in ancestor)) basis = 'commit';
+    if (!('unavailable' in ancestor)) { basis = 'commit'; from = since.commit; }
     log.debug('basis', 'closure commit against HEAD', { commit: since.commit, ancestor: basis === 'commit' });
   }
-  const range = basis === 'commit' ? `${since.commit}..HEAD` : `--since=${since.at}`;
+  let closingCommit: string | undefined;
+  if (basis === 'date') {
+    const closing = await findClosingCommit(projectRoot, since.dir, gitBinary);
+    if (closing !== null) { basis = 'closing-commit'; from = closing.sha; closingCommit = closing.sha; }
+  }
+  const range = from !== null ? `${from}..HEAD` : `--since=${since.at}`;
   const pathspec = ['--', '.', ...excluded.map(entry => `:(exclude)${entry}`)];
   // quotePath off: a path git would octal-escape is named to the reader as it is on disk.
   const outcome = await runGit(projectRoot, [
     '-c', 'core.quotePath=false', 'log', '--no-merges', '--name-only', `--format=${RECORD}%H${FIELD}%cI${FIELD}%s`,
-    ...(basis === 'commit' ? [range] : [range, 'HEAD']), ...pathspec,
+    ...(from !== null ? [range] : [range, 'HEAD']), ...pathspec,
   ], gitBinary);
-  if ('unavailable' in outcome) return { state: 'unavailable', basis, range, commits: [], paths: [], reason: outcome.unavailable };
+  const found = closingCommit !== undefined ? { closingCommit } : {};
+  if ('unavailable' in outcome) return { state: 'unavailable', basis, range, ...found, commits: [], paths: [], reason: outcome.unavailable };
   const { commits, paths } = parseLog(outcome.stdout);
   log.info('since', 'commits since the last closure read', { basis, commits: commits.length, paths: paths.length });
-  return { state: 'listed', basis, range, commits, paths };
+  return { state: 'listed', basis, range, ...found, commits, paths };
 }
 
 /** `HEAD` at this moment, or why it cannot be named. */

@@ -675,7 +675,7 @@ async function readWhereTheWorkStands(prior: PriorMemory, projectRoot: string, r
     log.warn('prior', 'progress file header names no closure', { file: PROGRESS_FILE });
     return;
   }
-  prior.commits = await commitsSince(projectRoot, { commit: header.commit, at: header.closedAt },
+  prior.commits = await commitsSince(projectRoot, { commit: header.commit, at: header.closedAt, dir: header.dir },
     [RUN_ROOT_NAME, ...KNOWN_MEMORY_FILES], gitBinary);
   if (prior.commits.state === 'unavailable') {
     prior.notRead.push({ item: 'git history', reason: prior.commits.reason ?? 'git could not be read' });
@@ -750,6 +750,12 @@ function renderSince(prior: PriorMemory, summary: CommitSummary | undefined): st
   if (header === null || history === null) return [...out, 'No earlier closure recorded, so no history since one was read.', ''];
   if (history.state === 'unavailable') return [...out, `Not read: ${history.reason ?? 'git could not be read'}.`, ''];
   const since = `the closure of ${header.dir} on ${header.closedAt}`;
+  if (history.basis === 'closing-commit') {
+    const closing = (history.closingCommit ?? '').slice(0, 12);
+    out.push(header.commit === null
+      ? `That closure recorded no commit; its closing commit ${closing} is on HEAD's history, so this reads from it: \`${history.range}\`.`
+      : `The commit that closure recorded, ${header.commit.slice(0, 12)}, is not an ancestor of HEAD; the closing commit of ${header.dir}, ${closing}, is, so this reads from it: \`${history.range}\`.`, '');
+  }
   if (history.basis === 'date') {
     out.push(header.commit === null
       ? `That closure recorded no commit, so this reads by date: \`${history.range}\`.`

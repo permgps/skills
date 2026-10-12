@@ -100,7 +100,7 @@ test('commits that touched only .maestro and the memory files are not code', nee
   const closedAt = repo.commit({ 'src/app.ts': 'export {};\n' }, 'the closing commit');
   await closure(repo.runRoot, closedAt);
   repo.commit({ '.maestro/2026-10-01-first/decisions.md': '- kept\n', 'AGENTS.md': '# Agents\n', '.claude/CLAUDE.md': '# Claude\n' }, 'memory block', '2026-10-02T10:00:00Z');
-  const history = await commitsSince(repo.root, { commit: closedAt, at: '2026-10-01T12:00:00Z' }, ['.maestro', 'AGENTS.md', 'CLAUDE.md', '.claude/CLAUDE.md', 'GEMINI.md']);
+  const history = await commitsSince(repo.root, { commit: closedAt, at: '2026-10-01T12:00:00Z', dir: CLOSED }, ['.maestro', 'AGENTS.md', 'CLAUDE.md', '.claude/CLAUDE.md', 'GEMINI.md']);
   assert.deepEqual({ state: history.state, basis: history.basis, count: history.commits.length }, { state: 'listed', basis: 'commit', count: 0 });
   const text = renderPrior(await readPriorMemory(repo.root, repo.runRoot, NEW_RUN), READ_AT);
   assert.match(text, new RegExp(`No code commits since the closure of ${CLOSED} on 2026-10-01T12:00:00Z\\.`));
@@ -202,3 +202,113 @@ test('the changed paths stop at fifty and count the rest', () => {
   assert.match(text, /- `src\/file-049\.ts`\n- and 7 more\n/);
   assert.doesNotMatch(text, /file-050/);
 });
+
+// --- the closing commit, found by its subject when the header's commit is gone --
+
+/** The commit the memory run makes after a closure: `.maestro/` only, the fixed subject, the trailer. */
+function closingCommit(repo: Repo, dir: string, date: string, note = 'closed'): string {
+  writeFileSync(path.join(repo.runRoot, `closing-note-${dir}.md`), `${note}\n`);
+  repo.git(['add', '--', '.maestro']);
+  repo.git(['commit', '-q', '-m', `maestro: close ${dir}`, '-m', `Maestro-Run: ${dir}`, '--', '.maestro'], date);
+  return repo.git(['rev-parse', 'HEAD']).trim();
+}
+
+/** Reword the root commit and replay everything after it, so every sha changes and every subject stays. */
+function rewriteFromRoot(repo: Repo, root: string): void {
+  const branch = repo.git(['symbolic-ref', '--short', 'HEAD']).trim();
+  repo.git(['checkout', '-q', '--detach', root]);
+  repo.git(['commit', '-q', '--amend', '-m', 'base, reworded'], '2026-10-01T09:00:00Z');
+  const reworded = repo.git(['rev-parse', 'HEAD']).trim();
+  repo.git(['rebase', '-q', '--onto', reworded, root, branch], '2026-10-06T10:00:00Z');
+}
+
+const isAncestor = (repo: Repo, sha: string): boolean =>
+  spawnSync('git', ['-C', repo.root, 'merge-base', '--is-ancestor', sha, 'HEAD']).status === 0;
+
+/** The newest commit on HEAD whose subject is exactly the closing subject of `dir`, as the test sees it. */
+const closingOnHead = (repo: Repo, dir: string): string =>
+  repo.git(['log', '--format=%H %s', 'HEAD']).split('\n').find(line => line.slice(41) === `maestro: close ${dir}`)!.slice(0, 40);
+
+test('after a rebase rewrote the closure commit, the closing commit found by its subject is the basis', needsGit, () => withRepo(async repo => {
+  const root = repo.commit({ 'src/app.ts': 'export {};\n' }, 'base', '2026-10-01T09:00:00Z');
+  const closedAt = repo.commit({ 'src/cart.ts': 'export {};\n' }, 'the last таск', '2026-10-01T11:00:00Z');
+  await closure(repo.runRoot, closedAt);
+  closingCommit(repo, CLOSED, '2026-10-01T12:30:00Z');
+  repo.commit({ 'src/fix.ts': 'export {};\n' }, 'a fix by hand', '2026-10-03T10:00:00Z');
+  rewriteFromRoot(repo, root);
+  assert.equal(isAncestor(repo, closedAt), false, 'the rewrite must leave the header commit off HEAD');
+  const closing = closingOnHead(repo, CLOSED);
+  const fix = repo.git(['rev-parse', 'HEAD']).trim();
+  const prior = await readPriorMemory(repo.root, repo.runRoot, NEW_RUN);
+  assert.equal(prior.commits?.basis, 'closing-commit');
+  assert.equal(prior.commits?.range, `${closing}..HEAD`);
+  assert.equal(prior.commits?.closingCommit, closing);
+  assert.deepEqual(prior.commits?.commits.map(commit => commit.sha), [fix]);
+  assert.deepEqual(prior.commits?.paths, ['src/fix.ts']);
+  assert.equal(sinceSection(renderPrior(prior, READ_AT)), [
+    '## Since The Last Closure',
+    '',
+    `The commit that closure recorded, ${closedAt.slice(0, 12)}, is not an ancestor of HEAD; the closing commit of ${CLOSED}, ${closing.slice(0, 12)}, is, so this reads from it: \`${closing}..HEAD\`.`,
+    '',
+    `1 commit over code since the closure of ${CLOSED} on 2026-10-01T12:00:00Z, newest first:`,
+    '',
+    `- \`${fix.slice(0, 7)}\` 2026-10-06 a fix by hand`, // the rebase's committer date
+    '',
+    '### Changed Paths',
+    '',
+    '- `src/fix.ts`',
+    '',
+  ].join('\n'));
+}));
+
+test('a closure that recorded no commit reads from its closing commit when HEAD carries one', needsGit, () => withRepo(async repo => {
+  repo.commit({ 'src/app.ts': 'export {};\n' }, 'before', '2026-09-30T10:00:00Z');
+  await closure(repo.runRoot, null);
+  const closing = closingCommit(repo, CLOSED, '2026-10-01T12:30:00Z');
+  const after = repo.commit({ 'src/next.ts': 'export {};\n' }, 'after', '2026-10-02T10:00:00Z');
+  const history = await commitsSince(repo.root, { commit: null, at: '2026-10-01T12:00:00Z', dir: CLOSED }, ['.maestro']);
+  assert.deepEqual({ basis: history.basis, range: history.range, closingCommit: history.closingCommit },
+    { basis: 'closing-commit', range: `${closing}..HEAD`, closingCommit: closing });
+  const prior = await readPriorMemory(repo.root, repo.runRoot, NEW_RUN);
+  assert.deepEqual(prior.commits?.commits.map(commit => commit.sha), [after]);
+  assert.match(renderPrior(prior, READ_AT), new RegExp(
+    `That closure recorded no commit; its closing commit ${closing.slice(0, 12)} is on HEAD's history, so this reads from it: \`${closing}\\.\\.HEAD\`\\.`));
+}));
+
+test('a closing subject that appears only in a commit body is not a closing commit', needsGit, () => withRepo(async repo => {
+  repo.commit({ 'src/app.ts': 'export {};\n' }, 'before', '2026-09-30T10:00:00Z');
+  await closure(repo.runRoot, null);
+  repo.git(['add', '-A']);
+  repo.git(['commit', '-q', '-m', 'tidy the progress file', '-m', `maestro: close ${CLOSED}`], '2026-10-01T12:30:00Z');
+  const after = repo.commit({ 'src/next.ts': 'export {};\n' }, 'after', '2026-10-02T10:00:00Z');
+  const prior = await readPriorMemory(repo.root, repo.runRoot, NEW_RUN);
+  assert.equal(prior.commits?.basis, 'date');
+  assert.equal(prior.commits?.closingCommit, undefined);
+  assert.deepEqual(prior.commits?.commits.map(commit => commit.sha), [after]);
+  assert.match(renderPrior(prior, READ_AT), /That closure recorded no commit, so this reads by date/);
+}));
+
+test('the closing commit of another run directory is not this closure\'s, even when its name extends this one', needsGit, () => withRepo(async repo => {
+  repo.commit({ 'src/app.ts': 'export {};\n' }, 'before', '2026-09-30T10:00:00Z');
+  await closure(repo.runRoot, null);
+  closingCommit(repo, '2026-09-01-other', '2026-10-01T12:30:00Z');
+  closingCommit(repo, `${CLOSED}-again`, '2026-10-01T12:40:00Z');
+  const after = repo.commit({ 'src/next.ts': 'export {};\n' }, 'after', '2026-10-02T10:00:00Z');
+  const prior = await readPriorMemory(repo.root, repo.runRoot, NEW_RUN);
+  assert.equal(prior.commits?.basis, 'date');
+  assert.deepEqual(prior.commits?.commits.map(commit => commit.sha), [after]);
+}));
+
+test('two closing commits of the same run directory: the newest is the basis', needsGit, () => withRepo(async repo => {
+  const lost = repo.commit({ 'src/app.ts': 'export {};\n' }, 'before', '2026-09-30T10:00:00Z');
+  await closure(repo.runRoot, 'f'.repeat(40));
+  closingCommit(repo, CLOSED, '2026-10-01T12:30:00Z', 'first');
+  const between = repo.commit({ 'src/between.ts': 'export {};\n' }, 'between', '2026-10-01T15:00:00Z');
+  const newest = closingCommit(repo, CLOSED, '2026-10-01T16:00:00Z', 'second');
+  const after = repo.commit({ 'src/next.ts': 'export {};\n' }, 'after', '2026-10-02T10:00:00Z');
+  assert.ok(lost !== newest && between !== newest);
+  const prior = await readPriorMemory(repo.root, repo.runRoot, NEW_RUN);
+  assert.equal(prior.commits?.basis, 'closing-commit');
+  assert.equal(prior.commits?.range, `${newest}..HEAD`);
+  assert.deepEqual(prior.commits?.commits.map(commit => commit.sha), [after]);
+}));
