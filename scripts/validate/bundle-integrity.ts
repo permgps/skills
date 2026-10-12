@@ -23,6 +23,7 @@ import { formatViolation, type Violation } from '../shared/violation.ts';
 // The helper's own reader, so the field held equal to `package.json` here is
 // exactly the field the прогон reads to say a newer Maestro is out.
 import { metadataVersion } from '../../skills/maestro/tools/runtime/update-check.mts';
+import { PROGRESS_FILE } from '../memory/progress.ts';
 
 export type { Violation };
 
@@ -291,6 +292,16 @@ export const MEMORY_ANCHORS: readonly Anchor[] = [
     why: 'the words to avoid survive the carry, so the next прогон does not give one thing a second name' },
   { file: 'phases/9-memory.md', literal: 'Leave out a term the project glossary already defines',
     why: 'each word has one source of truth, and the block stays short' },
+  { file: 'phases/0-preflight.md', literal: '--commit-summary',
+    why: 'past thirty commits prior.md is written only on the second call, with the commit reader\'s lines' },
+  { file: 'phases/0-preflight.md', literal: 'commits since the last closure not summarised:',
+    why: 'a history nobody summarised is a decision taken for the user, and it reaches the отчёт through debt.assumptions' },
+  { file: 'phases/2-briefing.md', literal: '### Leftovers —',
+    why: 'work an earlier прогон left open is offered once, under the one heading G1 accepts without an R##' },
+  { file: 'phases/3-spec.md', literal: 'changed since the last closure',
+    why: 'the existing-code reader reads first what changed outside Maestro, handed as paths, never as prior.md' },
+  { file: 'phases/7-acceptance.md', literal: 'PROGRESS.md',
+    why: 'the closing publish writes where the work stands, and a failure is said to the user' },
 ];
 
 /**
@@ -1131,6 +1142,13 @@ export async function checkBundle(
         add('memory', file, 0,
           `brief mentions ${PRIOR_MEMORY_FILE} outside "## ${NOT_GIVEN_HEADING}" — no субагент is handed `
           + 'what earlier runs decided; only withhold it');
+      }
+      // The progress file is earlier runs' open work: it reaches a run only
+      // through prior.md, so a brief that names it hands it on past the rule above.
+      if (outside.includes(PROGRESS_FILE)) {
+        add('memory', file, 0,
+          `brief mentions ${PROGRESS_FILE} outside "## ${NOT_GIVEN_HEADING}" — the work earlier runs left open `
+          + `reaches a run only through ${PRIOR_MEMORY_FILE}, which no субагент is handed; only withhold it`);
       }
       const named = PROJECT_GLOSSARY_FILES.filter(name => new RegExp(`(?<![\\w-])${name.replace('.', '\\.')}`).test(outside));
       if (named.length > 0) {

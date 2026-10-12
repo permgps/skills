@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -24,7 +24,9 @@ import {
   standardsSources,
   type Violation,
 } from './gate-readers.ts';
-import { PRIOR_FILE } from '../memory/markers.ts';
+import { PRIOR_FILE, readPriorMemory, renderPrior } from '../memory/markers.ts';
+import { PROGRESS_FILE } from '../memory/progress.ts';
+import { parseTables } from './spec-integrity.ts';
 import { MEMORY_FILES_BY_HOST } from '../../skills/maestro/tools/runtime/memory.mts';
 
 /** Every standards source, backticked, as the shipped prose names them. */
@@ -701,4 +703,30 @@ test('the shipped phase step, spec section and brief name every standards source
 test('sectionBody at level 3 stops at the next ### and at the next ##', () => {
   assert.equal(sectionBody('### A\n\na\n\n### B\n\nb\n', 'A', 3), '\na\n');
   assert.equal(sectionBody('## R\n\n### A\n\na\n\n## S\n\ns\n', 'A', 3), '\na\n');
+});
+
+// --- where the work stands reaches no reader -----------------------------------
+
+test('what the progress file says reaches a reader only inside prior.md, which every reader withholds', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'gate-readers-progress-'));
+  try {
+    const runRoot = path.join(root, '.maestro');
+    await mkdir(path.join(runRoot, '2026-10-12-next--wip'), { recursive: true });
+    const progress = '# Where The Work Stands\n\nClosed 2026-10-01-first on 2026-10-01T12:00:00Z, outcome completed, at commit none.\n\n## Not Done\n\n- [2026-10-01-first#R02] R02 Exports — deferred: later\n';
+    await writeFile(path.join(runRoot, PROGRESS_FILE), progress, 'utf8');
+    const prior = renderPrior(await readPriorMemory(root, runRoot, '2026-10-12-next--wip', { gitBinary: 'git-that-is-not-installed' }), new Date('2026-10-12T09:00:00Z'));
+    assert.ok(prior.includes(progress.trimEnd()), 'prior.md does not carry the progress file');
+
+    const gates = await readFile(new URL('../../docs/spec/gates.md', import.meta.url), 'utf8');
+    const table = parseTables(gates).find(found => ['Gate', "Reader's brief", 'Given', 'Withheld'].every(column => found.columns.includes(column)));
+    assert.ok(table, 'gates.md has no reader table');
+    const forbidden = [PRIOR_MEMORY_INPUT, PROGRESS_FILE].map(name => normalizeName(name));
+    for (const row of table.rows) {
+      const given = splitNames(row['Given']);
+      for (const name of forbidden) assert.equal(given.includes(name), false, `${String(row['Gate'])} gives ${name}`);
+      const brief = normalizeName(row["Reader's brief"]);
+      const declared = declaredInputs(await readFile(new URL(`../../skills/maestro/prompts/${brief}`, import.meta.url), 'utf8')) ?? [];
+      for (const name of forbidden) assert.equal(declared.includes(name), false, `${brief} declares ${name} as given`);
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
 });

@@ -567,6 +567,43 @@ test('a brief that hands its субагент prior.md is reported, while withho
   });
 });
 
+// --- where the work stands between прогоны ------------------------------------
+
+const PROGRESS_LITERALS = [
+  '--commit-summary', 'commits since the last closure not summarised:', '### Leftovers —',
+  'changed since the last closure', 'PROGRESS.md',
+];
+const PROGRESS_ANCHORS = MEMORY_ANCHORS.filter(anchor => PROGRESS_LITERALS.includes(anchor.literal));
+
+test('the progress path has its five anchors in the memory path', () => {
+  assert.deepEqual(PROGRESS_ANCHORS.map(anchor => anchor.literal), PROGRESS_LITERALS);
+});
+
+for (const anchor of PROGRESS_ANCHORS) {
+  test(`${anchor.file} losing "${anchor.literal}" is the one memory finding, named on that file`, async () => {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, anchor.file);
+      const flat = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal), `${anchor.file} carries no "${anchor.literal}"`);
+      await writeFile(target, flat.split(anchor.literal).join('removed'), 'utf8');
+      const violations = (await checkBundle(copy)).filter(v => v.check === 'memory');
+      assert.deepEqual(violations.map(v => v.file), [anchor.file.split('/').join(path.sep)]);
+      assert.ok((violations[0]?.message ?? '').includes(anchor.literal), violations[0]?.message);
+    });
+  });
+}
+
+test('a brief that hands its субагент PROGRESS.md is reported, while withholding it is not', async () => {
+  await withShippedCopy(async copy => {
+    const executor = path.join(copy, 'prompts', 'executor.md');
+    const body = await readFile(executor, 'utf8');
+    await writeFile(executor, body.replace('# ', '# Also read `.maestro/PROGRESS.md` first.\n\n# '), 'utf8');
+    const violations = (await checkBundle(copy)).filter(v => v.check === 'memory');
+    assert.deepEqual(violations.map(v => v.file), [path.join('prompts', 'executor.md')]);
+    assert.match(violations[0]?.message ?? '', /PROGRESS\.md outside/);
+  });
+});
+
 // --- the project glossary is read, never written ------------------------------
 
 const GLOSSARY_ANCHORS = MEMORY_ANCHORS.filter(anchor => /glossary|\(not: x, y\)/.test(anchor.literal));
