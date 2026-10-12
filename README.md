@@ -654,7 +654,10 @@ What else is on it:
   the critical path are marked.
 - **Every требование row opens** to your own quoted words, the таски that name
   it, each check with its result and failure cause, and open findings. A
-  требование no таск names is marked.
+  требование no таск names is marked. Chips with counts filter the list —
+  all, built, in progress, deferred, and dropped when there are any — ten rows
+  show before «Показать все N», and a deferred, placeholder or dropped row
+  shows its reason inline.
 - **Verified original scope beside authorised current scope**, «Услышано, но не
   взято» and «Сверх запрошенного», and on a stopped run, the reason it stopped.
 - **A small `i` on every region and stage** that explains it with numbers from

@@ -204,6 +204,21 @@ records: «Услышано, но не взято», the user's words the manife
 context, each with its reason, and «Сверх запрошенного», what the run delivered
 that nobody asked for.
 
+**Chips filter the list by what became of your words.** Above the rows sit
+«Все», «Построено», «В работе», «Отложено», and «Снято» once anything was
+dropped, each with its count. The first three are the Требования card's own
+groups, «Снято» holds what was dropped, and together they add up to «Все». A
+chip at zero is still drawn, because a zero there is news; «Снято» only
+appears when something is dropped. The chosen chip shows its first ten rows,
+then «Показать все N», N being that chip's count; opened, the press reads
+«Свернуть». A deferred, placeholder or dropped row shows its reason on a muted
+line under your words — «Причина: …» — without being opened. «Построено» stays
+«Построено» after the final check passes: the chips sort by how far the build
+got, and each row's result column says where the check passed. Which chip you
+chose is kept in this browser, like the theme and the language, and never
+reaches the run; a chip the current run does not draw reads as «Все» until it
+does. See [`docs/spec/dashboard.md`](spec/dashboard.md) › *Your Words, Filtered*.
+
 An opened row stays open across the poll that redraws the page every two
 seconds, and keyboard focus stays on the row or toggle that had it.
 
@@ -365,12 +380,14 @@ mkdir -p /tmp/shot && cp skills/maestro/assets/dashboard.html /tmp/shot/
 cp docs/assets/state-finished.fixture.js /tmp/shot/state.js
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   --headless --disable-gpu --hide-scrollbars --allow-file-access-from-files \
-  --virtual-time-budget=4000 --window-size=1280,2500 \
+  --virtual-time-budget=4000 --window-size=1280,3400 \
   --screenshot=docs/assets/dashboard-finished.png file:///tmp/shot/dashboard.html
 ```
 
-The window is 2500 pixels tall, up from 2100 when «Лента» was added, so the
-capture still reaches the start of the требования list.
+The window is 3400 pixels tall, up from 2500 when the requirement list gained
+its chips, so the capture holds the whole page down to the checks: «Все 20»
+pressed, ten rows, and «Показать все 20» after them. It was 2100 before «Лента»
+was added.
 
 The clocks in a capture of the in-flight state are measured against the moment
 of the capture, so re-running the command produces a different image. That is

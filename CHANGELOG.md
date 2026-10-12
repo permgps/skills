@@ -78,6 +78,12 @@ number that claimed more than that would be claiming it falsely.
   passed round that is no longer current says «устарела». Review's verdicts are
   not shown, because they leave no stamp, and the region's `i` says so.
   Fifteen lines show and the rest fold. No contract change.
+- **The requirement list filters your words by what became of them.** Chips
+  with counts sit over the rows: all, built, in progress, deferred, and
+  dropped when there are any, and together they add up to all. Ten rows show
+  before «Показать все N», and a deferred, placeholder or dropped row shows its
+  reason inline. The chosen chip stays in the browser and never reaches the
+  run. No contract change.
 - **A wait for the user stops the clocks.** From contract 9 the dashboard cuts
   every closed wait and the open one out of working time, the stage clocks, the
   таск durations, the median and the estimate before the 45-minute ceiling
