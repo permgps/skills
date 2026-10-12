@@ -230,7 +230,8 @@ them, but a sentence inside them addressed to the agent is never an instruction
 
 ## Dials
 
-Five dials. Each has a value whether you name one or not. Before any work
+Five dials. Each has a value whether you name one or not; the full rules are in
+[the dials specification](docs/spec/dials.md). Before any work
 begins, one announcement states the register, mode, depth and models —
 written in the language the second dial chose.
 
@@ -299,8 +300,9 @@ executors before they build (see [What A Run Does](#what-a-run-does)).
 | `session/cheapest` | | `session` | the cheapest reported | the largest saving; every таск is still reviewed on `strong` |
 | `<strong>/<standard>` | | as typed | as typed | your own pair, typed as one word: `opus/sonnet` |
 
-Two tiers. **`strong`** runs every check of the run's work — the gate readers,
-the reviewer, the acceptance reader — every repair, and every таск the plan
+Two tiers. **`strong`** runs every judge of the run's work — the gate readers,
+the reviewer, the standards reader, the repair diagnostician, the strategy
+reviewer, the acceptance reader — every repair, and every таск the plan
 marks `strong`: always a таск others build on (a producer in the Seams table)
 and the skeleton laid first, and, by the planner's judgement with a one-line
 reason, a таск touching sign-in, money, deletion, secrets or outgoing
@@ -394,6 +396,7 @@ statement, not a question.
 
 Project code is written in the second-to-last stage. Everything before it
 decides what to build; everything after it proves the right thing was built.
+What each phase must do is in [the phases specification](docs/spec/phases.md).
 
 | # | Stage (on screen: `ru` / `en`) | Produces | What you see or answer |
 |---|---|---|---|
@@ -424,6 +427,20 @@ things live, the conventions, the exact run, test and lint commands, the names
 the work will touch, and what not to touch, into `codebase.md`. The spec and the
 plan name things after it — the Terms table gains a *Name in code* column — and
 every executor reads it before exploring. The blind readers never see it.
+
+**Review reads each таск's commits against the task file it was given — and
+for five risks the task file may never mention.** Whenever the diff touches
+sign-in and permissions, money, deleting data, secrets, or messages sent to
+third parties, the reviewer checks that category whatever tier the таск ran
+on, and a finding comes with a concrete counterexample, tagged
+`risk:<category>`. A blocking one goes to repair like any other; an observation
+reaches the отчёт. Once every таск is done, one standards reader looks across
+the whole прогон for what a per-таск review cannot see — duplication between
+таски — against your project's documented standards: the memory files,
+`CONTRIBUTING*`, `CODING_STANDARDS*` and `STYLEGUIDE*` at the root and in
+`.github/`, and conventions pages under `docs/`. It writes
+`reviews/standards.md` once; its observations go to the отчёт and are never
+repaired.
 
 Two more phases run outside that sequence:
 
@@ -461,9 +478,11 @@ alone — you see «R03 — оплата картой», not «R03».
 | Dirty working tree | preflight finds uncommitted changes | not in `full` | continue, or stop and tidy up first |
 | A Latin name for the run | the бриф is entirely in Russian | not in `full` (it uses `run-<date>`) | a short English name for the run directory |
 | Register, then mode | first run in a project | all, `full` included | a register and a mode, or "pin neither" |
+| Models | first run on a host, or a pinned model the host no longer offers — see [The First Run In A Project](#the-first-run-in-a-project) | all, `full` included; never on Gemini CLI | one of the offered pairs (`session/next` is recommended) or your own `<strong>/<standard>` |
 | Ambiguous dials | two different words for one dial | not in `full` | which one you meant |
 | A credential in your text | redaction finds one at ingest | all | S2: before going on, it names the redacted variables, advises rotating them, and never echoes a value — a secret found in a file already written stops the run |
 | The manifest | after numbering your words | `semi`, `interview`, `manual` (shown without a question in `full`) | "right, start the briefing" · "R02 is wrong / something is missing" · your own correction |
+| Leftovers from earlier runs | `PROGRESS.md` holds open items; asked once, in the first briefing round — see [The Next Run](#the-next-run) | `semi`, `interview`, `manual` | leave them, take some, or say they no longer matter |
 | The briefing block | forks in the бриф | `semi` (genuine forks), `interview`, `manual` (all forks) | an option, «как советуешь», «да» to the recommendation, or your own text; each choice is echoed back as recorded |
 | The specification | after G2 | `manual` | approve, or say what to change |
 | The plan | after G3 | `manual` | approve, or say what to change |
@@ -472,6 +491,7 @@ alone — you see «R03 — оплата картой», not «R03».
 | Raising the repair limit | a strategy review asks for more attempts | all | your exact words authorise it; a forecast of what will close comes with the question |
 | Closing with residual findings | acceptance ends with findings left | all | accept the residual set shown (the run closes `closed_with_exceptions`), or keep repairing |
 | Someone else holds the run | the state carries another session's token | all | continue it, or wait — the run cannot tell a live session from a dead one |
+| Commits on another branch | a resumed run finds a таск's lost commits on another local branch — see [Resuming An Interrupted Run](#resuming-an-interrupted-run) | all | switch back to that branch, or let the run rebuild the таск |
 | The state changed underneath | another write landed since the last read | all | re-read and continue from what is on disk |
 | A gate fails a third time | the same finding fails one gate three times | all | the run stops and reports what cannot be satisfied |
 
@@ -513,7 +533,7 @@ a warning: the phase is redone.
 |---|---|---|
 | G1 | briefing | every requirement has a status/reason; every question in `answers.md` records its recommended option and the option chosen; a fresh independent source audit has run and the initial agreement is frozen |
 | G2 | specification | intent and independent raw-reference readers find no unresolved mandatory gap |
-| G3 | plan | each required obligation has an implementation owner, each check has an execution owner, the task reader finds the handoff executable, and the plan-consistency reader, seeing every task file at once, finds no two таски sharing a file without an order between them |
+| G3 | plan | each required obligation has an implementation owner, each check has an execution owner, the task reader finds the handoff executable, and the plan-consistency reader, seeing every task file at once, finds no two таски sharing a file without an order between them; every producer and the skeleton laid first are `strong`, and each task file's `Model` and `References` rows agree with the run state |
 | G4 | acceptance | all current required checks and coverage pass; missing evidence remains pending |
 
 Independent readings withhold earlier conclusions. G2 includes a separate reader
@@ -535,7 +555,8 @@ and acceptance runs again once the build has changed.
 
 ## Six Rules Nothing Turns Off
 
-No mode or depth removes any of them.
+No mode or depth removes any of them. Their full statement is in
+[the safety specification](docs/spec/safety.md).
 
 1. **S1** — A requirement is removed only by you, in your own words. Change your
    mind while a run is going and what you said is quoted verbatim, in the
@@ -565,17 +586,24 @@ your-project/.maestro/
 │   ├── codebase.md                 what your repository held before the run, read once before the spec
 │   ├── spec.md, interfaces.md      the specification and the contracts between таски
 │   ├── discovered-interfaces.md    what the build found it needed
-│   ├── tasks/, reviews/            one file per таск and per review
+│   ├── tasks/                      one file per таск, and a handoff file for a таск that outgrew one context
+│   ├── reviews/                    one file per таск review, and standards.md from the one standards pass
 │   ├── evidence/<execution-id>/    captured check output, referenced by path and hash
 │   ├── report.md                   the отчёт
 │   ├── decisions.md                what was decided, what instead, and why
-│   └── amendments.md               specification changes the build forced
+│   ├── amendments.md               specification changes the build forced
+│   └── state.js                    the run's last state, kept when the next run starts
 ├── README.md                       the register: one row per run and how it ended
 ├── PROGRESS.md                     where the work stands: what is settled, not done, known broken, fixed by hand
 ├── config.json                     your pinned mode and register, and each host's models
 ├── state.js, dashboard.html        the run state and the page that reads it
+├── validation.js                   the helper's verdict on the last state it published, shown on the page
+├── serve.json, opened.json         the page's local server, and the address already opened for you
 └── sync.mts, runtime/              the helper copied in at preflight
 ```
+
+The helper's own files are listed module by module in
+[the runtime layout](docs/install.md#autonomous-runtime-layout).
 
 - **The register.** `.maestro/README.md` lists every run — when it started, its
   directory, whether it is in progress, completed, closed with exceptions or
@@ -584,8 +612,10 @@ your-project/.maestro/
   outside the markers is never touched.
 - **The отчёт.** `report.md` has fixed sections, in this order: *What was
   asked*, *Disagreements*, *Assumptions*, *Questions to forward*, *Hard to
-  undo*, *Observations*, *What is left*. A second acceptance round is appended below the first. The questions to forward
-  are also given in chat as one block you can copy, in your language.
+  undo*, *Observations*, *What is left*. *What was asked* ends with one line counting the таски each
+  model built — `Models: N таски on strong (<name>), M on standard (<name>)`.
+  A second acceptance round is appended below the first. The questions to
+  forward are also given in chat as one block you can copy, in your language.
 - **The outcome.** A closed run is `completed` (a current passing G4),
   `closed_with_exceptions` (you accepted a residual set; the underlying failure
   is preserved), or `stopped_incomplete` (with its reason). Activity reaching
@@ -704,81 +734,54 @@ is deleted.
 ## The Dashboard
 
 One self-contained HTML file, opened for you when the run starts, reading the run
-state on its own. Offline, no CDN, no fonts, no build step.
+state on its own. Offline, no CDN, no fonts, no build step. Every number on it
+is computed from the run state when the page draws itself; everything about it
+is in [`docs/dashboard.md`](docs/dashboard.md).
 
 ![The dashboard during the build stage](docs/assets/dashboard-running.png)
 
-A band at the top says what is happening: the прогон's condition as a word and a
-colour — working, waiting for you, finished or failed — then progress across the
-whole прогон, one sentence about the таски, the таски in flight by title, and the
-eight stages as a strip with their clocks. What is left stands at its right.
-Progress is weighted by how long each stage typically takes — the build counts
-six, specification and review two, the rest one. Four cards follow:
-requirements built (or verified, once the final check passed), таски as one
-square each, the last tests with the таск they ran after, and working time.
-Brief coverage became a line under G2 in the checks, and the debt became the
-total of «Ваш ход». And the build itself grouped by wave, so the
-parallelism you paid for is the parallelism you can see — measured from the
-clocks rather than claimed from the plan. Every таск bar says its status in a
-word; a bar in repair quotes what was sent back, a failed bar names how the last
-repair attempt ended, and a wave that has not started names the таски it waits
-for. In a pane narrower than 992 pixels the page turns dense — the same
-regions, tighter, the cards two by two — and never scrolls sideways. Every number is computed from the run
-state when the page draws itself, and «осталось» is a range, review and acceptance
-included, that refuses to be sharper than the прогоны it was measured from.
-
-What else is on it:
-
-- **«Ваш ход» — what only you can settle**, in one place: empty variables by
-  name, placeholders, open promised work, one-way changes grouped by kind, and
-  assumptions. See [Your move](docs/dashboard.md#your-move).
-- **«Лента» — what just happened**, newest first, each line with its age, every
-  event read from a stamp the run state already carries; fifteen show and the
-  rest fold. See [Feed](docs/dashboard.md#feed).
-- **Every таск row opens** to the требования it serves, its blockers, files,
-  owned area, commits, restarts, trips to repair, tests and defects; tasks on
-  the critical path are marked.
-- **Every требование row opens** to your own quoted words, the таски that name
-  it, each check with its result and failure cause, and open findings. A
-  требование no таск names is marked. Chips with counts filter the list —
-  all, built, in progress, deferred, and dropped when there are any — ten rows
-  show before «Показать все N», and a deferred, placeholder or dropped row
-  shows its reason inline.
-- **Verified original scope beside authorised current scope**, «Услышано, но не
-  взято» and «Сверх запрошенного», and on a stopped run, the reason it stopped.
-- **A small `i` on every region and stage** that explains it with numbers from
-  your run — which median the estimate used, how long the chain is, how many
-  требования are in the denominator and why. Escape or a click elsewhere closes
-  it. A «Ваш ход» group longer than five lines folds the rest. Rows open by click or Enter, and focus
-  survives the page's redraw.
-- **The silence line.** The run writes state only at transitions, so the page
-  says how long it has been since the last write and raises the line once the
-  silence is longer than any this run has already come through — a session that
-  died no longer looks like one that is thinking. A run stopped on your question
-  says what it is waiting for instead — a reply, approval of the specification
-  or the plan, permission for an irreversible action — and the browser tab
-  reads «● Ждём вас». From contract 9 the clocks stop while it waits: time spent
-  waiting for you is not counted as working time. Contract 10, the current one,
-  adds the closing sentence below.
-- **A finished run reads as a report.** Under «Завершён» or «Сбой» the run's
-  own sentence says what now exists, in the band's colour, and the path of the
-  отчёт is named for you to open; «Ваш ход» moves up to just under the header.
-  See [A finished run](docs/dashboard.md#a-finished-run).
-- **Two switches in the header** — theme (light, dark, auto) and language (ru,
-  en, auto) — remembered by your browser only. See
+- **The band at the top** says what is happening: the прогон's condition as a
+  word and a colour — working, waiting for you, finished or failed — progress
+  across the whole прогон, the таски in flight by title, the eight stages with
+  their clocks, and «Осталось», a range to acceptance that is never sharper than
+  the прогоны it was measured from. See
+  [A run in flight](docs/dashboard.md#a-run-in-flight).
+- **Four cards** — requirements built, таски as squares, the last tests with
+  the таск they ran after, working time — and below them the build grouped by
+  wave, each таск bar saying its status in a word and opening to its
+  requirements, blockers, files, commits, repairs and tests.
+- **Your requirements**, each opening to your own quoted words, the таски that
+  name it and its checks, filtered by what became of them. See
+  [Verified original and current scope](docs/dashboard.md#verified-original-and-current-scope).
+- **«Ваш ход»** — what only you can settle, in one place. See
+  [Your move](docs/dashboard.md#your-move).
+- **«Лента»** — what just happened, newest first. See
+  [Feed](docs/dashboard.md#feed).
+- **A small `i` on every region and stage** explains its number with figures
+  from your run. See
+  [Asking what a number means](docs/dashboard.md#asking-what-a-number-means).
+- **Silence and waiting are told apart.** The page says how long it has been
+  since the last write and raises that line once the silence is longer than any
+  this run has come through; a run stopped on your question says what it is
+  waiting for, the tab reads «● Ждём вас», and the clocks stop. See
+  [When the page has nothing new to say](docs/dashboard.md#when-the-page-has-nothing-new-to-say).
+- **A finished run reads as a report** — the run's own sentence on what now
+  exists, and the path of the отчёт. See
+  [A finished run](docs/dashboard.md#a-finished-run).
+- **Two switches in the header**, theme and language, remembered by your
+  browser only; in a narrow pane the same regions turn dense and never scroll
+  sideways. See
   [the two switches](docs/dashboard.md#the-two-switches-in-the-header).
 
 ![The dashboard after a finished run](docs/assets/dashboard-finished.png)
 
 **You do not have to go looking for it.** The helper that keeps the page current
-is what opens it, and it records in `opened.json` that it did, so a run that
-writes state dozens of times raises exactly one tab. An address that *moved* is
-opened again, because by then the tab you are holding is dead. Nothing opens
-over SSH or in CI. A host that shows the page in a pane of its own should load
-the loopback `http://` address the helper prints — not a `file://` path, from
-which the page can show the snapshot embedded in it but cannot read the state
-that keeps it moving — and the run passes `--no-open` there, so you do not get
-two pages.
+is what opens it, once per address, and nothing opens over SSH or in CI. A host
+that shows the page in a pane of its own should load the loopback `http://`
+address the helper prints, not a `file://` path, and the run passes `--no-open`
+there so you do not get two pages. It is the only user-visible page a прогон
+opens — see
+[It is the only page the прогон opens](docs/dashboard.md#it-is-the-only-page-the-прогон-opens).
 
 The commands you might run yourself, from the project root:
 
@@ -791,15 +794,11 @@ MAESTRO_SYNC_DEBUG=1 node .maestro/sync.mts  # diagnostics on stderr
 
 `MAESTRO_SYNC_NO_OPEN` in the environment does what `--no-open` does, and
 `LOG_LEVEL=DEBUG` also turns diagnostics on. `--validate` and `--project` are
-read-only checks that print JSON; `--publish`, `--serve` and the memory commands
-are what the orchestrator uses, not you. If the loopback server cannot start,
+read-only checks that print JSON; `--publish`, `--serve`, `--memory-read`,
+`--memory-write`, `--config-models`, `--update-check` and `--commits-check` are
+what the orchestrator uses, not you. If the loopback server cannot start,
 the page falls back to a file snapshot. More in
 [viewer runtime and recovery](docs/dashboard.md#viewer-runtime-and-recovery).
-
-**It is the only user-visible page a прогон opens.** Owned temporary servers and
-headless browsers may run bounded checks without taking over that viewer; when
-a browser is unavailable, affected checks remain incomplete. Everything about
-the page is in [`docs/dashboard.md`](docs/dashboard.md).
 
 ## Scout
 
@@ -924,18 +923,13 @@ stages read *Подготовка, Требования, Брифинг, Спе�
 numbered words are the *манифест*. Each term has exactly one name — the
 словарь is [`docs/spec/vocabulary.md`](docs/spec/vocabulary.md).
 
-**Three fields of the state carry the прогон's language, and the boundary is
-who is speaking.** `gates[].findings`, `tasks[].title` and `stages[].note` are the
-прогон's own sentences to you, printed on the dashboard word for word, so those
-three follow the dial while every other field stays English. The page also shows
-`debt` and `oneWay` lines, `additions`, `stopReason`, a требование's `title` and
-the verification record's text as written; those are record lines the отчёт and
-the gates read too, so the page quotes them rather than translating. A quotation
-keeps the language it was said in, so an English отчёт carries Russian findings
-inside it. `node .maestro/sync.mts` holds the rule for `ru`, naming each
-offending line after it has printed the address. It deliberately does not hold
-`en`: an English finding quoting your own Russian sentence is correct, and no
-check can tell that from a breach.
+**Five fields of the state carry the прогон's language** — the run's own
+sentences to you: gate findings, таск titles, stage notes, what it is waiting
+for, and the closing `result`. Every other field stays English, and a line the
+отчёт and the gates also read, such as a requirement's title, is quoted as
+written rather than translated. `node .maestro/sync.mts` holds the rule for
+`ru`; the field list and why `en` cannot be held are in
+[the state contract](docs/spec/state-contract.md).
 
 **How plainly it speaks is a separate dial**, and it does not change the words
 themselves. In *по-простому* a *таск* is still a *таск* — it simply arrives with
@@ -971,20 +965,11 @@ diffs, not filtered away. Every таск and repair commit carries the
 `Maestro-Run:` and `Requirements:` trailers described in
 [Fixing Something By Hand](#fixing-something-by-hand).
 
-**The contract is versioned, and old runs stay readable.**
-
-- Contract 5 preserves the redacted original request, requires an independent
-  source audit before agreement, and distinguishes frozen original scope from
-  authorised current scope.
-- Contract 6 makes the run close таски instead of repeating repairs: readiness
-  records, defects under a parent таск, strategy reviews, a user-only limit
-  raise, and the plan-consistency reader at G3. A contract-5 run resumes as
-  contract 6 with its history marked inherited.
-- Contract 7 keeps all of this and adds the dated run directory and the
-  register.
-- Contract 8, which new runs publish, adds the run's `models` and each таск's
-  `model` tier. A contract-7 run keeps running on the session's model and is
-  never migrated.
+**The contract is versioned, and old runs stay readable.** New runs publish
+contract 10; the helper publishes a state from contract 4 through 10, and the
+dashboard renders an older state as it always did. What each version added is in
+[the state contract](docs/spec/state-contract.md#versioning) and
+[`CHANGELOG.md`](CHANGELOG.md).
 
 The fields, and what may be left out of them, are in
 [`docs/spec/state-contract.md`](docs/spec/state-contract.md); what verification
@@ -1042,7 +1027,7 @@ development dependencies are `typescript` and `@types/node`.
 | `npm run view` | the viewer boundary: the run opens only its dashboard |
 | `npm run test` | every `*.test.ts`, including the copied-runtime integration tests and the README reference check |
 | `npm run link` / `npm run unlink` | link the checkout into the local agent directories |
-| `npm run metrics` | measure a finished run: `npm run metrics -- [<dir>] [--json]`, default `.maestro`; reads only `state.js`; exit `0` measured, `2` unreadable |
+| `npm run metrics` | measure a finished run: `npm run metrics -- [<dir>] [--json]`, default `.maestro`; reads only `state.js`; counts таски, restarts and repairs per model tier; exit `0` measured, `2` unreadable |
 | `npm run parity:browser` | the real-Chrome pointer suite; exit `2` when no browser is available |
 | `npm run parity:workflow` | an isolated Codex CLI evaluation |
 | `npm run parity:workflow:prepare` | prepare that evaluation without running it |
