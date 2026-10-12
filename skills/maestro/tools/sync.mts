@@ -25,7 +25,7 @@ async function viewer(noOpen: boolean): Promise<string | null> {
   await openPage(RUN_DIR, url, false, noOpen);
   return url;
 }
-/** The block body for --memory-write, the pin for --config-models; null when nothing is piped, so a terminal never hangs. */
+/** The block body for --memory-write, the commit summary for --memory-read, the pin for --config-models; null when nothing is piped, so a terminal never hangs. */
 async function stdinText(): Promise<string | null> {
   if (process.stdin.isTTY) return null;
   const chunks: Buffer[] = [];

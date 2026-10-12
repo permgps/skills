@@ -12,7 +12,9 @@ import path from 'node:path';
 
 import {
   BEGIN_MARKER, END_MARKER, GLOSSARY_READ_LIMIT_BYTES, fenceFor, glossaryLinks, readPriorMemory, readProjectGlossary, renderPrior,
+  type PriorMemory,
 } from './markers.ts';
+import { fixesReadAtPreflight, progressInPrior } from './progress.ts';
 import { upsertRegister } from '../../skills/maestro/tools/runtime/register.mts';
 import { activeContract7State, contract7State } from '../state/fixtures/verification.ts';
 
@@ -38,7 +40,8 @@ async function earlierRun(runRoot: string, decisions: string | null): Promise<st
 test('a project nobody ran before yields a prior.md that says so in both sections', () => withProject(async (root, runRoot) => {
   const prior = await readPriorMemory(root, runRoot, '2026-10-04-new-run--wip');
   assert.deepEqual(prior, {
-    blocks: [], glossary: { state: 'absent', files: [], bytes: 0, limit: GLOSSARY_READ_LIMIT_BYTES }, runs: [], notRead: [],
+    blocks: [], glossary: { state: 'absent', files: [], bytes: 0, limit: GLOSSARY_READ_LIMIT_BYTES }, runs: [],
+    progress: null, commits: null, notRead: [],
   });
   const text = renderPrior(prior, READ_AT);
   assert.match(text, /No maestro block in any memory file\./);
@@ -76,6 +79,14 @@ test('the block and an earlier run\'s decisions are both carried, verbatim and i
     `### ${dir} — completed, started 2026-09-29`,
     '',
     '- Chose SQLite instead of Postgres, because the app runs offline. (R03, 2026-09-29)',
+    '',
+    '## Where The Work Stands',
+    '',
+    'No `.maestro/PROGRESS.md`: no earlier прогон has closed with one.',
+    '',
+    '## Since The Last Closure',
+    '',
+    'No earlier closure recorded, so no history since one was read.',
     '',
   ].join('\n'));
 }));
@@ -307,3 +318,69 @@ test('a map of brackets in their thousands is read in linear time', () => {
   glossaryLinks(`${'](['.repeat(50_000)}${'](x'.repeat(50_000)}`);
   assert.ok(performance.now() - started < 1000, 'glossaryLinks backtracked on adversarial input');
 });
+
+// --- where the work stands -----------------------------------------------------
+
+const PROGRESS = [
+  '# Where The Work Stands',
+  '',
+  'Closed 2026-09-29-synthetic-menu on 2026-09-29T09:20:00Z, outcome completed, at commit abc1234.',
+  '',
+  '## Not Done',
+  '',
+  '- [2026-09-29-synthetic-menu#R02] R02 Exports — deferred: later',
+  '',
+].join('\n');
+
+function withProgress(text: string): PriorMemory {
+  return {
+    blocks: [], glossary: { state: 'absent', files: [], bytes: 0, limit: GLOSSARY_READ_LIMIT_BYTES }, runs: [], notRead: [],
+    progress: { text, header: { dir: '2026-09-29-synthetic-menu', closedAt: '2026-09-29T09:20:00Z', outcome: 'completed', commit: 'abc1234' } },
+    commits: { state: 'listed', basis: 'commit', range: 'abc1234..HEAD', paths: ['src/cart.ts'],
+      commits: [{ sha: 'def5678aaaa', date: '2026-10-02T10:00:00+05:00', subject: 'add the cart by hand' }] },
+  };
+}
+
+test('prior.md carries the progress file verbatim and the commits since its closure, byte for byte', () => {
+  const text = renderPrior(withProgress(PROGRESS), READ_AT);
+  assert.ok(text.endsWith([
+    '## Earlier Decisions',
+    '',
+    'No earlier run in the register.',
+    '',
+    '## Where The Work Stands',
+    '',
+    '`.maestro/PROGRESS.md` as the last closure left it. An item under Settled By The User binds like an earlier',
+    'decision; Not Done and Known Bugs are offered once in briefing and never taken without the user\'s answer.',
+    '',
+    '```markdown',
+    PROGRESS.trimEnd(),
+    '```',
+    '',
+    '## Since The Last Closure',
+    '',
+    '1 commit over code since the closure of 2026-09-29-synthetic-menu on 2026-09-29T09:20:00Z, newest first:',
+    '',
+    '- `def5678` 2026-10-02 add the cart by hand',
+    '',
+    '### Changed Paths',
+    '',
+    '- `src/cart.ts`',
+    '',
+  ].join('\n')), text);
+});
+
+test('a progress file that holds a fence gets a longer fence, and its copy reads back whole', () => {
+  const fenced = `${PROGRESS}\n## Fixes Without Maestro\n\n- ran \`\`\`npm ci\`\`\` by hand\n`;
+  const text = renderPrior(withProgress(fenced), READ_AT);
+  assert.match(text, /^````markdown$/m);
+  assert.equal(progressInPrior(text), `${fenced.trimEnd()}\n`);
+  assert.deepEqual(fixesReadAtPreflight(text), ['- ran ```npm ci``` by hand']);
+});
+
+test('a progress file is read from .maestro/ beside the register', () => withProject(async (root, runRoot) => {
+  await writeFile(path.join(runRoot, 'PROGRESS.md'), PROGRESS, 'utf8');
+  const prior = await readPriorMemory(root, runRoot, NEW_RUN, { gitBinary: 'git-that-is-not-installed' });
+  assert.equal(prior.progress?.text, PROGRESS);
+  assert.equal(prior.progress?.header?.commit, 'abc1234');
+}));

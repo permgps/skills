@@ -297,3 +297,137 @@ test('a resumed read that keeps prior.md still reports the same existingCode', {
     assert.deepEqual(again['existingCode'], first['existingCode']);
   } finally { await project.dispose(); }
 });
+
+// --- where the work stands, and the commits since the last closure ---------------
+
+const needsGit = { skip: hasGit ? false : 'git is not on PATH' };
+
+/** git in the project, as a user's history would have it. */
+function git(root: string, ...args: string[]): string {
+  const done = spawnSync('git', ['-C', root, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8' });
+  assert.equal(done.status, 0, `git ${args.join(' ')}: ${done.stderr}`);
+  return done.stdout;
+}
+
+/** A repository whose earlier run closed through publication, so PROGRESS.md names a real commit. */
+async function landedInRepo(project: Target): Promise<string> {
+  git(project.root, 'init', '-q');
+  await writeFile(path.join(project.root, 'app.ts'), 'export {};\n', 'utf8');
+  git(project.root, 'add', 'app.ts');
+  git(project.root, 'commit', '-q', '-m', 'the code the run built');
+  await landEarlierRun(project, '- Kept the menu static. (R01, 2026-09-29)\n');
+  await mkdir(path.join(project.maestro, CURRENT));
+  return git(project.root, 'rev-parse', 'HEAD').trim();
+}
+
+/** `count` real commits over code, each touching its own file. */
+async function commitsOverCode(project: Target, count: number): Promise<void> {
+  await mkdir(path.join(project.root, 'src'), { recursive: true });
+  for (let index = 1; index <= count; index += 1) {
+    await writeFile(path.join(project.root, 'src', `f${index}.ts`), `export const n = ${index};\n`, 'utf8');
+    git(project.root, 'add', '-A', 'src');
+    git(project.root, 'commit', '-q', '-m', `change ${index}`);
+  }
+}
+
+const priorOf = (project: Target): Promise<string> => readFile(path.join(project.maestro, CURRENT, 'prior.md'), 'utf8');
+const priorExists = async (project: Target): Promise<boolean> =>
+  (await readdir(path.join(project.maestro, CURRENT))).includes('prior.md');
+
+test('with no progress file the read reports it absent and no closure to read history from', async () => {
+  const project = await target();
+  try {
+    await mkdir(path.join(project.maestro, CURRENT));
+    const read = project.sync(['--memory-read', '--run-dir', CURRENT]);
+    assert.equal(read['progress'], 'absent');
+    assert.deepEqual(read['commits'], { state: 'none', count: 0, paths: [] });
+  } finally { await project.dispose(); }
+});
+
+test('a few commits since the closure publication recorded are listed with their paths', needsGit, async () => {
+  const project = await target();
+  try {
+    const closedAt = await landedInRepo(project);
+    await commitsOverCode(project, 2);
+    const read = project.sync(['--memory-read', '--run-dir', CURRENT]);
+    assert.equal(read.code, 0, read.stdout);
+    assert.equal(read['action'], 'written');
+    assert.equal(read['progress'], 'read');
+    assert.deepEqual(read['commits'], { state: 'listed', basis: 'commit', range: `${closedAt}..HEAD`, count: 2, paths: ['src/f1.ts', 'src/f2.ts'] });
+    const prior = await priorOf(project);
+    assert.match(prior, /## Where The Work Stands\n\n`\.maestro\/PROGRESS\.md` as the last closure left it/);
+    assert.match(prior, /2 commits over code since the closure of 2026-09-29-synthetic-menu/);
+  } finally { await project.dispose(); }
+});
+
+test('past thirty commits the first read writes nothing and asks for a summary', needsGit, async () => {
+  const project = await target();
+  try {
+    const closedAt = await landedInRepo(project);
+    await commitsOverCode(project, 31);
+    const read = project.sync(['--memory-read', '--run-dir', CURRENT]);
+    assert.equal(read.code, 0, read.stdout);
+    assert.equal(read['action'], 'summary-needed');
+    assert.deepEqual({ ...(read['commits'] as Record<string, unknown>), paths: undefined },
+      { state: 'summary-needed', basis: 'commit', range: `${closedAt}..HEAD`, count: 31, paths: undefined });
+    assert.equal(await priorExists(project), false);
+  } finally { await project.dispose(); }
+});
+
+test('the second read with the reader\'s summary on stdin writes it in place of the list', needsGit, async () => {
+  const project = await target();
+  try {
+    await landedInRepo(project);
+    await commitsOverCode(project, 31);
+    const read = project.sync(['--memory-read', '--run-dir', CURRENT, '--commit-summary'], 'src/ grew 31 small modules\n\n- each exports one number\n');
+    assert.equal(read.code, 0, read.stdout);
+    assert.equal(read['action'], 'written');
+    assert.equal((read['commits'] as { state: string }).state, 'summarised');
+    const prior = await priorOf(project);
+    assert.match(prior, /a commit reader summarised them:\n\n- src\/ grew 31 small modules\n- each exports one number\n/);
+    assert.doesNotMatch(prior, /change 17/);
+  } finally { await project.dispose(); }
+});
+
+test('a summary of no lines or more than ten is refused with exit 1, and nothing is written', needsGit, async () => {
+  const project = await target();
+  try {
+    await landedInRepo(project);
+    await commitsOverCode(project, 31);
+    for (const [input, lines] of [['\n  \n', 0], [Array.from({ length: 11 }, (_, index) => `line ${index}`).join('\n'), 11]] as const) {
+      const read = project.sync(['--memory-read', '--run-dir', CURRENT, '--commit-summary'], input);
+      assert.equal(read.code, 1, read.stdout);
+      assert.equal(read['lines'], lines);
+      assert.match(String(read['error']), /1 to 10 non-empty lines/);
+      assert.equal(await priorExists(project), false);
+    }
+  } finally { await project.dispose(); }
+});
+
+test('with the reader declined the newest thirty subjects are written and the rest counted', needsGit, async () => {
+  const project = await target();
+  try {
+    await landedInRepo(project);
+    await commitsOverCode(project, 31);
+    const read = project.sync(['--memory-read', '--run-dir', CURRENT, '--no-commit-summary']);
+    assert.equal(read.code, 0, read.stdout);
+    assert.equal((read['commits'] as { state: string }).state, 'unsummarised');
+    const prior = await priorOf(project);
+    assert.match(prior, /change 31\n/);
+    assert.doesNotMatch(prior, /change 1\n/);
+    assert.match(prior, /- 1 earlier commits not summarised\.\n/);
+  } finally { await project.dispose(); }
+});
+
+test('an existing prior.md is kept byte for byte whatever the summary flags say', needsGit, async () => {
+  const project = await target();
+  try {
+    await landedInRepo(project);
+    await commitsOverCode(project, 31);
+    assert.equal(project.sync(['--memory-read', '--run-dir', CURRENT, '--no-commit-summary'])['action'], 'written');
+    const first = await priorOf(project);
+    const again = project.sync(['--memory-read', '--run-dir', CURRENT, '--commit-summary'], 'a different summary\n');
+    assert.equal(again['action'], 'kept');
+    assert.equal(await priorOf(project), first);
+  } finally { await project.dispose(); }
+});

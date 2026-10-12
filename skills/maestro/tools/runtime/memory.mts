@@ -16,6 +16,12 @@
 // writes it. The read is capped, because `prior.md` is read into the contexts
 // of briefing, the spec and the plan, and a glossary has no size of its own.
 //
+// It also carries where the work stands: `.maestro/PROGRESS.md` as the last
+// closure wrote it, and the commits over code since that closure, read through
+// `history.mts`. Past thirty commits the list is replaced by a commit reader's
+// summary, which arrives on a second call (decision D8), so `prior.md` is still
+// written exactly once.
+//
 // The read also says whether the project holds code, because preflight calls it
 // exactly once, at the point the answer is needed. The rule lives in
 // `existing-code.mts`; this module only passes it the memory file and project
@@ -27,6 +33,8 @@ import { lstat, open, readFile, realpath, rename, stat, unlink } from 'node:fs/p
 import path from 'node:path';
 
 import { detectExistingCode } from './existing-code.mts';
+import { commitsSince, type CommitsSince } from './history.mts';
+import { PRIOR_PROGRESS_HEADING, PROGRESS_FILE, parseHeaderCommit, type ProgressHeader } from './progress.mts';
 import { readRegisterRuns } from './register.mts';
 import { createLogger } from './shared/log.mts';
 import {
@@ -418,9 +426,25 @@ export interface PriorMemory {
   /** The user's own file of words; read, never written. */
   glossary: ProjectGlossary;
   runs: { dir: string; started: string; status: string; decisions: string | null }[];
+  /** `.maestro/PROGRESS.md` verbatim, and the closure its header records; null when there is no file. */
+  progress: { text: string; header: ProgressHeader | null } | null;
+  /** The commits over code since that closure; null when no closure is recorded. */
+  commits: CommitsSince | null;
   /** Something that exists and was not read, with the reason. */
   notRead: { item: string; reason: string }[];
 }
+
+/** The most commits `prior.md` lists; past it a commit reader summarises them. */
+export const COMMIT_LIST_MAX = 30;
+
+/** The most lines a commit reader's summary may hold. */
+export const COMMIT_SUMMARY_MAX = 10;
+
+/** The most changed paths `prior.md` names before it counts the rest. */
+export const CHANGED_PATHS_MAX = 50;
+
+/** The directory under the project root that holds Maestro's own record, never code. */
+const RUN_ROOT_NAME = '.maestro';
 
 const reasonOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -572,9 +596,12 @@ export async function readProjectGlossary(projectRoot: string): Promise<{ glossa
  * a malformed file is recorded under `notRead` for the phase to say aloud.
  * Runs from before contract 7 have no register row and are not found at all.
  */
-export async function readPriorMemory(projectRoot: string, runRoot: string, currentDir: string): Promise<PriorMemory> {
+export async function readPriorMemory(
+  projectRoot: string, runRoot: string, currentDir: string, options: { gitBinary?: string } = {},
+): Promise<PriorMemory> {
   const prior: PriorMemory = {
-    blocks: [], glossary: { state: 'absent', files: [], bytes: 0, limit: GLOSSARY_READ_LIMIT_BYTES }, runs: [], notRead: [],
+    blocks: [], glossary: { state: 'absent', files: [], bytes: 0, limit: GLOSSARY_READ_LIMIT_BYTES }, runs: [],
+    progress: null, commits: null, notRead: [],
   };
 
   for (const file of KNOWN_MEMORY_FILES) {
@@ -621,11 +648,41 @@ export async function readPriorMemory(projectRoot: string, runRoot: string, curr
     log.debug('prior', 'earlier run read', { dir: row.dir, status: row.status, found: decisions !== null });
   }
 
+  await readWhereTheWorkStands(prior, projectRoot, runRoot, options.gitBinary);
+
   log.info('prior', 'prior memory read', {
     runs: prior.runs.length, skipped: prior.notRead.length, blockFiles: prior.blocks.map(block => block.file),
-    glossary: prior.glossary.state,
+    glossary: prior.glossary.state, commits: prior.commits?.commits.length ?? null,
   });
   return prior;
+}
+
+/**
+ * The progress file and the history since the closure it records. Neither can
+ * stop the read: a file whose header names no closure, and a history git cannot
+ * give, are each one line under Not Read.
+ */
+async function readWhereTheWorkStands(prior: PriorMemory, projectRoot: string, runRoot: string, gitBinary = 'git'): Promise<void> {
+  const text = await readIfPresent(path.join(runRoot, PROGRESS_FILE));
+  if (text === null) {
+    log.debug('prior', 'where the work stands', { progress: false, commits: null, basis: null });
+    return;
+  }
+  const header = parseHeaderCommit(text);
+  prior.progress = { text, header };
+  if (header === null) {
+    prior.notRead.push({ item: `${RUN_ROOT_NAME}/${PROGRESS_FILE}`, reason: 'its header names no closure, so the commits since one were not read' });
+    log.warn('prior', 'progress file header names no closure', { file: PROGRESS_FILE });
+    return;
+  }
+  prior.commits = await commitsSince(projectRoot, { commit: header.commit, at: header.closedAt },
+    [RUN_ROOT_NAME, ...KNOWN_MEMORY_FILES], gitBinary);
+  if (prior.commits.state === 'unavailable') {
+    prior.notRead.push({ item: 'git history', reason: prior.commits.reason ?? 'git could not be read' });
+  }
+  log.debug('prior', 'where the work stands', {
+    progress: true, commits: prior.commits.commits.length, basis: prior.commits.basis ?? null, state: prior.commits.state,
+  });
 }
 
 /**
@@ -660,8 +717,67 @@ function renderGlossary(glossary: ProjectGlossary): string[] {
   return out;
 }
 
-/** `prior.md`, rendered the same way from the same input every time. */
-export function renderPrior(prior: PriorMemory, readAt: Date): string {
+/** The progress file, fenced: its own `#` headings would otherwise read as the structure of `prior.md`. */
+function renderProgress(progress: PriorMemory['progress']): string[] {
+  const out: string[] = [PRIOR_PROGRESS_HEADING, ''];
+  if (progress === null) return [...out, `No \`${RUN_ROOT_NAME}/${PROGRESS_FILE}\`: no earlier прогон has closed with one.`, ''];
+  const body = progress.text.trimEnd();
+  const fence = fenceFor(body);
+  out.push(
+    `\`${RUN_ROOT_NAME}/${PROGRESS_FILE}\` as the last closure left it. An item under Settled By The User binds like an earlier`,
+    'decision; Not Done and Known Bugs are offered once in briefing and never taken without the user\'s answer.',
+    '',
+    `${fence}markdown`, body, fence, '',
+  );
+  return out;
+}
+
+/** How a commit reader's answer arrived: its lines, or `declined` when it could not give one. */
+export type CommitSummary = readonly string[] | 'declined';
+
+const commitLine = (commit: { sha: string; date: string; subject: string }): string =>
+  `- \`${commit.sha.slice(0, 7)}\` ${commit.date.slice(0, 10)} ${commit.subject}`;
+
+/**
+ * The commits since the last closure: the list up to {@link COMMIT_LIST_MAX},
+ * past it the reader's summary or the newest subjects and a count, and in every
+ * listed form the changed paths, which phase 3 hands the existing-code reader.
+ */
+function renderSince(prior: PriorMemory, summary: CommitSummary | undefined): string[] {
+  const out: string[] = ['## Since The Last Closure', ''];
+  const header = prior.progress?.header ?? null;
+  const history = prior.commits;
+  if (header === null || history === null) return [...out, 'No earlier closure recorded, so no history since one was read.', ''];
+  if (history.state === 'unavailable') return [...out, `Not read: ${history.reason ?? 'git could not be read'}.`, ''];
+  const since = `the closure of ${header.dir} on ${header.closedAt}`;
+  if (history.basis === 'date') {
+    out.push(header.commit === null
+      ? `That closure recorded no commit, so this reads by date: \`${history.range}\`.`
+      : `The commit that closure recorded, ${header.commit.slice(0, 12)}, is not an ancestor of HEAD (a reset, a rebase or another branch), so this reads by date: \`${history.range}\`.`, '');
+  }
+  const count = history.commits.length;
+  if (count === 0) return [...out, `No code commits since ${since}.`, ''];
+  if (count <= COMMIT_LIST_MAX) {
+    out.push(`${count} commit${count === 1 ? '' : 's'} over code since ${since}, newest first:`, '', ...history.commits.map(commitLine), '');
+  } else if (Array.isArray(summary)) {
+    out.push(`${count} commits over code since ${since}; a commit reader summarised them:`, '',
+      ...summary.map(line => `- ${line.replace(/^\s*[-*]\s+/, '').trim()}`), '');
+  } else {
+    out.push(`${count} commits over code since ${since}; the newest ${COMMIT_LIST_MAX}, unsummarised:`, '',
+      ...history.commits.slice(0, COMMIT_LIST_MAX).map(commitLine),
+      `- ${count - COMMIT_LIST_MAX} earlier commits not summarised.`, '');
+  }
+  const paths = history.paths;
+  out.push('### Changed Paths', '', ...paths.slice(0, CHANGED_PATHS_MAX).map(file => `- \`${file}\``));
+  if (paths.length > CHANGED_PATHS_MAX) out.push(`- and ${paths.length - CHANGED_PATHS_MAX} more`);
+  return [...out, ''];
+}
+
+/**
+ * `prior.md`, rendered the same way from the same input every time. `summary`
+ * is the commit reader's answer, needed only past {@link COMMIT_LIST_MAX} commits.
+ */
+export function renderPrior(prior: PriorMemory, readAt: Date, summary?: CommitSummary): string {
   const out: string[] = [
     '# Prior Memory',
     '',
@@ -691,6 +807,9 @@ export function renderPrior(prior: PriorMemory, readAt: Date): string {
       run.decisions === null || run.decisions === '' ? 'No decisions recorded.' : run.decisions, '');
   }
 
+  out.push(...renderProgress(prior.progress));
+  out.push(...renderSince(prior, summary));
+
   if (prior.notRead.length > 0) {
     out.push('## Not Read', '');
     for (const entry of prior.notRead) out.push(`- \`${entry.item}\`: ${entry.reason}`);
@@ -709,6 +828,18 @@ const optionOf = (args: string[], name: string): string | undefined => {
   return index >= 0 ? args[index + 1] : undefined;
 };
 
+/** The JSON shape of the commits since the last closure, as `--memory-read` reports them. */
+function commitsResult(prior: PriorMemory, state: string): Record<string, unknown> {
+  const history = prior.commits;
+  return {
+    state,
+    ...(history?.basis ? { basis: history.basis } : {}),
+    ...(history?.range ? { range: history.range } : {}),
+    count: history?.commits.length ?? 0,
+    paths: history?.paths.slice(0, CHANGED_PATHS_MAX) ?? [],
+  };
+}
+
 /**
  * `--memory-read --run-dir <dir>`: write `<dir>/prior.md` once, from the memory
  * files and the register. An existing `prior.md` is kept byte for byte, so a
@@ -717,8 +848,14 @@ const optionOf = (args: string[], name: string): string | undefined => {
  * preflight the build has not run, so a resumed preflight that finds `prior.md`
  * kept still learns the answer it has not yet published. Exit 0 written or
  * kept; 2 when the run directory is not a usable one.
+ *
+ * Past {@link COMMIT_LIST_MAX} commits since the last closure the first call
+ * writes nothing and answers `summary-needed`; preflight dispatches the commit
+ * reader and calls again with `--commit-summary` (its 1–10 lines on stdin) or,
+ * when the reader failed, `--no-commit-summary` (decision D8). A summary of no
+ * lines or more than ten is exit 1, and nothing is written.
  */
-async function readCommand(args: string[], runRoot: string, now: Date): Promise<CommandOutcome> {
+async function readCommand(args: string[], runRoot: string, now: Date, readInput: () => Promise<string | null>): Promise<CommandOutcome> {
   const dir = optionOf(args, '--run-dir');
   if (dir === undefined || !parseRunDir(dir)) {
     log.error('read-command', 'run directory missing or not a run directory name', { dir });
@@ -737,14 +874,47 @@ async function readCommand(args: string[], runRoot: string, now: Date): Promise<
     log.info('read-command', 'prior.md already written; kept', { target });
     return { result: { action: 'kept', path: target, existingCode }, code: 0 };
   }
+  const wantsSummary = args.includes('--commit-summary');
+  const declined = args.includes('--no-commit-summary');
+  log.debug('read-command', 'commit summary flags parsed', { summary: wantsSummary ? 'lines' : declined ? 'declined' : 'none' });
+  if (wantsSummary && declined) {
+    return { result: { error: 'pass --commit-summary or --no-commit-summary, not both' }, code: 2 };
+  }
+  let summary: CommitSummary | undefined = declined ? 'declined' : undefined;
+  if (wantsSummary) {
+    const lines = ((await readInput()) ?? '').split(/\r?\n/).map(line => line.trim()).filter(line => line !== '');
+    if (lines.length === 0 || lines.length > COMMIT_SUMMARY_MAX) {
+      log.error('read-command', 'commit summary refused', { lines: lines.length });
+      return {
+        result: { error: `pipe the commit reader's summary on stdin: 1 to ${COMMIT_SUMMARY_MAX} non-empty lines`, lines: lines.length },
+        code: 1,
+      };
+    }
+    summary = lines;
+  }
   const prior = await readPriorMemory(projectRoot, runRoot, dir);
-  await replaceKeepingMode(target, renderPrior(prior, now));
-  log.info('read-command', 'prior.md written', { target });
+  const progress = prior.progress === null ? 'absent' : 'read';
+  const count = prior.commits?.commits.length ?? 0;
+  const over = prior.commits?.state === 'listed' && count > COMMIT_LIST_MAX;
+  if (over && summary === undefined) {
+    log.info('read-command', 'commits past the list limit; a summary is needed before prior.md is written', { count });
+    return {
+      result: { action: 'summary-needed', path: target, existingCode, progress, commits: commitsResult(prior, 'summary-needed') },
+      code: 0,
+    };
+  }
+  const commitsState = prior.commits === null ? 'none'
+    : prior.commits.state === 'unavailable' ? 'unavailable'
+      : !over ? 'listed' : Array.isArray(summary) ? 'summarised' : 'unsummarised';
+  await replaceKeepingMode(target, renderPrior(prior, now, summary));
+  log.info('read-command', 'prior.md written', { target, commits: commitsState });
   return {
     result: {
       action: 'written',
       path: target,
       existingCode,
+      progress,
+      commits: commitsResult(prior, commitsState),
       blockFiles: prior.blocks.map(block => block.file),
       runs: prior.runs.map(run => run.dir),
       glossary: {
@@ -797,7 +967,7 @@ export async function memoryCommand(
 ): Promise<CommandOutcome> {
   log.debug('command', 'memory action', { action: args[0], runDir: optionOf(args, '--run-dir'), host: optionOf(args, '--host') });
   try {
-    if (args[0] === '--memory-read') return await readCommand(args, runRoot, now);
+    if (args[0] === '--memory-read') return await readCommand(args, runRoot, now, readInput);
     return await writeCommand(args, runRoot, readInput);
   } catch (error) {
     const reason = reasonOf(error);
