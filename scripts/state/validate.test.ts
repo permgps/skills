@@ -1281,6 +1281,15 @@ test('a result below contract 10 is refused, whatever the lifecycle (V6)', () =>
   }
 });
 
+test('a result on a state that names no contract version is refused in words, not as contract-undefined (V6)', () => {
+  const state: Record<string, unknown> = { ...contract10State() };
+  delete state['contractVersion'];
+  const violation = validateState(state).find(found => found.field === 'result');
+  assert.ok(violation);
+  assert.match(violation.message, /result arrives with contract 10 — a state that names no contract version closes without it; remove it/);
+  assert.doesNotMatch(violation.message, /undefined/);
+});
+
 test('a state newer than this build is refused as a whole, not by the result rule (V7)', () => {
   const newer = { ...contract10State(), contractVersion: CONTRACT_VERSION + 1 };
   delete newer.result;

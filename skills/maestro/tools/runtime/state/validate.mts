@@ -16,12 +16,12 @@ import {
   GATE_STATUSES,
   LANGUAGES,
   LIFECYCLES,
-  RESULT_MAX,
   MODEL_TIERS,
   MODES,
   ONE_WAY_KINDS,
   REGISTERS,
   REQUIREMENT_STATUSES,
+  RESULT_MAX,
   SIGNAL_KINDS,
   STAGE_IDS,
   STAGE_STATUSES,
@@ -152,7 +152,8 @@ function checkResult(value: Record<string, unknown>, add: (field: string, messag
   if (typeof version !== 'number' || version < 10) {
     if (result === undefined) return;
     log.debug('version-gate', 'field refused for its contract version', { version, field: 'result' });
-    add('result', `result arrives with contract 10 — a contract-${String(version)} run closes without it; remove it`);
+    const holder = typeof version === 'number' ? `a contract-${version} run` : 'a state that names no contract version';
+    add('result', `result arrives with contract 10 — ${holder} closes without it; remove it`);
     return;
   }
   if (lifecycle !== 'closed') {

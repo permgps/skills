@@ -214,7 +214,7 @@ Construct the complete contract-10 candidate in temporary JSON. It carries:
 publish after the helper has answered.
 
 Omit optional fields that have no value. In an active run, do not include
-`outcome` or `finishedAt`, even as JSON `null`; do the same for absent stage/task
+`outcome`, `finishedAt` or `result`, even as JSON `null`; do the same for absent stage/task
 timestamps. Only fields explicitly defined as nullable (such as `tests`) use
 `null`.
 
