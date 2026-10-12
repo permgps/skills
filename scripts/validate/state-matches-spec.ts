@@ -50,6 +50,7 @@ const VALUE_SET_CONSTANTS: Record<string, string> = {
   'verification.strategyReviews[].decision': 'STRATEGY_DECISIONS',
   'signals[]': 'SIGNAL_KINDS',
   'awaiting.kind': 'AWAITING_KINDS',
+  'leftovers[].disposition': 'LEFTOVER_DISPOSITIONS',
 };
 
 /** Stage ids belong to phases.md; the contract only mirrors them. */

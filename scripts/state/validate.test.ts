@@ -1297,3 +1297,76 @@ test('a state newer than this build is refused as a whole, not by the result rul
   assert.ok(found.includes('contractVersion'));
   assert.equal(found.includes('result'), false);
 });
+
+// --- leftovers: the user's disposition of carried open work (D2) ----------------
+
+const leftover = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
+  key: '2026-09-30-landing-page#R03',
+  disposition: 'taken',
+  answer: 'возьми R03, остальное потом',
+  at: '2026-10-12T09:15:00Z',
+  ...extra,
+});
+
+const withLeftovers = (entries: unknown[], base: RunState = activeContract10State()): RunState =>
+  ({ ...base, leftovers: entries } as unknown as RunState);
+
+test('a leftover the user took or dismissed, keyed by its origin run, validates', () => {
+  assert.deepEqual(validateState(withLeftovers([
+    leftover(),
+    leftover({ key: '2026-09-30-landing-page#T04', disposition: 'dismissed', answer: 'T04 больше не нужен' }),
+    leftover({ key: '2026-10-01-pricing#F-12' }),
+  ])), []);
+});
+
+test('a contract-9 state carrying leftovers is accepted, because the field is optional', () => {
+  assert.deepEqual(validateState(withLeftovers([leftover()], activeContract9State())), []);
+});
+
+test('a leftover key that names no run directory and state id is refused, and says what to write', () => {
+  for (const key of ['R03', '2026-09-30-landing-page--wip#R03', '2026-09-30-landing-page#', 'landing#R03', '2026-09-30-landing-page#R 03', 42]) {
+    const violations = validateState(withLeftovers([leftover({ key })]));
+    assert.deepEqual(fields(violations), ['leftovers[0].key'], JSON.stringify(key));
+    assert.match(violations[0]!.message, /<YYYY-MM-DD>-<slug>#<id>/);
+  }
+});
+
+test('the same leftover named twice is refused at its second entry', () => {
+  const violations = validateState(withLeftovers([leftover(), leftover({ disposition: 'dismissed' })]));
+  assert.deepEqual(fields(violations), ['leftovers[1].key']);
+  assert.match(violations[0]!.message, /appears twice/);
+});
+
+test('a leftover with no answer is refused, because only the user disposes of one', () => {
+  for (const answer of ['', '   ', undefined, 7]) {
+    const violations = validateState(withLeftovers([leftover({ answer })]));
+    assert.deepEqual(fields(violations), ['leftovers[0].answer'], JSON.stringify(answer));
+    assert.match(violations[0]!.message, /the user's reply verbatim/);
+  }
+});
+
+test('a leftover stamped with something other than a moment is refused', () => {
+  for (const at of ['yesterday', '2026-10-12', '2026-10-12T09:15:00', undefined]) {
+    const violations = validateState(withLeftovers([leftover({ at })]));
+    assert.deepEqual(fields(violations), ['leftovers[0].at'], JSON.stringify(at));
+  }
+});
+
+test('a leftover disposition outside taken and dismissed is refused', () => {
+  for (const disposition of ['later', 'Taken', undefined]) {
+    const violations = validateState(withLeftovers([leftover({ disposition })]));
+    assert.deepEqual(fields(violations), ['leftovers[0].disposition'], JSON.stringify(disposition));
+    assert.match(violations[0]!.message, /taken, dismissed/);
+  }
+});
+
+test('leftovers that are not a list of entries are refused as a whole or by position', () => {
+  assert.deepEqual(fields(validateState({ ...activeContract10State(), leftovers: 'R03' } as unknown as RunState)), ['leftovers']);
+  assert.deepEqual(fields(validateState(withLeftovers(['R03']))), ['leftovers[0]']);
+});
+
+test('leftovers below contract 7 are refused, because their keys name contract-7 run directories', () => {
+  const violations = validateState(withLeftovers([leftover()], contract6State()));
+  assert.deepEqual(fields(violations), ['leftovers']);
+  assert.match(violations[0]!.message, /arrives with contract 7/);
+});

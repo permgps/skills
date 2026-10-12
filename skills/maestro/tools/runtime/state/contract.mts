@@ -859,6 +859,31 @@ export const SIGNAL_KINDS = ['withheld-request', 'brief-exceeded', 'out-of-zone-
 export type SignalKind = typeof SIGNAL_KINDS[number];
 
 /**
+ * What the user did with an open item an earlier прогон left in
+ * `.maestro/PROGRESS.md`: took it into this run, or said it is no longer
+ * relevant. Leaving it for later is no entry at all, so the file carries it on.
+ */
+export const LEFTOVER_DISPOSITIONS = ['taken', 'dismissed'] as const;
+export type LeftoverDisposition = typeof LEFTOVER_DISPOSITIONS[number];
+
+/**
+ * One carried item the user disposed of, written by briefing from the
+ * leftovers question and read by the closing publish (decision D2 of the
+ * progress-file plan).
+ *
+ * `key` is `<origin dir>#<state id>`, the stable name the progress file gives
+ * the item, because the file is rewritten whole at every closure and an item
+ * with no key could not be told apart from its regenerated copy. `answer` is
+ * the user's reply verbatim, after redaction; `at` is when it was given.
+ */
+export interface LeftoverEntry {
+  key: string;
+  disposition: LeftoverDisposition;
+  answer: string;
+  at: string;
+}
+
+/**
  * The whole file. Written by the orchestrator at phase boundaries and task
  * transitions only; read by the dashboard and by nothing else.
  *
@@ -956,6 +981,14 @@ export interface RunState {
    * dispatch the existing-code reader; no tool or page reads it.
    */
   existingCode?: boolean;
+  /**
+   * The user's disposition of items an earlier прогон left open, one entry per
+   * item named in the briefing's leftovers question. Optional and unseeded:
+   * absent means nothing was offered or nothing was named. Written by briefing
+   * alone; the closing publish reads it to drop taken items from
+   * `.maestro/PROGRESS.md` and settle dismissed ones. The dashboard ignores it.
+   */
+  leftovers?: LeftoverEntry[];
   /** The last full suite run. */
   tests?: TestResult;
   /** ISO 8601, set by the acceptance phase. */

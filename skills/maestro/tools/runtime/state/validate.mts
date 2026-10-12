@@ -15,6 +15,7 @@ import {
   GATE_IDS,
   GATE_STATUSES,
   LANGUAGES,
+  LEFTOVER_DISPOSITIONS,
   LIFECYCLES,
   MODEL_TIERS,
   MODES,
@@ -33,7 +34,7 @@ import {
 } from './contract.mts';
 import { validateClosureRecord } from './closure.mts';
 import { validateVerificationRecord } from './verification.mts';
-import { WIP_SUFFIX, parseRunDir, toRunDir } from './paths.mts';
+import { LEFTOVER_KEY_PATTERN, WIP_SUFFIX, parseRunDir, toRunDir } from './paths.mts';
 
 const log = createLogger('state');
 
@@ -165,6 +166,63 @@ function checkResult(value: Record<string, unknown>, add: (field: string, messag
   } else if (!isResultLine(result)) {
     refuse('shape', `result must be one non-empty line of at most ${RESULT_MAX} characters — say what now exists`);
   }
+}
+
+/**
+ * The user's disposition of items an earlier прогон left open (D2).
+ *
+ * Optional at every version from 7, so it raises no contract version; below 7
+ * it is refused, because its keys name contract-7 run directories that such a
+ * run never had. Each entry is held to the shape the closing publish relies
+ * on: a key it can match, one entry per key, the user's own words and a moment.
+ */
+function checkLeftovers(value: Record<string, unknown>, add: (field: string, message: string) => void): void {
+  const version = value['contractVersion'];
+  const leftovers = value['leftovers'];
+  if (leftovers === undefined) return;
+  // A newer contract is refused as a whole, exactly as checkRunDir does.
+  if (typeof version === 'number' && version > CONTRACT_VERSION) return;
+  if (typeof version !== 'number' || version < 7) {
+    log.debug('version-gate', 'field refused for its contract version', { version, field: 'leftovers' });
+    add('leftovers', 'leftovers arrives with contract 7 — an older run has no progress file to dispose of; remove it');
+    return;
+  }
+  if (!Array.isArray(leftovers)) {
+    add('leftovers', 'leftovers must be a list of { key, disposition, answer, at } — one entry per item the user named');
+    return;
+  }
+  const refuse = (at: string, key: unknown, problem: 'key' | 'duplicate' | 'answer' | 'at' | 'disposition', message: string): void => {
+    log.debug('leftovers', 'entry refused', { key: typeof key === 'string' ? key : null, problem });
+    add(at, message);
+  };
+  const seen = new Set<string>();
+  leftovers.forEach((entry, position) => {
+    const at = `leftovers[${position}]`;
+    if (!isRecord(entry)) {
+      add(at, 'a leftover must be an object { key, disposition, answer, at }');
+      return;
+    }
+    const key = entry['key'];
+    if (typeof key !== 'string' || !LEFTOVER_KEY_PATTERN.test(key)) {
+      refuse(`${at}.key`, key, 'key',
+        'a leftover key is <YYYY-MM-DD>-<slug>#<id>, copied from the [key] the progress file shows — write it as the file has it');
+    } else if (seen.has(key)) {
+      refuse(`${at}.key`, key, 'duplicate', `${key} appears twice — keep one entry per item, with the user's last word on it`);
+    } else {
+      seen.add(key);
+    }
+    if (typeof entry['disposition'] !== 'string' || !(LEFTOVER_DISPOSITIONS as readonly string[]).includes(entry['disposition'])) {
+      refuse(`${at}.disposition`, key, 'disposition',
+        `a leftover disposition is one of ${LEFTOVER_DISPOSITIONS.join(', ')} — an item left for later gets no entry`);
+    }
+    const answer = entry['answer'];
+    if (typeof answer !== 'string' || answer.trim() === '') {
+      refuse(`${at}.answer`, key, 'answer', 'a leftover carries the user\'s reply verbatim, after redaction — only the user disposes of an item');
+    }
+    if (!isMoment(entry['at'])) {
+      refuse(`${at}.at`, key, 'at', 'a leftover\'s at is the ISO 8601 moment, with its zone, when the user answered');
+    }
+  });
 }
 
 /** A `oneWay` line: one of the kinds, the dash, then a subject. */
@@ -883,6 +941,7 @@ export function validateState(value: unknown): StateViolation[] {
   }
   checkRunDir(value, add);
   checkResult(value, add);
+  checkLeftovers(value, add);
 
   // The models each tier runs on. Each half is `session` or a name the host
   // reported; which names the host reports is the dials phase's question, never

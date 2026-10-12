@@ -39,6 +39,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `oneWay` | optional list of strings, one inward one-way change each | review | acceptance, dashboard |
 | `signals` | optional list of strings, one recorded signal each, appended by build, review and acceptance | preflight | metrics |
 | `existingCode` | optional boolean, whether the project held code at preflight | preflight | spec |
+| `leftovers` | optional list of `{ key, disposition, answer, at }`, the user's disposition of items an earlier прогон left open, from contract 7 | briefing | the closing publish |
 | `tests` | `{ passed, failed }` | build | dashboard |
 | `finishedAt` | ISO 8601 closure timestamp, only when closed in contracts 4–10 | acceptance | dashboard |
 | `interruptedAt` | ISO 8601 string | preflight | dashboard |
@@ -78,11 +79,11 @@ row says `dashboard`.** The orchestrator reads its own state constantly — on
 recovery after a compaction, and in the repair phase, which learns from
 `tasks[].status` which таск arrived and by which entrance. Listing itself as a
 reader of what it writes would turn a column about the integration point into a
-list of everywhere the state is opened. The four exceptions name the phase or
+list of everywhere the state is opened. The five exceptions name the phase or
 tool that reads the field besides the page: `oneWay` is read by acceptance for
 the отчёт, `signals` by the metrics tool and by no screen, `existingCode`
-by the spec phase alone, and `models` by every phase that dispatches a
-субагент.
+by the spec phase alone, `models` by every phase that dispatches a
+субагент, and `leftovers` by the closing publish, which `sync.mts` performs.
 
 `heldBy` was a dash here until the page began naming the claim inside its raised
 silence notice; it now says `dashboard` because that is now true, not to keep the
@@ -258,6 +259,16 @@ existed, and phase 3 dispatches no reader, exactly as before. The validator
 accepts only a boolean. Its `Read by` cell names the spec phase rather than a
 tool, because no tool or page reads it.
 
+**`leftovers` is what the user did with work an earlier прогон left open.**
+Briefing writes one entry per item the user named in its leftovers question:
+`key` is the item's `<YYYY-MM-DD>-<slug>#<id>` exactly as `.maestro/PROGRESS.md`
+shows it, `disposition` is `taken` or `dismissed`, `answer` is the user's reply
+verbatim after redaction, and `at` is when it was given. An item left for later
+gets no entry, so the closing publish carries it on. The validator refuses a
+key of another shape, a key named twice, an empty answer and an `at` that is not
+a moment. It is optional and not seeded, and below contract 7 it is refused,
+because its keys name contract-7 run directories. The dashboard does not read it.
+
 **`gates[].findings`, the three lists inside `debt`, `additions`, `oneWay` and
 `signals` hold strings, one line each.** The rows above say so and the validator
 enforces it; it is repeated here because the phase writing one of them is pulled
@@ -299,6 +310,7 @@ cannot.
 | `verification.strategyReviews[].decision` | `change_strategy`, `stop_incomplete`, `request_limit` |
 | `signals[]` | `withheld-request`, `brief-exceeded`, `out-of-zone-write` |
 | `awaiting.kind` | `answer`, `briefing-round`, `spec-gate`, `plan-gate`, `one-way-action`, `repair-limit` |
+| `leftovers[].disposition` | `taken`, `dismissed` |
 
 **`pending` is a стадия's word and a гейт's, and never a таск's.** The three
 sets sit one under another above and the middle one is the odd column out, which
@@ -585,7 +597,10 @@ closure say what now exists:
 is what raises it, as `dir` did at 7 and `models` at 8: an optional sentence
 would raise nothing, and a closing прогон that left it out would end without
 saying what it built. The dashboard's `KNOWN_CONTRACT_VERSION` moves with it;
-a contract-9 state renders as it did, with no result line.
+a contract-9 state renders as it did, with no result line. **`leftovers` arrived later
+within version 10 and raised nothing**: it is optional, widens no existing value
+set, and the dashboard does not render it. A contract-7, 8 or 9 run may carry it,
+because its keys need only a contract-7 run directory.
 
 **Version 9** widens the value set `awaiting.kind` and adds two optional
 fields, `awaiting.note` and `waits`. The value set is what raises it: a

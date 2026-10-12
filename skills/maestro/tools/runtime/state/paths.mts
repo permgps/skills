@@ -68,6 +68,16 @@ export const WIP_SUFFIX = '--wip';
 export const RUN_DIR_PATTERN = /^(\d{4}-\d{2}-\d{2})-([a-z0-9]+(?:-[a-z0-9]+)*)(--wip)?$/;
 
 /**
+ * The key `.maestro/PROGRESS.md` gives an open item: the closed run directory
+ * it came from, `#`, then the id the state gave it there. Built from
+ * {@link RUN_DIR_PATTERN} without its suffix, because only a closed run writes
+ * the file, so the two grammars cannot drift apart.
+ */
+export const LEFTOVER_KEY_PATTERN = new RegExp(
+  `^(${RUN_DIR_PATTERN.source.slice(1, -'(--wip)?$'.length)})#([A-Za-z0-9._-]+)$`,
+);
+
+/**
  * The contract-7 run directory name. The date is the UTC day `startedAt` names,
  * through the same `toDate` that dates the brief, so the two dates in one
  * directory cannot disagree.

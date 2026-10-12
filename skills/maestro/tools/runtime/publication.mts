@@ -17,6 +17,8 @@ import { atomicText, serializeState } from './state/write.mts';
 import { STATE_FILE, WIP_SUFFIX, parseRunDir, runDirName } from './state/paths.mts';
 import { relocateRunDir, restoreRunDir, type Relocation } from './relocation.mts';
 import { upsertRegister } from './register.mts';
+import { headCommit } from './history.mts';
+import { PROGRESS_FILE, buildProgress, fixesReadAtPreflight } from './progress.mts';
 
 const log = createLogger('sync');
 export type Viewer = (noOpen: boolean) => Promise<string | null>;
@@ -125,6 +127,39 @@ async function keepClosedState(dir: string, previous: RunState, source: string):
   }
   await atomicText(kept, source);
   return { path: kept };
+}
+
+const readOptional = async (file: string): Promise<string | null> => {
+  try { return await readFile(file, 'utf8'); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw error;
+  }
+};
+
+/**
+ * Rewrite `.maestro/PROGRESS.md` from the closing state (decision D1). It runs
+ * at publication rather than as a step a phase performs by hand, because both
+ * closures — acceptance and the repair stop — publish, and a ritual done by
+ * hand drifts. Like the register, it cannot fail the publish: a failure is
+ * reported and the next closing publish rewrites the file.
+ */
+async function writeProgress(runRoot: string, state: RunState): Promise<'written' | 'failed'> {
+  const target = path.join(runRoot, PROGRESS_FILE);
+  let commit: string | null = null;
+  try {
+    const head = await headCommit(path.dirname(runRoot));
+    commit = 'sha' in head ? head.sha : null;
+    const previous = await readOptional(target);
+    const prior = await readOptional(path.join(runRoot, runDirName(state), 'prior.md'));
+    await atomicText(target, buildProgress({ state, previous, priorFixes: fixesReadAtPreflight(prior), commit }));
+    log.info('progress', 'progress file rewritten', { action: 'written', path: target, commit });
+    return 'written';
+  } catch (error) {
+    log.warn('progress', 'progress file could not be written; the next closing publish rewrites it', {
+      action: 'failed', path: target, commit, reason: error instanceof Error ? error.message : String(error) });
+    return 'failed';
+  }
 }
 
 async function readPrevious(file: string): Promise<RunState | null> {
@@ -269,6 +304,10 @@ export async function candidateMode(args: string[], dir: string,
         runId: state.runId, reason: error instanceof Error ? error.message : String(error) });
     }
   }
+  let progress: 'written' | 'failed' | null = null;
+  if (errors.length === 0 && state.contractVersion >= 7 && state.lifecycle === 'closed' && previous?.lifecycle !== 'closed') {
+    progress = await writeProgress(dir, state);
+  }
   const envelope = validationEnvelope(errors.length ? 'invalid' : 'valid', candidate, errors, errors.length ? previous : state);
   try {
     await writeValidation(dir, envelope);
@@ -290,6 +329,6 @@ export async function candidateMode(args: string[], dir: string,
   }
   return { code: 0, result: { status: 'published', revision: state.updatedAt, path: target, url, projection: summary,
     ...(waitClosed ? { waitClosed: { by: waitClosed.by, since: waitClosed.since, until: waitClosed.until } } : {}),
-    ...(relocation ? { relocated: relocation } : {}), ...(register ? { register } : {}),
+    ...(relocation ? { relocated: relocation } : {}), ...(register ? { register } : {}), ...(progress ? { progress } : {}),
     ...(succession && previous ? { succeeded: { runId: previous.runId, kept: path.relative(dir, kept ?? '') } } : {}) } };
 }
