@@ -52,11 +52,12 @@ the target, without replacing the populated run directory:
     shared/log.mts
     shared/owned-block.mts
     publication.mts, relocation.mts, register.mts, legacy.mts, dashboard.mts, server.mts, opener.mts
-    config.mts, memory.mts, existing-code.mts, update-check.mts
+    config.mts, memory.mts, existing-code.mts, update-check.mts, progress.mts, history.mts
   dashboard.html
   state.js, validation.js
   serve.json, opened.json
   README.md                        the run register, one row per run of contract 7 or later
+  PROGRESS.md                      where the work stands, rewritten by every closing publish
   <YYYY-MM-DD>-<slug>--wip/        a run in progress; the suffix comes off when it closes
   <YYYY-MM-DD>-<slug>/             a run that closed
   <slug>/                          a run from before contract 7, under its old name

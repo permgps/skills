@@ -708,6 +708,14 @@ run's row in `.maestro/README.md` from the published state; a register write tha
 fails does not undo the publish, is reported in the result, and is repaired by
 the next publish.
 
+**The progress file.** The publish that closes a run of contract 7 or later —
+its candidate `closed`, the published state not — also rewrites
+`.maestro/PROGRESS.md` (see [`artifacts.md`](artifacts.md)), naming in its
+header the commit `git rev-parse HEAD` gives, or `none`. The result carries
+`progress`: `written`, or `failed` when the file could not be written. A
+failure does not undo the publish and is repaired by the next closing publish.
+Any other publish leaves the file alone and carries no `progress`.
+
 `--validate <candidate>` and `--project <candidate>` are read-only: no state,
 diagnostic, snapshot, viewer or opener writes. JSON actions emit one result on
 stdout: exit 0 for valid/current/legacy/published, 1 for invalid/rejected state,
@@ -720,12 +728,25 @@ exit codes.
 
 - `--memory-read --run-dir <dir>` writes `.maestro/<dir>/prior.md` from the
   maestro block of every known memory file, the project glossary and the
-  `decisions.md` of each register row except `<dir>`. It reports
-  `action: "written"`, `blockFiles`, `runs`, `glossary` and `notRead`.
+  `decisions.md` of each register row except `<dir>`, followed by
+  `.maestro/PROGRESS.md` and the commits over code since the closure it records.
+  It reports `action: "written"`, `existingCode`, `blockFiles`, `runs`,
+  `glossary`, `progress`, `commits` and `notRead`. `existingCode` is
+  `{ present, source, first }`, also on `kept`. `progress` is `absent` or
+  `read`. `commits` is `{ state, basis?, range?, count, paths }`: `state` is
+  `none` (no closure recorded), `unavailable` (git could not say),
+  `listed`, `summarised` or `unsummarised`; `basis` is `commit` or
+  `date`; `paths` stops at fifty.
   `glossary` is `{ state, files, bytes, limit }`: `state` is `absent`,
   `read` or `over-limit`, `files` names every file found in read order,
   and `bytes` is their sum against the `limit`. Past the limit none of them
-  is read; that is still exit 0. An existing `prior.md` is kept, with `action: "kept"`.
+  is read; that is still exit 0. Past thirty commits the read writes nothing
+  and reports `action: "summary-needed"` with `commits.state` the same; a
+  second call with `--commit-summary` and one to ten lines on stdin writes them
+  in place of the list, and `--no-commit-summary` writes the newest thirty
+  subjects with a count of the rest. A summary of no lines or more than ten
+  exits 1 with `{ error, lines }` and writes nothing. An existing `prior.md`
+  is kept, whatever the flags, with `action: "kept"`.
   Malformed markers are reported under `notRead` and still exit 0. A missing,
   malformed or absent run directory exits 2.
 - `--memory-write --host <claude-code|codex|gemini-cli>` reads the block body

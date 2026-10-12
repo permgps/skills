@@ -8,14 +8,14 @@ right thing was built.
 
 | Id | Name | Stage | Reads | Produces |
 |---|---|---|---|---|
-| preflight | Preflight | yes | user arguments, repository state, the memory file, the project glossary, the register and earlier runs' `decisions.md`, the published `SKILL.md`'s version | resolved dials, run state created with whether the project holds code, dashboard raised, `prior.md` |
+| preflight | Preflight | yes | user arguments, repository state, the memory file, the project glossary, the register and earlier runs' `decisions.md`, the progress file, the history since the last closure, the published `SKILL.md`'s version | resolved dials, run state created with whether the project holds code, dashboard raised, `prior.md` |
 | manifest | Manifest | yes | бриф from the user, redacted source snapshots and independent audit return | `brief.md` — written once, then grown by its additions block — and `manifest.md` |
 | briefing | Briefing | yes | `manifest.md`, declared references, `prior.md` | `answers.md`, neutral `reference.md` |
 | spec | Specification | yes | `manifest.md`, `answers.md`, raw reference, `prior.md`, the repository (through the existing-code reader, once) | `codebase.md`, `spec.md`, obligation and source coverage map |
 | plan | Plan | yes | `spec.md`, obligations and checks, the repository's test, typecheck and lint configuration, `prior.md`, `codebase.md` | `tasks/`, `interfaces.md`, ownership map |
 | build | Build | yes | task files and the references their *References* rows name, `interfaces.md`, `codebase.md`, blockers' `D##` rows | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
 | review | Review | yes | task files, obligations, evidence, `interfaces.md`, project code, the project's documented standards | `reviews/` including `reviews/standards.md` once per прогон, findings and check limits |
-| acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md` |
+| acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md`, `PROGRESS.md` (through the closing publish) |
 | memory | Memory | no | `discovered-interfaces.md`, `spec.md`, the Terms table of `interfaces.md`, the seam-level items of `reviews/standards.md`, the `noCorrectSeam:` lines of repeated repairs' diagnoses, `prior.md`, project code, run state | the memory block in the host's memory file, `decisions.md` |
 | repair | Repair | no | whatever one of its six doors provides | retried таск, `amendments.md` |
 
@@ -1025,10 +1025,40 @@ things the same way and does not give one thing a second name. A term the
 project glossary already defines is not carried: each word keeps one source of
 truth, and the block stays short.
 
+**Where the work stands** reaches `prior.md` in two more sections. *Where The
+Work Stands* is `.maestro/PROGRESS.md` verbatim and fenced, as the last closing
+publish wrote it. *Since The Last Closure* lists the commits over code since the
+commit that file's header records, newest first and without merges, with the
+paths they changed. Commits that touched only `.maestro/` and the memory files
+are not code. When that commit is no longer an ancestor of `HEAD` — a reset, a
+rebase, another branch — or none was recorded, the read falls back to the
+closure's moment and says so. Without git the section says why it was not read.
+Past thirty commits the first read writes nothing and answers
+`summary-needed`; preflight dispatches the commit reader on `standard`, and a
+second read writes its at most ten lines in place of the list. When the reader
+fails, `--no-commit-summary` writes the newest thirty subjects with a count of
+the rest, and one `debt.assumptions` line says so. Commit subjects are copied
+as git prints them and are not redacted: they come from the user's own history,
+and the runtime does not carry the redaction filter.
+
+Each part is used once. An item under *Settled By The User* binds the
+specification the way an earlier decision does. *Not Done* and *Known Bugs*
+are one question in briefing's first round, `### Leftovers — <gist>`, asked in
+`semi`, `interview` and `manual` and never in `full`; an item is never taken
+without the user's answer, and the closing publish carries every item nobody
+took or dismissed. That question is the one thing `prior.md` may add to what a
+mode asks, and it adds no требование by itself. The changed paths go to the
+existing-code reader as a plain list.
+
+**`PROGRESS.md` is not memory.** The memory block holds what the project is,
+and nothing true only for one прогон. The progress file holds open work —
+what was deferred, what failed, what the user settled — and is rewritten whole
+at every closure, so it is never older than the last run that closed.
+
 Every blind reader withholds `prior.md` (see [`gates.md`](gates.md)). A reader
 holding earlier decisions would confirm the past instead of checking this
-run's words, and the project glossary reaches a blind reader through nothing
-else.
+run's words, and the project glossary and the progress file reach a blind
+reader through nothing else.
 
 ### What Qualifies
 

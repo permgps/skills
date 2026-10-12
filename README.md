@@ -427,8 +427,8 @@ Two more phases run outside that sequence:
 - **Memory** — runs during the build and after acceptance and asks nothing. It
   writes what should outlive the run into the instruction file your host loads
   and appends to `decisions.md`; the next run's preflight reads both back into
-  `prior.md`, and its briefing says when a recommendation follows or
-  contradicts an earlier decision.
+  `prior.md`, with the progress file the last closure wrote, and its briefing
+  says when a recommendation follows or contradicts an earlier decision.
 
 Before any broad, browser or integrated check, the run records **readiness**
 against a disposable source-only copy of the project, so a broken setup is
@@ -548,7 +548,7 @@ your-project/.maestro/
 ├── 2026-10-04-notes-page--wip/     one directory per run; --wip comes off when it closes
 │   ├── 2026-10-04-brief.md         your words, redacted, plus the dated additions block
 │   ├── manifest.md                 the numbered requirements
-│   ├── prior.md                    what earlier runs decided and your project glossary, read at preflight
+│   ├── prior.md                    what earlier runs decided and left open, your project glossary, and the commits since, read at preflight
 │   ├── answers.md, reference.md    briefing answers and the recorded reference
 │   ├── codebase.md                 what your repository held before the run, read once before the spec
 │   ├── spec.md, interfaces.md      the specification and the contracts between таски
@@ -559,6 +559,7 @@ your-project/.maestro/
 │   ├── decisions.md                what was decided, what instead, and why
 │   └── amendments.md               specification changes the build forced
 ├── README.md                       the register: one row per run and how it ended
+├── PROGRESS.md                     where the work stands: what is settled, not done, known broken, fixed by hand
 ├── config.json                     your pinned mode and register
 ├── state.js, dashboard.html        the run state and the page that reads it
 └── sync.mts, runtime/              the helper copied in at preflight
@@ -605,6 +606,19 @@ your-project/.maestro/
   glossary or the бриф. All of it together is read up to 32 KiB; past that,
   none of it is read, and the run says so. Terms your project glossary already
   defines are not repeated in the memory block.
+- **Where the work stands.** Every run that closes rewrites
+  `.maestro/PROGRESS.md` from what it left: what you settled (requirements you
+  dropped, leftovers you dismissed), what is not done (deferred, waiting on you,
+  incomplete, failed таски), and known bugs, each keyed by the run it came from.
+  The header names the commit the run closed at. Add your own lines under
+  *Fixes Without Maestro*; nothing else in it is yours to edit. The next run's
+  preflight copies it into `prior.md` with the commits over code since that
+  commit and the paths they changed — past thirty commits, a reader on the
+  cheaper model sums them up in at most ten lines. In `semi`, `interview` and
+  `manual` its first round of questions offers the open items once: leave them,
+  take some, or say they no longer matter. `full` never asks and takes nothing.
+  The changed paths go to the existing-code reader first; the blind readers
+  never see any of it.
 - **Your existing code is read once, before the spec.** Preflight checks
   whether the project already holds code; Maestro's own files, the host's
   skill installs, memory files, your project glossary, a root README or

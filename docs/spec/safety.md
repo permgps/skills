@@ -35,8 +35,10 @@ contradicts — and by then the бриф is the one document nobody is re-readin
   the прогон is a fact about the source, not a request from the user. The user's
   requests arrive as требования, and nowhere else.
 - **S5 has one boundary, not a judgement call.** The orchestrator's writes are
-  limited to run artifacts, the project memory file, and version control. Every
-  other path in the repository belongs to an executor. The project glossary is
+  limited to run artifacts, the project memory file, and version control. Run
+  artifacts include `.maestro/`'s own files beside the run directories — the
+  register `README.md`, `config.json` and `PROGRESS.md`. Every other path in
+  the repository belongs to an executor. The project glossary is
   the user's file, not the project memory file: a прогон reads it at preflight
   and writes into it nowhere.
 - **S4 asks even in the no-questions mode.** That mode buys the user freedom from

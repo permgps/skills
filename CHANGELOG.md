@@ -14,6 +14,22 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **Where the work stands survives between прогоны.** Every closing publish
+  rewrites `.maestro/PROGRESS.md` from the closed state: *Settled By The User*,
+  *Not Done*, *Known Bugs* and *Fixes Without Maestro*, each item keyed
+  `[<run dir>#<id>]` so another run's open work is carried until the user
+  takes or dismisses it, and a header naming the commit `HEAD` was at. The
+  next preflight copies it into `prior.md` with the commits over code since
+  that commit and the paths they changed; past thirty, `--memory-read` answers
+  `summary-needed` and a new `standard`-tier commit reader sums them up for
+  `--commit-summary`. Briefing offers the open items once under
+  `### Leftovers — <gist>`, the one heading G1 accepts without an `R##`, and
+  never in `full`; the user's answer lands in a new optional state field,
+  `leftovers`, which raises no contract version. The existing-code reader is
+  handed the changed paths. `npm run check` holds it through the new
+  `progress`, `history` and `progress-sync` tests, five memory anchors, and a
+  `gate-readers` test that no reader is handed `PROGRESS.md` or `prior.md`.
+
 `CONTRACT_VERSION` moves to `10`.
 
 - **BREAKING: a closed contract-10 state requires `result`.** One line of at

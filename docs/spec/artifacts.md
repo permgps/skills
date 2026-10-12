@@ -25,6 +25,7 @@ project that was built, not with Maestro.
 │   ├── amendments.md
 │   └── state.js                 (the run's last state, kept when the next run starts)
 ├── README.md                    (the register: one row per run of contract 7 or later)
+├── PROGRESS.md                  (where the work stands, rewritten by every closing publish)
 ├── config.json
 ├── state.js
 └── dashboard.html
@@ -58,6 +59,25 @@ rewrites that row from the published state, so the row closes when the run
 does. Text outside the markers belongs to the user and is never touched. Runs
 from before contract 7 have no row, and the file's header says so.
 
+**`PROGRESS.md` is where the work stands between прогоны.** Every closing
+publish rewrites it whole, from the closed state, the file it replaces and the
+closing run's `prior.md` — whether acceptance closed the run or repair stopped
+it. Its header names the closed run, its outcome and the commit `HEAD` was at,
+or `none` without git. Under it, *Settled By The User* holds what the
+user decided in their own words: dropped требования with their reason, and
+carried items they dismissed. *Not Done* holds deferred, placeholder and
+incomplete требования and failed таски. *Known Bugs* holds open findings — with
+the user's authorization quoted when an accepted exception covers one — and
+requirements that failed acceptance with no finding naming them. *Fixes Without
+Maestro* is the one section the user writes into; a line this run's preflight
+already read is dropped at its closure, and one added since is kept. Every
+item is keyed `[<run dir>#<id>]`, so an item from another run is carried until
+the user takes or dismisses it, and a run that closes again regenerates its own.
+Past about sixty lines the oldest settled items give way to a count; open work
+is never trimmed. Decisions are not repeated there: each run's `decisions.md`
+and the memory block hold them. A write that fails does not fail the publish,
+which reports `progress: failed`, and the next closing publish rewrites it.
+
 The dashboard is opened directly and there is no second entry point beside it.
 An `index.html` pointing at a self-contained page would be an artifact with no
 writer, which is how it survived unnoticed in this tree until the dashboard was
@@ -86,6 +106,7 @@ actually built.
 | `amendments.md` | repair | build, review, acceptance | append-only |
 | `config.json` | preflight | preflight | yes |
 | `README.md` | preflight | the user, a later прогон | yes, its owned rows rewritten by publication |
+| `PROGRESS.md` | acceptance | the user, a later прогон's preflight | yes, rewritten whole by every closing publish |
 | `state.js` | preflight | dashboard, gates, metrics | yes |
 | `<dir>/state.js` | preflight | the user | no |
 | `dashboard.html` | preflight | the user | no |
