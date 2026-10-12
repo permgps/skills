@@ -7,7 +7,9 @@ The human view of a прогон. It is opened for the user, not described to th
 **The data it renders comes from `state.js` and nothing else.** The dashboard
 never reads `manifest.md`, `spec.md`, a task file, or any path in the
 repository. A view that reaches into artifacts becomes a second source of truth,
-and the second one is silently wrong.
+and the second one is silently wrong. It composes one path, for display only:
+a closed run's отчёт, named so the reader can open it and never fetched (*A
+Finished Run Reads As A Report*).
 
 Contract-4/5 verification records and their validation envelope arrive through
 that same snapshot. The page derives requirement results and run outcome from
@@ -34,13 +36,13 @@ like to look at it.
 | Key | Region | Shows | Source |
 |---|---|---|---|
 | `dials` | Dials | Mode, depth, the register when the state names one, and any mid-run change | `mode`, `depth`, `explain`, `dialChanges[]` |
-| `header` | Что происходит | The run's condition as a colour and a word, the share of the road, one sentence about the таски, the таски in flight by title, and the eight stages as a strip with their clocks | `stages[]`, `tasks[]`, `currentStage`, `awaiting`, `lifecycle`, `outcome`, `interruptedAt` |
+| `header` | Что происходит | The run's condition as a colour and a word, after closure the прогон's sentence about what now exists and the отчёт's path, the share of the road, one sentence about the таски, the таски in flight by title, and the eight stages as a strip with their clocks | `stages[]`, `tasks[]`, `currentStage`, `awaiting`, `lifecycle`, `outcome`, `interruptedAt`, `result`, `dir` |
 | `estimate` | Осталось | The estimate as a range — the remaining critical path plus the review and acceptance stages still ahead — and what it covers; shown at the right of the header band | `tasks[]`, `stages[]` |
 | `requirements` | Требования (счёт) | Live требования built, in progress and deferred, with a bar; verified instead of built once the current G4 passed | `requirements[]`, `tasks[]`, `verification` |
 | `tasks` | Таски | Accepted of cut, one square per таск in its status colour, with what is in motion, failed or retried in words | `tasks[]` |
 | `tests` | Тесты | The last suite's passed count, the failed count beside it, and the таск it ran after or the full suite at acceptance | `tests`, or the own suite of the таск that finished last |
 | `elapsed` | Рабочее время | Working time since `startedAt`, the median таск beneath it, and the calendar span when the two differ | every timestamp in the state |
-| `handover` | Ваш ход | What only the user can settle: empty variables by name, placeholders, open promised work, one-way changes by kind, assumptions, and the total, which the retired Долг card counted | `debt`, `verification.promisedWork`, `oneWay` |
+| `handover` | Ваш ход | What only the user can settle: empty variables by name, placeholders, open promised work, one-way changes by kind, assumptions, and the total, which the retired Долг card counted; under the cards while the run is active, moved under the header once it is closed | `debt`, `verification.promisedWork`, `oneWay` |
 | `feed` | Лента | What just happened, newest first, each event with its age; fifteen shown, the rest folded | `stages[]`, `tasks[]`, `gates[]`, `verification.repairAttempts`, `verification.acceptanceRounds` |
 | `stages` | Этапы | The eight stages in order, each with its Label, note and duration | `stages[]`, labels from `vocabulary.md` |
 | `build` | Ход разработки | The таски grouped by волна, each a bar in its status colour with its status in a word and its clock; a repair bar quotes what was sent back, a failed bar names the last repair outcome, and a wave not yet started names what it waits for | `tasks[]`, `verification` |
@@ -71,7 +73,8 @@ The header's title is the slug and, for a state of contract 7 or later, the day 
 started, read out of `dir` — «Прогон: <slug> · <YYYY-MM-DD>». A state whose
 `dir` is absent or does not parse is titled by its slug alone, as every state
 before contract 7 was. The page reads the date and nothing else out of `dir`:
-it builds no artifact path, and whether the run is still in progress is said by
+it builds no artifact path from it but one — the отчёт's, for display, once the
+run is closed (*A Finished Run Reads As A Report*) — and whether the run is still in progress is said by
 the lifecycle the page already renders, not by the suffix. The page carries its
 own copy of the `dir` grammar because it imports nothing; the copy is compared
 with the runtime's by `npm run dashboard`.
@@ -163,6 +166,62 @@ each stage's note, the findings of a failed check, and its own `i`.
 **The band replaced two regions.** `progress` became the bar, and `stage`
 became the strip and the `header` explanation. The `estimate` region moved
 into the band whole, with the same key, `i` and explanation.
+
+## A Finished Run Reads As A Report
+
+Once the run is closed, the page answers what it left behind before anything
+else. "Closure" is the C1/C2 predicate above — `lifecycle: closed`, or below
+contract 4 a `finishedAt` — computed once, by `isClosedRun`, for the band's
+word and for where «Ваш ход» sits, so the two cannot disagree. An interrupted
+run (C3) is not closed: it may still be resumed.
+
+**The result line.** Under the condition word, the прогон's own sentence about
+what now exists, from `result` (contract 10, [`state-contract.md`](state-contract.md)),
+trimmed and printed as written. It takes **the band's colour**: `--accent`
+under «Завершён», `--fail` under «Сбой». A finished-coloured line under a
+failed word would contradict the word above it. The stop reason stays in the
+notice; the line does not replace it. The sentence names what was built and
+says "verified" only for a `completed` outcome — «Завершён» says closed, never
+verified, and the page adds nothing that blurs the two. No check can read a
+sentence's claim, so that rule is held by the acceptance prose alone.
+
+**The отчёт line.** «Отчёт: `.maestro/<dir>/report.md`» / "Report: …", the
+path composed from `dir` for a closed state of contract 7 or later whose
+`dir` parses and carries no `--wip`. It is the one path the page composes,
+for display only: the page never fetches it and still reads `state.js` and
+nothing else. It names where the отчёт is **or will be in a moment** — the
+closing publish comes before `report.md` is written, and a
+`closed_with_exceptions` closure publishes on the user's answer and writes the
+отчёт after, into the same `dir` — so the page never says the file exists.
+
+| # | State | Condition | Result line | Report line | «Ваш ход» |
+|---|---|---|---|---|---|
+| F1 | contract 10, closed `completed`, `result` set | finished | shown, `--accent` | `.maestro/<dir>/report.md` | under the header |
+| F2 | contract 10, closed `closed_with_exceptions` | finished | shown, `--accent` | shown | under the header |
+| F3 | contract 10, closed `stopped_incomplete`, `stopReason` set | failed | shown, `--fail`; the stop reason stays in the notice | shown | under the header |
+| F4 | contract 7–9, closed | as C1/C2 | none (no field) | shown | under the header |
+| F5 | contract 4–6, closed (no `dir`) | as C1/C2 | none | none | under the header |
+| F6 | below 4, `finishedAt` set (both doc fixtures) | finished | none | none | under the header |
+| F7 | active, any contract | C3–C6 | none, even if a malformed state carries one | none | under the cards |
+| F8 | not closed, `interruptedAt` set | failed | none | none | under the cards |
+| F9 | closed, `dir` absent, malformed, or still ending in `--wip` | as C1/C2 | per `result` | none | under the header |
+| F10 | `result` not a string, or blank after trimming | — | none | per `dir` | per closure |
+| F11 | closed, then reopened (next poll is active) | C3–C6 | gone | gone | back under the cards, focus kept |
+
+The page does not re-check the version of `result`: the validator owns that
+rule, and the page shows what a closed state carries.
+
+**«Ваш ход» moves in the DOM, not by CSS `order`.** Once closed, the region
+is the first child of `<main>`; otherwise it sits directly after the cards.
+CSS `order` would move the box and leave the reading order and the tab order
+where they were, so a keyboard or screen-reader user would meet it in a place
+nobody sees it. The node is moved only when its place differs, so a poll moves
+nothing, and the redraw's focus rule hands focus back across the one move.
+
+Each `header` explanation gains one line on a closed run, saying the line
+under the word is the прогон's own sentence and the path names the отчёт the
+page does not open; each `handover` explanation gains one saying the block
+sits under the header because it is the whole next step.
 
 ## Four Cards
 
@@ -610,7 +669,7 @@ English: "· with review and acceptance", "· with review", "· with acceptance"
 run is left".
 
 - **An absent stage adds nothing.** The page does not invent a stage the state
-  never wrote. A contract-9 state always carries all eight (`state-contract.md`).
+  never wrote. A state from contract 9 on always carries all eight (`state-contract.md`).
 - **Overlap is read, not rejected.** The contract allows one `active` stage,
   but the contract-2 running fixture has development and review active
   together. Each stage is read on its own status, so the overlap adds the
@@ -654,6 +713,8 @@ calendar span does not, so the run's calendar line appears whenever a wait
 over a minute happened. The ceiling stays for silence that was not a question.
 A state below contract 9 keeps the arithmetic above, open `awaiting` included,
 and the working-time explanation says a wait is not counted only where it is so.
+Contract 10 changes no arithmetic: its one field, `result`, is drawn under
+the condition word (*A Finished Run Reads As A Report*).
 
 ## Lifecycle
 
@@ -843,8 +904,9 @@ neither can the orchestrator — the contract records the claim, not a lease.
 
 ## Your Move
 
-The `handover` region sits directly under the cards, above the stages and the
-lists: a requirement list can run to dozens of rows, and what only the user can
+The `handover` region sits under the cards while the run is active, and
+under the header once it is closed (*A Finished Run Reads As A Report*). Either
+way it is above the stages and the lists: a requirement list can run to dozens of rows, and what only the user can
 settle must not wait at the bottom of it. It gathers, in this order:
 empty environment variables (**names only** — S2), placeholders, open promised
 work, one-way changes grouped by kind, then assumptions. A group longer than five
@@ -862,7 +924,8 @@ as written — never dropped and never guessed into a known kind.
 
 ## A Feed Derived From The State
 
-The `feed` region sits under «Ваш ход» and above «Этапы», so "what just
+The `feed` region sits under «Ваш ход» while the run is active — under the
+cards once it is closed and «Ваш ход» has moved up — and above «Этапы», so "what just
 happened" is read before the detailed blocks. It lists events in words, newest
 first, each with its age.
 

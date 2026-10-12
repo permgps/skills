@@ -178,6 +178,14 @@
   .band-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem 1rem; }
   .band-head h2 { margin: 0; }
   #band-condition { font-size: 1.15rem; font-weight: 700; }
+  /* A closed run's own sentence, in the band's colour: a finished line under
+     «Сбой» would contradict the word above it. One weight under the word. */
+  #band-result { margin: .2rem 0 0; font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+  .band-finished #band-result { color: var(--accent); }
+  .band-failed #band-result { color: var(--fail); }
+  /* A long dir must wrap, never scroll the pane at 380 pixels. */
+  #band-report { margin: .15rem 0 0; overflow-wrap: anywhere; }
+  #band-report code { overflow-wrap: anywhere; }
   #band-caption { margin-top: .5rem; font-variant-numeric: tabular-nums; }
   #band-headline { margin: .1rem 0 0; font-size: 1rem; }
   #band-flight { margin-top: .15rem; overflow-wrap: anywhere; }
@@ -396,6 +404,8 @@
         <h2 data-label="header"></h2>
         <b id="band-condition">—</b>
       </div>
+      <p id="band-result" hidden></p>
+      <p class="sub" id="band-report" hidden></p>
       <p class="sub" id="band-caption"></p>
       <div class="bar"><i id="progress-fill" style="width:0%"></i></div>
       <p id="band-headline"></p>
@@ -651,6 +661,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         promised: 'Обещано доделать',
         oneWay: 'Необратимые изменения',
         stopReason: 'Причина остановки',
+        report: 'Отчёт',
         holder: 'Метка прогона',
         quote: 'Вашими словами',
         checked: 'Как проверено',
@@ -906,6 +917,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         },
         tabAwaiting: '● Ждём вас',
         stopReasonLine: function (reason) { return L10N.ru.SCREEN.stopReason + ': ' + reason; },
+        reportLine: function () { return L10N.ru.SCREEN.report + ': '; },
         holderLine: function (token, moment, plain) {
           return plain
             ? 'Прогон заняла сессия чата с меткой ' + token + ' — в ' + moment + '.'
@@ -1083,6 +1095,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         promised: 'Promised work',
         oneWay: 'One-way changes',
         stopReason: 'Why it stopped',
+        report: 'Report',
         holder: 'Run claim',
         quote: 'In your words',
         checked: 'How it was checked',
@@ -1311,6 +1324,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         },
         tabAwaiting: '● Waiting for you',
         stopReasonLine: function (reason) { return L10N.en.SCREEN.stopReason + ': ' + reason; },
+        reportLine: function () { return L10N.en.SCREEN.report + ': '; },
         holderLine: function (token, moment, plain) {
           return plain
             ? 'A chat session marked ' + token + ' took this run at ' + moment + '.'
@@ -2731,6 +2745,50 @@ globalThis.MAESTRO_LOGIC = (function () {
     return awaitingOf(state) ? words(language).UI.tabAwaiting : 'Maestro';
   }
 
+  /**
+   * Whether the прогон is closed: `lifecycle: closed`, or, below contract 4,
+   * which has no lifecycle, a `finishedAt`. One predicate for the band's word
+   * and for where «Ваш ход» sits, so the two cannot disagree about one run. An
+   * interrupted run is not closed: it may still be resumed.
+   */
+  function isClosedRun(state) {
+    if (!state) return false;
+    if (state.lifecycle === 'closed') return true;
+    return !(state.contractVersion >= 4) && !!state.finishedAt;
+  }
+
+  /**
+   * The прогон's own sentence about what now exists, trimmed, or `null`.
+   *
+   * Shown only once the run is closed. The page does not re-check the
+   * contract version: the validator owns that rule, and the page shows what
+   * the state carries — so a malformed active state's sentence stays unshown
+   * because the run is not closed, not because its version is wrong.
+   */
+  function resultOf(state) {
+    if (!isClosedRun(state) || typeof state.result !== 'string') return null;
+    var text = state.result.trim();
+    return text === '' ? null : text;
+  }
+
+  /**
+   * Where the отчёт of a closed run is, as `.maestro/<dir>/report.md`, or
+   * `null`.
+   *
+   * The one path this page composes, and for display only: it is never
+   * fetched, because the page reads `state.js` and nothing else. It names
+   * where the отчёт is, or will be in a moment — the closing publish comes
+   * before `report.md` is written — and never claims the file exists. Only a
+   * closed run from contract 7 on carries a `dir` without `--wip`; anything
+   * else names no path rather than guessing one.
+   */
+  function reportPathOf(state) {
+    if (!isClosedRun(state) || !(state.contractVersion >= 7) || typeof state.dir !== 'string') return null;
+    var parsed = RUN_DIR_PATTERN.exec(state.dir);
+    if (!parsed || parsed[3]) return null;
+    return '.maestro/' + state.dir + '/report.md';
+  }
+
   /** The four conditions the band can say, in the order vocabulary.md lists them. */
   var CONDITION_ORDER = ['working', 'waiting', 'finished', 'failed'];
 
@@ -2762,10 +2820,9 @@ globalThis.MAESTRO_LOGIC = (function () {
     var found = function (condition, reason, stageId) {
       return { condition: condition, reason: reason, stageId: stageId || null };
     };
-    if (state && state.lifecycle === 'closed') {
+    if (isClosedRun(state)) {
       return found(state.outcome === 'stopped_incomplete' ? 'failed' : 'finished', 'outcome');
     }
-    if (state && !(state.contractVersion >= 4) && state.finishedAt) return found('finished', 'outcome');
     if (state && state.interruptedAt) return found('failed', 'interrupted');
     if (awaitingOf(state)) return found('waiting', 'awaiting');
     var failed = orderedStages(state).filter(function (stage) { return stage.status === 'failed'; })[0];
@@ -3518,7 +3575,9 @@ globalThis.MAESTRO_LOGIC = (function () {
           + 'Часы этапа идут от его начала и встают, когда он закрыт; этап открывается той же записью, которой закрылся предыдущий. Пропущенный этап подписан «' + L10N.ru.STAGE_STATUS.skipped
           + '», упавший — «' + L10N.ru.STAGE_STATUS.failed + '», не начатый — прочерком. Строка над этапами называет таски в работе, на ревью и на исправлении — до '
           + IN_FLIGHT_CAP + ' в группе, остальные числом; весь список — в «Ход разработки».'
-      ];
+      ].concat(isClosedRun(state) ? [
+        'Строка под словом — собственное предложение прогона о том, что теперь есть, записанное при закрытии. Ниже — путь к отчёту: страница называет файл, но не открывает его, а при закрытии он может появиться на мгновение позже.'
+      ] : []);
     },
 
     elapsed: function (state, now, marks) {
@@ -3660,7 +3719,9 @@ globalThis.MAESTRO_LOGIC = (function () {
             + ', обещано доделать ' + h.promised.length + ', необратимых изменений ' + h.oneWayCount
             + ', допущений ' + h.assumptions.length + '.',
         'Строка «Всего» наверху блока складывает всё, что ждёт вас, из тех же списков, что и группы под ней. В пустых переменных лежат только имена: значение секрета не попадает в состояние никогда — это правило безопасности, а не договорённость. Обещанная работа видна с контракта 4. Группа длиннее пяти строк свёрнута.'
-      ];
+      ].concat(isClosedRun(state) ? [
+        'Прогон закрыт, поэтому этот блок стоит сразу под полосой: всё, что осталось, — ваш следующий шаг целиком.'
+      ] : []);
     },
 
     feed: function (state) {
@@ -3780,7 +3841,9 @@ globalThis.MAESTRO_LOGIC = (function () {
           + L10N.ru.STAGE_STATUS.skipped + '», сломавшийся — «' + L10N.ru.STAGE_STATUS.failed
           + '». Строка над шагами называет таски, которые сейчас в работе, на ревью или на исправлении, — не больше '
           + IN_FLIGHT_CAP + ' в каждой группе.'
-      ];
+      ].concat(isClosedRun(state) ? [
+        'Строка под словом — то, что прогон сам написал при закрытии о том, что теперь готово. Ниже — где лежит отчёт: страница называет этот файл, но сама его не открывает.'
+      ] : []);
     },
 
     elapsed: function (state, now, marks) {
@@ -3926,7 +3989,9 @@ globalThis.MAESTRO_LOGIC = (function () {
             + ', обещанной и не сделанной работы ' + h.promised.length + ', изменений, которые нельзя отменить, '
             + h.oneWayCount + ', допущений ' + h.assumptions.length + '.',
         'Допущение — это решение, которое прогон принял за вас, потому что не спросил. Строка «Всего» наверху блока складывает всё, что ждёт вас.'
-      ];
+      ].concat(isClosedRun(state) ? [
+        'Работа закончена, поэтому этот блок поднят сразу под полосу наверху: дальше всё зависит от вас.'
+      ] : []);
     },
 
     feed: function (state) {
@@ -4034,7 +4099,9 @@ globalThis.MAESTRO_LOGIC = (function () {
           + L10N.en.STAGE_STATUS.skipped + '», a failed one «' + L10N.en.STAGE_STATUS.failed
           + '», one not yet begun with a dash. The line above the stages names the tasks in progress, in review and in repair — up to '
           + IN_FLIGHT_CAP + ' a group, the rest as a number; the whole list is in Development progress.'
-      ];
+      ].concat(isClosedRun(state) ? [
+        'The line under the word is the run\'s own sentence about what now exists, written at closure. Below it is the path of the report: the page names the file but never opens it, and at closure it may appear a moment later.'
+      ] : []);
     },
 
     elapsed: function (state, now, marks) {
@@ -4177,7 +4244,9 @@ globalThis.MAESTRO_LOGIC = (function () {
             + ', promised work ' + h.promised.length + ', one-way changes ' + h.oneWayCount
             + ', assumptions ' + h.assumptions.length + '.',
         'The «In all» line at the top of the block adds up everything waiting on you, from the same lists as the groups below it. The empty variables hold names only: the value of a secret never reaches the run’s files — that is a safety rule, not an agreement. Promised work appears from contract 4. A group longer than five lines is folded.'
-      ];
+      ].concat(isClosedRun(state) ? [
+        'The run is closed, so this block sits directly under the band: what is left is the whole of your next step.'
+      ] : []);
     },
 
     feed: function (state) {
@@ -4297,7 +4366,9 @@ globalThis.MAESTRO_LOGIC = (function () {
           + L10N.en.STAGE_STATUS.skipped + '», a broken one «' + L10N.en.STAGE_STATUS.failed
           + '». The line above the steps names the tasks being worked on, being checked or being fixed — no more than '
           + IN_FLIGHT_CAP + ' in each group.'
-      ];
+      ].concat(isClosedRun(state) ? [
+        'The line under the word is what the run itself wrote, when it closed, about what is ready now. Below it is where the report is: the page names that file but does not open it.'
+      ] : []);
     },
 
     elapsed: function (state, now, marks) {
@@ -4444,7 +4515,9 @@ globalThis.MAESTRO_LOGIC = (function () {
             + ', promised work not yet done ' + h.promised.length + ', changes that cannot be undone '
             + h.oneWayCount + ', assumptions ' + h.assumptions.length + '.',
         'An assumption is a decision the run made for you because it did not ask. The «In all» line at the top of the block adds up everything waiting on you.'
-      ];
+      ].concat(isClosedRun(state) ? [
+        'The work is over, so this block moved up to just under the band at the top: what happens next is up to you.'
+      ] : []);
     },
 
     feed: function (state) {
@@ -4785,6 +4858,9 @@ globalThis.MAESTRO_LOGIC = (function () {
     tabTitle: tabTitle,
     CONDITION_ORDER: CONDITION_ORDER,
     conditionOf: conditionOf,
+    isClosedRun: isClosedRun,
+    resultOf: resultOf,
+    reportPathOf: reportPathOf,
     stripOf: stripOf,
     IN_FLIGHT_CAP: IN_FLIGHT_CAP,
     inFlightOf: inFlightOf,
@@ -5245,6 +5321,7 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     renderRequirements(state);
     renderGates(state);
     renderHandover(state);
+    placeHandover(state);
     renderFeed(state);
     refillOpenExplainer();
     tick();
@@ -5261,6 +5338,21 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     var condition = L.conditionOf(state);
     el('band').className = 'band band-' + condition.condition;
     text('band-condition', L.label(T.CONDITION, condition.condition));
+
+    // After closure: the run's own sentence, then where its отчёт is. The path
+    // is named for the reader to open, never fetched — the page reads state.js
+    // and nothing else. Both go through textContent: the sentence is the run's
+    // text, and a view that read it as markup would render what nobody wrote.
+    var result = L.resultOf(state);
+    text('band-result', result || '');
+    el('band-result').hidden = result === null;
+    var reportPath = L.reportPathOf(state);
+    var report = clear(el('band-report'));
+    if (reportPath !== null) {
+      report.appendChild(document.createTextNode(T.UI.reportLine()));
+      put(report, 'code', reportPath);
+    }
+    report.hidden = reportPath === null;
 
     var progress = L.overallProgress(state);
     text('band-caption', T.UI.bandCaption(progress.percent));
@@ -5552,6 +5644,26 @@ globalThis.MAESTRO_VALIDATION_SNAPSHOT = null;
     if (!open) return;
     var list = put(host, 'ul', null, 'findings findings-quiet');
     lines.forEach(function (line) { put(list, 'li', line); });
+  }
+
+  /**
+   * «Ваш ход» sits under the cards while the run is active and first under the
+   * header once it is closed, because then it is the whole next step. Moved in
+   * the DOM rather than by CSS `order`, so the reading order and the tab order
+   * follow what is seen; moved only when its place differs, so a poll moves
+   * nothing, and render's keepingFocus hands focus back across the one move.
+   */
+  function placeHandover(state) {
+    var main = el('regions');
+    var cards = el('cards');
+    // The section that holds #handover; a selector naming the region here would
+    // read to the region check as a second place the region is marked.
+    var region = el('handover').parentNode;
+    if (L.isClosedRun(state)) {
+      if (main.firstElementChild !== region) main.insertBefore(region, main.firstElementChild);
+    } else if (cards.nextElementSibling !== region) {
+      main.insertBefore(region, cards.nextElementSibling);
+    }
   }
 
   function renderHandover(state) {

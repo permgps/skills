@@ -10,7 +10,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { evaluateLogic, scriptBlock } from './dashboard-integrity.ts';
-import { contract9State, correctedSourceAuditState, controlledState, defect, repairContract6State, strategyReview, v3Attempt, sourceVerifiedState, deferredScopeState, sha256, verifiedState } from '../state/fixtures/verification.ts';
+import { activeContract10State, contract10State, contract6State, contract9State, correctedSourceAuditState, controlledState, defect, repairContract6State, strategyReview, v3Attempt, sourceVerifiedState, deferredScopeState, sha256, verifiedState } from '../state/fixtures/verification.ts';
 import { projectState } from '../state/projection.ts';
 import { parseStateSource } from '../state/read.ts';
 import { AWAITING_KINDS } from '../state/contract.ts';
@@ -41,6 +41,9 @@ interface Logic {
   tabTitle: (state: unknown, language?: string) => string;
   CONDITION_ORDER: string[];
   conditionOf: (state: unknown) => { condition: string; reason: string; stageId: string | null };
+  isClosedRun: (state: unknown) => boolean;
+  resultOf: (state: unknown) => string | null;
+  reportPathOf: (state: unknown) => string | null;
   stripOf: (state: unknown) => Array<{
     id: string; status: string; current: boolean; from: string | null; until: string | null;
   }>;
@@ -2146,7 +2149,7 @@ for (const { row, state, says } of CONDITION_STATES) {
     for (const language of ['ru', 'en'] as const) {
       for (const register of ['normal', 'plain']) {
         const lines = L.explain('header', state, AT('2026-08-19T11:30:00.000Z'), marks, register, language);
-        assert.equal(lines.length, 4, `${language}/${register}`);
+        assert.equal(lines.length, L.isClosedRun(state) ? 5 : 4, `${language}/${register}`);
         for (const line of lines) assert.ok(typeof line === 'string' && line.trim() !== '', `${language}/${register} left a blank line`);
         assert.match(lines[1]!, says[language], `${language}/${register}`);
       }
@@ -3524,6 +3527,169 @@ test('the plain requirement-list explanation, composed from live data, says no s
       for (const word of banned) {
         const says = wordwise ? new RegExp(`\\b${word}\\b`).test(said) : said.includes(word);
         assert.ok(!says, `${language}: the plain requirement-list explanation says "${word}"`);
+      }
+    }
+  }
+});
+
+// --- a finished run reads as a report ----------------------------------------
+// F1–F11 of docs/spec/dashboard.md › A Finished Run Reads As A Report: what a
+// closed run shows under the condition word, and where «Ваш ход» goes.
+
+const docFinished = parseStateSource(await readFile('docs/assets/state-finished.fixture.js', 'utf8'));
+const docRunning = parseStateSource(await readFile('docs/assets/state-running.fixture.js', 'utf8'));
+const CLOSED_REPORT = '.maestro/2026-09-29-synthetic-menu/report.md';
+
+test('F1: a closed contract-10 run shows its result and names its отчёт by path', () => {
+  const state = contract10State();
+  assert.equal(L.isClosedRun(state), true);
+  assert.equal(L.resultOf(state), state.result);
+  assert.equal(L.reportPathOf(state), CLOSED_REPORT);
+  assert.equal(L.conditionOf(state).condition, 'finished');
+});
+
+test('F2: a run closed with exceptions shows its result and its отчёт too', () => {
+  const state = { ...contract10State(), outcome: 'closed_with_exceptions' };
+  assert.equal(L.isClosedRun(state), true);
+  assert.equal(L.resultOf(state), contract10State().result);
+  assert.equal(L.reportPathOf(state), CLOSED_REPORT);
+  assert.equal(L.conditionOf(state).condition, 'finished');
+});
+
+test('F3: a run that stopped incomplete shows its result under a failed band', () => {
+  const state = { ...contract10State(), outcome: 'stopped_incomplete', stopReason: 'The schema task never closed' };
+  assert.equal(L.isClosedRun(state), true);
+  assert.equal(L.resultOf(state), contract10State().result);
+  assert.equal(L.reportPathOf(state), CLOSED_REPORT);
+  assert.equal(L.conditionOf(state).condition, 'failed');
+});
+
+test('F4: a closed contract-9 run has no result line, and its отчёт is still named', () => {
+  assert.equal(L.isClosedRun(contract9State()), true);
+  assert.equal(L.resultOf(contract9State()), null);
+  assert.equal(L.reportPathOf(contract9State()), CLOSED_REPORT);
+});
+
+test('F5: a closed run older than contract 7 has no dir, so no path is composed', () => {
+  assert.equal(L.isClosedRun(contract6State()), true);
+  assert.equal(L.resultOf(contract6State()), null);
+  assert.equal(L.reportPathOf(contract6State()), null);
+});
+
+test('F6: a run older than contract 4 that wrote finishedAt is closed, with neither line', () => {
+  assert.equal(L.isClosedRun(docFinished), true);
+  assert.equal(L.resultOf(docFinished), null);
+  assert.equal(L.reportPathOf(docFinished), null);
+});
+
+test('F7: an active run is not closed, and a result a malformed state carries is not shown', () => {
+  for (const state of [activeContract10State(), { ...activeContract10State(), result: 'The menu is built.' }, docRunning]) {
+    assert.equal(L.isClosedRun(state), false);
+    assert.equal(L.resultOf(state), null);
+    assert.equal(L.reportPathOf(state), null);
+  }
+});
+
+test('F8: an interrupted run is not closed, so it shows neither line', () => {
+  const state = { ...activeContract10State(), interruptedAt: '2026-09-29T09:15:00Z', result: 'The menu is built.' };
+  assert.equal(L.isClosedRun(state), false);
+  assert.equal(L.resultOf(state), null);
+  assert.equal(L.reportPathOf(state), null);
+  assert.equal(L.conditionOf(state).condition, 'failed');
+});
+
+test('F9: a closed run whose dir is absent, malformed or still --wip names no path, and keeps its result', () => {
+  const closed = contract10State();
+  const { dir: _dropped, ...noDir } = closed;
+  for (const state of [noDir, { ...closed, dir: '../escape' }, { ...closed, dir: '2026-09-29-synthetic-menu--wip' }, { ...closed, dir: 42 }]) {
+    assert.equal(L.isClosedRun(state), true);
+    assert.equal(L.reportPathOf(state), null, JSON.stringify((state as { dir?: unknown }).dir));
+    assert.equal(L.resultOf(state), closed.result);
+  }
+});
+
+test('F10: a result that is not a string or is blank shows no line, and one with spaces around it is trimmed', () => {
+  for (const result of [42, '', '   ', null, { text: 'built' }]) {
+    assert.equal(L.resultOf({ ...contract10State(), result }), null, JSON.stringify(result));
+  }
+  assert.equal(L.resultOf({ ...contract10State(), result: '  The menu is built.  ' }), 'The menu is built.');
+  assert.equal(L.reportPathOf({ ...contract10State(), result: 42 }), CLOSED_REPORT);
+});
+
+test('F11: a closed run reopened on the next poll shows neither line again', () => {
+  const closed = contract10State();
+  const reopened: Record<string, unknown> = { ...closed, lifecycle: 'active', dir: '2026-09-29-synthetic-menu--wip' };
+  delete reopened['outcome']; delete reopened['finishedAt']; delete reopened['result'];
+  assert.equal(L.isClosedRun(closed), true);
+  assert.equal(L.isClosedRun(reopened), false);
+  assert.equal(L.resultOf(reopened), null);
+  assert.equal(L.reportPathOf(reopened), null);
+});
+
+test('closure on the band and closure for «Ваш ход» are the same predicate', () => {
+  for (const state of [contract10State(), contract9State(), contract6State(), docFinished, docRunning, activeContract10State(),
+    { ...contract10State(), outcome: 'stopped_incomplete' }, { ...activeContract10State(), interruptedAt: '2026-09-29T09:15:00Z' }]) {
+    const closedByBand = L.conditionOf(state).reason === 'outcome';
+    assert.equal(L.isClosedRun(state), closedByBand);
+  }
+});
+
+test('the отчёт line is labelled in both languages, and the label is a screen label', () => {
+  const ui = (language: string): { reportLine: () => string } => L.L10N[language]!['UI'] as unknown as { reportLine: () => string };
+  assert.equal(ui('ru').reportLine(), 'Отчёт: ');
+  assert.equal(ui('en').reportLine(), 'Report: ');
+  assert.equal(L.L10N['ru']!['SCREEN']!['report'], 'Отчёт');
+  assert.equal(L.L10N['en']!['SCREEN']!['report'], 'Report');
+});
+
+test('the отчёт label says no word the vocabulary calls shorthand', async () => {
+  const tables = parseTables(await readFile('docs/spec/vocabulary.md', 'utf8'));
+  for (const [language, column, wordwise] of [['ru', 'Shorthand', false], ['en', 'Shorthand (en)', true]] as const) {
+    const table = tables.find(each => each.columns.includes(column))!;
+    const banned = table.rows.flatMap(row => cleanCell(row[column]).split(',')).map(word => word.trim().toLowerCase()).filter(Boolean);
+    const said = (L.L10N[language]!['UI'] as unknown as { reportLine: () => string }).reportLine().toLowerCase();
+    for (const word of banned) {
+      const says = wordwise ? new RegExp(`\\b${word}\\b`).test(said) : said.includes(word);
+      assert.ok(!says, `${language}: "${said}" says "${word}"`);
+    }
+  }
+});
+
+test('a closed run\'s header and «Ваш ход» explain the result line, the отчёт path and the moved block, in every register and language', () => {
+  const closed = contract10State();
+  const active = activeContract10State();
+  const says = {
+    ru: { header: /отчёт/i, handover: /сразу под полос/ },
+    en: { header: /report/i, handover: /under the band/ },
+  } as const;
+  for (const language of ['ru', 'en'] as const) {
+    for (const register of ['normal', 'plain']) {
+      const where = `${language}/${register}`;
+      const header = L.explain('header', closed, NOW, [], register, language);
+      const quietHeader = L.explain('header', active, NOW, [], register, language);
+      assert.equal(header.length, quietHeader.length + 1, where);
+      assert.match(header[header.length - 1]!, says[language].header, where);
+      assert.ok(!quietHeader.join(' ').match(says[language].header), `${where}: the active header names the отчёт`);
+      const handover = L.explain('handover', closed, NOW, [], register, language);
+      const quietHandover = L.explain('handover', active, NOW, [], register, language);
+      assert.equal(handover.length, quietHandover.length + 1, where);
+      assert.match(handover[handover.length - 1]!, says[language].handover, where);
+      assert.ok(!quietHandover.join(' ').match(says[language].handover), where);
+    }
+  }
+});
+
+test('the plain closed-run lines say no word the vocabulary calls shorthand', async () => {
+  const tables = parseTables(await readFile('docs/spec/vocabulary.md', 'utf8'));
+  for (const [language, column, wordwise] of [['ru', 'Shorthand', false], ['en', 'Shorthand (en)', true]] as const) {
+    const table = tables.find(each => each.columns.includes(column))!;
+    const banned = table.rows.flatMap(row => cleanCell(row[column]).split(',')).map(word => word.trim().toLowerCase()).filter(Boolean);
+    for (const key of ['header', 'handover']) {
+      const lines = L.explain(key, contract10State(), NOW, [], 'plain', language);
+      const said = lines[lines.length - 1]!.toLowerCase();
+      for (const word of banned) {
+        const found = wordwise ? new RegExp(`\\b${word}\\b`).test(said) : said.includes(word);
+        assert.ok(!found, `${language}/${key}: "${said}" says "${word}"`);
       }
     }
   }

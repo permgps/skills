@@ -202,6 +202,7 @@ term, and a term with two homes drifts.
 | Обещано доделать | Promised work | Work the прогон promised and has not finished — contract 4 and later |
 | Необратимые изменения | One-way changes | Inward changes the user should know about before building on top: deletions, renames, migrations, major upgrades |
 | Причина остановки | Why it stopped | The reason a прогон stopped without full verification, as the прогон wrote it |
+| Отчёт | Report | Where a closed прогон's отчёт is, as a path the page names under the header and never opens |
 | Метка прогона | Run claim | The short token a chat writes when it takes the прогон, shown only when the прогон has gone quiet for too long |
 | Вашими словами | In your words | The user's own words a требование came from, quoted in the language they were said in |
 | Как проверено | How it was checked | The checks behind one требование, each with its result |
@@ -265,8 +266,8 @@ What Is Happening*. The rows are in the order the page lists them, and
 |---|---|---|---|
 | `working` | Идёт работа | Working | Anything not below — including a chat that has gone silent, which the page cannot tell from a busy one |
 | `waiting` | Ждёт вас | Waiting for you | The прогон is stopped on a question to the user; this outranks a failed стадия |
-| `finished` | Завершён | Finished | The прогон closed with `completed` or `closed_with_exceptions`, or an old one wrote `finishedAt`. It says closed and never verified: whether the work was verified is the run notice's sentence |
-| `failed` | Сбой | Failed | The прогон closed as `stopped_incomplete`, was interrupted, or a стадия failed with nobody asked |
+| `finished` | Завершён | Finished | The прогон closed with `completed` or `closed_with_exceptions`, or an old one wrote `finishedAt`. It says closed and never verified: whether the work was verified is the run notice's sentence. A closed run shows its result line in this colour |
+| `failed` | Сбой | Failed | The прогон closed as `stopped_incomplete`, was interrupted, or a стадия failed with nobody asked. A closed run shows its result line in this colour |
 
 ## Requirement Progress
 
