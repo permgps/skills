@@ -190,7 +190,8 @@ approach, dispatch and return IDs. INFO the decision; WARN exhaustion.
 Valid: eight attempts closed no таск; the review finds the schema таск still in
 repair and decides to close it first. Invalid: a ninth attempt with no review,
 a review written by the coordinator, or «raise the limit» with no forecast.
-Next action: the attempt the decision allows, or closure as stopped_incomplete.
+Next action: the attempt the decision allows, or closure as stopped_incomplete,
+then the memory run after a closure, which ends with the closing commit.
 
 ### 3. If it is a retry — hand it over again
 
@@ -267,6 +268,10 @@ else. A single entry overwritten records the last commit and loses the first, an
 then the re-review has nothing to read but the tree, which by now carries every
 wave that landed since. Three *done means* items of a real таск became
 uncheckable that way.
+
+The repair commit carries the same two trailers as the таск's first commit,
+`Maestro-Run:` and `Requirements:`, as Разработка step 3 spells them, so a
+later reader of the history finds the repair under the same требование.
 
 ## When It Does Not Go That Way
 

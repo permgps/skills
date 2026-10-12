@@ -240,7 +240,9 @@ included, is under the new name. The same closing publish rewrites
 `.maestro/PROGRESS.md` from the closed state and reports `progress`: `written`,
 or `failed`, which you say to the user in one line and which is not a stop — the
 next closing publish rewrites the file. Record any promised further round before offering
-closure; a promise left open blocks every outcome.
+closure; a promise left open blocks every outcome. The closure ends with the
+memory run and its closing commit, so the commit the `PROGRESS.md` header
+names is `HEAD` before that commit, never the closing commit itself.
 
 In the same closing candidate write `result`: one sentence, in the прогон's
 language, of at most 200 characters, saying what now exists for the user to use.
@@ -334,6 +336,7 @@ chance to know rather than when it is still cheap to change.
 
 The прогон is over but for the **memory** phase, which has rules of its own that
 `SKILL.md` names and runs last because it describes the code as it finally is.
+It ends with the closing commit, the last commit of the прогон.
 
 ## Scope Progress Projection
 

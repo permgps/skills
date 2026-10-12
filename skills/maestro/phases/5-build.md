@@ -161,6 +161,18 @@ For each таск that returns done, in this order:
    `commit:` only names the HEAD it worked on. A прогон survives a compaction and
    a crash by what is committed, and the review phase judges each таск against
    the diff of its own commit.
+
+   The subject is the таск's id and title. After a blank line come exactly
+   these two trailers, `Requirements:` listing the таск's `requirementIds` in
+   id order, separated by a comma and a space:
+
+   ```text
+   Maestro-Run: <dir without --wip>
+   Requirements: R01, R02
+   ```
+
+   Таск numbers and requirement ids restart every прогон, so the trailers are
+   what ties a change in the history back to its требование and its run.
    <!-- maestro:degrades:version-control -->
    Where preflight found no version control, there is nothing to commit: say so
    once, and tell the review phase it will be reading the working tree rather

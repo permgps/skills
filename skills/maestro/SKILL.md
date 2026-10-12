@@ -37,8 +37,8 @@ right thing was built.
 | 7 | Acceptance | [`phases/7-acceptance.md`](phases/7-acceptance.md) | `report.md` |
 
 Two phases run outside the sequence: **Memory**
-([`phases/9-memory.md`](phases/9-memory.md)), once during Build and once after
-Acceptance, and **Repair** ([`phases/8-repair.md`](phases/8-repair.md)), which a
+([`phases/9-memory.md`](phases/9-memory.md)), once during Build and
+once after every closure, acceptance's or repair's, and **Repair** ([`phases/8-repair.md`](phases/8-repair.md)), which a
 таск reaches three ways — by coming back anything other than done, by failing
 its review, or by carrying a требование G4 disagreed about.
 

@@ -2,7 +2,8 @@
 
 Read twice, and never as part of the sequence: once during Разработка, when a
 таск comes back having found something the rest of the project will keep running
-into, and once after приёмка, when the code exists and can be described.
+into, and once after every closure — acceptance's or repair's — when the code
+exists and can be described.
 
 The прогон ends. What it worked out does not have to. This phase is the only
 thing standing between a finished project and a next session that starts by
@@ -16,7 +17,7 @@ and nobody is asked about it.
 | Run | Read | The question it answers |
 |---|---|---|
 | during Разработка | `discovered-interfaces.md`, the таск that returned, the run state | what did this таск run into that the next person will too |
-| after приёмка | `spec.md`, the project code, `discovered-interfaces.md`, the Terms table of `interfaces.md`, the seam-level items of `reviews/standards.md`, the `noCorrectSeam:` lines of repeated repairs' diagnoses in the run state, `prior.md`, the run state | what is this project now, where are its seams, and what does it call things |
+| after every closure | `spec.md`, the project code, `discovered-interfaces.md`, the Terms table of `interfaces.md`, the seam-level items of `reviews/standards.md`, the `noCorrectSeam:` lines of repeated repairs' diagnoses in the run state, `prior.md`, the run state | what is this project now, where are its seams, and what does it call things |
 
 You do not read `brief.md`, `manifest.md` or `report.md` here. Those say what was
 asked and what was delivered; this phase records what was **learned**, and the
@@ -88,8 +89,17 @@ each host. The JSON line names the file.
   an end before a begin. **Stop.** Say which files and which lines, from the
   JSON. Do not pick the pair you think was meant. The text between the other
   pair is somebody's, and a guess deletes it.
-- **Exit 2** means the host or the body was unusable. An empty body is refused
-  on purpose: when there is nothing to write, do not call it at all.
+- **Exit 2** means the host was missing or unknown, or nothing was piped.
+
+**After a closure the helper is always called**, even when this прогон learned
+nothing: an empty body keeps the block already there and refreshes its tail.
+During Разработка the old rule stands: when there is nothing to write, do not
+call it at all.
+
+**The helper writes the tail itself.** Every block ends with *Working Between
+Runs* — how to make a small fix without Maestro and which slice of the history
+to read. The helper cuts a body at that heading and appends its own copy, so do
+not write it or edit it; a body copied from `prior.md` may carry it as it is.
 
 **You own the region between those two lines and nothing else.** Everything
 above the begin marker and below the end marker belongs to the user. It is not
@@ -165,6 +175,27 @@ every later session, so a credential landing in it is the worst version of the
 same violation, not a milder one. Redaction runs over what you are about to
 write, exactly as it ran over the бриф.
 
+### 5. Commit the closure
+
+After a closure, once the block and the decision records are written and the
+redaction of step 4 has run over what is staged, make the прогон's last commit.
+`<dir>` is the run directory's name after closure, without `--wip`, and
+`<memory file>` is the `file` the helper's JSON line named:
+
+```text
+git add -- .maestro <memory file>
+git commit -m "maestro: close <dir>" -m "Maestro-Run: <dir>" -- .maestro <memory file>
+```
+
+Exactly that subject: preflight finds the last closure by it when a rebase has
+rewritten the commit the `PROGRESS.md` header names. Nothing else is staged or
+committed — the pathspecs keep whatever the user had staged where it was, and
+`-A` would take it. During Разработка there is no closing commit.
+
+<!-- maestro:degrades:version-control -->
+Where preflight found no version control, there is nothing to commit: say so
+once and skip this step. The block and the records are written all the same.
+
 ## When It Does Not Go That Way
 
 **The memory file has a block from another tool.** Markers that are not yours are
@@ -197,6 +228,7 @@ nothing worth keeping rather than failing at something.
 |---|---|
 | the memory file the helper resolved | the owned block replaced or appended; everything outside it byte for byte as it was |
 | `.maestro/<dir>/decisions.md` | one appended entry per decision, each naming the `D##` or `R##` it came from |
+| version control | after a closure, one closing commit, `maestro: close <dir>`, over `.maestro/` and the memory file only |
 | project code | unchanged — this phase writes none of it |
 
 ## Scope Progress Projection

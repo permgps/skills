@@ -280,7 +280,11 @@ Work Stands*, and lists the commits over code since that closure under *Since
 The Last Closure*, with the paths they changed. The JSON line reports both:
 `progress` (`absent` or `read`) and `commits` — its `state`, `basis`,
 `range`, `count` and `paths`. Commits that touched only `.maestro/` and the
-memory files are not code and are not counted.
+memory files are not code and are not counted. `basis` says where the read
+started: `commit` from the commit the progress file's header names,
+`closing-commit` from that run's closing commit found by its subject when a
+rebase rewrote the first, `date` from the closure's moment when neither is on
+`HEAD`'s history.
 
 **Past thirty commits the first read writes nothing** and answers
 `action: "summary-needed"`, with the range in `commits.range`. Dispatch the
