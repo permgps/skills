@@ -195,6 +195,9 @@ union of exactly these commits, read one commit at a time. A range from the
 first commit's parent to the last is not that union once later waves land in
 the tree: it carries every foreign commit between the two. See
 [`phases.md`](phases.md) for what a re-review reads, and why it is not the tree.
+Each of these commits carries the `Maestro-Run:` and `Requirements:` trailers
+(`phases.md`, *Commits*), so the history ties it to its run and its
+требования even where the state is no longer at hand.
 
 **The whole `tasks[]` array is written when the таски are cut**, every entry
 `queued`, with its `blockedBy`, `wave`, `zone`, and the three counters at zero.
@@ -735,8 +738,10 @@ exit codes.
   `{ present, source, first }`, also on `kept`. `progress` is `absent` or
   `read`. `commits` is `{ state, basis?, range?, count, paths }`: `state` is
   `none` (no closure recorded), `unavailable` (git could not say),
-  `listed`, `summarised` or `unsummarised`; `basis` is `commit` or
-  `date`; `paths` stops at fifty.
+  `listed`, `summarised` or `unsummarised`; `basis` is `commit`,
+  `closing-commit` (the closing commit of the recorded run, found by its
+  subject, when the header's commit is not on `HEAD`'s history) or `date`;
+  `paths` stops at fifty.
   `glossary` is `{ state, files, bytes, limit }`: `state` is `absent`,
   `read` or `over-limit`, `files` names every file found in read order,
   and `bytes` is their sum against the `limit`. Past the limit none of them
@@ -753,9 +758,13 @@ exit codes.
   from stdin and splices it into the memory file [`hosts.md`](hosts.md)
   resolves for that host. It reports `path`, `file`, `bytes`,
   `action` (`created`, `appended` or `replaced`), `loadedByHost` and `reason`.
+  The block always ends with the helper's tail, `## Working Between Runs`:
+  the body is cut at that line and the canonical tail appended, so a carried
+  or edited tail is replaced. An empty body keeps the block already there and
+  refreshes its tail, or writes the tail alone where there is no block.
   - Exit 1: the block is in two files (`files`), the markers are malformed
     (`file`, `lines`), or the body carries a marker.
-  - Exit 2: the host is missing or unknown, or the body is empty or not piped.
+  - Exit 2: the host is missing or unknown, or no body was piped.
   - Canonical module: `tools/runtime/memory.mts`. `scripts/memory/markers.ts`
     is its facade.
 

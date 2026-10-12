@@ -45,7 +45,7 @@ says so in its first word.
 | subagent fan-out | subagent fan-out | every wave is one таск wide. The independent reader, the reviewer and the blind reader still run — sequentially, each in a fresh context — because they are gates, not optimisations |
 | a subagent with a context you control | context isolation | **stop.** G2 and G4 are withholding checks. A reader that inherits what you know confirms what you know, and nothing downstream can tell that it did |
 | worktrees | worktree isolation | every wave is one таск wide. Same consequence as no fan-out, arrived at from the other side |
-| commits | version control | the прогон runs. Say in the announcement that it cannot commit, and tell the review phase it will be reading the working tree rather than one таск's diff |
+| commits | version control | the прогон runs. Say in the announcement that it cannot commit, and tell the review phase it will be reading the working tree rather than one таск's diff; the memory run makes no closing commit |
 | writing project files | file writes | **stop.** There is nowhere to build |
 | a page that follows the state | — | the прогон runs and the отчёт is unaffected. Say the view is a still picture, name the file, and stop promising a live one |
 | a model per subagent | model per subagent | the models question is not asked and every субагент runs on the session's model; say so in the announcement, and the отчёт's models line still counts the tiers the plan marked |

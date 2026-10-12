@@ -581,7 +581,12 @@ your-project/.maestro/
 - **Project memory.** A short block between `<!-- maestro:begin -->` and
   `<!-- maestro:end -->` in the instruction file your host loads at session
   start, so the next session reads it first. Your own text outside the markers is
-  never edited.
+  never edited. The block always ends with *Working Between Runs*, which the
+  helper writes itself on every write: how to make a small fix without Maestro
+  (read `.maestro/PROGRESS.md`, add a line under *Fixes Without Maestro*,
+  commit with the `Maestro-Run:` trailer) and which slice of the history to read
+  — since the last closure, by requirement, by file, by fragment, by line, never
+  the whole log. Edit it and the next write puts it back.
 
   | Host | Loads at session start | Creates when none exists |
   |---|---|---|
@@ -611,9 +616,13 @@ your-project/.maestro/
   dropped, leftovers you dismissed), what is not done (deferred, waiting on you,
   incomplete, failed таски), and known bugs, each keyed by the run it came from.
   The header names the commit the run closed at. Add your own lines under
-  *Fixes Without Maestro*; nothing else in it is yours to edit. The next run's
-  preflight copies it into `prior.md` with the commits over code since that
-  commit and the paths they changed — past thirty commits, a reader on the
+  *Fixes Without Maestro*; nothing else in it is yours to edit. Each closure
+  ends with one more commit, `maestro: close <dir>`, holding `.maestro/` and the
+  memory file and nothing you had staged. The next run's preflight copies the
+  file into `prior.md` with the commits over code since that closure and the
+  paths they changed. It reads from the commit the header names; if a rebase
+  rewrote it, from the closing commit, found by its subject; failing both, from
+  the closure's date — and says which — past thirty commits, a reader on the
   cheaper model sums them up in at most ten lines. In `semi`, `interview` and
   `manual` its first round of questions offers the open items once: leave them,
   take some, or say they no longer matter. `full` never asks and takes nothing.
@@ -896,7 +905,12 @@ nobody is driving. So you are asked.
 reads the ordered union of that таск's own commits, one diff per commit — never
 a range, which would carry every foreign commit between them, and never the
 tree. Paths those commits touched outside the таск's files are listed beside the
-diffs, not filtered away.
+diffs, not filtered away. Every таск and repair commit carries two trailers,
+`Maestro-Run: <dir>` and `Requirements: R01, R02`, because таск numbers and
+requirement ids restart every run; `git log -E --all-match
+--grep='^Maestro-Run: <dir>$' --grep='^Requirements: (.*, )?R02(,|$)'` finds
+every change one requirement of one run caused. Give a fix you make by hand the
+same trailers.
 
 **The contract is versioned, and old runs stay readable.**
 

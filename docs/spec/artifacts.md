@@ -63,7 +63,10 @@ from before contract 7 have no row, and the file's header says so.
 publish rewrites it whole, from the closed state, the file it replaces and the
 closing run's `prior.md` — whether acceptance closed the run or repair stopped
 it. Its header names the closed run, its outcome and the commit `HEAD` was at,
-or `none` without git. Under it, *Settled By The User* holds what the
+or `none` without git. That commit precedes the closing commit, which the
+memory run makes afterwards and which commits this file; when a rebase rewrites
+the header's commit, preflight finds the closure by the closing commit's
+subject instead. Under it, *Settled By The User* holds what the
 user decided in their own words: dropped требования with their reason, and
 carried items they dismissed. *Not Done* holds deferred, placeholder and
 incomplete требования and failed таски. *Known Bugs* holds open findings — with
@@ -306,7 +309,11 @@ comparison of them has two answers to choose from.
   changes the user made while this прогон was running.
 - `.maestro/` is committed, not ignored. It is the user's record of what was
   promised and what was delivered; a прогон that leaves nothing behind did not
-  happen.
+  happen. The memory run after every closure commits it, together with the
+  memory file and nothing else, as the прогон's last commit:
+  `maestro: close <dir>` with a `Maestro-Run: <dir>` trailer (see
+  [`phases.md`](phases.md), *Memory*). Without version control nothing is
+  committed and the прогон says so.
 - Nothing under `.maestro/` is deleted by a later прогон. A second прогон gets
   a second directory under its own start date; when `<YYYY-MM-DD>-<slug>`
   already exists, with or without `--wip`, the slug takes a numeric suffix.

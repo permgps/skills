@@ -14,6 +14,20 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **Commits a later session can trace.** Every таск and repair commit carries
+  `Maestro-Run: <dir>` and `Requirements: R01, R02` trailers, because таск
+  numbers and requirement ids restart every прогон. The memory phase now runs
+  after every closure, acceptance's or repair's, and ends with a closing commit
+  `maestro: close <dir>` over `.maestro/` and the memory file only, by
+  pathspec. When a rebase rewrote the commit `PROGRESS.md` names, preflight
+  finds the last closure by that subject (`basis: closing-commit`) before it
+  falls back to the date. `--memory-write` ends the block with a tail it
+  regenerates on every write, *Working Between Runs*: a small fix without
+  Maestro, and which slice of the history to read. An empty body no longer
+  exits 2; it keeps the block and refreshes the tail. `npm run check` holds it
+  through nine `trace` anchors in `npm run bundle`, a test tying the phase
+  file's subject to `history.mts`, and new `history`, `markers` and
+  `memory-sync` tests.
 - **Where the work stands survives between прогоны.** Every closing publish
   rewrites `.maestro/PROGRESS.md` from the closed state: *Settled By The User*,
   *Not Done*, *Known Bugs* and *Fixes Without Maestro*, each item keyed

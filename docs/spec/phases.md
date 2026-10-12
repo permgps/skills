@@ -525,6 +525,20 @@ always will be; waiting for a quiet tree would serialise the build, which is the
 one thing the wave order exists to avoid. Only the range changes; the diff was
 already what the review read.
 
+**Every commit the прогон makes carries a `Maestro-Run:` trailer.** A таск
+commit and a repair commit carry two, after a blank line under the subject:
+`Maestro-Run: <dir without --wip>` and `Requirements: R01, R02`, the таск's
+`requirementIds` in id order. Таск numbers and requirement ids restart every
+прогон, so the trailers are what ties a change in the history back to its
+требование and its run. For the same reason a requirement is never searched
+alone: `git log --grep=R02` crosses runs, and the slice by requirement is
+`git log -E --all-match --grep='^Maestro-Run: <dir>$' --grep='^Requirements: (.*, )?R02(,|$)'`.
+A fix made without Maestro carries the trailers of what it touches: the run
+whose requirement it changes, or the last closed run when it changes none.
+`Maestro-Run:` therefore means "the run whose requirements this commit refers
+to", on a прогон's own commits and on the user's alike. The closing commit
+(see *Memory*) carries `Maestro-Run:` alone.
+
 ### Handoff
 
 A таск that runs out of context before it is done leaves
@@ -918,8 +932,30 @@ phase is what survives that.
 It runs twice, and the two runs have different things to say. **During build**,
 when a таск returns having discovered something the rest of the project will
 keep running into, the fact is recorded while it is still attached to the таск
-that found it. **After acceptance**, when the code exists and can be described,
+that found it. **After every closure** — acceptance's, or repair's when it stops
+the run as `stopped_incomplete` — when the code exists and can be described,
 what is written is what the project now is rather than what a таск ran into.
+
+**The run after a closure always calls the helper and ends with the closing
+commit.** An empty body keeps the block already there and refreshes its tail,
+so a run that learned nothing still leaves the tail current. Then, after the
+redaction this phase runs over what it writes, the прогон's last commit is made
+by pathspec: `git add -- .maestro <memory file>` and
+`git commit -m "maestro: close <dir>" -m "Maestro-Run: <dir>" -- .maestro <memory file>`,
+where `<dir>` is the run directory without `--wip` and `<memory file>` is the
+file the helper named. Nothing the user staged is taken. That subject is fixed:
+preflight finds the last closure by it. Without version control the step is
+said once and skipped. During build nothing is committed by this phase, and
+with nothing to write the helper is not called.
+
+**The block ends with the helper's tail.** `--memory-write` cuts the body at
+the line `## Working Between Runs` and appends its own copy of that section:
+*A Small Fix Without Maestro* (read `PROGRESS.md` and the commits since the
+last closure, add a line under *Fixes Without Maestro*, commit with the
+trailers) and *Which Slice Of The History* (since the last closure, by
+requirement, by file, by fragment, by line — never the whole log). It is
+regenerated on every write, so a copy carried through `prior.md` or an edit by
+hand never drifts from what the helper and the phase files spell.
 
 ### Where It Writes
 
@@ -1030,9 +1066,14 @@ Work Stands* is `.maestro/PROGRESS.md` verbatim and fenced, as the last closing
 publish wrote it. *Since The Last Closure* lists the commits over code since the
 commit that file's header records, newest first and without merges, with the
 paths they changed. Commits that touched only `.maestro/` and the memory files
-are not code. When that commit is no longer an ancestor of `HEAD` — a reset, a
-rebase, another branch — or none was recorded, the read falls back to the
-closure's moment and says so. Without git the section says why it was not read.
+are not code. The read starts from the first of three that holds: the commit
+that header records, when it is an ancestor of `HEAD` (`basis: commit`); the
+closing commit of that run, the newest commit on `HEAD`'s history whose subject
+is exactly `maestro: close <dir>` (`basis: closing-commit`) — a rebase rewrites
+both shas and keeps the subject, and a match in a commit body or for a longer
+directory name is not one; otherwise the closure's moment (`basis: date`), as
+after a reset or on another branch. The section says which, and why the first
+did not hold. Without git the section says why it was not read.
 Past thirty commits the first read writes nothing and answers
 `summary-needed`; preflight dispatches the commit reader on `standard`, and a
 second read writes its at most ten lines in place of the list. When the reader
