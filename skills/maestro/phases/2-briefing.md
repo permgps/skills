@@ -87,8 +87,8 @@ and dismiss others. In `full` it is never asked: nothing is taken, nothing is
 dismissed, and the closing publish carries every item on. An item is never
 taken without the user's answer.
 
-Every item the reply names becomes one entry of the run state's `leftovers`:
-its `key` as the file shows it, `disposition` `taken` or `dismissed`,
+Every item the reply names becomes one entry of the run state's `leftovers`,
+written in step 6 with the statuses: its `key` as the file shows it, `disposition` `taken` or `dismissed`,
 `answer` the user's reply verbatim after redaction, and `at` the moment it
 was given. Leaving an item for later writes nothing. **A taken item follows
 *A Change That Arrives Later* steps 1–3, even inside this phase:** the user's
@@ -228,6 +228,9 @@ one, the user's reason.
 - A status change the user did not make is not a status change. S1: a требование
   is removed only by the user, and their words are what records it.
 - The reason is the user's answer, not your paraphrase of your own question.
+- The same write records `leftovers`: one entry per item the leftovers
+  question's reply named in step 3, and none for an item left for later. This
+  step is its only writer.
 
 ## A Change That Arrives Later
 
@@ -238,7 +241,8 @@ in a file and another way in the state.
 
 The user may withdraw a требование, add one, or reword one at any point. When
 that happens *in this phase* it is an ordinary answer, and step 6 already covers
-it. When it happens later — during the plan, mid-build, while a таск is under
+it — with one exception: a leftover the user takes in step 3 follows steps 1–3
+below even here, because its words are in no бриф. When it happens later — during the plan, mid-build, while a таск is under
 review — this is what to do, in this order.
 
 ### The order is the procedure
