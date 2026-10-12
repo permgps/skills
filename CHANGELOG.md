@@ -70,6 +70,14 @@ number that claimed more than that would be claiming it falsely.
   a stage starts, its own clock replaces its share. The estimate no longer goes
   blank while review and acceptance run, and `measure` prints each прогон's
   review and acceptance share of development. No contract change.
+- **The dashboard gains «Лента»: what just happened**, newest first, each line
+  with its age — a stage started, a таск started or handed in to review with
+  its test count, a repair attempt with its outcome, a check passed or not.
+  Every event is read from a stamp the state already carries; from contract 4
+  the finished-work check is one line per acceptance round, and the latest
+  passed round that is no longer current says «устарела». Review's verdicts are
+  not shown, because they leave no stamp, and the region's `i` says so.
+  Fifteen lines show and the rest fold. No contract change.
 - **A wait for the user stops the clocks.** From contract 9 the dashboard cuts
   every closed wait and the open one out of working time, the stage clocks, the
   таск durations, the median and the estimate before the 45-minute ceiling

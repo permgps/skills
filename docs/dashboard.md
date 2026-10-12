@@ -95,6 +95,19 @@ those numbers is computed from the run state at render time; none is stored.
 The brief's coverage is a line under G2 in Гейты, and the total of what waits on
 you heads «Ваш ход».
 
+Under «Ваш ход» is **«Лента»**: what just happened, newest first, in words, each
+line with how long ago it was. A stage started, a таск went out, a таск was
+handed in to review with its test count, a repair attempt came back with its
+outcome, a check passed or did not. Every line is read from a stamp the run
+state already carries, so the feed cannot tell a different story from the
+blocks below it — and what leaves no stamp is not in it. Review accepting a
+таск or sending it back changes a status and dates nothing, so neither appears;
+the region's `i` names those kinds, so their absence reads as a rule rather
+than a gap. Fifteen lines show and the rest fold behind «Показать ещё N». The
+ages move every second with the clocks and are calendar time, not working
+time; past a day the line shows the moment itself. See
+[Feed](#feed).
+
 **Осталось is a range and refuses to be sharper.** It is the median of finished
 таски measured along the remaining critical path, plus the review and acceptance
 still ahead, and below two finished таски it says *рано считать* rather than
@@ -210,6 +223,31 @@ A group longer than five lines folds the rest behind a press. The region opens
 with one total line — «Всего 6 пунктов» — counted from the same lists, so the
 line and the groups cannot disagree. It took the place of the old Долг card,
 and counts promised work and one-way changes too.
+
+## Feed
+
+«Лента» lists what happened, newest first, each line read from a stamp the run
+state carries and from nothing else. No log is written for it, so the run state
+did not change shape to make room for it.
+
+| Line | Read from |
+|---|---|
+| «Начался этап «Разработка»» | a stage's `startedAt` |
+| «Таск 03 «Блок с ценами» взят в работу» | a таск's `startedAt` |
+| «Таск 03 «Блок с ценами» сдан на ревью · 41 тест пройден» | a таск's `finishedAt` and `tests` |
+| «Таск 03 «Блок с ценами»: попытка исправления — Всё ещё не проходит» | a repair attempt's `at` and outcome, from contract 4 |
+| «G3 · пройдена проверка плана» | the check's status, dated by the end of the stage it follows |
+
+From contract 4 the finished-work check is read from each acceptance round
+instead, at the moment the round was performed, so a failed round and the
+passed one after it are two lines. If inputs moved after the latest passed
+round, its line ends «· устарела». In the plain register a check's line names
+it in words only, without G1–G4.
+
+What the stamps cannot say, the feed does not say either. A таск that went out
+again shows only its latest start and hand-in. Review's verdicts, a restart and
+a relay to a fresh subagent leave no stamp and never appear. The feed of a
+finished run measures ages from now, so it honestly says the run was yesterday.
 
 ## A finished run
 
@@ -327,9 +365,12 @@ mkdir -p /tmp/shot && cp skills/maestro/assets/dashboard.html /tmp/shot/
 cp docs/assets/state-finished.fixture.js /tmp/shot/state.js
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   --headless --disable-gpu --hide-scrollbars --allow-file-access-from-files \
-  --virtual-time-budget=4000 --window-size=1280,2100 \
+  --virtual-time-budget=4000 --window-size=1280,2500 \
   --screenshot=docs/assets/dashboard-finished.png file:///tmp/shot/dashboard.html
 ```
+
+The window is 2500 pixels tall, up from 2100 when «Лента» was added, so the
+capture still reaches the start of the требования list.
 
 The clocks in a capture of the in-flight state are measured against the moment
 of the capture, so re-running the command produces a different image. That is

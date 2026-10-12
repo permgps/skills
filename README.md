@@ -646,6 +646,9 @@ What else is on it:
 - **«Ваш ход» — what only you can settle**, in one place: empty variables by
   name, placeholders, open promised work, one-way changes grouped by kind, and
   assumptions. See [Your move](docs/dashboard.md#your-move).
+- **«Лента» — what just happened**, newest first, each line with its age, every
+  event read from a stamp the run state already carries; fifteen show and the
+  rest fold. See [Feed](docs/dashboard.md#feed).
 - **Every таск row opens** to the требования it serves, its blockers, files,
   owned area, commits, restarts, trips to repair, tests and defects; tasks on
   the critical path are marked.
