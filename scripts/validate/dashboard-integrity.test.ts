@@ -9,6 +9,7 @@ import {
   sliceObjectLiteral,
   stripComments,
   type SpecSources,
+  type Violation,
 } from './dashboard-integrity.ts';
 import { RUN_DIR_PATTERN } from '../state/paths.ts';
 import { LEVELS, resolveLevel } from '../shared/log.ts';
@@ -137,6 +138,13 @@ const DASHBOARD = `# Dashboard
 |---|---|---|
 | \`review\` | 0.09 | 1.11 |
 | \`acceptance\` | 0.09 | 0.39 |
+
+## A Narrow Pane
+
+| Width | From there up |
+|---|---|
+| \`48rem\` | the estimate stands beside the band |
+| \`62rem\` | the roomy padding and numbers |
 `;
 
 const SPEC: SpecSources = {
@@ -257,7 +265,10 @@ const SWITCHES = [
   '<button data-language-choice="en">EN</button>',
 ].join('\n');
 
-/** The three theme states, with one token apiece so the sets can be compared. */
+/**
+ * The three theme states, with one token apiece so the sets can be compared,
+ * and the two width queries the breakpoint table above names.
+ */
 const STYLE = `<style>
   :root,
   :root[data-theme="light"] { --bg: #fff; }
@@ -265,6 +276,8 @@ const STYLE = `<style>
     :root:not([data-theme]) { --bg: #000; }
   }
   :root[data-theme="dark"] { --bg: #000; }
+  @media (min-width: 48rem) { #band { gap: 1rem; } }
+  @media (min-width: 62rem) { body { padding: 1.5rem; } }
 </style>`;
 
 /** A page shaped like the real one, small enough that a test can bend one part of it. */
@@ -1064,4 +1077,75 @@ test('each label table logs which table it held and how many violations it found
   assert.equal(info('FEED_KIND', 'en')['violations'], 0);
   assert.equal(info('GATE_NAME', 'ru')['violations'], 0);
   assert.equal(info('CONDITION', 'ru')['violations'], 0);
+});
+
+/** The layout findings alone, for a page whose stylesheet one test bends. */
+const layoutFindings = (html: string, spec: SpecSources = SPEC): Violation[] =>
+  checkDashboard(html, spec).filter(v => v.check === 'layout');
+
+/** The fixture stylesheet with one more rule before its end. */
+const styleWith = (rule: string): string => STYLE.replace('</style>', `  ${rule}\n</style>`);
+
+test('a width query the breakpoint table has no row for is reported, naming the width', () => {
+  const found = layoutFindings(page({ style: styleWith('@media (min-width: 40rem) { h1 { margin: 0; } }') }));
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.message, /min-width: 40rem.*the page and dashboard\.md › A Narrow Pane has no row for it/);
+  assert.ok(found[0]!.line > 0, 'the finding points at the query\'s line');
+});
+
+test('a breakpoint row no width query uses is reported, naming the width', () => {
+  const spec = { ...SPEC, 'dashboard.md': DASHBOARD.replace(
+    '| \`62rem\` | the roomy padding and numbers |',
+    '| \`62rem\` | the roomy padding and numbers |\n| \`80rem\` | a third column |') };
+  const found = layoutFindings(page(), spec);
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.message, /80rem.*in dashboard\.md › A Narrow Pane and no width query in the page uses it/);
+});
+
+test('a max-width query is reported, because the page is narrow-first', () => {
+  const found = layoutFindings(page({ style: styleWith('@media (max-width: 62rem) { h1 { margin: 0; } }') }));
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.message, /max-width: 62rem.*narrows.*write the narrow value as the base rule and the wide one under min-width/);
+});
+
+test('a range query that narrows is reported like max-width', () => {
+  for (const prelude of ['(width < 62rem)', '(width <= 62rem)']) {
+    const found = layoutFindings(page({ style: styleWith(`@media ${prelude} { h1 { margin: 0; } }`) }));
+    assert.equal(found.length, 1, prelude);
+    assert.match(found[0]!.message, /narrows/, prelude);
+  }
+});
+
+test('a colour-scheme query is not a width query and is not reported', () => {
+  const found = layoutFindings(page({ style: styleWith('@media (prefers-color-scheme: light) { h1 { margin: 0; } }') }));
+  assert.deepEqual(found, []);
+});
+
+test('a specification without the breakpoint table is reported once, and nothing is compared to it', () => {
+  const spec = { ...SPEC, 'dashboard.md': DASHBOARD.slice(0, DASHBOARD.indexOf('## A Narrow Pane')) };
+  const found = layoutFindings(page({ style: styleWith('@media (min-width: 40rem) { h1 { margin: 0; } }') }), spec);
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.message, /dashboard\.md has no table with columns Width and From there up/);
+});
+
+test('the layout check logs the two sets of breakpoints it compared', (t) => {
+  if (LEVELS[resolveLevel(process.env['LOG_LEVEL'])] > LEVELS.INFO) {
+    t.skip('LOG_LEVEL hides INFO');
+    return;
+  }
+  const lines: string[] = [];
+  const write = t.mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
+    lines.push(String(chunk));
+    return true;
+  });
+  try {
+    checkDashboard(page(), SPEC);
+  } finally {
+    write.mock.restore();
+  }
+  const line = lines.find(text => text.startsWith('INFO [dashboard-integrity.layout] breakpoints compared'));
+  assert.ok(line, 'no INFO line from the layout check');
+  const facts = JSON.parse(line.slice(line.indexOf('{'))) as Record<string, unknown>;
+  assert.deepEqual(facts['page'], ['48rem', '62rem']);
+  assert.deepEqual(facts['spec'], ['48rem', '62rem']);
 });

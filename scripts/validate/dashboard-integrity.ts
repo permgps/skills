@@ -261,6 +261,97 @@ export function evaluateLogic(block: string): Record<string, unknown> {
   return logic as Record<string, unknown>;
 }
 
+/** The columns of the breakpoint table under dashboard.md › A Narrow Pane. */
+const BREAKPOINT_COLUMNS = ['Width', 'From there up'];
+
+const NARROW_FIRST = 'write the narrow value as the base rule and the wide one under min-width';
+
+/** One `@media` prelude that names a width, and what it does with it. */
+export interface WidthQuery {
+  prelude: string;
+  /** 1-based, in the page as written. */
+  line: number;
+  /** The widths from which the query applies: `min-width: X`, `width >= X`, `X <= width`. */
+  from: string[];
+  /** True for `max-width`, `width < X`, `X > width` — a rule that takes something away below a width. */
+  narrows: boolean;
+}
+
+/**
+ * Every width query in the page's `<style>` block, read from source with the
+ * comments blanked, so a query quoted in a comment is not a query.
+ *
+ * A colour-scheme query names no width and is not returned.
+ */
+export function widthQueries(code: string): WidthQuery[] {
+  const style = /<style>([\s\S]*?)<\/style>/.exec(code);
+  if (!style) return [];
+  const sheetStart = style.index + '<style>'.length;
+
+  const queries: WidthQuery[] = [];
+  for (const hit of (style[1] ?? '').matchAll(/@media\s+([^{]+)\{/g)) {
+    const prelude = (hit[1] ?? '').trim().replace(/\s+/g, ' ');
+    if (!/\bwidth\b/.test(prelude)) continue;
+
+    const from = [
+      ...prelude.matchAll(/min-width\s*:\s*([^)\s]+)/g),
+      ...prelude.matchAll(/\bwidth\s*>=?\s*([^)\s]+)/g),
+      ...prelude.matchAll(/([^(\s]+)\s*<=?\s*width\b/g),
+    ].map(found => found[1] ?? '');
+    const narrows = /max-width/.test(prelude) || /\bwidth\s*</.test(prelude) || />=?\s*width\b/.test(prelude);
+    const line = code.slice(0, sheetStart + hit.index).split('\n').length;
+    log.debug('layout', 'media query read', { prelude, width: from.join(', ') || null });
+    queries.push({ prelude, line, from, narrows });
+  }
+  return queries;
+}
+
+/**
+ * The page's width queries against the specification's breakpoint table.
+ *
+ * The spec states the breakpoints and the stylesheet applies them, and a fact
+ * written in two places drifts unless something holds the copies together.
+ */
+export function checkLayout(code: string, dashboardSpec: string): Array<{ line: number; message: string }> {
+  const found: Array<{ line: number; message: string }> = [];
+  const queries = widthQueries(code);
+
+  for (const query of queries) {
+    if (query.narrows) {
+      found.push({ line: query.line, message:
+        `@media ${query.prelude} narrows the page — the page is narrow-first, so ${NARROW_FIRST}` });
+    } else if (query.from.length === 0) {
+      found.push({ line: query.line, message:
+        `@media ${query.prelude} names a width the layout check cannot read — ${NARROW_FIRST}` });
+    }
+  }
+
+  const page = [...new Set(queries.flatMap(query => query.from))];
+  const table = findTable(parseTables(dashboardSpec), BREAKPOINT_COLUMNS);
+  if (!table) {
+    found.push({ line: 0, message: `dashboard.md has no table with columns ${BREAKPOINT_COLUMNS.join(' and ')} — `
+      + 'add it under A Narrow Pane, one row per min-width the page uses, saying what changes from there up' });
+    log.info('layout', 'breakpoints compared', { page, spec: null });
+    return found;
+  }
+
+  const spec = table.rows.map(row => cleanCell(row['Width']));
+  for (const width of page.filter(each => !spec.includes(each))) {
+    const query = queries.find(each => each.from.includes(width));
+    found.push({ line: query?.line ?? 0, message:
+      `@media ${query?.prelude ?? width}: ${width} is a breakpoint in the page and `
+      + 'dashboard.md › A Narrow Pane has no row for it — add the row saying what changes from there up, '
+      + 'or fold the rule into an existing breakpoint' });
+  }
+  for (const width of spec.filter(each => !page.includes(each))) {
+    found.push({ line: 0, message:
+      `${width} is a breakpoint in dashboard.md › A Narrow Pane and no width query in the page uses it — `
+      + `remove the row, or write the wide values under @media (min-width: ${width})` });
+  }
+  log.info('layout', 'breakpoints compared', { page, spec });
+  return found;
+}
+
 export interface SpecSources {
   'vocabulary.md': string;
   'phases.md': string;
@@ -419,6 +510,16 @@ export function checkDashboard(html: string, spec: SpecSources): Violation[] {
           `"${name}" is declared in the "${state}" theme block and not in the light one${why}`);
       }
     }
+  }
+
+  // --- the page's widths are the specification's breakpoints ---------------
+  //
+  // The page is narrow-first: it usually lives in a pane beside the chat, so
+  // the dense values are the base rules and a wider screen only adds to them.
+  // A max-width query would make the narrow layout an exception again, and a
+  // min-width the specification does not list is a layout nobody specified.
+  for (const violation of checkLayout(code, spec['dashboard.md'])) {
+    add('layout', violation.line, violation.message);
   }
 
   // --- the copied vocabulary still matches the vocabulary -------------------

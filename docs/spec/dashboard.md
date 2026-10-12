@@ -154,8 +154,8 @@ wrote drawn as pending. Each cell carries the stage label and its own working
 clock, the same clock as the timeline row. A skipped or failed cell shows its
 status label («Пропущен», «Сбой») instead of a clock. A pending cell shows a
 dash. The current stage carries `aria-current="step"` and a heavier weight.
-The strip is eight columns where there is room and four otherwise, and never
-scrolls sideways.
+The strip is eight columns at `62rem` and wider; narrower, as many `6rem`
+columns as fit, so a label never breaks mid-word. It never scrolls sideways.
 
 **The `stages` region stays.** The strip is a summary. The timeline below keeps
 each stage's note, the findings of a failed check, and its own `i`.
@@ -168,7 +168,7 @@ into the band whole, with the same key, `i` and explanation.
 
 Under the band sit four cards, in this order: Требования, Таски, Тесты,
 Рабочее время. They are one row of four at `62rem` and wider, and two by two
-below it. Every card reads fields every contract already carries — no
+below it (*A Narrow Pane*). Every card reads fields every contract already carries — no
 contract change made them.
 
 ### Требования: built, never done
@@ -255,6 +255,57 @@ it, and the card and the estimate stay on one figure.
 Each card's `i` explanation moved with its number: the coverage paragraph
 lives in `gates`, the debt paragraph — including that only variable names are
 kept — in `handover`, in both registers and both languages.
+
+## A Narrow Pane
+
+The page usually lives in a pane beside the chat, 380 to 900 pixels wide. So
+the stylesheet is **narrow-first**: the dense values are the base rules, and a
+wider screen only adds to them. No width query takes something away below a
+width — no `max-width`, no `width <`.
+
+**Breakpoints.** Viewport width at the browser's 16 px root:
+
+| Width | From there up |
+|---|---|
+| `48rem` | the estimate stands beside the band's main column instead of under it |
+| `62rem` | the roomy padding and headline numbers, the strip in eight columns, the four cards in one row |
+
+`npm run dashboard` holds the page's width queries to this table: a
+`min-width` the table does not list, a row no query uses, and any narrowing
+query are each a finding.
+
+**Below `62rem` the page is dense.** The page padding is `.75rem` instead of
+`1.5rem`; the gaps between regions and between cards, and a panel's padding,
+are `.75rem` instead of `1rem`. The headline numbers are smaller: a card's
+figure `1.35rem` instead of `1.7rem`, the condition word `1.15rem` instead
+of `1.35rem`, the estimate `1.1rem` instead of `1.25rem`, the title
+`1.1rem` instead of `1.25rem`. A card is `6rem` tall at least instead of
+`7.5rem`. The strip's cells are as many `6rem` columns as fit, at `.72rem`
+instead of `.78rem`. The cards stay two by two.
+
+**The same regions, in the same order, at every width.** Nothing is hidden,
+folded or reordered, and the page never scrolls sideways.
+
+**One threshold for narrow.** The roadmap item named about 900 pixels; the
+threshold is `62rem` (992 px), because the cards already turn two by two
+there, and a second value 92 px away would leave a band with dense cards and
+roomy padding. **The strip wraps instead of breaking words:** four fixed
+columns at 380 px broke every stage label mid-word, and a `6rem` cell holds
+the longest one, «Спецификация» or "Specification", whole.
+
+| # | Width | Band | Strip | Cards | Padding and numbers |
+|---|---|---|---|---|---|
+| W1 | 380 px (pane floor) | one column, the estimate under the main column | three columns, no label broken | two by two | dense |
+| W2 | 500 px | one column | four columns | two by two | dense |
+| W3 | 767 px | one column | as many `6rem` columns as fit | two by two | dense |
+| W4 | 768 px (`48rem`) | two columns | as many as fit in the main column | two by two | dense |
+| W5 | 900 px (pane ceiling) | two columns | as many as fit | two by two | dense |
+| W6 | 991 px | two columns | as many as fit | two by two | dense |
+| W7 | 992 px (`62rem`) and wider | two columns | eight columns | one row of four | roomy |
+
+In every row both languages and both themes hold. The feed keeps its age
+column at every width: at 380 px an old run's age is a full date and the line
+wraps to two or three lines, which is the fact the line carries.
 
 ## The Reader's Own Two Controls
 

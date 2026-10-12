@@ -25,6 +25,13 @@
     attribute wins in both directions. JavaScript sets the attribute and reads
     nothing back: a theme decided in script would be a second place to look the
     day these colours are changed.
+
+    Narrow-first. The page usually lives in a pane beside the chat, 380 to 900
+    pixels wide, so the dense values are the base rules and one block at the
+    end, @media (min-width: 62rem), restores the roomy ones. Nothing is hidden
+    or reordered at any width. The band's own split at 48rem is a different
+    fact and stays beside #band. docs/spec/dashboard.md › A Narrow Pane lists
+    both breakpoints, and npm run dashboard holds the page to that list.
   */
   :root,
   :root[data-theme="light"] {
@@ -74,23 +81,23 @@
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    padding: 1.5rem;
+    padding: .75rem;
     background: var(--bg);
     color: var(--ink);
     font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  h1 { font-size: 1.25rem; margin: 0 0 .5rem; }
+  h1 { font-size: 1.1rem; margin: 0 0 .5rem; }
   h2 {
     font-size: .72rem; margin: 0 0 .6rem; color: var(--muted);
     font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
   }
   header { margin-bottom: 1rem; }
-  main { display: grid; gap: 1rem; }
+  main { display: grid; gap: .75rem; }
   section {
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 8px;
-    padding: 1rem;
+    padding: .75rem;
   }
   #dials { display: flex; flex-wrap: wrap; gap: .4rem; }
   .chip {
@@ -170,21 +177,22 @@
   .band-failed #band-condition { color: var(--fail); }
   .band-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem 1rem; }
   .band-head h2 { margin: 0; }
-  #band-condition { font-size: 1.35rem; font-weight: 700; }
+  #band-condition { font-size: 1.15rem; font-weight: 700; }
   #band-caption { margin-top: .5rem; font-variant-numeric: tabular-nums; }
   #band-headline { margin: .1rem 0 0; font-size: 1rem; }
   #band-flight { margin-top: .15rem; overflow-wrap: anywhere; }
   /* A range is two numbers and a gap; at the card headline size it wraps mid-phrase. */
-  .band-side .value { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-  /* Eight stages in a row where there is room for eight, four otherwise —
-     never a sideways scroll. The dense narrow layout is a later item. */
+  .band-side .value { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  /* Narrower than 62rem, as many 6rem cells as fit: the longest label,
+     «Спецификация», fits one whole, where four fixed columns at a pane's 380
+     pixels broke every label mid-word. Eight in a row from 62rem. Never a
+     sideways scroll; overflow-wrap stays as the last resort below the pane. */
   .strip {
     list-style: none; margin: .75rem 0 0; padding: 0;
-    display: grid; gap: .35rem; grid-template-columns: repeat(4, minmax(0, 1fr));
+    display: grid; gap: .35rem; grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
   }
-  @media (min-width: 62rem) { .strip { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
   .strip li {
-    min-width: 0; padding: .25rem .45rem; font-size: .78rem;
+    min-width: 0; padding: .25rem .45rem; font-size: .72rem;
     border: 1px solid var(--line); border-radius: 6px;
   }
   .strip .name { display: block; overflow-wrap: anywhere; }
@@ -201,16 +209,14 @@
 
   /* --- the four cards --- */
   #cards {
-    display: grid; gap: 1rem; padding: 0; border: 0; background: none;
+    display: grid; gap: .75rem; padding: 0; border: 0; background: none;
     grid-template-columns: repeat(2, 1fr);
   }
-  /* One row of four on anything wide enough; two by two on a phone. */
-  @media (min-width: 62rem) { #cards { grid-template-columns: repeat(4, 1fr); } }
   .card {
     background: var(--panel); border: 1px solid var(--line);
-    border-radius: 8px; padding: .9rem 1rem; min-height: 7.5rem;
+    border-radius: 8px; padding: .7rem .8rem; min-height: 6rem;
   }
-  .card .value { font-size: 1.7rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .card .value { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   .card .value small { font-size: .95rem; font-weight: 400; color: var(--muted); }
   #tests-failed.fail { color: var(--fail); }
   /* One square per таск, in the chip palette. The colour is never the only
@@ -348,6 +354,22 @@
   }
   .switch button[aria-pressed="true"] { background: var(--ghost); color: var(--ink); }
   [hidden] { display: none !important; }
+
+  /* --- 62rem and wider: the roomy page ---
+     Two by two cards on anything narrower; one row of four here. */
+  @media (min-width: 62rem) {
+    body { padding: 1.5rem; }
+    h1 { font-size: 1.25rem; }
+    main, #cards { gap: 1rem; }
+    section { padding: 1rem; }
+    #band-condition { font-size: 1.35rem; }
+    .band-side .value { font-size: 1.25rem; }
+    .strip { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+    .strip li { font-size: .78rem; }
+    #cards { grid-template-columns: repeat(4, 1fr); }
+    .card { padding: .9rem 1rem; min-height: 7.5rem; }
+    .card .value { font-size: 1.7rem; }
+  }
 </style>
 </head>
 <body>
