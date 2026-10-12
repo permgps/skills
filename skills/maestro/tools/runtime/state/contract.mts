@@ -804,6 +804,17 @@ export interface TaskEntry {
    * once later waves are in the tree.
    */
   commits?: string[];
+  /**
+   * The commits a resume found `HEAD`'s history no longer holds (`sync.mts
+   * --commits-check`), moved here out of `commits`. Moved, so that `commits`
+   * stays exactly the union review reads, and a lost sha is never reviewed or
+   * reported lost twice; kept, so that the таск's own history is not rewritten
+   * either. A sha leaves `commits` only into this list and never leaves it.
+   *
+   * Optional at every version and unseeded: absent means nothing was lost.
+   * Adding it widens no value set, so `CONTRACT_VERSION` did not move for it.
+   */
+  lostCommits?: string[];
 }
 
 export interface RequirementEntry {

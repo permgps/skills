@@ -9,7 +9,10 @@
 // `unavailable` with a reason. Nothing here throws, and no прогон stops on its
 // history.
 //
-// Contract: docs/spec/phases.md, section "Memory".
+// These calls also answer the resume check: whether each commit a таск recorded
+// is still on `HEAD`'s history (`commits-check.mts`).
+//
+// Contract: docs/spec/phases.md, sections "Memory" and "Recovery".
 
 import { execFile } from 'node:child_process';
 
@@ -90,6 +93,9 @@ export interface CommitsSince {
   /** Why the history could not be read; only on `unavailable`. */
   reason?: string;
 }
+
+/** What a commit name looks like: abbreviated or whole, SHA-1 or SHA-256. */
+export const SHA_PATTERN = /^[0-9a-f]{7,64}$/;
 
 const RECORD = '\x1e';
 const FIELD = '\x1f';
@@ -177,6 +183,100 @@ export async function headCommit(projectRoot: string, gitBinary = 'git'): Promis
   const outcome = await runGit(projectRoot, ['rev-parse', '--verify', 'HEAD'], gitBinary);
   if ('unavailable' in outcome) return { unavailable: outcome.unavailable };
   const sha = outcome.stdout.trim();
-  if (!/^[0-9a-f]{7,64}$/.test(sha)) return { unavailable: 'git rev-parse HEAD named no commit' };
+  if (!SHA_PATTERN.test(sha)) return { unavailable: 'git rev-parse HEAD named no commit' };
   return { sha };
+}
+
+// --- a recorded commit, classified against HEAD on resume ----------------------
+
+/**
+ * Where one recorded commit stands. `not-ancestor`: the object exists and
+ * `HEAD`'s history does not contain it. `missing`: git cannot name it, or the
+ * entry is not a sha at all. `unavailable`: git did not answer, so nothing may
+ * be concluded from it.
+ */
+export type Ancestry =
+  | { state: 'ancestor' }
+  | { state: 'not-ancestor' }
+  | { state: 'missing' }
+  | { state: 'unavailable'; reason: string };
+
+const short = (sha: string): string => sha.slice(0, 12);
+
+/** Classify one recorded commit against `HEAD`. Never throws. */
+export async function ancestry(projectRoot: string, sha: string, gitBinary = 'git'): Promise<Ancestry> {
+  const classified = (state: Ancestry): Ancestry => {
+    log.debug('ancestry', 'recorded commit classified', { sha: short(sha), state: state.state });
+    return state;
+  };
+  // Checked before any git call, so an entry like `--all` never reaches git as an option.
+  if (!SHA_PATTERN.test(sha)) return classified({ state: 'missing' });
+  const exists = await runGit(projectRoot, ['cat-file', '-e', `${sha}^{commit}`], gitBinary);
+  if ('unavailable' in exists) {
+    if (exists.exit === 128 || exists.exit === 1) return classified({ state: 'missing' });
+    return classified({ state: 'unavailable', reason: exists.unavailable });
+  }
+  // commitsSince folds exit 1 into "not usable" because it only picks a basis.
+  // Here "not an ancestor" resets a таск, and "git did not answer" must never
+  // do that, so exit 1 is the only failure read as an answer.
+  const ancestor = await runGit(projectRoot, ['merge-base', '--is-ancestor', sha, 'HEAD'], gitBinary);
+  if (!('unavailable' in ancestor)) return classified({ state: 'ancestor' });
+  if (ancestor.exit === 1) return classified({ state: 'not-ancestor' });
+  return classified({ state: 'unavailable', reason: ancestor.unavailable });
+}
+
+/**
+ * The local branches whose history holds `sha`, sorted. Called only for a
+ * `not-ancestor` commit, so the branch `HEAD` is on never appears.
+ */
+export async function branchesContaining(projectRoot: string, sha: string, gitBinary = 'git'): Promise<{ branches: string[] } | { unavailable: string }> {
+  if (!SHA_PATTERN.test(sha)) return { branches: [] };
+  const outcome = await runGit(projectRoot, ['for-each-ref', `--contains=${sha}`, '--format=%(refname:short)', 'refs/heads'], gitBinary);
+  if ('unavailable' in outcome) return { unavailable: outcome.unavailable };
+  const branches = outcome.stdout.split('\n').filter(line => line !== '').sort();
+  // The names are the user's, so only their count is logged.
+  log.debug('branches', 'containing branches counted', { sha: short(sha), count: branches.length });
+  return { branches };
+}
+
+/**
+ * The commit on `HEAD`'s history a rebase most likely rewrote `sha` into: the
+ * newest whose subject equals `sha`'s exactly, whose `Maestro-Run:` trailer is
+ * exactly `dir`, and which no таск records (`excluded`, whole or abbreviated).
+ * A hint for the relaunched executor, never a substitute for the relaunch. Null
+ * when `sha`'s object is gone (there is no subject to match) or git cannot say.
+ */
+export async function findRewrittenCommit(
+  projectRoot: string,
+  lost: { sha: string; dir: string; excluded: ReadonlySet<string> },
+  gitBinary = 'git',
+): Promise<{ sha: string } | null> {
+  if (!SHA_PATTERN.test(lost.sha)) return null;
+  const subjectOutcome = await runGit(projectRoot, ['log', '-1', '--format=%s', lost.sha, '--'], gitBinary);
+  if ('unavailable' in subjectOutcome) {
+    log.debug('rewritten', 'twin searched', { sha: short(lost.sha), found: false, candidates: 0 });
+    return null;
+  }
+  const subject = subjectOutcome.stdout.replace(/\n$/, '');
+  const outcome = await runGit(projectRoot, [
+    'log', `--format=${RECORD}%H${FIELD}%s${FIELD}%(trailers:key=Maestro-Run,valueonly,separator=%x2C)`, 'HEAD', '--',
+  ], gitBinary);
+  if ('unavailable' in outcome) {
+    log.debug('rewritten', 'twin searched', { sha: short(lost.sha), found: false, candidates: 0 });
+    return null;
+  }
+  const recorded = [...lost.excluded];
+  const isRecorded = (candidate: string): boolean => recorded.some(entry => entry !== '' && candidate.startsWith(entry));
+  let candidates = 0;
+  let match: string | undefined;
+  for (const record of outcome.stdout.split(RECORD)) {
+    const fields = record.replace(/\n+$/, '').split(FIELD);
+    if (fields.length < 3 || fields[1] !== subject) continue;
+    candidates += 1;
+    if (fields[2]!.trim() !== lost.dir || isRecorded(fields[0]!)) continue;
+    match = fields[0]!;
+    break;
+  }
+  log.debug('rewritten', 'twin searched', { sha: short(lost.sha), found: match !== undefined, candidates });
+  return match !== undefined ? { sha: match } : null;
 }

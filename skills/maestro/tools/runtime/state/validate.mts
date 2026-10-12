@@ -786,6 +786,21 @@ export function validateState(value: unknown): StateViolation[] {
         }
       }
 
+      // A sha in both lists would be reviewed as the таск's work and declared
+      // lost at once; a resume moves it, so the overlap is a half-done move.
+      const lostCommits = entry['lostCommits'];
+      if (lostCommits !== undefined && requireArray(`${at}.lostCommits`, lostCommits)) {
+        const recorded = new Set(Array.isArray(commits) ? commits : []);
+        const seen = new Set<unknown>();
+        (lostCommits as unknown[]).forEach((sha, position) => {
+          const where = `${at}.lostCommits[${position}]`;
+          if (typeof sha !== 'string' || sha === '') add(where, 'lost commit must be a non-empty string');
+          else if (recorded.has(sha)) add(where, `commit ${sha} is both recorded and lost; remove it from commits`);
+          else if (seen.has(sha)) add(where, `commit ${sha} is declared lost twice; keep one entry`);
+          seen.add(sha);
+        });
+      }
+
       if (atLeastV2) {
         // The wave is a layer, and a layer starts at one. A таск carrying zero
         // is a таск the plan phase never placed.

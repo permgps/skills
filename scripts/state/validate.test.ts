@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { validateState, isValidState, type StateViolation } from './validate.ts';
 import { CONTRACT_VERSION, type RunState, type VerificationRecordV3 } from './contract.ts';
-import { activeContract10State, activeContract7State, activeContract8State, activeContract9State, contract10State, contract6State, contract7State, contract8State, contract9State, sourceVerifiedState } from './fixtures/verification.ts';
+import { activeContract10State, activeContract7State, activeContract8State, activeContract9State, asContract10, contract10State, contract6State, contract7State, contract8State, contract9State, repairContract6State, sourceVerifiedState, v3Attempt } from './fixtures/verification.ts';
 import { validateStateTransition } from './closure.ts';
 import { prepareLegacyResume } from './projection.ts';
 
@@ -1369,4 +1369,158 @@ test('leftovers below contract 7 are refused, because their keys name contract-7
   const violations = validateState(withLeftovers([leftover()], contract6State()));
   assert.deepEqual(fields(violations), ['leftovers']);
   assert.match(violations[0]!.message, /arrives with contract 7/);
+});
+
+// --- lostCommits: what a resume found HEAD no longer holds ---------------------
+
+test('lostCommits is optional at every contract', () => {
+  assert.deepEqual(validateState(baseline()), []);
+  assert.deepEqual(validateState(activeContract10State()), []);
+  const state = activeContract10State();
+  state.tasks[0] = { ...state.tasks[0]!, lostCommits: ['0ld0001'] };
+  assert.deepEqual(validateState(state), []);
+});
+
+test('a lost commit that is not a non-empty string is reported by its own index', () => {
+  const violations = validateState(withPatch({
+    tasks: [{ ...baseline().tasks[0], lostCommits: ['a1b2c3d', 7, ''] }],
+  }));
+  assert.deepEqual(fields(violations), ['tasks[0].lostCommits[1]', 'tasks[0].lostCommits[2]']);
+  assert.deepEqual(fields(validateState(withPatch({
+    tasks: [{ ...baseline().tasks[0], lostCommits: 'a1b2c3d' }],
+  }))), ['tasks[0].lostCommits']);
+});
+
+test('a sha both recorded and declared lost is refused, and the message says to take it out of commits', () => {
+  const violations = validateState(withPatch({
+    tasks: [{ ...baseline().tasks[0], commits: ['a1b2c3d'], lostCommits: ['a1b2c3d'] }],
+  }));
+  assert.deepEqual(fields(violations), ['tasks[0].lostCommits[0]']);
+  assert.match(violations[0]!.message, /remove it from commits/);
+});
+
+test('a sha declared lost twice is refused', () => {
+  const violations = validateState(withPatch({
+    tasks: [{ ...baseline().tasks[0], lostCommits: ['a1b2c3d', 'a1b2c3d'] }],
+  }));
+  assert.deepEqual(fields(violations), ['tasks[0].lostCommits[1]']);
+});
+
+/** An active contract-10 run with a second таск, so a reset can name a dependent. */
+function resumed(first: Partial<RunState['tasks'][number]>, second: Partial<RunState['tasks'][number]> = {}): RunState {
+  const state = activeContract10State();
+  state.tasks[0] = { ...state.tasks[0]!, ...first };
+  state.tasks.push({
+    ...state.tasks[0]!, id: '02', title: 'Footer', status: 'queued', blockedBy: ['01'], commits: [], files: [],
+    retries: 0, repairs: 0, handoffs: 0, ...second,
+  });
+  for (const task of state.tasks) if (task.status === 'queued') { delete task.startedAt; delete task.finishedAt; delete task.tests; }
+  return state;
+}
+
+/** What a reset writes for one таск: the lost shas moved, the timing and files cleared, the counters kept. */
+function reset(task: RunState['tasks'][number], lost: string[], status: RunState['tasks'][number]['status'] = 'queued'): void {
+  task.commits = (task.commits ?? []).filter(sha => !lost.includes(sha));
+  task.lostCommits = [...(task.lostCommits ?? []), ...lost];
+  if (status === 'queued') {
+    task.status = 'queued';
+    task.files = [];
+    delete task.startedAt; delete task.finishedAt; delete task.tests;
+  }
+}
+
+const transition = (prior: RunState, next: RunState): string[] =>
+  [...validateState(next), ...validateStateTransition(prior, next)].map(item => item.message);
+
+test('a done таск whose commit was lost goes back to queued with the sha moved', () => {
+  const prior = resumed({ status: 'done', commits: ['abcdef0'], finishedAt: '2026-09-29T09:12:00Z' });
+  const next = structuredClone(prior);
+  reset(next.tasks[0]!, ['abcdef0']);
+  assert.deepEqual(transition(prior, next), []);
+});
+
+test('a таск in review whose commit was lost goes back to queued with the sha moved', () => {
+  const prior = resumed({ status: 'review', commits: ['abcdef0'] });
+  const next = structuredClone(prior);
+  reset(next.tasks[0]!, ['abcdef0']);
+  assert.deepEqual(transition(prior, next), []);
+});
+
+test('a таск in repair whose repair commit was lost goes back to queued and keeps its counters', () => {
+  const prior = asContract10(repairContract6State());
+  const next = structuredClone(prior);
+  reset(next.tasks[0]!, ['fedcba1']);
+  assert.equal(next.tasks[0]!.repairs, 1);
+  assert.deepEqual(transition(prior, next), []);
+});
+
+test('a running таск whose own repair commit was lost goes back to queued', () => {
+  const prior = resumed({ status: 'running', commits: ['abcdef0', 'fedcba1'], startedAt: '2026-09-29T09:11:00Z', repairs: 1 });
+  delete prior.tasks[0]!.finishedAt;
+  const next = structuredClone(prior);
+  reset(next.tasks[0]!, ['fedcba1']);
+  assert.deepEqual(transition(prior, next), []);
+});
+
+test('a failed таск whose commit was lost stays failed, with the sha moved', () => {
+  const prior = resumed({ status: 'failed', commits: ['abcdef0'], retries: 2 });
+  const next = structuredClone(prior);
+  reset(next.tasks[0]!, ['abcdef0'], 'failed');
+  assert.deepEqual(transition(prior, next), []);
+});
+
+test('a queued таск that lost an earlier commit moves it and stays queued', () => {
+  const prior = resumed({ status: 'queued', commits: ['abcdef0', 'fedcba1'], lostCommits: ['0ld0001'] });
+  const next = structuredClone(prior);
+  reset(next.tasks[0]!, ['fedcba1']);
+  assert.deepEqual(next.tasks[0]!.lostCommits, ['0ld0001', 'fedcba1']);
+  assert.deepEqual(transition(prior, next), []);
+});
+
+test('a running dependent of a reset таск goes back to queued with its own commits intact', () => {
+  const prior = resumed({ status: 'done', commits: ['abcdef0'] },
+    { status: 'running', commits: ['0b0b0b0'], startedAt: '2026-09-29T09:15:00Z' });
+  const next = structuredClone(prior);
+  reset(next.tasks[0]!, ['abcdef0']);
+  next.tasks[1]!.status = 'queued';
+  delete next.tasks[1]!.startedAt;
+  assert.deepEqual(next.tasks[1]!.commits, ['0b0b0b0']);
+  assert.deepEqual(transition(prior, next), []);
+});
+
+test('a recorded commit dropped without being moved is refused, and the message says to move it', () => {
+  const prior = resumed({ status: 'done', commits: ['abcdef0'] });
+  const next = structuredClone(prior);
+  reset(next.tasks[0]!, ['abcdef0']);
+  next.tasks[0]!.lostCommits = [];
+  const messages = transition(prior, next);
+  assert.ok(messages.some(message => /abcdef0 left commits.*move it to lostCommits; never drop it/.test(message)), messages.join('\n'));
+});
+
+test('a sha that leaves lostCommits is refused', () => {
+  const prior = resumed({ status: 'queued', commits: [], lostCommits: ['0ld0001'] });
+  const next = structuredClone(prior);
+  next.tasks[0]!.lostCommits = [];
+  assert.ok(transition(prior, next).some(message => /0ld0001 left lostCommits/.test(message)));
+  next.tasks[0]!.commits = ['0ld0001'];
+  assert.ok(transition(prior, next).some(message => /0ld0001 left lostCommits/.test(message)));
+});
+
+test('a finished таск sent back to queued without a lost commit is refused', () => {
+  for (const status of ['done', 'review', 'repair'] as const) {
+    const prior = resumed({ status, commits: ['abcdef0'] });
+    const next = structuredClone(prior);
+    next.tasks[0]!.status = 'queued';
+    delete next.tasks[0]!.finishedAt; delete next.tasks[0]!.startedAt; delete next.tasks[0]!.tests;
+    assert.ok(transition(prior, next).some(message => /only a lost commit sends a .* таск back to queued/.test(message)), status);
+  }
+});
+
+test('a repair attempt whose commit is now in lostCommits only is still accepted', () => {
+  const state = asContract10(repairContract6State());
+  const record = state.verification!;
+  record.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T10:00:00Z', { outcome: 'still_failing', commit: 'fedcba1' })];
+  assert.deepEqual(validateState(state), []);
+  reset(state.tasks[0]!, ['fedcba1']);
+  assert.deepEqual(validateState(state), []);
 });

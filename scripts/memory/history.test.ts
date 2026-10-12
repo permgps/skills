@@ -12,7 +12,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { commitsSince, headCommit } from '../../skills/maestro/tools/runtime/history.mts';
+import { ancestry, branchesContaining, commitsSince, findRewrittenCommit, headCommit } from '../../skills/maestro/tools/runtime/history.mts';
 import { CHANGED_PATHS_MAX, readPriorMemory, renderPrior, type PriorMemory } from './markers.ts';
 
 const hasGit = spawnSync('git', ['--version']).status === 0;
@@ -311,4 +311,104 @@ test('two closing commits of the same run directory: the newest is the basis', n
   assert.equal(prior.commits?.basis, 'closing-commit');
   assert.equal(prior.commits?.range, `${newest}..HEAD`);
   assert.deepEqual(prior.commits?.commits.map(commit => commit.sha), [after]);
+}));
+
+// --- a recorded commit, classified against HEAD on resume ---------------------
+
+/** A таск commit as Разработка makes it: `<id> <title>`, then the two trailers. */
+function taskCommit(repo: Repo, file: string, subject: string, run: string, date: string): string {
+  writeFileSync(path.join(repo.root, file), `${subject}\n`);
+  repo.git(['add', '-A']);
+  repo.git(['commit', '-q', '-m', subject, '-m', `Maestro-Run: ${run}\nRequirements: R01`], date);
+  return repo.git(['rev-parse', 'HEAD']).trim();
+}
+
+const RUN = '2026-10-12-shop';
+
+test('a recorded commit on HEAD\'s history is an ancestor', needsGit, () => withRepo(async repo => {
+  const sha = repo.commit({ 'a.txt': 'a\n' }, 'first');
+  repo.commit({ 'b.txt': 'b\n' }, 'second');
+  assert.deepEqual(await ancestry(repo.root, sha), { state: 'ancestor' });
+}));
+
+test('a recorded commit left behind by a hard reset is not an ancestor, while its object still exists', needsGit, () => withRepo(async repo => {
+  const base = repo.commit({ 'a.txt': 'a\n' }, 'first');
+  const lost = repo.commit({ 'b.txt': 'b\n' }, 'second');
+  repo.git(['reset', '-q', '--hard', base]);
+  assert.deepEqual(await ancestry(repo.root, lost), { state: 'not-ancestor' });
+}));
+
+test('a well-formed sha that never existed is missing, not unavailable', needsGit, () => withRepo(async repo => {
+  repo.commit({ 'a.txt': 'a\n' }, 'first');
+  assert.deepEqual(await ancestry(repo.root, 'f'.repeat(40)), { state: 'missing' });
+}));
+
+test('an entry that is not a hex sha is missing and never reaches git as an option', async () => {
+  // A binary that does not exist: had any of these been spawned, the answer would be `unavailable`.
+  for (const entry of ['--all', '', 'xyz']) {
+    assert.deepEqual(await ancestry(tmpdir(), entry, 'git-that-must-not-be-spawned'), { state: 'missing' }, entry);
+  }
+});
+
+test('a git that cannot be started makes the classification unavailable, with its reason', async () => {
+  const outcome = await ancestry(tmpdir(), 'a'.repeat(40), path.join(tmpdir(), 'no-such-git-binary'));
+  assert.deepEqual(outcome, { state: 'unavailable', reason: 'git could not be started: ENOENT' });
+});
+
+test('an unborn HEAD makes the classification unavailable, never not-ancestor', needsGit, () => withRepo(async repo => {
+  const sha = repo.commit({ 'a.txt': 'a\n' }, 'first');
+  repo.git(['checkout', '-q', '--orphan', 'empty']);
+  const outcome = await ancestry(repo.root, sha);
+  assert.equal(outcome.state, 'unavailable');
+}));
+
+test('the local branch a checkout left a commit on is named; after a reset none is', needsGit, () => withRepo(async repo => {
+  const base = repo.commit({ 'a.txt': 'a\n' }, 'first');
+  const branch = repo.git(['symbolic-ref', '--short', 'HEAD']).trim();
+  const ahead = repo.commit({ 'b.txt': 'b\n' }, 'second');
+  repo.git(['checkout', '-q', '-b', 'other', base]);
+  assert.deepEqual(await branchesContaining(repo.root, ahead), { branches: [branch] });
+  repo.git(['checkout', '-q', branch]);
+  repo.git(['reset', '-q', '--hard', base]);
+  assert.deepEqual(await branchesContaining(repo.root, ahead), { branches: [] });
+}));
+
+test('after a rebase the rewritten twin of a таск commit is found by its subject and its run trailer', needsGit, () => withRepo(async repo => {
+  const root = repo.commit({ 'a.txt': 'a\n' }, 'base', '2026-10-01T09:00:00Z');
+  const lost = taskCommit(repo, 'cart.ts', '01 Cart', RUN, '2026-10-01T10:00:00Z');
+  rewriteFromRoot(repo, root);
+  assert.equal(isAncestor(repo, lost), false, 'the rewrite must leave the recorded commit off HEAD');
+  const twin = repo.git(['rev-parse', 'HEAD']).trim();
+  assert.deepEqual(await findRewrittenCommit(repo.root, { sha: lost, dir: RUN, excluded: new Set([lost]) }), { sha: twin });
+}));
+
+test('a commit with the same subject but another run\'s trailer is not the twin', needsGit, () => withRepo(async repo => {
+  const root = repo.commit({ 'a.txt': 'a\n' }, 'base', '2026-10-01T09:00:00Z');
+  const lost = taskCommit(repo, 'cart.ts', '01 Cart', RUN, '2026-10-01T10:00:00Z');
+  repo.git(['reset', '-q', '--hard', root]);
+  taskCommit(repo, 'cart.ts', '01 Cart', '2026-09-01-other', '2026-10-02T10:00:00Z');
+  assert.equal(await findRewrittenCommit(repo.root, { sha: lost, dir: RUN, excluded: new Set([lost]) }), null);
+}));
+
+test('a candidate some таск already records is not the twin', needsGit, () => withRepo(async repo => {
+  const root = repo.commit({ 'a.txt': 'a\n' }, 'base', '2026-10-01T09:00:00Z');
+  const lost = taskCommit(repo, 'cart.ts', '01 Cart', RUN, '2026-10-01T10:00:00Z');
+  rewriteFromRoot(repo, root);
+  const twin = repo.git(['rev-parse', 'HEAD']).trim();
+  assert.equal(await findRewrittenCommit(repo.root, { sha: lost, dir: RUN, excluded: new Set([lost, twin]) }), null);
+}));
+
+test('of two commits that match, the newest is the twin', needsGit, () => withRepo(async repo => {
+  const root = repo.commit({ 'a.txt': 'a\n' }, 'base', '2026-10-01T09:00:00Z');
+  const lost = taskCommit(repo, 'cart.ts', '01 Cart', RUN, '2026-10-01T10:00:00Z');
+  repo.git(['reset', '-q', '--hard', root]);
+  taskCommit(repo, 'cart.ts', '01 Cart', RUN, '2026-10-02T10:00:00Z');
+  const newest = taskCommit(repo, 'cart-again.ts', '01 Cart', RUN, '2026-10-03T10:00:00Z');
+  assert.deepEqual(await findRewrittenCommit(repo.root, { sha: lost, dir: RUN, excluded: new Set([lost]) }), { sha: newest });
+}));
+
+test('a lost commit whose object is gone has no subject to match, so no twin is named', needsGit, () => withRepo(async repo => {
+  repo.commit({ 'a.txt': 'a\n' }, 'base', '2026-10-01T09:00:00Z');
+  taskCommit(repo, 'cart.ts', '01 Cart', RUN, '2026-10-01T10:00:00Z');
+  assert.equal(await findRewrittenCommit(repo.root, { sha: 'f'.repeat(40), dir: RUN, excluded: new Set() }), null);
 }));

@@ -442,7 +442,10 @@ export function validateClosureRecord(state: RunState): VerificationViolation[] 
       fail('repeat', 'repeatKind is first exactly when the attempt has no predecessor');
     }
     if (attempt.outcome === 'defect_verified' && !attempt.commit) fail('commit', 'a verified repair names the commit that made it');
-    if (attempt.commit && !tasks.get(attempt.taskId)?.commits?.includes(attempt.commit)) {
+    // A repair commit a resume later found lost moved to lostCommits; it was
+    // still the commit the attempt made.
+    const landed = tasks.get(attempt.taskId);
+    if (attempt.commit && ![...(landed?.commits ?? []), ...(landed?.lostCommits ?? [])].includes(attempt.commit)) {
       fail('commit', `repair commit ${attempt.commit} is missing from task ${attempt.taskId} commits; review would not see it`);
     }
     if (attempt.outcome === 'prerequisite_blocked' && attempt.blockingPrerequisites.length === 0) {
@@ -529,7 +532,6 @@ const open = (id: string, tasks: Map<string, TaskEntry>, defects: Map<string, De
 export function validateClosureTransition(previous: RunState, next: RunState): VerificationViolation[] {
   const current = next.verification;
   const prior = previous.verification;
-  if (next.contractVersion < 6 || !current || current.version !== 3 || !prior || prior.version === 1) return [];
   const errors: VerificationViolation[] = [];
   const add = (field: string, message: string, context: Record<string, unknown> = {}): void => {
     errors.push({ field, message });
@@ -537,6 +539,38 @@ export function validateClosureTransition(previous: RunState, next: RunState): V
   };
   const tasks = new Map(next.tasks.map(task => [task.id, task]));
   const before = new Map(previous.tasks.map(task => [task.id, task]));
+
+  // --- a recorded commit is moved, never dropped ----------------------------------
+  // Checked ahead of the verification guard: a commit list exists from contract
+  // 3, and a resume can lose a commit whatever record the run keeps. Moving is
+  // the only way out of `commits`, so review never reads a sha HEAD lost and the
+  // таск's history is not rewritten either; a lost commit is the only thing that
+  // sends a finished таск back to `queued`.
+  for (const task of next.tasks) {
+    const earlier = before.get(task.id);
+    if (!earlier) continue;
+    const field = `tasks[${task.id}]`;
+    const recorded = new Set(task.commits ?? []);
+    const lost = new Set(task.lostCommits ?? []);
+    for (const sha of earlier.commits ?? []) {
+      if (recorded.has(sha) || lost.has(sha)) continue;
+      add(`${field}.commits`, `commit ${sha} left commits of task ${task.id} without being declared lost; `
+        + 'move it to lostCommits; never drop it', { taskId: task.id, rule: 'commit-dropped', sha: sha.slice(0, 12) });
+    }
+    for (const sha of earlier.lostCommits ?? []) {
+      if (lost.has(sha)) continue;
+      add(`${field}.lostCommits`, `commit ${sha} left lostCommits of task ${task.id}; a lost commit stays lost — `
+        + 'land the relaunched work in a new commit', { taskId: task.id, rule: 'lost-commit-left', sha: sha.slice(0, 12) });
+    }
+    const moved = [...lost].filter(sha => !(earlier.lostCommits ?? []).includes(sha)).length;
+    if (moved > 0) log.info('closure-transition', 'commits moved to lostCommits', { taskId: task.id, moved });
+    if (task.status === 'queued' && ['review', 'done', 'repair'].includes(earlier.status) && moved === 0) {
+      add(`${field}.status`, `task ${task.id} went from ${earlier.status} to queued with no newly lost commit; `
+        + `only a lost commit sends a ${earlier.status} таск back to queued`, { taskId: task.id, rule: 'requeue', from: earlier.status });
+    }
+  }
+
+  if (next.contractVersion < 6 || !current || current.version !== 3 || !prior || prior.version === 1) return errors;
   const defects = new Map(current.defects.map(defect => [defect.id, defect]));
 
   // --- carried history -------------------------------------------------------------
