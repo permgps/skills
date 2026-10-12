@@ -35,14 +35,14 @@ a real прогон — see [Limitations](#limitations) and
 - [Installation](#installation)
 - [Starting A Run](#starting-a-run)
 - [Dials](#dials) — register, language, mode, depth, models
-- [What A Run Does](#what-a-run-does) — the stages, repair, memory
+- [What A Run Does](#what-a-run-does) — the stages, review, repair
 - [When It Asks You](#when-it-asks-you) — every stop, and what you can answer
 - [Talking To A Run In Progress](#talking-to-a-run-in-progress)
 - [Four Gates](#four-gates)
 - [Six Rules Nothing Turns Off](#six-rules-nothing-turns-off)
 - [What A Run Leaves In Your Project](#what-a-run-leaves-in-your-project)
 - [Between Runs](#between-runs) — closing, memory, the next run, resuming, fixing by hand
-- [The Dashboard](#the-dashboard)
+- [The Dashboard](#the-dashboard) — what each region shows, and where it is described
 - [Scout](#scout)
 - [Hosts](#hosts)
 - [The Language It Speaks](#the-language-it-speaks)
@@ -67,9 +67,11 @@ Then, in Claude Code, inside that project:
 
 What happens next:
 
-1. **The first run in a project asks two things** — how it should explain
-   things (*по-простому* or *обычный*), then which mode to start in — and
-   writes the answers to `.maestro/config.json`. It never asks them again.
+1. **The first run in a project asks how to work** — how it should explain
+   things (*по-простому* or *обычный*), then which mode to start in, then which
+   models build what — and writes the answers to `.maestro/config.json`. It
+   never asks them again; only a new host, or a pinned model no longer
+   offered, brings the models question back.
 2. **The dashboard opens** in your browser (or in your host's pane) and stays
    current for the whole run.
 3. **Your words come back numbered** as `R01`, `R02`… Correct anything that was
@@ -80,9 +82,13 @@ What happens next:
 5. From there it specifies, plans, builds, reviews and checks — stopping only
    where a decision is yours. At the end you get `report.md` and a block of
    questions to forward.
+6. **It closes with one commit and `.maestro/PROGRESS.md`** — what is settled,
+   not done and known broken. The next run reads it first and offers you the
+   open items once. See [Between Runs](#between-runs).
 
 If the session is interrupted, open a new one in the same project and say
-«продолжай». The run picks up from where its state says it stopped.
+«продолжай». The run picks up from where its state says it stopped, after
+checking that its commits are still there.
 
 ## Requirements
 
@@ -1043,7 +1049,7 @@ The parity and completion runs need tools `check` does not; see
 | Page | What it covers |
 |---|---|
 | [`docs/install.md`](docs/install.md) | every install form, the runtime layout, the first-run questions, Codex and Gemini, the git guard, checking the repository |
-| [`docs/dashboard.md`](docs/dashboard.md) | every region of the page, the switches, the opener, recovery, and what is checked |
+| [`docs/dashboard.md`](docs/dashboard.md) | every region of the page, the switches, what each number means, the silent page, the opener, recovery, and what is checked |
 | [`docs/parity-verification.md`](docs/parity-verification.md) | verification commands, the parity matrix, and execution limits |
 | [`docs/spec/README.md`](docs/spec/README.md) | reading order for the specification, and how to run the checks |
 | [`docs/spec/vocabulary.md`](docs/spec/vocabulary.md) | every term, its one name, and the on-screen labels in both languages |

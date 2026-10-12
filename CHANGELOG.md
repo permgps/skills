@@ -12,6 +12,21 @@ a finished отчёт with all four gates passed, but one of the four modes has 
 been run at all and two findings about concurrent orchestrators stand open. A
 number that claimed more than that would be claiming it falsely.
 
+## Unreleased
+
+- **The README catches up with v0.0.14.** It names the version that ships,
+  the update check as Maestro's one network call, memory after every
+  closure, the review's five risk categories and its standards pass, every
+  judge on the `strong` tier, G3's `Model` and `References` rows, the
+  отчёт's `Models:` line, three stops the table lacked, and the runtime
+  files `.maestro/` holds. A new *Between Runs* section gathers the closing
+  commit, `PROGRESS.md`, project memory, the glossary, the next run's
+  leftovers, the resume commit check, fixing by hand and reopening; *The
+  Dashboard* becomes a map into `docs/dashboard.md`; *Under The Hood* links
+  the contract history instead of stopping at contract 8. The README check
+  in `npm run test` now also holds the Contents list against the sections
+  and the `Status:` line against `package.json`'s version.
+
 ## v0.0.14-alpha — 2026-10-12
 
 The work between прогоны, and a dashboard that says what is happening.
