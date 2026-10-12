@@ -276,6 +276,19 @@ finished run measures ages from now, so it honestly says the run was yesterday.
 
 ![The dashboard after acceptance](assets/dashboard-finished.png)
 
+Once a run is closed, the page answers what it left behind before anything
+else. Under the condition word the run's own sentence says what now exists —
+written at closure, from contract 10, in the run's language — in the band's
+colour: green under «Завершён», red under «Сбой», so a finished-looking line
+never sits under a failed word. Under it, «Отчёт: `.maestro/<dir>/report.md`»
+names where the отчёт is: the page composes that one path for you to open and
+never opens it itself, and at the moment of closure the file may appear a
+moment after the line. «Ваш ход» moves up to just under the header, because
+after closure it is the whole next step; a reopened run puts it back under the
+cards. The captures come from contract-2 fixtures, which carry neither the
+sentence nor a `dir`, so they show the moved «Ваш ход» but no result or
+отчёт line.
+
 After `finishedAt` the page stays a readable record with every clock stopped,
 and each stage shows its own duration rather than the run's. A frozen clock with
 no explanation is the one failure mode the header notice exists to prevent: an
@@ -500,6 +513,8 @@ time, each stage, each таск, the median and the estimate — leaves out the 
 the run spent waiting for your reply, so the clocks stand still while it waits
 and pick up when you answer. The calendar time is shown beside the working time
 whenever they differ. A run on an older contract keeps the old arithmetic.
+Contract 10, the current one, adds no arithmetic: it adds the closing sentence
+under the condition word (see [A finished run](#a-finished-run)).
 
 The raised line also names the run's claim — «Метка прогона: k7f2 с 2026-08-19 21:27» —
 the same token a second chat quotes when it finds the run already claimed. The

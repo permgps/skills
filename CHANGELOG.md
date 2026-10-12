@@ -14,7 +14,23 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
-`CONTRACT_VERSION` moves to `9`.
+`CONTRACT_VERSION` moves to `10`.
+
+- **BREAKING: a closed contract-10 state requires `result`.** One line of at
+  most 200 characters, in the прогон's language, saying what now exists;
+  acceptance writes it in the closing candidate. An active state must not carry
+  it — a reopened run drops it with `outcome` and `finishedAt` — and it is
+  refused below contract 10, so a contract-9 run keeps closing without it.
+  `result` is the fifth field written in the прогон's language, and
+  `sync.mts` holds it for `ru` like the other four. Publication accepts
+  contracts 4 through 10.
+- **A finished run reads as a report.** Once closed, the header shows the
+  прогон's sentence under the condition word in the band's colour and names
+  the отчёт as «Отчёт: `.maestro/<dir>/report.md`» — the one path the page
+  composes, for display, never fetched. «Ваш ход» moves in the DOM to just
+  under the header, and back under the cards if the run is reopened.
+
+Earlier in this release `CONTRACT_VERSION` moved to `9`.
 
 - **BREAKING: contract 9 keeps the time a прогон waited for you.** `waits` is
   a new optional list of closed waits, `{ since, until }`, kept by

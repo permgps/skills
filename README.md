@@ -673,7 +673,12 @@ What else is on it:
   says what it is waiting for instead — a reply, approval of the specification
   or the plan, permission for an irreversible action — and the browser tab
   reads «● Ждём вас». From contract 9 the clocks stop while it waits: time spent
-  waiting for you is not counted as working time.
+  waiting for you is not counted as working time. Contract 10, the current one,
+  adds the closing sentence below.
+- **A finished run reads as a report.** Under «Завершён» or «Сбой» the run's
+  own sentence says what now exists, in the band's colour, and the path of the
+  отчёт is named for you to open; «Ваш ход» moves up to just under the header.
+  See [A finished run](docs/dashboard.md#a-finished-run).
 - **Two switches in the header** — theme (light, dark, auto) and language (ru,
   en, auto) — remembered by your browser only. See
   [the two switches](docs/dashboard.md#the-two-switches-in-the-header).
