@@ -15,7 +15,10 @@ project that was built, not with Maestro.
 │   ├── spec.md
 │   ├── interfaces.md
 │   ├── discovered-interfaces.md
+│   ├── shared.md
 │   ├── tasks/NN-<slug>.md
+│   ├── tasks/units.json
+│   ├── plan-reads/r<round>-<NN>.md
 │   ├── tasks/NN-<slug>-handoff.md
 │   ├── reviews/NN-<slug>.md
 │   ├── reviews/standards.md
@@ -99,7 +102,10 @@ actually built.
 | `spec.md` | spec | plan, build, review | yes, by amendment only |
 | `interfaces.md` | plan | build, review, G3, memory | no |
 | `discovered-interfaces.md` | build | build, memory | append-only |
+| `shared.md` | plan | the plan, through `--plan-render` into each citing task file | no |
 | `tasks/NN-<slug>.md` | plan | build, review, G3 | no |
+| `tasks/units.json` | plan | the plan, through `--plan-units` and `--plan-coverage` | yes, rewritten whole by `--plan-units --record` after each covered round |
+| `plan-reads/r<round>-<NN>.md` | plan | the plan, through `--plan-coverage` | no |
 | `tasks/NN-<slug>-handoff.md` | build | build, review | no |
 | `reviews/NN-<slug>.md` | review | repair, acceptance | append-only |
 | `reviews/standards.md` | review | acceptance, memory | no, written once per прогон |
@@ -119,6 +125,17 @@ more naturally. `interfaces.md` holds the boundaries the plan derived from the
 spec; `discovered-interfaces.md` holds what finished таски actually built. One
 file written by two phases has no owner, and the first disagreement between them
 is unattributable.
+
+**`shared.md` is the one home of a fact two таски need**, written by the plan
+as `### F-<n> — <title>` entries. It reaches no reader directly:
+`sync.mts --plan-render` copies each entry a task file cites into that file's
+section between `<!-- maestro:facts:start -->` and `<!-- maestro:facts:end -->`,
+so a task file stays the one thing its executor, its reviewer and its G3 reader
+are handed. The section is generated and never edited by hand. `tasks/units.json`
+is the hash of every unit, fact and `interfaces.md` after the last G3 round
+whose reader returns were all covered, so the next round asks only about what
+changed. `plan-reads/` keeps each reader return as it came back, which is what
+`--plan-coverage` checks. See [`phases.md`](phases.md) › *Task Granularity*.
 
 The review phase is **not** among its readers. A review judges one таск against
 the task file its executor was handed and the boundaries in `interfaces.md`;

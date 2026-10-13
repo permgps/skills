@@ -24,6 +24,7 @@ import { formatViolation, type Violation } from '../shared/violation.ts';
 // exactly the field the прогон reads to say a newer Maestro is out.
 import { metadataVersion } from '../../skills/maestro/tools/runtime/update-check.mts';
 import { closingSubject } from '../../skills/maestro/tools/runtime/history.mts';
+import { FACTS_START } from '../../skills/maestro/tools/runtime/plan-units.mts';
 import { KNOWN_MEMORY_FILES } from '../memory/markers.ts';
 import { PROGRESS_FILE } from '../memory/progress.ts';
 
@@ -902,6 +903,36 @@ export const ROUND_ANCHORS: readonly Anchor[] = [
 ];
 
 /**
+ * The literal text that makes a G3 reader an enumeration rather than a sample.
+ *
+ * The helper numbers units, renders shared facts and checks each return's
+ * coverage, but only the plan phase calls it and only the briefs ask for one
+ * verdict line per unit. A phase that loses a call, or a brief that loses its
+ * verdict format, fails silently: readers go back to returning what they
+ * happened to notice, and G3 goes back to finding something new every round.
+ */
+export const PLAN_UNIT_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/4-plan.md', literal: '--plan-units',
+    why: 'without it no round knows which units changed, and every round re-reads every unit' },
+  { file: 'phases/4-plan.md', literal: '--plan-render',
+    why: 'a fact edited in shared.md and never rendered leaves every citing task file on the old text' },
+  { file: 'phases/4-plan.md', literal: '--plan-coverage',
+    why: 'a return nobody checks for coverage is a sample again' },
+  { file: 'phases/4-plan.md', literal: 'shared.md',
+    why: 'a fact two таски need, restated in each, is how three task files came to say three things about one row' },
+  { file: 'phases/4-plan.md', literal: FACTS_START,
+    why: 'the marker is how the helper finds the section it owns; a phase naming another marker sends the orchestrator to edit by hand' },
+  { file: 'phases/4-plan.md', literal: 'never append',
+    why: 'a fix appended beside the text it corrects is the contradiction the next reader finds' },
+  { file: 'phases/8-repair.md', literal: '--plan-coverage consistency',
+    why: 'repair re-dispatches the consistency reader, and its return needs the same coverage check' },
+  { file: 'prompts/task-reader.md', literal: 'one verdict line per unit',
+    why: 'a reader not asked for a verdict per unit reports what it noticed, and the coverage check has nothing to count' },
+  { file: 'prompts/plan-consistency-reader.md', literal: 'One verdict line per таск and per seam',
+    why: 'the consistency reader is held to every таск and seam only if it writes a line for each' },
+];
+
+/**
  * Names of what contract 8 retired, held out of every shipped file.
  *
  * A dead Markdown link to a deleted phase is already the link pass's finding;
@@ -1363,6 +1394,7 @@ export async function checkBundle(
   // Only a bundle with a plan phase has gates that send a phase back; Scout has none.
   if (byFile.has('phases/4-plan.md')) {
     for (const v of missingAnchors(byFile, ROUND_ANCHORS, 'rounds')) add(v.check, v.file, v.line, v.message);
+    for (const v of missingAnchors(byFile, PLAN_UNIT_ANCHORS, 'units')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- commits a later session can trace ---------------------------------------

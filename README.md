@@ -802,8 +802,9 @@ MAESTRO_SYNC_DEBUG=1 node .maestro/sync.mts  # diagnostics on stderr
 `MAESTRO_SYNC_NO_OPEN` in the environment does what `--no-open` does, and
 `LOG_LEVEL=DEBUG` also turns diagnostics on. `--validate` and `--project` are
 read-only checks that print JSON; `--publish`, `--serve`, `--memory-read`,
-`--memory-write`, `--config-models`, `--update-check` and `--commits-check` are
-what the orchestrator uses, not you. If the loopback server cannot start,
+`--memory-write`, `--config-models`, `--update-check`, `--commits-check`,
+`--plan-units`, `--plan-render` and `--plan-coverage` are what the orchestrator
+uses, not you. If the loopback server cannot start,
 the page falls back to a file snapshot. More in
 [viewer runtime and recovery](docs/dashboard.md#viewer-runtime-and-recovery).
 
@@ -963,6 +964,17 @@ is refused rather than landing on top of somebody else's. This detects a second
 orchestrator instead of preventing one, deliberately — nothing here can expire a
 lease, and a lock that refused would strand the next session in front of a run
 nobody is driving. So you are asked.
+
+**A plan reader judges every instruction, once.** Every instruction in a task
+file is a numbered unit, and each G3 reader returns one verdict per unit it is
+asked about; the helper refuses a return that skipped one. After a round whose
+returns are all complete, a later round asks only about the units that
+changed. A fact two таски need — a checklist row, an oracle, a decision about
+either — is written once in `shared.md` and copied into each task file that
+cites it, and a finding is fixed by rewriting the text it quotes, never by
+appending a correction beside it. One run before this spent sixty-one G3 rounds
+and 1.8 billion tokens because each fresh reader sampled the plan differently
+and each fix was appended.
 
 **A таск's commits are a list**, because a repaired таск lands twice. Review
 reads the ordered union of that таск's own commits, one diff per commit — never

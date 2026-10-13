@@ -14,6 +14,20 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **A plan reader judges every instruction, and a fix rewrites it.** A
+  domtut_copy run spent 61 G3 rounds and 1.8 B reader input tokens. Its first
+  round found 244 things, and in the last twenty rounds two findings in three
+  quoted text that about twenty earlier readers had been given. Readers sampled
+  large task files, fixes were appended as new decisions beside the old ones,
+  and each checklist row was restated in nearly five task files. Now every task
+  file instruction is a unit (`` - `U<n>` ``). A reader returns one verdict per
+  unit it is asked about, `sync.mts --plan-coverage` refuses a return that
+  skipped one, and a later round asks only about the units that changed
+  (`--plan-units [--record]`). A fact two таски need lives once in `shared.md`
+  and is copied into each citing task file by `--plan-render`. A finding is
+  fixed by rewriting the quoted text in place and sweeping its class across
+  every task file. `bundle-integrity` holds the calls and the verdict formats,
+  and a test holds each brief's example to the helper's parser.
 - **A gate runs at most 60 rounds before you decide.** G1, G2 and G3 used to
   stop only when the same finding failed three times, so a plan gate that found
   something new in each round ran sixty rounds and twelve hours without asking.

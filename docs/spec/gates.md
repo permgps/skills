@@ -7,7 +7,7 @@ that fails is not a warning: the phase is redone.
 |---|---|---|
 | G1 | briefing | Every требование has a status and no unexplained open entry; every `answers.md` entry that offered options marks exactly one recommended and records the chosen option in full; contract 5 also requires a fresh returned independent source audit and frozen initial agreement |
 | G2 | spec | Every live требование is dispositioned; independent intent and raw-reference passes find no unresolved mandatory coverage gap |
-| G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner that transitively depends on each integration dependency; no two таски share a file unless one transitively blocks the other; a task reader finds each task executable, and a plan-consistency reader given every task file finds no coordination defect between them; from contract 8, every producer in the Seams table and the skeleton (the sole таск of wave 1) are `strong`, each task file's `Model` row agrees with `tasks[].model`, and each task file's `References` row cites only ids the register holds, each with a location, while every available visual reference and contextual example is cited by some таск |
+| G3 | plan | Every in-spec требование maps to an obligation and implementation owner; every required check has an execution owner that transitively depends on each integration dependency; no two таски share a file unless one transitively blocks the other; a task reader finds each task executable, and a plan-consistency reader given every task file finds no coordination defect between them, each reader's return covering every unit, таск and seam it was asked about; from contract 8, every producer in the Seams table and the skeleton (the sole таск of wave 1) are `strong`, each task file's `Model` row agrees with `tasks[].model`, and each task file's `References` row cites only ids the register holds, each with a location, while every available visual reference and contextual example is cited by some таск |
 | G4 | acceptance | Current, applicable evidence and independent discovery cover the current contract; failures and incomplete checks are reconciled under [`verification.md`](verification.md); contract 6 also closes `completed` with no open defect, and stops after an exhausted budget only with a `budget_exhausted` strategy review |
 
 ## Evidence
@@ -16,7 +16,7 @@ that fails is not a warning: the phase is redone.
 |---|---|
 | G1 | The status map has no unexplained open entries; each `answers.md` entry with options carries a gist, one recommendation, an `Answer:` and a `Chosen:` that names an offered option or `own answer`; v5 has a current source/manifest audit and initial agreement baseline |
 | G2 | Status map, obligation/source coverage map, independent intent and raw-reference discovery findings |
-| G3 | Requirement → obligation → implementation task and obligation → check → execution task mappings, including verification-only tasks; from contract 8, the Seams table's Producer task ids, and the `Model` and `References` rows of each task file, and nothing else of it, against `tasks[].model` and `verification.references` |
+| G3 | Requirement → obligation → implementation task and obligation → check → execution task mappings, including verification-only tasks; from contract 8, the Seams table's Producer task ids, and the `Model` and `References` rows of each task file, and nothing else of it, against `tasks[].model` and `verification.references`; the reader returns kept under `plan-reads/`, each covered by `sync.mts --plan-coverage`, and a `sync.mts --plan-units` that reports no violation |
 | G4 | Current check executions, complete coverage reviews, union of substantiated findings, and a fresh acceptance round |
 
 The requirement id is what makes a finding evidence rather than an opinion. A
@@ -153,7 +153,10 @@ and becomes a second opinion on work it has already seen.
   and reports what cannot be satisfied, rather than looping.
 - G1, G2 and G3 each run at most 60 rounds, whatever each round found. A round
   is one evaluation of the gate — its mechanical half, every reader dispatched
-  for it, and what came back. A failed round appends one line to the gate's
+  for it, and what came back. A G3 return sent back to a fresh reader for the
+  units it skipped belongs to the same round, and a later G3 round asks only
+  about the units that changed (see [`phases.md`](phases.md) › *Task
+  Granularity*). A failed round appends one line to the gate's
   `findings`, opening with the round number, so the count survives a compaction
   as the number on the last line. When the sixtieth round fails, and each
   sixtieth after it, the run stops on a question (`awaiting.kind` `answer`, the

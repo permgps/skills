@@ -800,6 +800,39 @@ exit codes.
   - Exit 2: no readable `state.js` beside the helper (`{ error }`).
   - Canonical module: `tools/runtime/commits-check.mts`, over the bounded
     calls in `tools/runtime/history.mts`.
+- `--plan-units [--record]` reads the run directory `state.js` names: its
+  `tasks/NN-*.md`, `shared.md` (absent means no facts) and `interfaces.md`. It
+  reports `{ result: "listed", tasks, facts, changed, violations, restated }`.
+  `tasks` lists `{ id, units: [{ id, hash, facts, changed }] }`. A unit is a
+  list item opening with `` `U<n>` ``, its hash is the sha256 of its
+  whitespace-normalised text, and `changed` compares it with
+  `tasks/units.json`: a new or rewritten unit, a unit citing a fact whose hash
+  moved, or every unit when there is no baseline or `interfaces.md` changed.
+  `violations` are `{ kind, task?, id?, detail }`, with `kind` one of
+  `duplicate-unit`, `no-units`, `duplicate-fact`, `unknown-fact` or
+  `stale-facts`. `restated` lists each sentence of 160 characters or more that
+  two or more task files carry outside their facts sections. `--record` writes
+  `tasks/units.json` — every unit, fact and `interfaces.md` hash — through a
+  temporary file and a rename, and adds `recorded: true`.
+  - Exit 0: no violation and nothing restated. Exit 1: either. Exit 2: no
+    readable `state.js`, no `dir` in it, or no `tasks/` (`{ error }`).
+- `--plan-render` rewrites the section between `<!-- maestro:facts:start -->`
+  and `<!-- maestro:facts:end -->` of every task file from `shared.md`: each
+  cited `### F-<n>` entry, verbatim, in number order. It removes the section
+  from a file that cites nothing and appends it to one that had none. It
+  reports `{ result: "rendered", changed: [task ids] }`.
+  - Exit 1: `{ result: "refused", violations }` for a cited id `shared.md` does
+    not define or a fact defined twice; nothing is written. Exit 2 as above.
+- `--plan-coverage <NN|consistency> <return-file> [--all]` reads a G3 reader's
+  return and reports `{ result: "covered"|"incomplete", requested, missing,
+  unknown, duplicate, findings }`. A verdict line is `U<n>`, `T<NN>` or
+  `seam <Seam cell>`, then `: ok` or `: finding`. For `NN` the requested ids
+  are that task's changed units; for `consistency`, every таск with a changed
+  unit and every Seams row whose producer or consumer cell names one. `--all`
+  requests everything, whatever the baseline says.
+  - Exit 0: covered. Exit 1: incomplete. Exit 2: bad arguments, an unreadable
+    return file, or as above.
+  - Canonical module: `tools/runtime/plan-units.mts`, for all three commands.
 
 Strict `--publish <candidate> [--expect <revision>] [--holder <token>]`
 requires a matching expected revision whenever state exists, checks both prior

@@ -436,6 +436,60 @@ requirement. Repair dispatches the same reader again when a defect crosses
 таски. Two таски sharing a file with neither blocking the other is refused
 mechanically at G3 as well, because a later wave does not order them by itself.
 
+**Every instruction of a task file is a unit.** *What to build*, *Verification
+map* and *Done means* are sections whose items open with an id in backticks,
+`` - `U<n>` ``, numbered from `U1` in each file; one unit holds one thing an
+executor acts on or checks. The header table keeps its `Model` and `References`
+rows, which G3 reads.
+
+**A reader is held to every unit it is asked about.** A task-file reader is
+handed the list of unit ids it must judge and returns one verdict line per unit,
+`U<n>: ok` or `U<n>: finding — …`, each finding quoted under its line. The
+consistency reader returns one line per таск (`T03: …`) and per Seams row
+(`seam <Seam cell>: …`). Each return is saved under `plan-reads/` and checked by
+`sync.mts --plan-coverage`. A return that skipped a unit goes back to a fresh
+reader for the missing units only, within the same round, and never counts
+until it is covered. Round 1 asks about every unit. After a round whose returns
+are all covered, `--plan-units --record` stores each unit's hash. A later round
+asks only about changed units — rewritten, citing a fact that changed, or every
+unit when `interfaces.md` changed — while still handing the reader the whole
+file, since a rewritten unit can contradict one that did not move. The
+consistency reader then goes out for the таски with a changed unit and the
+seams that name them; repair's re-dispatch asks about everything (`--all`).
+G3's reading half passes when the last round's returns are covered and carry
+no finding, and `--plan-units` reports no violation.
+
+**A fact two таски need lives once, in `shared.md`.** A source row, an oracle,
+an approved deviation, an expected value, and every decision about any of them,
+is written as `### F-<n> — <title>` when more than one task file needs it. A
+task file cites the id inside a unit and never restates it.
+`sync.mts --plan-render` copies each cited entry verbatim into the task file's
+section between `<!-- maestro:facts:start -->` and `<!-- maestro:facts:end -->`,
+so every consumer of a task file — executor, reviewer, both readers — is still
+handed one file, and no reader's input list changes. Nothing between the
+markers is edited by hand. `--plan-units` reports a stale section, an unknown or
+doubly defined fact, and any sentence of 160 characters or more that two task
+files restate outside it.
+
+**A finding is fixed by rewriting what it quotes.** The unit, or the fact in
+`shared.md`, is changed in place so the file says one thing. A later note that
+overrides earlier text — a second decision about the same thing, «supersedes»,
+«instead of the above» — is never added. Before a finding is closed, every task
+file and `shared.md` is searched for the same term, row or pattern, and every
+instance is fixed in the same round.
+
+These four rules exist because of one прогон's G3. It ran sixty-one rounds, and
+its readers spent 1.8 billion input tokens. Findings decayed from 244 in the
+first round to a tail of one or two per round. That tail was not new text: in
+the last twenty rounds, two findings in three quoted text that had been in the
+file for ten rounds or more, and that about twenty earlier readers had been
+given. A reader handed a 50–268 KB task file and an open question samples it,
+and the next fresh reader samples something else. The fixes made it worse in two
+ways. They were appended as new decisions beside the old ones, so
+decision-against-decision contradictions grew from 1% of findings to 11%. And
+each of 167 checklist rows was restated in nearly five task files, so a fix in
+one left the other four disagreeing.
+
 ## Execution
 
 The granularity table above names a wave width and never says what a wave is.

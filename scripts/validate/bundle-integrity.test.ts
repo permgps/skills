@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { metadataVersion } from '../../skills/maestro/tools/runtime/update-check.mts';
 import { closingSubject } from '../../skills/maestro/tools/runtime/history.mts';
+import { FACTS_END, FACTS_START, VERDICT_LINE } from '../../skills/maestro/tools/runtime/plan-units.mts';
 
 import {
   BRIEFING_ANCHORS,
@@ -21,6 +22,7 @@ import {
   TRACE_ANCHORS,
   RESUME_ANCHORS,
   ROUND_ANCHORS,
+  PLAN_UNIT_ANCHORS,
   GATE_ROUND_BUDGET,
   GATE_ROUND_PHRASE,
   textAfterHandoff,
@@ -1556,6 +1558,66 @@ test('the specification and the README state the same round budget as the bundle
   for (const file of ['../../docs/spec/gates.md', '../../README.md']) {
     const body = (await readFile(fileURLToPath(new URL(file, import.meta.url)), 'utf8')).replace(/\s+/g, ' ');
     assert.ok(body.includes(phrase), `${file} does not state "${phrase}"; the bundle's round budget is ${GATE_ROUND_BUDGET}`);
+  }
+});
+
+// --- a G3 reader enumerates units rather than sampling them ---------------------
+
+test('every plan-unit anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(PLAN_UNIT_ANCHORS.length > 0, 'PLAN_UNIT_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of PLAN_UNIT_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'units'), []);
+  });
+});
+
+for (const anchor of PLAN_UNIT_ANCHORS) {
+  test(`${anchor.file} losing "${anchor.literal}" is the one units finding, named on that file`, async () => {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, anchor.file);
+      const flat = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal), `${anchor.file} carries no "${anchor.literal}"`);
+      await writeFile(target, flat.split(anchor.literal).join('removed'), 'utf8');
+      const violations = (await checkBundle(copy)).filter(v => v.check === 'units');
+      assert.deepEqual(violations.map(v => v.file), [anchor.file.split('/').join(path.sep)]);
+      assert.ok((violations[0]?.message ?? '').includes(anchor.literal), violations[0]?.message);
+    });
+  });
+}
+
+/** The first text block under a heading: the verdict example a brief shows its reader. */
+function exampleUnder(body: string, heading: string): string[] {
+  const section = body.slice(body.indexOf(heading));
+  const block = section.match(/```text\n([\s\S]*?)```/);
+  assert.ok(block, `no text example under ${heading}`);
+  return block![1]!.split('\n').filter(line => line.trim() !== '');
+}
+
+for (const brief of ['task-reader.md', 'plan-consistency-reader.md']) {
+  test(`every verdict line ${brief} shows is one the helper parses, and every detail line is not`, async () => {
+    const body = await readFile(fileURLToPath(new URL(`../../skills/maestro/prompts/${brief}`, import.meta.url)), 'utf8');
+    const lines = exampleUnder(body, '## Your Output');
+    const verdicts = lines.filter(line => !/^\s/.test(line));
+    assert.ok(verdicts.length >= 2, `${brief} shows fewer than two verdict lines`);
+    for (const line of verdicts) assert.match(line, VERDICT_LINE, `${brief}: --plan-coverage would not count «${line}»`);
+    for (const line of lines.filter(line => /^\s/.test(line))) {
+      assert.doesNotMatch(line, VERDICT_LINE, `${brief}: a detail line «${line}» would be counted as a verdict`);
+    }
+    assert.ok(verdicts.some(line => / finding\b/.test(line)) && verdicts.some(line => /: ok$/.test(line)),
+      `${brief} must show both an ok and a finding`);
+  });
+}
+
+test('the plan phase names the facts markers the helper owns, and sync.mts dispatches all three plan flags', async () => {
+  const plan = await readFile(fileURLToPath(new URL('../../skills/maestro/phases/4-plan.md', import.meta.url)), 'utf8');
+  const sync = await readFile(fileURLToPath(new URL('../../skills/maestro/tools/sync.mts', import.meta.url)), 'utf8');
+  assert.ok(plan.includes(FACTS_START) && plan.includes(FACTS_END), '4-plan.md names markers other than the ones --plan-render writes');
+  for (const flag of ['--plan-units', '--plan-render', '--plan-coverage']) {
+    assert.ok(sync.includes(`'${flag}'`), `sync.mts dispatches no ${flag}; the plan phase would fall through to a refresh`);
+    assert.ok(PLAN_UNIT_ANCHORS.some(anchor => anchor.file === 'phases/4-plan.md' && anchor.literal === flag));
   }
 });
 
