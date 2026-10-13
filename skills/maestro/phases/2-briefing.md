@@ -314,6 +314,17 @@ keeps G1 pending; never replace it with your own pass.
 - A failed G1 returns control here: this phase runs again with the findings as
   input. It may fail twice on the same finding; on the third the прогон stops and
   reports what cannot be satisfied rather than looping.
+- **G1 runs at most 60 rounds, whatever each one found.** A round is one
+  evaluation of the gate: the count, every reader dispatched for it, and what
+  came back. A failed round appends one line to G1's `findings` that opens with
+  its round number and says in short what was found and what was done; the
+  number on the last line is the count a compaction cannot lose. When round 60
+  fails, and each sixtieth after it, log WARN once with the gate, the round and
+  the open findings, then stop on a question — `awaiting.kind` `answer`, the
+  note naming G1 and how many findings are open — showing that round's open
+  findings with three answers: another 60 rounds; the spec now, with G1 left
+  `failed` and those findings quoted in the отчёт's *What is left*; or stop the
+  прогон here. One finding failing a third time still stops the прогон first.
 - **G1 is never passed with notes.** A finding is acted on, or recorded as an
   explicit deferral against a requirement id — which is itself a status change.
 

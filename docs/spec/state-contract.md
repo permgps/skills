@@ -94,7 +94,7 @@ which stop it is, one per stop in `SKILL.md` › *Asking A Question*:
 
 | `kind` | The stop |
 |---|---|
-| `answer` | the манифест, a claim or stale-state question, and anything else that asks; the dials questions come before any state and write nothing |
+| `answer` | the манифест, a claim or stale-state question, a gate whose round budget is spent, and anything else that asks; the dials questions come before any state and write nothing |
 | `briefing-round` | the брифинг block |
 | `spec-gate` | the spec shown for approval in `manual` |
 | `plan-gate` | the plan shown for approval in `manual` |

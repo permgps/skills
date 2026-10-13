@@ -191,7 +191,9 @@ would raise its silence alarm over a run that is only waiting for its reader,
 nor say what it waits for, nor stop its clocks. The dials questions write nothing,
 because they come before preflight and no state of this прогон exists yet; a
 gate failing a third time is an interruption rather than a question, and writes
-`interruptedAt` instead — the validator refuses a state carrying both.
+`interruptedAt` instead — the validator refuses a state carrying both. A gate
+whose round budget is spent is the other way round: the user decides what
+happens next, so it is a question and writes `awaiting` with `kind` `answer`.
 
 `SKILL.md` states these rules and not the reason they are resident. The reason
 is maintenance knowledge, and a sentence that changes no behaviour costs context
@@ -884,7 +886,7 @@ and passing it quietly are the same mistake made in opposite directions.
 | Questions to forward | every placeholder standing in for a fact nobody supplied, as a questionnaire the user can send on to whoever knows |
 | Hard to undo | every inward change the прогон made that is hard to take back — migrations, deleted or renamed user files, major dependency upgrades — in plain words |
 | Observations | the non-blocking findings the reviews carried forward, each `unrequested` or `risk:` one with its tag; then, under their own sub-heading, the standards pass's observations, or one line saying it did not run; then each `noCorrectSeam:` line of a repeated repair's diagnosis, as a defect repaired without a regression check, with its таск and reason — never the hypotheses |
-| What is left | deferred and dropped требования, unresolved work, closure outcome, and accepted exceptions without hiding technical failures |
+| What is left | deferred and dropped требования, unresolved work, closure outcome, and accepted exceptions without hiding technical failures; each gate the user moved past at its round budget, with its open findings |
 
 Fixed, because a отчёт whose shape is decided per прогон is a отчёт two прогона
 cannot be compared through. A section with nothing in it says so in one line

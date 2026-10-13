@@ -1,7 +1,8 @@
 # Phase 5 — Разработка
 
-Read when the plan has passed G3. This is the only phase where project code
-appears, and it is the one phase where you do not write any of it.
+Read when the plan has passed G3, or the user moved past it at its round budget.
+This is the only phase where project code appears, and it is the one phase where
+you do not write any of it.
 
 `S5` is not a preference here, it is the mechanism the whole order rests on. You
 hold `spec.md`, the манифест and the plan; an executor holds one таск and the

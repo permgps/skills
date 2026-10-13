@@ -873,6 +873,35 @@ export const RESUME_ANCHORS: readonly Anchor[] = [
 ];
 
 /**
+ * How many rounds a gate that sends its phase back may run before the прогон
+ * stops and asks the user, held to one number in every file that states it.
+ *
+ * The other stop counts only the same finding failing three times. A прогон
+ * whose plan gate found something new in each of sixty rounds never met it and
+ * ran twelve hours, because each fix gave a fresh reader new text to question.
+ * The budget counts rounds, whatever they found.
+ */
+export const GATE_ROUND_BUDGET = 60;
+
+/** The phrase every gate's own phase file and `SKILL.md` carry for the budget. */
+export const GATE_ROUND_PHRASE = `at most ${GATE_ROUND_BUDGET} rounds`;
+
+/**
+ * The files that state the round budget: the resident rule, and the phase each
+ * of G1–G3 sends back. G4 sends no phase back, so it has no budget of rounds.
+ */
+export const ROUND_ANCHORS: readonly Anchor[] = [
+  { file: 'SKILL.md', literal: GATE_ROUND_PHRASE,
+    why: 'the resident gate rule is the one a прогон re-reads after a compaction, and without the budget a gate that finds something new each round never stops' },
+  { file: 'phases/2-briefing.md', literal: GATE_ROUND_PHRASE,
+    why: 'G1 sends брифинг back, and its round budget is applied where the phase reruns' },
+  { file: 'phases/3-spec.md', literal: GATE_ROUND_PHRASE,
+    why: 'G2 sends the spec back, and its round budget is applied where the phase reruns' },
+  { file: 'phases/4-plan.md', literal: GATE_ROUND_PHRASE,
+    why: 'G3 sends the plan back, and a plan gate is where sixty rounds once ran without a stop' },
+];
+
+/**
  * Names of what contract 8 retired, held out of every shipped file.
  *
  * A dead Markdown link to a deleted phase is already the link pass's finding;
@@ -1328,6 +1357,12 @@ export async function checkBundle(
   // Only a bundle with an executor brief builds and stops; Scout has none.
   if (byFile.has('prompts/executor.md')) {
     for (const v of missingAnchors(byFile, STOP_ANCHORS, 'stops')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- a gate that sends its phase back runs a bounded number of rounds -------
+  // Only a bundle with a plan phase has gates that send a phase back; Scout has none.
+  if (byFile.has('phases/4-plan.md')) {
+    for (const v of missingAnchors(byFile, ROUND_ANCHORS, 'rounds')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- commits a later session can trace ---------------------------------------

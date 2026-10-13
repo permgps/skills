@@ -350,9 +350,9 @@ words they can answer. `S3` still holds.
 
 **A question that stops the прогон carries its answers.** Everything the прогон
 has done stands still behind one reply — the dials questions on a first прогон,
-the манифест, the брифинг block, the spec and plan gates in `manual`, an S4
-action, a spent repair limit. A sentence into an empty box is not a question to
-someone new to this: they cannot tell what an answer looks like.
+the манифест, the брифинг block, the spec and plan gates in `manual`, an S4 action,
+a spent repair limit or gate round budget. A sentence into an empty box is not a
+question to someone new to this: they cannot tell what an answer looks like.
 
 **Offer the answers, in the прогон's language.** If your host can put choices in
 front of the user, use it — that is the shortest path from a stopped прогон to a moving one. If it
@@ -455,17 +455,17 @@ the two exactly where they disagree.
 **The original text is withheld and the additions are not**: the text became
 the манифест agreed at G1, and an addition never passed that gate.
 
-When a gate fails, open
-[`references/failure-modes.md`](references/failure-modes.md) — the catalogue of
-excuses and red flags. It is read at the failure and closed again; nothing in it
-is a rule, and keeping it in context is how a catalogue turns into one.
+When a gate fails, open [`references/failure-modes.md`](references/failure-modes.md) — the catalogue of
+excuses and red flags. It is read at the failure and closed again; nothing in it is a rule, and keeping
+it in context is how a catalogue turns into one.
 
 A failed gate returns control to the phase it follows, which runs again with the gate's findings as input.
 A gate may fail twice on the same finding; on the third failure the run stops and reports what cannot be
 satisfied rather than looping. A stop that asks nothing writes `interruptedAt`, never with `awaiting`.
-**A gate is never passed with notes** — findings are acted on, or recorded as an
-explicit deferral against a requirement id, which itself changes that
-requirement's status.
+G1–G3 run at most 60 rounds, whatever each one found: a failed round appends one line, opening with its
+number, to the gate's `findings`; at the sixtieth the run stops on a question its phase file words.
+**A gate is never passed with notes** — findings are acted on, or recorded as an explicit deferral
+against a requirement id, which itself changes that requirement's status.
 
 **G4 is the exception to the first sentence.** Приёмка re-run against the same
 манифест and the same build finds the same thing, so a failed G4 does not send

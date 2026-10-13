@@ -1,8 +1,8 @@
 # Phase 4 — План
 
-Read when the specification has passed G2. This phase cuts `spec.md` into таски
-and writes down the boundaries between them. It ends at G3, and it is the last
-phase before project code exists.
+Read when the specification has passed G2, or the user moved past it at its round
+budget. This phase cuts `spec.md` into таски and writes down the boundaries
+between them. It ends at G3, and it is the last phase before project code exists.
 
 You do not build anything here, and you will not build anything after it either
 — `S5` holds for the whole прогон. What this phase decides is who gets handed
@@ -330,7 +330,8 @@ per `CD-N`. The same reader is dispatched again when repair finds a defect
 that crosses tasks.
 
 Act on every finding by editing the task file, here, before any executor sees
-it. Then record them in the G3 entry of the run state — an empty list is a real
+it. Then record them in the G3 entry of the run state, one line per failed
+round as *Gates* below says — an empty list is a real
 answer, and a gate passed while carrying findings is not passed.
 
 **Why this is a gate half and not a proofread.** The first end-to-end прогон cut
@@ -484,6 +485,18 @@ itself.
 - A failed G3 returns control here: this phase runs again with the findings as
   input. It may fail twice on the same finding; on the third the прогон stops and
   reports what cannot be satisfied rather than looping.
+- **G3 runs at most 60 rounds, whatever each one found.** A round is one
+  evaluation of the gate: the mechanical half, every reader dispatched for it,
+  and what came back. A failed round appends one line to G3's `findings` that
+  opens with its round number and says in short what was found and what was
+  done; the number on the last line is the count a compaction cannot lose. When
+  round 60 fails, and each sixtieth after it, log WARN once with the gate, the
+  round and the open findings, then stop on a question — `awaiting.kind`
+  `answer`, the note naming G3 and how many findings are open — showing that
+  round's open findings with three answers: another 60 rounds; the build now,
+  with G3 left `failed` and those findings quoted in the отчёт's *What is left*;
+  or stop the прогон here. Findings that change every round are what this
+  budget is for; one finding failing a third time still stops the прогон first.
 - **G3 is never passed with notes.** A finding is acted on, or recorded as an
   explicit deferral against a requirement id — which is itself a status change,
   and one only the user can make.

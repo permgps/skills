@@ -500,6 +500,7 @@ alone — you see «R03 — оплата картой», not «R03».
 | Commits on another branch | a resumed run finds a таск's lost commits on another local branch — see [Resuming An Interrupted Run](#resuming-an-interrupted-run) | all | switch back to that branch, or let the run rebuild the таск |
 | The state changed underneath | another write landed since the last read | all | re-read and continue from what is on disk |
 | A gate fails a third time | the same finding fails one gate three times | all | the run stops and reports what cannot be satisfied |
+| A gate's round budget is spent | G1, G2 or G3 has failed 60 rounds, each finding something new | all | another 60 rounds; the next phase now, with the open findings named in the отчёт; or stop |
 
 While the run waits on any of these, the dashboard says it is waiting for your
 reply rather than counting silence. A stop that asks nothing — a gate failing a

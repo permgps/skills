@@ -1,8 +1,8 @@
 # Phase 3 — Спецификация
 
-Read when брифинг has passed G1. This phase turns требования and the answers to
-them into `spec.md` — the one document every executor is given and every review
-judges against. It ends at G2.
+Read when брифинг has passed G1, or the user moved past it at its round budget.
+This phase turns требования and the answers to them into `spec.md` — the one
+document every executor is given and every review judges against. It ends at G2.
 
 This is the first phase that designs anything. Everything before it recorded
 what the user said; from here on, what gets built is being decided.
@@ -247,6 +247,17 @@ that reached the run state and not the бриф.
 - A failed G2 returns control here: this phase runs again with the findings as
   input. It may fail twice on the same finding; on the third the прогон stops
   and reports what cannot be satisfied rather than looping.
+- **G2 runs at most 60 rounds, whatever each one found.** A round is one
+  evaluation of the gate: every reader dispatched for it and what came back. A
+  failed round appends one line to G2's `findings` that opens with its round
+  number and says in short what was found and what was done; the number on the
+  last line is the count a compaction cannot lose. When round 60 fails, and each
+  sixtieth after it, log WARN once with the gate, the round and the open
+  findings, then stop on a question — `awaiting.kind` `answer`, the note naming
+  G2 and how many findings are open — showing that round's open findings with
+  three answers: another 60 rounds; the plan now, with G2 left `failed` and
+  those findings quoted in the отчёт's *What is left*; or stop the прогон here.
+  One finding failing a third time still stops the прогон first.
 
 ## Output Of This Phase
 

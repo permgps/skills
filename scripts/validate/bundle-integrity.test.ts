@@ -20,6 +20,9 @@ import {
   STOP_ANCHORS,
   TRACE_ANCHORS,
   RESUME_ANCHORS,
+  ROUND_ANCHORS,
+  GATE_ROUND_BUDGET,
+  GATE_ROUND_PHRASE,
   textAfterHandoff,
   bundleProfileFor,
   carriesLeafRule,
@@ -1519,6 +1522,42 @@ for (const anchor of TRACE_ANCHORS) {
     });
   });
 }
+
+// --- a gate that sends its phase back runs a bounded number of rounds -----------
+
+test('every round anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(ROUND_ANCHORS.length > 0, 'ROUND_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of ROUND_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'rounds'), []);
+  });
+});
+
+for (const anchor of ROUND_ANCHORS) {
+  test(`${anchor.file} losing "${anchor.literal}" is the one rounds finding, named on that file`, async () => {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, anchor.file);
+      const flat = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal), `${anchor.file} carries no "${anchor.literal}"`);
+      await writeFile(target, flat.split(anchor.literal).join('removed'), 'utf8');
+      const violations = (await checkBundle(copy)).filter(v => v.check === 'rounds');
+      assert.deepEqual(violations.map(v => v.file), [anchor.file.split('/').join(path.sep)]);
+      assert.ok((violations[0]?.message ?? '').includes(anchor.literal), violations[0]?.message);
+    });
+  });
+}
+
+test('the specification and the README state the same round budget as the bundle', async () => {
+  const phrase = `${GATE_ROUND_BUDGET} rounds`;
+  assert.ok(GATE_ROUND_PHRASE.endsWith(phrase));
+  for (const file of ['../../docs/spec/gates.md', '../../README.md']) {
+    const body = (await readFile(fileURLToPath(new URL(file, import.meta.url)), 'utf8')).replace(/\s+/g, ' ');
+    assert.ok(body.includes(phrase), `${file} does not state "${phrase}"; the bundle's round budget is ${GATE_ROUND_BUDGET}`);
+  }
+});
 
 test('every resume anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
   assert.ok(RESUME_ANCHORS.length > 0, 'RESUME_ANCHORS holds no literal');

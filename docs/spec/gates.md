@@ -151,6 +151,22 @@ and becomes a second opinion on work it has already seen.
   with the gate's findings as input.
 - A gate may fail twice on the same finding. On the third failure the run stops
   and reports what cannot be satisfied, rather than looping.
+- G1, G2 and G3 each run at most 60 rounds, whatever each round found. A round
+  is one evaluation of the gate — its mechanical half, every reader dispatched
+  for it, and what came back. A failed round appends one line to the gate's
+  `findings`, opening with the round number, so the count survives a compaction
+  as the number on the last line. When the sixtieth round fails, and each
+  sixtieth after it, the run stops on a question (`awaiting.kind` `answer`, the
+  note naming the gate and the count of open findings) and shows that round's
+  open findings with three answers: another 60 rounds; the next phase now, with
+  the gate left `failed` and those findings quoted in the отчёт's *What is
+  left*; or stop the run. The gate is not passed by the second answer — it is
+  the user moving past it, and the state keeps saying `failed`.
+- The rule above counts one finding; the round budget counts rounds. A run whose
+  plan gate found something new in each of sixty rounds met only the first rule
+  and never stopped: each fix gave a fresh reader new text to question, and the
+  plan phase ran twelve hours. The round budget does not replace the first rule
+  — one finding failing a third time still stops the run long before sixty.
 - A gate is never "passed with notes". Findings are either acted on, or recorded
   as an explicit deferral against a requirement id, which itself changes that
   requirement's status.

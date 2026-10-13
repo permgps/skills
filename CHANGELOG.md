@@ -14,6 +14,14 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **A gate runs at most 60 rounds before you decide.** G1, G2 and G3 used to
+  stop only when the same finding failed three times, so a plan gate that found
+  something new in each round ran sixty rounds and twelve hours without asking.
+  Each failed round now appends one numbered line to the gate's findings, and
+  at the sixtieth the run stops on a question: another 60 rounds, the next
+  phase with the open findings named in the отчёт's *What is left*, or stop.
+  `bundle-integrity` holds the number in `SKILL.md` and the three phase files,
+  and a test holds it in the specification and this README.
 - **The README catches up with v0.0.14.** It names the version that ships,
   the update check as Maestro's one network call, memory after every
   closure, the review's five risk categories and its standards pass, every
