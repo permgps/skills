@@ -487,7 +487,7 @@ alone — you see «R03 — оплата картой», not «R03».
 | Models | first run on a host, or a pinned model the host no longer offers — see [The First Run In A Project](#the-first-run-in-a-project) | all, `full` included; never on Gemini CLI | one of the offered pairs (`session/next` is recommended) or your own `<strong>/<standard>` |
 | Ambiguous dials | two different words for one dial | not in `full` | which one you meant |
 | A credential in your text | redaction finds one at ingest | all | S2: before going on, it names the redacted variables, advises rotating them, and never echoes a value — a secret found in a file already written stops the run |
-| The manifest | after numbering your words | `semi`, `interview`, `manual` (shown without a question in `full`) | "right, start the briefing" · "R02 is wrong / something is missing" · your own correction |
+| The manifest | after numbering your words | `semi`, `interview`, `manual` (shown without a question in `full`) | "right, start the briefing" · "R02 is wrong / something is missing" · your own correction · with 2 or fewer requirements, "stop here, I'll make the change directly" |
 | Leftovers from earlier runs | `PROGRESS.md` holds open items; asked once, in the first briefing round — see [The Next Run](#the-next-run) | `semi`, `interview`, `manual` | leave them, take some, or say they no longer matter |
 | The briefing block | forks in the бриф | `semi` (genuine forks), `interview`, `manual` (all forks) | an option, «как советуешь», «да» to the recommendation, or your own text; each choice is echoed back as recorded |
 | The specification | after G2 | `manual` | approve, or say what to change |
@@ -526,6 +526,10 @@ instead.
   the next phase boundary.
 - **The dashboard disappeared or froze?** Say so, or run `node .maestro/sync.mts --reopen`
   yourself.
+- **What you hear while it works.** One line in the chat at every stage
+  transition and whenever a wave of таски closes: what closed and what comes
+  next. It says this even when the dashboard is open, because the page is not
+  always in view.
 - **Stop.** There is no stop command; tell the run to stop and it closes as
   `stopped_incomplete` with your reason recorded.
 - **A closed run can be reopened** with a new бриф aimed at it; see
@@ -621,7 +625,13 @@ The helper's own files are listed module by module in
   outside the markers is never touched.
 - **The отчёт.** `report.md` has fixed sections, in this order: *What was
   asked*, *Disagreements*, *Assumptions*, *Questions to forward*, *Hard to
-  undo*, *Observations*, *What is left*. *What was asked* ends with one line counting the таски each
+  undo*, *Checks to run on the target*, *Observations*, *What is left*.
+  *Checks to run on the target* lists each required check this machine could
+  not run, such as a live database, DNS, HTTPS or the target host's packages.
+  Each one comes with the command to run where the build lands and the outcome
+  to expect, or `no command recorded` when there is none. The plan writes such
+  checks as committed commands, and an installer's check names every
+  dependency the target lacks. *What was asked* ends with one line counting the таски each
   model built — `Models: N таски on strong (<name>), M on standard (<name>)`.
   A second acceptance round is appended below the first. The questions to
   forward are also given in chat as one block you can copy, in your language.
@@ -724,7 +734,11 @@ rewritten to bring a commit back.
 
 ### Fixing Something By Hand
 
-A small fix does not need a прогон. Read `.maestro/PROGRESS.md`, add a line
+A small fix does not need a прогон, and a run says so itself. When the manifest
+holds two or fewer requirements, one line before the list says a direct edit
+would most likely cost less. In `semi`, `interview` and `manual` you are offered
+to stop there; `full` says it and carries on. To fix by hand, read
+`.maestro/PROGRESS.md`, add a line
 under *Fixes Without Maestro*, and commit with the trailers a run uses. Every
 таск and repair commit carries two, `Maestro-Run: <dir>` and
 `Requirements: R01, R02`, because таск numbers and requirement ids restart
@@ -805,7 +819,8 @@ MAESTRO_SYNC_DEBUG=1 node .maestro/sync.mts  # diagnostics on stderr
 `LOG_LEVEL=DEBUG` also turns diagnostics on. `--validate` and `--project` are
 read-only checks that print JSON; `--publish`, `--serve`, `--memory-read`,
 `--memory-write`, `--config-models`, `--update-check`, `--commits-check`,
-`--plan-units`, `--plan-render` and `--plan-coverage` are what the orchestrator
+`--returns-check`, `--plan-units`, `--plan-render` and `--plan-coverage` are
+what the orchestrator
 uses, not you. If the loopback server cannot start,
 the page falls back to a file snapshot. More in
 [viewer runtime and recovery](docs/dashboard.md#viewer-runtime-and-recovery).

@@ -14,6 +14,35 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **An executor's return is checked before it is read.** An outside report on a
+  real build said formal acceptance dragged because some tests had no initial
+  failing run. The red-run rule existed, but its parser was repository tooling
+  that no прогон ran, so only the reviewer caught a missing red run, a phase
+  later. The parser now ships in the runtime, and build step 1a runs
+  `sync.mts --returns-check` on every return. Besides the format and the red
+  run, it holds `commit` and the red run's base to the commit the таск was
+  handed, an existing check to that base, and each capture to its SHA-256. A
+  refused return goes back to its executor once without spending a retry, and
+  a second refusal makes the таск incomplete. A fact git cannot decide is
+  listed as unchecked and left to the reviewer.
+- **A small манифест is told what a прогон costs.** At 2 or fewer требования,
+  one line before the list says a direct edit would most likely cost less.
+  `semi`, `interview` and `manual` offer a stop among the манифест's answers;
+  `full` says it and continues. No gate is lighter for a small бриф.
+- **What only the target can prove is handed over as commands.** A требование
+  observed only where the build lands (a live database, DNS, TLS, the target
+  host's packages) gets a committed check to run there. An installer's check
+  names every dependency the target lacks. The task reader reports a `target:`
+  row with nothing to run, and the отчёт gains a required section, *Checks to
+  run on the target*, listing each unavailable check with its command and
+  expected outcome.
+- **One line in the chat per стадия transition** and whenever a wave closes,
+  because the page is not always in view.
+- **Fixed:**
+  - the *Disagreements* cell of the acceptance phase said less than its spec
+    twin;
+  - the dashboard spec pointed at a report section that did not exist.
+
 - **A plan reader judges every instruction, and a fix rewrites it.** A
   domtut_copy run spent 61 G3 rounds and 1.8 B reader input tokens. Its first
   round found 244 things, and in the last twenty rounds two findings in three
