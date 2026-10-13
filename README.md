@@ -410,7 +410,7 @@ What each phase must do is in [the phases specification](docs/spec/phases.md).
 | 1 | Manifest (*Требования* / Requirements) | `brief.md`, `manifest.md` | your words numbered `R01…`, with the original under each line when the languages differ — confirm or correct |
 | 2 | Briefing (*Брифинг* / Briefing) | `answers.md`, `reference.md` | one numbered block of forks, at most two rounds |
 | 3 | Specification (*Спецификация* / Specification) | `codebase.md` in a project with code, `spec.md` | approval in `manual` only |
-| 4 | Plan (*План* / Plan) | `tasks/`, `interfaces.md` | approval in `manual`; a notice elsewhere |
+| 4 | Plan (*План* / Plan) | `tasks/`, `interfaces.md`, `shared.md`, `plan-reads/` | approval in `manual`; a notice elsewhere |
 | 5 | Build (*Разработка* / Development) | project code, `discovered-interfaces.md` | the dashboard's waves filling in; nothing to answer unless an S4 action comes up |
 | 6 | Review (*Ревью* / Review) | `reviews/` | nothing to answer |
 | 7 | Acceptance (*Приёмка* / Acceptance) | `report.md` | the outcome, the отчёт, and a block of questions to forward |
@@ -592,8 +592,10 @@ your-project/.maestro/
 │   ├── answers.md, reference.md    briefing answers and the recorded reference
 │   ├── codebase.md                 what your repository held before the run, read once before the spec
 │   ├── spec.md, interfaces.md      the specification and the contracts between таски
+│   ├── shared.md                   each fact two таски need, once; copied into the task files that cite it
 │   ├── discovered-interfaces.md    what the build found it needed
-│   ├── tasks/                      one file per таск, and a handoff file for a таск that outgrew one context
+│   ├── tasks/                      one file per таск, a handoff file for a таск that outgrew one context, and units.json, the unit hashes of the last complete plan-reading round
+│   ├── plan-reads/                 each plan reader's return, one verdict per unit it was asked about
 │   ├── reviews/                    one file per таск review, and standards.md from the one standards pass
 │   ├── evidence/<execution-id>/    captured check output, referenced by path and hash
 │   ├── report.md                   the отчёт
