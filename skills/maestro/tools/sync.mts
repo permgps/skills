@@ -12,6 +12,7 @@ import { configCommand } from './runtime/config.mts';
 import { memoryCommand } from './runtime/memory.mts';
 import { updateCommand } from './runtime/update-check.mts';
 import { commitsCheckCommand } from './runtime/commits-check.mts';
+import { planUnitsCommand } from './runtime/plan-units.mts';
 import { openPage, openingMessage } from './runtime/opener.mts';
 import { ensureViewer, serveDirectory } from './runtime/server.mts';
 import { extractStateLiteral } from './runtime/state/read.mts';
@@ -97,6 +98,11 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
   }
   if (args[0] === '--commits-check') {
     const outcome = await commitsCheckCommand(args, RUN_DIR);
+    process.stdout.write(JSON.stringify(outcome.result) + '\n');
+    return outcome.code;
+  }
+  if (['--plan-units', '--plan-render', '--plan-coverage'].includes(args[0] ?? '')) {
+    const outcome = await planUnitsCommand(args, RUN_DIR);
     process.stdout.write(JSON.stringify(outcome.result) + '\n');
     return outcome.code;
   }
