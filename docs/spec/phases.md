@@ -56,6 +56,33 @@ The manifest grows by rows and by nothing else. An added требование be
 in the state and in the additions, which is what keeps the manifest's two
 readings comparable.
 
+## The Манифест's Size
+
+A прогон costs the same ceremony whatever it builds. It runs every gate with an
+independent reader, a review per таск, a blind acceptance and the evidence each
+of them needs. For a change of one or two требования, that ceremony costs more
+than the change itself. An outside report (2026-10-13) said exactly this. The
+README already said a small fix needs no прогон, but no running прогон reads the
+README.
+
+So the manifest phase counts `requirements[]` when it shows the манифест. At
+**2 or fewer**, it says in one line, before the list, that a direct edit would
+most likely cost less.
+
+- In `semi`, `interview` and `manual`, the question the манифест already asks
+  offers one more answer: stop here. That adds an answer, not a stop.
+- In `full`, the line is said and the прогон continues.
+
+A chosen stop closes the прогон `stopped_incomplete` with a `stopReason` that
+says so, and only the memory phase runs after it.
+
+Why a notice and not a lighter mode: no dial removes a gate (`SKILL.md`,
+[`gates.md`](gates.md)), and a mode that verified less for a small бриф would
+be the first that did. Why the threshold is a count and not a judgement: the
+count is in the state at the moment the line is said, and a judgement of
+"small" is the orchestrator grading its own work. The прогон never stops itself
+on size. The user started it.
+
 ## Briefing
 
 The briefing proposes and the user disposes. Its aim is that a user who has
@@ -141,6 +168,24 @@ because it goes to every executor. It runs on the session's model.
 The spec reads `codebase.md` first and names an existing thing by its exact
 name in code. Identifiers are English words, never transliterations, and in
 existing code the convention `codebase.md` records wins.
+
+## A Line Per Transition
+
+At every стадия transition, and when a wave closes, the orchestrator says one
+line in the chat. The line says what closed and what comes next, in the terms
+*Reporting Progress* in `SKILL.md` sets: verified scenarios, closed таски and
+removed blockers count as progress; commits and counters do not.
+
+This is not the textual progress display that preflight forbids in place of a
+dashboard that failed to open. That stand-in imitates the page: it is a running
+picture of every таск and clock, and it is harder to remove later than a
+missing feature is to notice. A line per transition imitates nothing. It is
+what a colleague says on finishing one thing and starting the next.
+
+It is needed because the page is not always in view. It may sit in a folded
+pane, or on a host that never opened it, or the user may have looked away. An
+outside report (2026-10-13) found the user not told quickly enough where the
+work stood. Each transition was written to the state, and nothing was said.
 
 ## Loading Rule
 
@@ -492,6 +537,34 @@ decision-against-decision contradictions grew from 1% of findings to 11%. And
 each of 167 checklist rows was restated in nearly five task files, so a fix in
 one left the other four disagreeing.
 
+### A Check Only The Target Can Run
+
+Some требования are proved only where the build lands, and a прогон never
+reaches that place:
+- a live database;
+- DNS and a TLS certificate;
+- the packages the target host has installed;
+- a service this machine cannot call.
+
+A local check of these proves nothing about the target. Leaving them uncut
+hands the user a sentence where a check should be.
+
+So the spec names such an observation as target-only, and the plan cuts its
+check anyway, marked `target:` with the environment in the verification
+map's integration prerequisites. The таск that serves the требование writes
+the check as a committed command or script with its expected outcome. An
+install or deploy требование's check lists every dependency the target needs
+and fails naming each one that is missing. The executor returns it
+`unavailable` with `failureCause: unavailable_capability`, a limitation
+naming the environment, and the command as its invocation. The task reader
+reports a `target:` row with nothing to run. The отчёт's *Checks to run on
+the target* hands each one over with its command.
+
+This came from an outside report (2026-10-13). A dependency the installer
+needed was found missing only on the server, after every local check had
+passed. A target check that fails naming the missing dependency would have
+said so on the first run there.
+
 ## Execution
 
 The granularity table above names a wave width and never says what a wave is.
@@ -595,10 +668,22 @@ rules close it, all in the executor brief:
   and still exit green. Such a check is `unavailable` with its cause.
 - **Each таск names its test surface** (Task Granularity above).
 
+**The return is checked at intake, not a phase later.** Build step 1a runs
+`sync.mts --returns-check` on every executor return before anything in it is
+read. A return with no red run, a placeholder red run, a capture that does not
+hash to what it declares, or a commit that is not the handed base goes back to
+the same executor once, in the same wave. It does not go on to the reviewer.
+That resend spends no retry and opens no repair, because a format slip is
+cheaper for its author to fix than for a diagnostician. A second refusal makes
+the таск incomplete, and the repair phase owns it as usual. An outside report
+(2026-10-13) found formal acceptance dragging on tests nobody had seen fail.
+The rule existed, but only the reviewer ever applied it.
+
 The reviewer counts a missing red run, an assertion that recomputes the
 implementation, and a skip counted as a pass as blocking check-quality
 findings. Whether a red run truly came first is the reviewer's to judge against
-the diff. No check can see that.
+the diff, and so is any fact git could not decide at intake. No check can see
+that.
 
 ### Commits
 
@@ -941,6 +1026,7 @@ and passing it quietly are the same mistake made in opposite directions.
 | Assumptions | every decision taken on the user's behalf, every unfilled variable by name, and every wording whose translation was uncertain |
 | Questions to forward | every placeholder standing in for a fact nobody supplied, as a questionnaire the user can send on to whoever knows |
 | Hard to undo | every inward change the прогон made that is hard to take back — migrations, deleted or renamed user files, major dependency upgrades — in plain words |
+| Checks to run on the target | every required check that is `unavailable` or never ran, with its требование, what it observes, what was missing, the command to run where the build lands, and the outcome expected |
 | Observations | the non-blocking findings the reviews carried forward, each `unrequested` or `risk:` one with its tag; then, under their own sub-heading, the standards pass's observations, or one line saying it did not run; then each `noCorrectSeam:` line of a repeated repair's diagnosis, as a defect repaired without a regression check, with its таск and reason — never the hypotheses |
 | What is left | deferred and dropped требования, unresolved work, closure outcome, and accepted exceptions without hiding technical failures; each gate the user moved past at its round budget, with its open findings |
 
@@ -964,8 +1050,21 @@ in the прогон records that.
 Assumptions is where the прогон lists what it decided for the user, and where
 the manifest phase sends a translation it was not sure of. Questions to forward
 is where `S3` in [`safety.md`](safety.md) sends every invented fact it replaced
-with a placeholder. With Hard to undo, these are the sections that exist to be
-read even when everything passed: they hand over what only the user can do.
+with a placeholder. With Hard to undo and Checks to run on the target, these
+are the sections that exist to be read even when everything passed: they hand
+over what only the user can do.
+
+**Checks to run on the target is a list of commands, built from the state.**
+Every required check whose latest execution is `unavailable`, or that has none,
+is one numbered item. Each item gives the требование its obligations serve, what
+the check observes, the execution's limitation, the command (the execution's
+invocation, or else the check's procedure) and the check's oracle as the
+expected outcome. A check with no command recorded says so; the отчёт never
+invents one, because a command the прогон never ran is a command nobody has seen
+work. The section exists because such checks kept a прогон from `completed`
+correctly but were handed over nowhere. An outside report (2026-10-13) had to
+work out its live database, DNS and HTTPS from server logs, and the dashboard
+spec pointed at a report section that did not exist.
 
 **Questions to forward is a questionnaire, built from the state.** The spec
 phase writes each `debt.placeholders` entry as one labelled line —

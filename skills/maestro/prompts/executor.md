@@ -168,6 +168,15 @@ anything you leave out is lost.
    block missing a field is an incomplete return, never a partial pass. State the explicit limitation for an unavailable check.
    Captures remain in the task-owned location until the orchestrator verifies
    and imports them; you never write `.maestro/`.
+   The block is checked mechanically before anything in it is read: each
+   capture against its hash, `commit` and `against` against the base you were
+   handed, an existing check against that base. A refused block comes back to
+   you once, with each finding; fix the block, not the code.
+   A check written to run on the target — your task file's verification map
+   says `target:` — is written and committed like any other. It runs where the
+   build lands, never here: return it `unavailable`, with `failureCause:
+   unavailable_capability`, a limitation naming that environment, and the
+   command the user runs there as its `invocation`.
 
 ## If You Cannot Finish
 

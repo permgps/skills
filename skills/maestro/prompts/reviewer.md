@@ -181,6 +181,10 @@ check-quality finding when:
   red run that failed on no named assertion, or a red run against the
   implementation itself; or a `red: not applicable — existing check <path>`
   whose path the таск's diff added;
+- one of the facts intake left `unchecked` turns out false against the diff,
+  when the build hands you any: a `commit`, a red run's base, or an existing
+  check that is not the base the таск was handed, or not in it. Git could not
+  decide these at intake, so you do;
 - an assertion recomputes the implementation: its expected value is derived
   the way the code derives it, not taken from the task file's literal or
   oracle;

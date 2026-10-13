@@ -282,6 +282,9 @@ Entry: current audited R requirements and reference observations. Open
    other checks unmutated. Never infer production deployment from “prototype.”
 4. Hand these specifications to plan. Missing capability is a declared
    unavailable prerequisite, not a reason to omit a required observation.
+   Likewise, an observation only the target environment can make is named as
+   such: a live database, DNS, a TLS certificate, the target host's packages.
+   The plan then cuts its check to run there.
 Valid: restart retention is an integrated check. Invalid: replace it with
 passing save/read unit tests. Output: journey/check specifications and control
 selection basis; next action plan ownership, never an invented execution pass.

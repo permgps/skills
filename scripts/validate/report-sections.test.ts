@@ -6,8 +6,8 @@ import path from 'node:path';
 
 import { checkReportSections, readSectionTable, REQUIRED_SECTIONS } from './report-sections.ts';
 
-const SEVEN = ['What was asked', 'Disagreements', 'Assumptions', 'Questions to forward', 'Hard to undo',
-  'Observations', 'What is left'];
+const SECTIONS = ['What was asked', 'Disagreements', 'Assumptions', 'Questions to forward', 'Hard to undo',
+  'Checks to run on the target', 'Observations', 'What is left'];
 
 function table(sections: readonly string[]): string {
   return ['| Section | Holds |', '|---|---|', ...sections.map(name => `| ${name} | what ${name} holds |`)].join('\n');
@@ -50,55 +50,64 @@ async function withTree(tree: Tree, body: (specDir: string, bundleDir: string) =
 }
 
 test('the section table under a heading is read in order, and a table under the next heading is not', () => {
-  const read = readSectionTable(bundlePhase(SEVEN), '### 4. Write the отчёт');
-  assert.deepEqual(read?.sections, SEVEN);
-  assert.equal(readSectionTable(bundlePhase(SEVEN), '### Nowhere'), null);
+  const read = readSectionTable(bundlePhase(SECTIONS), '### 4. Write the отчёт');
+  assert.deepEqual(read?.sections, SECTIONS);
+  assert.equal(readSectionTable(bundlePhase(SECTIONS), '### Nowhere'), null);
 });
 
-test('two tables listing the same seven sections in the same order give no violation', async () => {
-  await withTree({ bundle: bundlePhase(SEVEN), spec: specPhases(SEVEN), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
+test('two tables listing the same sections in the same order give no violation', async () => {
+  await withTree({ bundle: bundlePhase(SECTIONS), spec: specPhases(SECTIONS), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
     assert.deepEqual(await checkReportSections({ specDir, bundleDir }), []);
   });
 });
 
 test('a section missing from the specification\'s table is one violation naming the position', async () => {
   await withTree({
-    bundle: bundlePhase(SEVEN),
-    spec: specPhases(SEVEN.filter(name => name !== 'Observations')),
+    bundle: bundlePhase(SECTIONS),
+    spec: specPhases(SECTIONS.filter(name => name !== 'Observations')),
     artifacts: ARTIFACTS,
   }, async (specDir, bundleDir) => {
     const violations = await checkReportSections({ specDir, bundleDir });
     assert.equal(violations.length, 1);
     assert.equal(violations[0]?.check, 'order');
-    assert.match(violations[0]?.message ?? '', /position 6/);
+    assert.match(violations[0]?.message ?? '', /position 7/);
     assert.match(violations[0]?.message ?? '', /"Observations"/);
   });
 });
 
 test('two sections swapped is a violation even though both tables hold the same names', async () => {
-  const swapped = [...SEVEN];
+  const swapped = [...SECTIONS];
   [swapped[3], swapped[4]] = [swapped[4] ?? '', swapped[3] ?? ''];
-  await withTree({ bundle: bundlePhase(SEVEN), spec: specPhases(swapped), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
+  await withTree({ bundle: bundlePhase(SECTIONS), spec: specPhases(swapped), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
     const violations = await checkReportSections({ specDir, bundleDir });
     assert.deepEqual(violations.map(v => v.check), ['order']);
     assert.match(violations[0]?.message ?? '', /position 4/);
   });
 });
 
-test('a table without the two handed-over sections is a violation even when both tables agree', async () => {
-  const five = SEVEN.filter(name => !REQUIRED_SECTIONS.includes(name));
-  await withTree({ bundle: bundlePhase(five), spec: specPhases(five), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
+test('a table without the handed-over sections is a violation even when both tables agree', async () => {
+  const rest = SECTIONS.filter(name => !REQUIRED_SECTIONS.includes(name));
+  await withTree({ bundle: bundlePhase(rest), spec: specPhases(rest), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
     const violations = await checkReportSections({ specDir, bundleDir });
-    assert.deepEqual(violations.map(v => v.check), ['required', 'required', 'required', 'required']);
+    assert.deepEqual(violations.map(v => v.check), Array(REQUIRED_SECTIONS.length * 2).fill('required'));
     assert.ok(violations.some(v => v.message.includes('"Questions to forward"')));
     assert.ok(violations.some(v => v.message.includes('"Hard to undo"')));
   });
 });
 
+test('a table without the target checks section is a violation on each table, naming it', async () => {
+  const rest = SECTIONS.filter(name => name !== 'Checks to run on the target');
+  await withTree({ bundle: bundlePhase(rest), spec: specPhases(rest), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
+    const violations = await checkReportSections({ specDir, bundleDir });
+    assert.deepEqual(violations.map(v => v.check), ['required', 'required']);
+    assert.ok(violations.every(v => v.message.includes('"Checks to run on the target"')));
+  });
+});
+
 test('a count of sections stated in prose is a violation, because the table is the count', async () => {
   await withTree({
-    bundle: bundlePhase(SEVEN),
-    spec: specPhases(SEVEN, 'When приёмка runs again the seven\nsections are written again.'),
+    bundle: bundlePhase(SECTIONS),
+    spec: specPhases(SECTIONS, 'When приёмка runs again the seven\nsections are written again.'),
     artifacts: '# Artifacts\n\nA second reading appends its own five sections under its own date.\n',
   }, async (specDir, bundleDir) => {
     const violations = await checkReportSections({ specDir, bundleDir });
@@ -109,13 +118,13 @@ test('a count of sections stated in prose is a violation, because the table is t
 });
 
 test('a heading that is missing is unreadable input, not a passed check', async () => {
-  await withTree({ bundle: '# Phase 7\n', spec: specPhases(SEVEN), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
+  await withTree({ bundle: '# Phase 7\n', spec: specPhases(SECTIONS), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
     await assert.rejects(() => checkReportSections({ specDir, bundleDir }), /### 4\. Write the отчёт/);
   });
 });
 
 test('a missing file is unreadable input', async () => {
-  await withTree({ bundle: bundlePhase(SEVEN), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
+  await withTree({ bundle: bundlePhase(SECTIONS), artifacts: ARTIFACTS }, async (specDir, bundleDir) => {
     await assert.rejects(() => checkReportSections({ specDir, bundleDir }));
   });
 });
@@ -129,5 +138,5 @@ test('the shipped bundle and spec list the same report sections', async () => {
   const shipped = readSectionTable(
     await readFile(path.join(root, 'skills', 'maestro', 'phases', '7-acceptance.md'), 'utf8'),
     '### 4. Write the отчёт');
-  assert.deepEqual(shipped?.sections, SEVEN);
+  assert.deepEqual(shipped?.sections, SECTIONS);
 });

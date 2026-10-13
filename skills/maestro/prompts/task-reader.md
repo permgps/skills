@@ -82,6 +82,10 @@ about the project:
   executor would have to choose what its tests call. Quote the *Boundaries*
   row instead. A row naming something `interfaces.md` does not carry is the
   name finding above.
+- **A target check with nothing to run.** A verification map row says
+  `target:`, but the task file asks for no committed command or script with an
+  expected outcome, so the user would be handed a sentence instead of a check.
+  Quote the row.
 - **A *done means* only a stub can meet.** An item of *done means* needs the
   output of a таск that is not in your *Depends on*, so you could meet it only
   against a stand-in for that output, and nothing would visibly work when you

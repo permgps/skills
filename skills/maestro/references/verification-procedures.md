@@ -181,6 +181,10 @@ actual independent/executor return. Missing return stays incomplete. A return
 that is not one `maestro-execution-return/1` block per check, or whose commit
 is not the base the таск was handed (for a repair, the parent commit), is not imported. Nor is a block with no red
 run and no allowed `red: not applicable`, or a skipped or pending test reported
-as `passed`: that test is `unavailable` with its cause. INFO the review verdict of a
+as `passed`: that test is `unavailable` with its cause.
+`sync.mts --returns-check` is the mechanical half of this refusal. It runs
+before the return is read, and it also holds each capture to its hash and an
+existing check to the base. What it lists as `unchecked`, and what no command
+can see, stays this procedure's and the reviewer's. INFO the review verdict of a
 repaired таск with `{ defectVerified, residualCount }`; WARN a detector that
 fails qualification.

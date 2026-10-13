@@ -241,7 +241,8 @@ received at run time.
 `report-sections` proves that the отчёт's sections are one list. The bundle's
 acceptance phase and [`phases.md`](phases.md) each carry a `| Section | Holds |`
 table; their Section columns must name the same sections in the same order,
-both must carry *Questions to forward* and *Hard to undo*, and neither they nor
+both must carry *Questions to forward*, *Hard to undo* and *Checks to run on the
+target*, and neither they nor
 [`artifacts.md`](artifacts.md) may say how many sections there are — a count in
 prose had already been written out six times, and it is the copy nobody updates.
 It reads the bundle and this specification, never a прогон's `report.md`.

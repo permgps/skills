@@ -154,10 +154,11 @@ sections under its own date rather than replacing what is there:
 | Section | Holds |
 |---|---|
 | What was asked | every `R##`, its status, and where it landed, and one line saying how many таски ran on which model |
-| Disagreements | the G4 findings, each quoted against its требование |
+| Disagreements | the G4 findings and the failed or incomplete требования, each quoted against its требование and its check evidence |
 | Assumptions | `debt.assumptions` and `debt.emptyEnv` as the прогон recorded them — every decision taken on the user's behalf, every unfilled variable by name — plus any wording whose translation was uncertain |
 | Questions to forward | `debt.placeholders`, as a questionnaire the user can send on as it is — every placeholder standing in for a fact nobody supplied |
 | Hard to undo | `oneWay`, one plain sentence per change the прогон made that is hard to take back |
+| Checks to run on the target | every required check whose latest result is `unavailable`, or that never ran, from the verification projection: its `R##`, what it observes, what was missing, the command to run there, and the outcome expected |
 | Observations | the non-blocking findings carried out of `reviews/`, each `unrequested` or `risk:` one with its tag; then, under their own sub-heading, the standards pass's observations from `reviews/standards.md` — or one line saying the pass did not run; then each `noCorrectSeam:` line of a repeated repair's diagnosis, as a defect repaired without a regression check, with its таск and the reason as written — never the hypotheses |
 | What is left | deferred and dropped требования, each with the reason recorded against it; then each gate the user moved past at its round budget, with that round's open findings quoted |
 
@@ -207,10 +208,28 @@ knowing before building on top. An empty `oneWay` says `Nothing hard to undo was
 recorded.` A state with no `oneWay` at all says `Not recorded: this прогон began
 before the scan existed.` — never "nothing", because nobody looked.
 
+**Checks to run on the target is a list the user can work through.** Take
+every required check of the verification projection whose latest execution is
+`unavailable`, or that has none. Write each one as a numbered item:
+- the `R##` its obligations serve;
+- what it observes, from the check's `target`;
+- what was missing, from the execution's `limitation`;
+- the command, from the execution's `invocation`, or else the check's
+  `procedure`;
+- the expected outcome, from its `oracle`.
+
+A check with neither an invocation nor a procedure says `no command recorded`.
+Never write one in its place: a command the прогон never ran is a command
+nobody has seen work. End the list with one line saying these are what the
+прогон could not prove here, and that its outcome stays incomplete until they
+pass. An empty list says `Every required check ran here.` Log DEBUG `report`
+`target checks listed` with `{ checks, withoutCommand }`.
+
 **Assumptions is read out of the state, not reconstructed from memory**, and so
-are Questions to forward and Hard to undo. The phases wrote `debt` as they
-incurred it and the review phase wrote `oneWay` from the diffs; assembling
-either list again here would produce a second answer to the same question, and
+are Questions to forward, Hard to undo and Checks to run on the target. The
+phases wrote `debt` as they incurred it, the review phase wrote `oneWay` from
+the diffs, and the build recorded every execution; assembling any of these
+lists again here would produce a second answer to the same question, and
 the two would differ exactly on what was forgotten. What this phase adds is the
 last full suite result into `tests`, and `finishedAt`.
 

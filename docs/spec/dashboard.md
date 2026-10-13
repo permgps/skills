@@ -501,8 +501,11 @@ row it belongs to is gone.
 
 ## Silence
 
-The state is written at transitions and nowhere else, so a прогон is quiet for
-long stretches by design. A прогон that has **stopped** is quiet in exactly the
+The state is written at transitions and nowhere else, so the state is quiet for
+long stretches by design. The chat is not silent between them: at every стадия
+transition and when a wave closes, the orchestrator says one line of progress
+— what closed and what comes next ([`phases.md`](phases.md), A Line Per
+Transition). A прогон that has **stopped** is quiet in exactly the
 same way, and until the two could be told apart the page went on counting over a
 run nobody was driving: the стадия had no `finishedAt` to stop its clock, and a
 session that died set no `interruptedAt` either.
@@ -780,7 +783,8 @@ failure belongs to the route rather than to the code.
 server and available headless browser may exercise a reference or integrated
 build with real input and recorded evidence. Neither may take over the dashboard
 pane or an unowned server. If the capability is absent, affected checks remain
-unavailable and reach *What You Could Not Check* at приёмка and the отчёт.
+unavailable. They reach the acceptance reader's *What You Could Not Check*,
+and the отчёт's *Checks to run on the target* hands them to the user.
 
 **A moved address is announced.** The panel's server can lose its port to
 another process between one state write and the next. When that happens the

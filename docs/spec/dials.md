@@ -171,6 +171,11 @@ enforced fail differently.
 `interview` and `manual` differ in exactly two cells: the spec gate and the plan
 gate. If they ever differ anywhere else, one of them is wrong.
 
+No mode changes what a прогон costs. A манифест of two or fewer требования is
+told so in every mode: `full` says it and continues, and the other three offer
+a stop among the манифест's answers ([`phases.md`](phases.md), The Манифест's
+Size).
+
 ## Depths
 
 | Depth | Default | Russian triggers | English triggers | Deepening a требование | New capabilities |

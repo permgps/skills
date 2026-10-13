@@ -81,6 +81,15 @@ initial, activated, panel-entry, and exit states as applicable. Where browser
 execution is unavailable, name the missing capability and mark affected checks
 `unavailable`; continue independent checks.
 
+A check only the target environment can run is not dropped and not faked. It
+is written as a committed command or script with its expected outcome, so the
+user can run it where the build lands. Such environments are a live database,
+DNS, a TLS certificate, the target host's installed packages, or a service this
+machine cannot reach. Here it is `unavailable` with `failureCause:
+unavailable_capability` and a limitation naming the environment, and the
+report hands it over with its command ([`phases.md`](phases.md), A Check Only
+The Target Can Run).
+
 ## Completion Extension (Verification 2)
 
 Contract 5 requires verification 2. Contract 4 requires verification 1 and keeps
@@ -394,10 +403,17 @@ or the reproduction minimal is judgement.
    made after the import. The state never holds the executor's return, so
    holding that `commit` to the base the таск was handed is the import's
    comparison, not the validator's. The same is why the red run lives in
-   the return and not in the state. The block's shape, the red run included,
-   is held by `scripts/gates/execution-return.ts` against the template the
-   executor brief ships. Whether the red run truly preceded the implementation,
-   and whether an assertion recomputes it, is review's to judge.
+   the return and not in the state. The import runs
+   `sync.mts --returns-check` on every return before reading it
+   ([`state-contract.md`](state-contract.md)). It checks the block's shape and
+   its red run, holds `commit` and the red run's base to the commit the таск
+   was handed, holds an existing check to that base, and holds each capture to
+   its hash. A refused return goes back to its executor once, without spending
+   a retry; a second refusal makes the таск incomplete. The same parser,
+   through its repository facade `scripts/gates/execution-return.ts`, holds the
+   template the executor brief ships. Whether the red run truly preceded the
+   implementation, whether an assertion recomputes it, and any fact git could
+   not decide at intake, are review's to judge.
 
 Valid: a readiness record shows `bootstrap: setup_failed` because the
 verification copy denied its own root; the coordinator allows the copy's root,

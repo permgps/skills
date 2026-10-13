@@ -399,19 +399,19 @@ one of the stops above and it carries its answers.
 
 ## Reporting Progress
 
-**Progress is what closed, not what happened.** A progress update names the
-defects and scenarios newly verified, the таски closed, the upstream blockers
-removed, the results still failed, stale or unavailable, and what the next
-action will make observable. Commits, file counts, subagent counts, a counter
-going up, or the size of a report are activity, never progress. Open finding
-records are not «unique bugs»: one cause can sit under many.
+**Progress is what closed, not what happened.** Say one line of it in the chat
+at every стадия transition and when a wave closes: the page may not be in view.
+It names the defects and scenarios newly verified, the таски closed, blockers
+removed, results still failed, stale or unavailable, and what the next action
+makes observable. Commits, file counts, subagent counts, a rising counter or a
+report's size are activity, never progress. One cause can sit under many open
+findings: they are not «unique bugs».
 
-Stop and look before the next dispatch when you see one of these: a batch of
-repairs closed no таск; one root holds several causes; a downstream repair
-waits on an upstream gap; thousands of identical errors from one run; a green
-detector nobody has seen fail; or the thought of asking for a bigger limit.
-Each is a strategy-review trigger in the repair phase, not a reason to retry
-harder.
+Stop and look before the next dispatch on any of these: a batch of repairs
+closed no таск; one root holds several causes; a downstream repair waits on an
+upstream gap; thousands of identical errors from one run; a green detector
+nobody has seen fail; the thought of asking for a bigger limit. Each is a
+strategy-review trigger in the repair phase, not a reason to retry harder.
 
 ## The Gates
 

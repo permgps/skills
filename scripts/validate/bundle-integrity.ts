@@ -403,6 +403,23 @@ export const TESTING_ANCHORS: readonly Anchor[] = [
     why: 'detector qualification covers a first build, not only a repair' },
   { file: 'references/verification-procedures.md', literal: 'skipped or pending test reported as `passed`',
     why: 'the import step refuses a skip reported as a pass' },
+  // A return is checked at intake (plan "A Return Is Checked At Intake", D2–D4):
+  // the parser ran nowhere in a прогон, so a missing red run waited a phase for
+  // the reviewer, and a refused return had no defined path back.
+  { file: 'phases/5-build.md',
+    literal: 'node .maestro/sync.mts --returns-check <return file> --root <its worktree, or the project root> --base <the commit the таск was handed>',
+    why: 'build step 1a runs the shipped check before anything in a return is read' },
+  { file: 'phases/5-build.md', literal: 'A resend is not a retry',
+    why: 'a refused return goes back once to its author without spending a retry or opening a repair' },
+  { file: 'phases/8-repair.md', literal: '--base <the parent commit>',
+    why: 'a repair attempt is checked against the commit it started from' },
+  { file: 'references/verification-procedures.md',
+    literal: '`sync.mts --returns-check` is the mechanical half of this refusal',
+    why: 'the prose refusal and the command must name each other, or one drifts' },
+  { file: 'prompts/executor.md', literal: 'checked mechanically before anything in it is read',
+    why: 'an executor that knows the block is checked writes it to pass the check, not the reader' },
+  { file: 'prompts/reviewer.md', literal: 'the facts intake left `unchecked`',
+    why: 'a fact git could not decide at intake is decided against the diff, never dropped' },
 ];
 
 /**
@@ -451,6 +468,17 @@ export const CUT_ANCHORS: readonly Anchor[] = [
   { file: 'prompts/plan-consistency-reader.md',
     literal: 'The Project conventions section of `interfaces.md` is what a command is checked against',
     why: 'a stale instruction needs one place to be stale against' },
+  // A требование only the target can prove gets a check written to run there
+  // (plan "A Return Is Checked At Intake", D7): an outside report found a
+  // missed dependency only on the server, after every local check had passed.
+  { file: 'phases/4-plan.md', literal: 'A check only the target environment can run is written to run there',
+    why: 'a target-only требование without a runnable check is handed over as a sentence, not a command' },
+  { file: 'phases/3-spec.md', literal: 'an observation only the target environment can make is named as such',
+    why: 'the plan cuts a target check only for an observation the spec named as target-only' },
+  { file: 'prompts/executor.md', literal: 'A check written to run on the target',
+    why: 'the executor returns a target check unavailable with the command to run, never as a local pass' },
+  { file: 'prompts/task-reader.md', literal: 'A target check with nothing to run',
+    why: 'the task reader is where a target check with no command is still free to fix' },
 ];
 
 /**
@@ -622,7 +650,9 @@ export const REPORT_ANCHORS: readonly Anchor[] = [
     why: 'the block is sent to somebody outside the прогон, who cannot read its ids' },
   { file: 'phases/7-acceptance.md', literal: 'Not recorded: this прогон began before the scan existed.',
     why: 'saying "nothing" when nobody looked is a claim nobody checked' },
-  { file: 'phases/7-acceptance.md', literal: 'are Questions to forward and Hard to undo',
+  { file: 'phases/7-acceptance.md', literal: 'A check with neither an invocation nor a procedure says `no command recorded`',
+    why: 'a command the прогон never ran, written into the отчёт, is a command nobody has seen work' },
+  { file: 'phases/7-acceptance.md', literal: 'are Questions to forward, Hard to undo and Checks to run on the target',
     why: 'a list assembled again at the end differs from the state exactly on what was forgotten' },
   { file: 'phases/7-acceptance.md',
     literal: 'give them in the chat in the прогон\'s language, as one block the user can copy and send on as it is',
@@ -811,6 +841,39 @@ export const STOP_ANCHORS: readonly Anchor[] = [
     why: 'a manual прогон waits on the plan, and the page names what it waits for only from this kind' },
   { file: 'phases/8-repair.md', literal: '`repair-limit`',
     why: 'a spent repair budget is the one repair stop that asks, and the user must see it is a decision, not a reply' },
+];
+
+/**
+ * The literal text that says a стадия transition in the chat.
+ *
+ * An outside report (2026-10-13) found the user not told quickly enough where
+ * the work stood. The state is written at transitions, and the page shows it,
+ * but nothing required a word in the chat, and on a host where the page is not
+ * in view the user saw nothing between questions. One line per transition is a
+ * status, not the textual stand-in for the dashboard that preflight forbids.
+ * Matched literally for the reason `MEMORY_ANCHORS` is.
+ */
+export const PROGRESS_LINE_ANCHORS: readonly Anchor[] = [
+  { file: 'SKILL.md', literal: 'Say one line of it in the chat at every стадия transition and when a wave closes',
+    why: 'a прогон quiet between questions looks the same as one that is stuck, wherever the page is not in view' },
+];
+
+/**
+ * The literal text that tells a small манифест what a прогон costs.
+ *
+ * An outside report (2026-10-13) found the прогон disproportionate for a small
+ * change, and nothing the orchestrator reads compared the size of the бриф
+ * with that cost: the README said a small fix needs no прогон, and no running
+ * прогон ever read the README. The manifest phase now counts the требования and
+ * says so once, at the cheapest moment, and the user decides. Matched literally
+ * for the reason `MEMORY_ANCHORS` is; the threshold is in the literal, so a
+ * changed number is a changed rule and fails here until the spec agrees.
+ */
+export const SIZE_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/1-manifest.md', literal: '2 or fewer требования',
+    why: 'the size notice is said at the манифест, before the прогон has spent anything' },
+  { file: 'phases/1-manifest.md', literal: 'The прогон never stops itself on size',
+    why: 'the notice offers a stop; it never takes one, because the user started the прогон' },
 ];
 
 /**
@@ -1388,6 +1451,19 @@ export async function checkBundle(
   // Only a bundle with an executor brief builds and stops; Scout has none.
   if (byFile.has('prompts/executor.md')) {
     for (const v of missingAnchors(byFile, STOP_ANCHORS, 'stops')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- a стадия transition is said in the chat ---------------------------------
+  // Only a bundle with a build phase has стадии long enough to report; Scout has none.
+  if (byFile.has('SKILL.md') && byFile.has('phases/5-build.md')) {
+    for (const v of missingAnchors(byFile, PROGRESS_LINE_ANCHORS, 'progress-line')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- a small манифест is told what a прогон costs ----------------------------
+  // Only a bundle that numbers требования and then builds them has a cost to
+  // state; Scout has neither, and a bundle with no build phase builds nothing.
+  if (byFile.has('phases/1-manifest.md') && byFile.has('phases/5-build.md')) {
+    for (const v of missingAnchors(byFile, SIZE_ANCHORS, 'size')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- a gate that sends its phase back runs a bounded number of rounds -------

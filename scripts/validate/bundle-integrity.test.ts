@@ -18,6 +18,8 @@ import {
   REVIEW_ANCHORS,
   SIGNAL_ANCHORS,
   CODEBASE_ANCHORS,
+  PROGRESS_LINE_ANCHORS,
+  SIZE_ANCHORS,
   STOP_ANCHORS,
   TRACE_ANCHORS,
   RESUME_ANCHORS,
@@ -831,6 +833,29 @@ test('the verification procedures losing the first-build red rule are reported, 
   });
 });
 
+/** What carries «a return is checked at intake, and a refused one is resent once». */
+const INTAKE_LITERALS: readonly [string, string][] = [
+  ['phases/5-build.md', 'node .maestro/sync.mts --returns-check <return file> --root <its worktree, or the project root> --base <the commit the таск was handed>'],
+  ['phases/5-build.md', 'A resend is not a retry'],
+  ['phases/8-repair.md', '--base <the parent commit>'],
+  ['references/verification-procedures.md', '`sync.mts --returns-check` is the mechanical half of this refusal'],
+  ['prompts/executor.md', 'checked mechanically before anything in it is read'],
+  ['prompts/reviewer.md', 'the facts intake left `unchecked`'],
+];
+
+test('each file that carries the intake check reports losing its line, on that file alone', async () => {
+  for (const [file, literal] of INTAKE_LITERALS) {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, ...file.split('/'));
+      const body = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(body.includes(literal), `${file} does not carry "${literal}"`);
+      await writeFile(target, body.replace(literal, 'removed'), 'utf8');
+      const violations = (await checkBundle(copy)).filter(v => v.check === 'testing');
+      assert.deepEqual(violations.map(v => v.file), [path.join(...file.split('/'))], literal);
+    });
+  }
+});
+
 /** The fenced return block part 5 of the shipped executor brief prescribes. */
 async function shippedReturnTemplate(): Promise<string> {
   return readFile(SHIPPED_EXECUTOR, 'utf8');
@@ -865,6 +890,27 @@ test('every cut anchor names a file the shipped bundle has, and the bundle carri
     }
     assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'cut'), []);
   });
+});
+
+/** What carries «a check only the target can run is written to run there». */
+const TARGET_LITERALS: readonly [string, string][] = [
+  ['phases/4-plan.md', 'A check only the target environment can run is written to run there'],
+  ['phases/3-spec.md', 'an observation only the target environment can make is named as such'],
+  ['prompts/executor.md', 'A check written to run on the target'],
+  ['prompts/task-reader.md', 'A target check with nothing to run'],
+];
+
+test('each file that carries the target-check rule reports losing it, on that file alone', async () => {
+  for (const [file, literal] of TARGET_LITERALS) {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, ...file.split('/'));
+      const body = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(body.includes(literal), `${file} does not carry "${literal}"`);
+      await writeFile(target, body.replace(literal, 'removed'), 'utf8');
+      const found = (await checkBundle(copy)).filter(v => v.check === 'cut');
+      assert.deepEqual(found.map(v => v.file), [path.join(...file.split('/'))], literal);
+    });
+  }
 });
 
 test('the plan phase losing its prefactor precondition is the one finding, named on the plan phase', async () => {
@@ -1318,6 +1364,56 @@ test('allow_implicit_invocation: false outside a policy block is not a declarati
     await writeFile(path.join(copy, 'agents', 'openai.yaml'), 'interface:\n  allow_implicit_invocation: false\n', 'utf8');
   });
   assert.deepEqual(violations.map(v => v.file), [path.join('agents', 'openai.yaml')]);
+});
+
+// --- a small манифест is told what a прогон costs ------------------------------
+
+test('every size anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(SIZE_ANCHORS.length > 0, 'SIZE_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of SIZE_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'size'), []);
+  });
+});
+
+test('the manifest phase losing its small-manifest threshold is the one size finding, named on that phase', async () => {
+  await withShippedCopy(async copy => {
+    const phase = path.join(copy, 'phases', '1-manifest.md');
+    const body = (await readFile(phase, 'utf8')).replace(/\s+/g, ' ');
+    const dropped = body.replace('2 or fewer требования', 'a few требования');
+    assert.notEqual(dropped, body);
+    await writeFile(phase, dropped, 'utf8');
+    const found = (await checkBundle(copy)).filter(v => v.check === 'size');
+    assert.deepEqual(found.map(v => v.file), [path.join('phases', '1-manifest.md')]);
+  });
+});
+
+// --- a стадия transition is said in the chat ------------------------------------
+
+test('every progress-line anchor is carried by the shipped bundle', async () => {
+  assert.ok(PROGRESS_LINE_ANCHORS.length > 0, 'PROGRESS_LINE_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of PROGRESS_LINE_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'progress-line'), []);
+  });
+});
+
+test('SKILL.md losing the line said at each стадия transition is the one progress-line finding', async () => {
+  await withShippedCopy(async copy => {
+    const skill = path.join(copy, 'SKILL.md');
+    const body = await readFile(skill, 'utf8');
+    const dropped = body.replace(/Say one line of it in the chat\s+at every стадия transition/, 'Say it when asked');
+    assert.notEqual(dropped, body);
+    await writeFile(skill, dropped, 'utf8');
+    const found = (await checkBundle(copy)).filter(v => v.check === 'progress-line');
+    assert.deepEqual(found.map(v => v.file), ['SKILL.md']);
+  });
 });
 
 // --- a stop says it stopped, and a missing capability has a path --------------

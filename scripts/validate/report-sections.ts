@@ -11,7 +11,8 @@
 //
 // So the list has one shape and this check holds it:
 // - the Section column of both tables is the same names in the same order;
-// - both carry the two handed-over sections, which the milestone exists for;
+// - both carry the handed-over sections, which exist to be read even when
+//   everything passed;
 // - no file states how many sections there are, because a count is a second
 //   copy of the table's length and is the copy nobody updates.
 //
@@ -38,8 +39,12 @@ export const SPEC_TABLE = { file: 'phases.md', heading: '### The Отчёт' } a
 /** Files that may not state a number of sections. */
 export const COUNT_FREE_SPEC_FILES: readonly string[] = ['phases.md', 'artifacts.md'];
 
-/** The sections this milestone added; their absence is a violation on its own. */
-export const REQUIRED_SECTIONS: readonly string[] = ['Questions to forward', 'Hard to undo'];
+/**
+ * The sections that hand over what only the user can do; the absence of any is
+ * a violation on its own. «Checks to run on the target» joined the first two
+ * after an outside report found live-environment checks handed over nowhere.
+ */
+export const REQUIRED_SECTIONS: readonly string[] = ['Questions to forward', 'Hard to undo', 'Checks to run on the target'];
 
 const COUNT = /\b(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+sections\b/gi;
 

@@ -210,6 +210,10 @@ and write the state at that transition. **Every repair and retry executor runs
 all for `session` or for a run with no `models` (contract 7), effort equal to
 the session's.
 
+Its return goes through the build phase's step 1a check, with
+`--base <the parent commit>`: the commit this attempt started from. The same
+single resend applies, and it spends no retry.
+
 Under contract 6 the brief is about one defect. It states the defect and its
 counterexample, the parent таск, the repair criteria as check IDs, the residual
 parent criteria, foreign prerequisites, the expected progress, and a closure

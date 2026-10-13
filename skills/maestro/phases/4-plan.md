@@ -332,6 +332,28 @@ unavailable check and limitation for later acceptance; it cannot silently
 substitute source signatures or a synthetic event. A human-visible viewer still
 belongs to the orchestrator and never to a task.
 
+**A check only the target environment can run is written to run there.**
+Some требования are observed only where the build lands, and this прогон never
+reaches that place:
+- a live database;
+- DNS;
+- a TLS certificate;
+- the packages the target host has installed;
+- a service this machine cannot call.
+
+The check for such a требование is still cut. The таск that serves it writes
+the check as a committed command or script, with its expected outcome, so the
+user can run it there. An install or deploy требование's check lists every
+dependency the target needs and fails, naming each one that is missing. A
+missed dependency then fails loudly on the first run at the target, instead of
+surfacing in a server log.
+
+Here such a check is `unavailable` with `failureCause:
+unavailable_capability` and a limitation that names the environment, and the
+отчёт hands it over with its command. Write `target:` and the environment in
+the verification map's integration prerequisites, so the task reader can hold
+the check to this rule.
+
 ### 5. Have each task file read by somebody standing where the executor will
 
 Hand every task file to its own subagent, briefed by
