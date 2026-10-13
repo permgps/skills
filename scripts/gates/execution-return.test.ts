@@ -189,6 +189,27 @@ test('red not applicable for any other reason, or an existing check with no path
   }
 });
 
+test('an existing check is read whatever its case, and a word that only begins like it is refused', () => {
+  assert.deepEqual(check(block({ red: ['red: not applicable — Existing check tests/cart.test.ts'] })), []);
+  assert.deepEqual(rules(block({ red: ['red: not applicable — existing checks tests/cart.test.ts'] })),
+    ['red-not-applicable']);
+});
+
+test('a red run written without indenting its fields is named as an indentation slip, not as an empty run', () => {
+  const red = RED_RUN.map(line => line.trimStart());
+  const violations = check(block({ red }));
+  assert.deepEqual(violations.map(violation => violation.check), ['red-unindented']);
+  assert.match(violations[0]!.message, /indent the red run's fields under `red:`/);
+});
+
+test('the runtime module the прогон ships finds what the repository facade finds', async () => {
+  const runtime = await import('../../skills/maestro/tools/runtime/execution-return.mts');
+  const markdown = block({ red: null });
+  const shipped = runtime.returnFindings(runtime.parseExecutionReturns(markdown));
+  assert.deepEqual(shipped.map(finding => [finding.rule, finding.checkId, finding.line]), [['red-missing', 'C03', 1]]);
+  assert.deepEqual(check(markdown).map(violation => violation.check), ['red-missing']);
+});
+
 test('a block missing its commit is one incomplete violation, never a partial pass', () => {
   const violations = check(block({ drop: ['commit'] }));
   assert.deepEqual(violations.map(violation => violation.check), ['incomplete']);

@@ -836,6 +836,30 @@ exit codes.
   - Exit 0: covered. Exit 1: incomplete. Exit 2: bad arguments, an unreadable
     return file, or as above.
   - Canonical module: `tools/runtime/plan-units.mts`, for all three commands.
+- `--returns-check <return-file> [--root <worktree>] [--base <commit>]` reads
+  an executor's return and reports
+  `{ ok, blocks, findings: [{ rule, checkId, line, message }], unchecked: [{ checkId, fact, reason }] }`
+  without writing anything. `findings` holds:
+  - every rule the return format carries (the red run included);
+  - `no-block` for a return with no block;
+  - what only the worktree and git can show:
+    - `commit-not-base` and `red-against-not-base` for a `commit:`, or a red
+      run's `base`/`parent` sha, that is not `--base`;
+    - `existing-check-new` for an `existing check <path>` that `--base` does
+      not hold;
+    - `capture-missing`, `capture-hash-mismatch`, `capture-hash-missing` and
+      `capture-outside-root` for each capture under `--root`, the red run's
+      included.
+
+  A fact git could not decide — git absent, no `--base`, or a `--base` that is
+  not a commit — goes to `unchecked` as `commit`, `red.against` or
+  `red.existingCheck`, and refuses nothing. `--root` defaults to the project
+  root.
+  - Exit 0: nothing found. Exit 1: any finding. Exit 2: no return file named,
+    or one that cannot be read (`{ error }`).
+  - Canonical module: `tools/runtime/execution-return.mts`.
+    `scripts/gates/execution-return.ts` is its facade and keeps the
+    repository CLI.
 
 Strict `--publish <candidate> [--expect <revision>] [--holder <token>]`
 requires a matching expected revision whenever state exists, checks both prior
