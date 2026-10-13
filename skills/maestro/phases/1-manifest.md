@@ -226,23 +226,6 @@ R02 — …
   back is what they said — and a round trip that shows only the far end is not
   one. It is the single place in the прогон where hiding a translation costs
   something, so it is the single place the original is shown beside it.
-- **A манифест of 2 or fewer требования is told what a прогон costs.** Count
-  `requirements[]` in the state. At two or fewer, say one line before the list,
-  in the прогон's language: a direct edit would most likely cost less than a
-  прогон, because the прогон runs every gate, a review per таск and a blind
-  acceptance whatever its size. Then:
-  - In `semi`, `interview` and `manual`, the question below offers one more
-    answer: stop here, and the user makes the change directly.
-  - In `full`, say it and continue.
-
-  The прогон never stops itself on size; the user started it. INFO
-  `manifest` `small manifest noticed` with `{ requirements, mode }`.
-
-  When the user takes the stop, close the прогон. Publish `lifecycle: closed`,
-  `outcome: stopped_incomplete`, `stopReason: "user stop: a direct edit was
-  chosen at the манифест"`, `finishedAt`, and `dir` without `--wip`, in one
-  candidate. Then run the memory phase, as after any closure. No other phase
-  runs.
 - **When they agree, there is no second line**, because there was no
   translation. A line repeated under itself would teach the user that the second
   line means nothing.
@@ -251,6 +234,26 @@ R02 — …
   требование. The second line lives in this display and nowhere on disk — the
   file the gates read must have one wording, or S1 has two documents to compare
   against and no way to choose.
+- **A манифест of 2 or fewer требования is told what a прогон costs.** Count
+  `requirements[]` in the state. At two or fewer, say one line before the list,
+  in the прогон's language: a direct edit would most likely cost less than a
+  прогон, because the прогон runs every gate, a review per таск and a blind
+  acceptance whatever its size. Then:
+  - In `semi`, `interview` and `manual`, the question below offers one more
+    answer: stop here, and the user makes the change directly — «Остановиться:
+    правку сделаю сам» in a Russian прогон, "Stop here: I'll make the change
+    myself" in an English one.
+  - In `full`, say it and continue.
+
+  The прогон never stops itself on size; the user started it. INFO
+  `manifest` `small manifest noticed` with `{ requirements, mode }`.
+
+  When the user takes the stop, close the прогон. Publish `lifecycle: closed`,
+  `outcome: stopped_incomplete`, `stopReason: "user stop: a direct edit was
+  chosen at the манифест"`, `finishedAt`, `result` — one line in the прогон's
+  language saying nothing was built and the change is the user's to make —
+  and `dir` without `--wip`, in one candidate. Then run the memory phase, as
+  after any closure. No other phase runs.
 - In `semi`, `interview` and `manual`: ask whether anything is missing or
   misread, and wait. **Offer the answers** — see *Asking A Question* in
   `SKILL.md`. Three of them, at least: that it is right and the брифинг may

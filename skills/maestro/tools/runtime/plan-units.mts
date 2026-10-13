@@ -157,7 +157,9 @@ export function currentFactsSection(text: string): string {
 export function withFactsSection(text: string, section: string): string {
   const existing = currentFactsSection(text);
   if (existing) {
-    const replaced = text.replace(existing, section);
+    // A function replacer: a fact may quote shell (`$$`, `$&`), and a string
+    // replacement would read those as patterns and nest the old section.
+    const replaced = text.replace(existing, () => section);
     return section ? replaced : replaced.replace(/\n{3,}$/, '\n\n').replace(/\s+$/, '\n');
   }
   return section ? `${text.replace(/\s+$/, '')}\n\n${section}\n` : text;

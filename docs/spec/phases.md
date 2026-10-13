@@ -74,7 +74,8 @@ most likely cost less.
 - In `full`, the line is said and the прогон continues.
 
 A chosen stop closes the прогон `stopped_incomplete` with a `stopReason` that
-says so, and only the memory phase runs after it.
+says so and the `result` line every contract-10 closure carries, and only the
+memory phase runs after it.
 
 Why a notice and not a lighter mode: no dial removes a gate (`SKILL.md`,
 [`gates.md`](gates.md)), and a mode that verified less for a small бриф would
@@ -668,11 +669,15 @@ rules close it, all in the executor brief:
   and still exit green. Such a check is `unavailable` with its cause.
 - **Each таск names its test surface** (Task Granularity above).
 
-**The return is checked at intake, not a phase later.** Build step 1a runs
+**The return is checked at intake, not a phase later.** Build step 1 runs
 `sync.mts --returns-check` on every executor return before anything in it is
-read. A return with no red run, a placeholder red run, a capture that does not
-hash to what it declares, or a commit that is not the handed base goes back to
-the same executor once, in the same wave. It does not go on to the reviewer.
+read, its discoveries included: the `D##` rows come after it, so a refused
+return hands a dependent nothing. A таск the verification map gives no check
+to execute returns no block, and the orchestrator says so with
+`--owns-no-check`; without it, an empty return is refused as a lost one. A
+return with no red run, a placeholder red run, a capture that does not hash
+to what it declares, or a commit that is not the handed base goes back to the
+same executor once, in the same wave. It does not go on to the reviewer.
 That resend spends no retry and opens no repair, because a format slip is
 cheaper for its author to fix than for a diagnostician. A second refusal makes
 the таск incomplete, and the repair phase owns it as usual. An outside report

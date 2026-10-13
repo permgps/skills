@@ -398,3 +398,69 @@ test('an Anthropic key sent as a bearer token is named ANTHROPIC_API_KEY', () =>
   assertGone(result, key);
   assert.deepEqual(result.names, ['ANTHROPIC_API_KEY']);
 });
+
+// A whole-project review (2026-10-14) found these shapes reaching disk: a
+// transcript line is JSON, so a file it quotes arrives with its quotes and
+// newlines escaped, and the assignment rule never saw a key it could read.
+
+test('a YAML password inside a JSON-escaped transcript string is removed', () => {
+  const secret = 'hunter2xyz';
+  const line = JSON.stringify({ type: 'return', result: `database:\n  password: ${secret}\n  user: app` });
+  const result = redact(line);
+  assertGone(result, secret);
+  assert.deepEqual(result.names, ['PASSWORD']);
+  assert.equal(JSON.parse(result.text).result, 'database:\n  password: [REDACTED:PASSWORD]\n  user: app');
+});
+
+test('a JSON file quoted inside a JSON transcript string loses its token, and the line still parses', () => {
+  const secret = 'abcd1234efgh5678';
+  const line = JSON.stringify({ type: 'read', text: `{"api_token": "${secret}", "name": "app"}` });
+  const result = redact(line);
+  assertGone(result, secret);
+  assert.deepEqual(JSON.parse(JSON.parse(result.text).text), { api_token: '[REDACTED:API_TOKEN]', name: 'app' });
+});
+
+test('an escaped string holding no credential leaves the line byte-identical', () => {
+  const line = JSON.stringify({ type: 'message', text: 'width: 100\n"quoted" \\ path\tend' });
+  assert.equal(redact(line).text, line);
+});
+
+test('a Basic authorization header is removed like a Bearer one', () => {
+  const secret = 'dXNlcjpwYXNzd29yZDEyMzQ=';
+  const result = redact(`Authorization: Basic ${secret}`);
+  assertGone(result, secret);
+  assert.equal(result.text, 'Authorization: Basic [REDACTED:BASIC_AUTH]');
+});
+
+test('the word "token" before a long plain word is prose, not a bearer token', () => {
+  const prose = 'Each token internationalization step\n## Token\n\nAuthentication.flow';
+  assert.equal(redact(prose).text, prose);
+});
+
+test('an unquoted YAML password with & and # in it is removed whole', () => {
+  const secret = 'Tr0ub4dor&3#x';
+  const result = redact(`password: ${secret}\n`);
+  assertGone(result, secret);
+  assert.equal(result.text, 'password: [REDACTED:PASSWORD]\n');
+});
+
+test('a quoted JSON passphrase with spaces is removed whole', () => {
+  const secret = 'correct horse battery staple';
+  const result = redact(`{"password": "${secret}"}`);
+  assertGone(result, secret);
+  assert.equal(result.text, '{"password": "[REDACTED:PASSWORD]"}');
+});
+
+test('a type annotation or a UI label under a password key stays', () => {
+  const code = 'password: string;\npassword: Map<string, string>\npassword: "Enter your password"\n';
+  assert.equal(redact(code).text, code);
+});
+
+test('curl -u user:password loses the password and keeps the user', () => {
+  const secret = 'hunter2xyz';
+  for (const command of [`curl -u admin:${secret} https://x`, `curl --user 'admin:${secret}' https://x`]) {
+    const result = redact(command);
+    assertGone(result, secret);
+    assert.ok(result.text.includes('admin:[REDACTED:HTTP_PASSWORD]'), result.text);
+  }
+});

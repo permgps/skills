@@ -23,12 +23,9 @@ import {
   RETURN_FORMAT,
   type ExecutionReturnBlock,
 } from '../../skills/maestro/tools/runtime/execution-return.mts';
-import { createLogger } from '../shared/log.ts';
 import { formatViolation, type Violation } from '../shared/violation.ts';
 
 export * from '../../skills/maestro/tools/runtime/execution-return.mts';
-
-const log = createLogger('gate-execution-return');
 
 /** The blocks a build phase would refuse to import, one violation per broken rule. */
 export function checkExecutionReturns(blocks: readonly ExecutionReturnBlock[], file: string): Violation[] {
@@ -47,11 +44,9 @@ async function main(): Promise<number> {
     text = await readFile(file, 'utf8');
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    log.debug('read', 'return file not read', { path: file, found: false, reason });
-    process.stdout.write(`execution-return: cannot read ${file}\n`);
+    process.stdout.write(`execution-return: cannot read ${file}: ${reason}\n`);
     return 2;
   }
-  log.debug('read', 'return file read', { path: file, found: true });
 
   const blocks = parseExecutionReturns(text);
   const violations = checkExecutionReturns(blocks, file);

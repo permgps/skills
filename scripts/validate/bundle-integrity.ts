@@ -408,7 +408,7 @@ export const TESTING_ANCHORS: readonly Anchor[] = [
   // the reviewer, and a refused return had no defined path back.
   { file: 'phases/5-build.md',
     literal: 'node .maestro/sync.mts --returns-check <return file> --root <its worktree, or the project root> --base <the commit the таск was handed>',
-    why: 'build step 1a runs the shipped check before anything in a return is read' },
+    why: 'build step 1 runs the shipped check before anything in a return is read' },
   { file: 'phases/5-build.md', literal: 'A resend is not a retry',
     why: 'a refused return goes back once to its author without spending a retry or opening a repair' },
   { file: 'phases/8-repair.md', literal: '--base <the parent commit>',
@@ -420,6 +420,14 @@ export const TESTING_ANCHORS: readonly Anchor[] = [
     why: 'an executor that knows the block is checked writes it to pass the check, not the reader' },
   { file: 'prompts/reviewer.md', literal: 'the facts intake left `unchecked`',
     why: 'a fact git could not decide at intake is decided against the diff, never dropped' },
+  // A whole-project review (2026-10-14) found an implementation таск that owns no check always
+  // refused as `no-block`, and its discoveries read before the check ran.
+  { file: 'phases/5-build.md', literal: 'Add `--owns-no-check` when the verification map names no check this таск',
+    why: 'an implementation таск whose checks another таск runs returns no block, and must not be refused for it' },
+  { file: 'phases/5-build.md', literal: 'Only a return step 1 accepted is read for them',
+    why: 'a refused return hands dependents no discovered interfaces' },
+  { file: 'prompts/executor.md', literal: 'no check — another таск executes every check it serves — returns no block',
+    why: 'the executor that owns no check knows an empty return is the right one' },
 ];
 
 /**
@@ -479,6 +487,15 @@ export const CUT_ANCHORS: readonly Anchor[] = [
     why: 'the executor returns a target check unavailable with the command to run, never as a local pass' },
   { file: 'prompts/task-reader.md', literal: 'A target check with nothing to run',
     why: 'the task reader is where a target check with no command is still free to fix' },
+  // S3 makes a требование `placeholder`, and a whole-project review (2026-10-14)
+  // found G2 and G3 accepting only `in-spec`: the прогон stopped at G2 or the
+  // таск that built it was refused as unasked-for work.
+  { file: 'phases/3-spec.md', literal: 'Every live требование is `in-spec`, `placeholder`, `deferred` or `dropped`',
+    why: 'a placeholder требование is built around its gap, so G2 settles it with the missing fact as its reason' },
+  { file: 'phases/4-plan.md', literal: 'every `in-spec` or `placeholder` требование maps to at least one таск',
+    why: 'G3 holds a placeholder требование to the same map as an in-spec one' },
+  { file: 'SKILL.md', literal: 'Every in-spec or placeholder требование maps to at least one таск',
+    why: 'the resident gate table agrees with the gate scripts' },
 ];
 
 /**
@@ -874,6 +891,12 @@ export const SIZE_ANCHORS: readonly Anchor[] = [
     why: 'the size notice is said at the манифест, before the прогон has spent anything' },
   { file: 'phases/1-manifest.md', literal: 'The прогон never stops itself on size',
     why: 'the notice offers a stop; it never takes one, because the user started the прогон' },
+  // A closed contract-10 state without `result` is refused at publish; the
+  // stop first listed its closing fields without it.
+  { file: 'phases/1-manifest.md', literal: '`finishedAt`, `result` — one line',
+    why: 'the stop at the манифест is a closure, and a closure publishes only with its result line' },
+  { file: 'phases/8-repair.md', literal: 'closure as stopped_incomplete, written as the acceptance phase writes its closing candidate',
+    why: 'a repair that stops closes with the same fields, `result` included, or the publish is refused' },
 ];
 
 /**

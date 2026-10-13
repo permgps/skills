@@ -13,6 +13,7 @@ import { REPAIR_OUTCOMES, STAGE_IDS, isMoment } from './contract.mts';
 import type {
   CheckExecution, CheckResult, RunState, VerificationCheck,
   VerificationObligation, VerificationRecord, SafeguardedRecord, VerificationResult, NegativeControl,
+  VerificationFinding, PromisedWork,
 } from './contract.mts';
 
 const log = createLogger('state');
@@ -64,6 +65,32 @@ function latestFirst<T extends { id: string }>(stamp: (item: T) => string): (a: 
     const right = instant(b);
     return right > left ? 1 : right < left ? -1 : b.id.localeCompare(a.id);
   };
+}
+
+/**
+ * Why a finding's resolving run cannot resolve it. Any existing run used to do,
+ * the very one the finding contradicted included, and a прогон closed
+ * `completed` over a finding nothing had answered. The run must be of a check
+ * the finding names, must pass, and must come after every run whose evidence
+ * the finding cites: a finding is answered by what was observed since.
+ */
+function resolutionFindings(item: VerificationFinding, executions: readonly CheckExecution[]): string[] {
+  const run = executions.find(execution => execution.id === item.resolutionExecutionId);
+  if (!run) return [];
+  const problems: string[] = [];
+  if (item.checkIds.length > 0 && !item.checkIds.includes(run.checkId)) {
+    problems.push(`${run.id} runs ${run.checkId}, which the finding does not name — resolve it with a passing run of ${item.checkIds.join(' or ')}`);
+  }
+  if (run.result !== 'passed') problems.push(`${run.id} is ${run.result} — only a passing run resolves a finding`);
+  const cited = new Set(item.evidenceIds);
+  const contradicted = executions.filter(execution => execution.evidenceIds.some(id => cited.has(id)));
+  if (contradicted.some(execution => execution.id === run.id)) {
+    problems.push(`${run.id} is the run the finding's own evidence came from — run the check again after the repair`);
+  } else if (contradicted.some(execution => !(Date.parse(run.executedAt) > Date.parse(execution.executedAt)))) {
+    problems.push(`${run.id} ran no later than the run the finding cites — a finding is answered by a run made since`);
+  }
+  if (problems.length > 0) log.debug('finding', 'resolution refused', { findingId: item.id, executionId: run.id, problems: problems.length });
+  return problems;
 }
 
 export function effectiveExecution(
@@ -522,6 +549,9 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
     if (item.resolutionExecutionId) references(`${at}.resolutionExecutionId`, [item.resolutionExecutionId], executionIds);
     if (item.supersedes) references(`${at}.supersedes`, [item.supersedes], findingIds);
     if (item.status === 'resolved' && !item.resolutionExecutionId) add(at, 'resolved finding needs a resolving execution');
+    if (item.status === 'resolved' && item.resolutionExecutionId) {
+      for (const message of resolutionFindings(item, record.executions)) add(`${at}.resolutionExecutionId`, message);
+    }
     if (!['open', 'resolved'].includes(item.status)) add(`${at}.status`, 'unknown finding status');
   });
   record.decisions.forEach((item, index) => {
@@ -646,12 +676,127 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
         || outstandingObligations.some(id => !acceptedObligations.has(id))) {
         add('outcome', 'exception closure needs bounded acceptance of every outstanding finding and obligation');
       }
+      // A требование can be failed or incomplete with nothing to select: no
+      // obligation, or every obligation passing under a missing coverage
+      // review. The two sets above then pass it through unaccepted.
+      const acceptedRequirements = new Set([
+        ...record.findings.filter(item => acceptedFindings.has(item.id)).flatMap(item => item.requirementIds),
+        ...record.obligations.filter(item => acceptedObligations.has(item.id)).flatMap(item => item.requirementIds),
+      ]);
+      const unaccepted = [...summary.failedIds, ...summary.incompleteIds].filter(id => !acceptedRequirements.has(id));
+      if (unaccepted.length > 0) {
+        log.debug('closure', 'exception closure leaves требования unaccepted', { unaccepted });
+        add('outcome', `exception closure leaves ${unaccepted.join(', ')} failed or incomplete with no accepted finding or obligation — `
+          + 'close stopped_incomplete, or give the user a decision that covers it');
+      }
     }
     if (state.outcome === 'stopped_incomplete' && !state.stopReason?.trim()) {
       add('stopReason', 'stopped incomplete run needs a reason');
     }
   }
   return errors;
+}
+
+/**
+ * How each key of the verification record may change from one write to the next.
+ *
+ * - `immutable`: a record, once published, is neither rewritten nor removed.
+ * - `append-only`: as `immutable`, and new records go after the old ones.
+ * - `one-way`: a record moves along one path and is never removed.
+ * - `guarded`: a rule of its own, here or in `closure.mts`.
+ * - `current`: recomputed on every write from what the run holds now.
+ *
+ * The transition reads its lists from here, and a test fails on a record key
+ * with no entry: the transition once froze only what it listed, and findings,
+ * promises and coverage reviews, listed nowhere, could be rewritten freely.
+ */
+export const TRANSITION_RULES = {
+  version: 'guarded',
+  targetRevision: 'guarded',
+  acceptanceInputDigest: 'current',
+  references: 'immutable',
+  surfaces: 'immutable',
+  obligations: 'immutable',
+  checks: 'immutable',
+  executions: 'immutable',
+  evidence: 'immutable',
+  findings: 'one-way',
+  decisions: 'immutable',
+  coverageReviews: 'immutable',
+  acceptanceRounds: 'immutable',
+  promisedWork: 'one-way',
+  repairLimits: 'guarded',
+  repairAttempts: 'immutable',
+  manifestDigest: 'current',
+  sourceSnapshots: 'append-only',
+  sourceClauses: 'append-only',
+  manifestAudits: 'append-only',
+  scopeBaseline: 'guarded',
+  scopeMappings: 'append-only',
+  journeys: 'append-only',
+  negativeControls: 'append-only',
+  readiness: 'guarded',
+  defects: 'guarded',
+  strategyReviews: 'guarded',
+  inheritedExecutionIds: 'guarded',
+  inheritedAttemptIds: 'guarded',
+} as const satisfies Record<string, 'immutable' | 'append-only' | 'one-way' | 'guarded' | 'current'>;
+
+const keysWithRule = (rule: string): string[] =>
+  Object.entries(TRANSITION_RULES).filter(([, value]) => value === rule).map(([key]) => key);
+
+/**
+ * The two published records that may move, and the one way each may.
+ *
+ * A finding is open until a run answers it, and a promise is open until a
+ * round keeps it or the user releases it. Left out of the immutable list, a
+ * write could delete either, or flip it without the run, round or decision the
+ * move stands for, and a прогон closed `completed` over a finding nobody fixed.
+ */
+function findingAndPromiseTransition(prior: VerificationRecord, current: VerificationRecord): VerificationViolation[] {
+  const errors: VerificationViolation[] = [];
+  for (const before of prior.findings) {
+    const after = current.findings.find(item => item.id === before.id);
+    const field = `verification.findings[${before.id}]`;
+    if (!after) {
+      errors.push({ field, message: 'a published finding cannot be removed — resolve it with a passing run, or supersede it with a new finding' });
+      continue;
+    }
+    const { status: _status, resolutionExecutionId: _resolution, ...rest } = after;
+    const { status: _was, resolutionExecutionId: _wasResolution, ...restBefore } = before;
+    const lawful = before.status === 'open'
+      ? isDeepStrictEqual(rest, restBefore) && (after.status === 'open'
+        ? after.resolutionExecutionId === undefined : after.status === 'resolved')
+      : isDeepStrictEqual(after, before);
+    if (!lawful) {
+      errors.push({ field, message: before.status === 'open'
+        ? 'an open finding may only become resolved, by a resolving run; its ids, evidence and words stay as published'
+        : 'a resolved finding is history — open a new finding that supersedes it' });
+    }
+  }
+  for (const before of prior.promisedWork) {
+    const after = current.promisedWork.find(item => item.id === before.id);
+    const field = `verification.promisedWork[${before.id}]`;
+    if (!after) {
+      errors.push({ field, message: 'a published promise cannot be removed — keep it with an acceptance round or release it by a user decision' });
+      continue;
+    }
+    if (!promiseMoveLawful(before, after)) {
+      errors.push({ field, message: before.status === 'open'
+        ? 'an open promise becomes done only with the acceptance round that kept it, or cancelled only with the user decision that released it'
+        : 'a kept or released promise is history and stays as published' });
+    }
+  }
+  if (errors.length > 0) log.debug('transition', 'finding or promise move refused', { violations: errors.length });
+  return errors;
+}
+
+function promiseMoveLawful(before: PromisedWork, after: PromisedWork): boolean {
+  if (before.status !== 'open') return isDeepStrictEqual(after, before);
+  if (after.id !== before.id || after.description !== before.description) return false;
+  if (after.status === 'open') return after.acceptanceRoundId === undefined && after.authorizationDecisionId === undefined;
+  if (after.status === 'done') return Boolean(after.acceptanceRoundId) && after.authorizationDecisionId === undefined;
+  return Boolean(after.authorizationDecisionId) && after.acceptanceRoundId === undefined;
 }
 
 /** Published records are history; a later write can append, not rewrite them. */
@@ -667,11 +812,10 @@ export function validateVerificationTransition(
     && STAGE_IDS.indexOf(previous.currentStage) <= STAGE_IDS.indexOf('plan')
     && !previous.stages.some(stage => stage.id === 'plan' && stage.status === 'done')
     && !previous.gates.some(gate => gate.id === 'G3' && gate.status === 'passed');
-  const collections: Array<keyof VerificationRecord> = [
-    'references', 'surfaces', 'obligations', 'checks', 'executions',
-    'evidence', 'decisions', 'acceptanceRounds',
-    'repairAttempts',
-  ];
+  // From TRANSITION_RULES, coverage reviews included: an incomplete review
+  // rewritten as complete is a coverage nobody performed.
+  const collections = keysWithRule('immutable') as Array<keyof VerificationRecord>;
+  errors.push(...findingAndPromiseTransition(prior, current));
   for (const name of collections) {
     const oldEntries = prior[name] as Array<{ id: string }>;
     const newEntries = current[name] as Array<{ id: string }>;
@@ -730,7 +874,7 @@ export function validateVerificationTransition(
     if (!lawful || current.version === 1) {
       errors.push({ field: 'verification.version', message: 'published safeguards cannot be downgraded' });
     } else {
-      for (const name of ['sourceSnapshots', 'sourceClauses', 'manifestAudits', 'scopeMappings', 'journeys', 'negativeControls'] as const) {
+      for (const name of keysWithRule('append-only') as Array<'sourceSnapshots' | 'sourceClauses' | 'manifestAudits' | 'scopeMappings' | 'journeys' | 'negativeControls'>) {
         if (!isDeepStrictEqual(current[name].slice(0, prior[name].length), prior[name])) {
           errors.push({ field: `verification.${name}`, message: 'source history must keep its append-only order' });
         }

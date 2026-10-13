@@ -836,12 +836,13 @@ exit codes.
   - Exit 0: covered. Exit 1: incomplete. Exit 2: bad arguments, an unreadable
     return file, or as above.
   - Canonical module: `tools/runtime/plan-units.mts`, for all three commands.
-- `--returns-check <return-file> [--root <worktree>] [--base <commit>]` reads
+- `--returns-check <return-file> [--root <worktree>] [--base <commit>] [--owns-no-check]` reads
   an executor's return and reports
   `{ ok, blocks, findings: [{ rule, checkId, line, message }], unchecked: [{ checkId, fact, reason }] }`
   without writing anything. `findings` holds:
   - every rule the return format carries (the red run included);
-  - `no-block` for a return with no block;
+  - `no-block` for a return with no block, unless `--owns-no-check` says
+    the таск executes no check;
   - what only the worktree and git can show:
     - `commit-not-base` and `red-against-not-base` for a `commit:`, or a red
       run's `base`/`parent` sha, that is not `--base`;

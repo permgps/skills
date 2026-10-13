@@ -171,7 +171,8 @@ anything you leave out is lost.
    The block is checked mechanically before anything in it is read: each
    capture against its hash, `commit` and `against` against the base you were
    handed, an existing check against that base. A refused block comes back to
-   you once, with each finding; fix the block, not the code.
+   you once, with each finding; fix the block, not the code. A таск that owns
+   no check — another таск executes every check it serves — returns no block.
    A check written to run on the target — your task file's verification map
    says `target:` — is written and committed like any other. It runs where the
    build lands, never here: return it `unavailable`, with `failureCause:

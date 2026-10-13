@@ -22,10 +22,12 @@ export type { GateFinding };
 const log = createLogger('gate-g2');
 
 /** Statuses a требование may still hold once the specification is written. */
-const SETTLED: RequirementStatus[] = ['in-spec', 'deferred', 'dropped'];
+// `placeholder` is S3's: the требование is built around a visible gap where a
+// fact about the user is missing, so it is as settled as `in-spec`.
+const SETTLED: RequirementStatus[] = ['in-spec', 'placeholder', 'deferred', 'dropped'];
 
-/** Of those, the ones that are only settled if the user's reason came with them. */
-const REASON_REQUIRED: RequirementStatus[] = ['deferred', 'dropped'];
+/** Of those, the ones that are only settled with a reason: the user's, or the missing fact named. */
+const REASON_REQUIRED: RequirementStatus[] = ['placeholder', 'deferred', 'dropped'];
 
 export function checkG2(state: RunState): GateFinding[] {
   const findings: GateFinding[] = [];

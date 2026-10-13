@@ -55,9 +55,9 @@ Three rules decide the cut, and they outrank the table:
 2. **A таск owns its files.** Two таски that edit the same file are one таск, or
    they are sequenced. Parallel width is bounded by file ownership, not by how
    many executors are available.
-3. **A таск traces to at least one требование**, and every `in-spec` требование
-   reaches at least one таск. That is G3, and it is what stops the cut from
-   drifting into work nobody asked for.
+3. **A таск traces to at least one требование**, and every `in-spec` or
+   `placeholder` требование reaches at least one таск. That is G3, and it is
+   what stops the cut from drifting into work nobody asked for.
 
 Four preferences shape the cut inside those rules. Each is a preference the
 plan may decline with a stated reason, never a hard rule; step 8 says where the
@@ -593,7 +593,8 @@ Ownership*, below, publishes its graph before G3 runs.
 
 The map between требования and таски holds in **both** directions:
 
-- every `in-spec` требование maps to at least one таск — nothing the user asked
+- every `in-spec` or `placeholder` требование maps to at least one таск —
+  a placeholder is built around its visible gap; nothing the user asked
   for was dropped on the way from the spec to the cut;
 - every таск traces back to at least one требование — nothing was added that
   nobody asked for.

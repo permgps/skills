@@ -528,6 +528,20 @@ every remaining failed/incomplete item while retaining technical results; and
 or be explicitly changed by the user before closure. A phase may finish while
 G4 fails. Closure never converts that failure into a pass.
 
+`closed_with_exceptions` covers a requirement only through a selected finding
+or obligation that names it. A failed or incomplete requirement with nothing
+selected keeps the run from that outcome.
+
+Findings, promises and coverage reviews are history like executions:
+- A published finding is never removed. An open one may become `resolved`
+  and nothing else about it changes. Its resolving run is a passing run of a
+  check it names, made after every run whose evidence it cites, so the run it
+  contradicted cannot answer it. A resolved finding stays as published; a new
+  finding supersedes it.
+- A promise is never removed. An open one becomes `done` with the acceptance
+  round that kept it, or `cancelled` with the user decision that released it.
+- A coverage review is immutable; a later review is appended.
+
 ### State examples
 
 | Case | Lifecycle / outcome | Verification and G4 |

@@ -242,6 +242,25 @@ test('V14/V15/V23: dashboard projection matches the state contract across closur
   assert.match(String(L.runNotice(old, 'en')), /verification not established.*G4: failed/);
 });
 
+test('an interrupted прогон with a verification record says it was interrupted and when, not only G4', () => {
+  // A frozen clock with no explanation is what the interruption rule exists to
+  // prevent; from contract 4 the verification line used to return first.
+  const state = structuredClone(verifiedState());
+  state.lifecycle = 'active';
+  delete state.outcome;
+  delete state.finishedAt;
+  delete state.result;
+  state.gates[3]!.status = 'pending';
+  state.interruptedAt = '2026-08-19T10:30:00.000Z';
+  const moment = L.formatMoment(state.interruptedAt);
+  for (const language of ['ru', 'en']) {
+    const notice = String(L.runNotice(state, language));
+    assert.ok(notice.includes(moment), `${language}: ${notice}`);
+    assert.match(notice, language === 'ru' ? /прерван/ : /interrupted/);
+    assert.match(notice, /G4/, 'the verification line is still said');
+  }
+});
+
 test('a duration reads as a clock at zero, in minutes and across an hour', () => {
   assert.equal(L.formatDuration(0), '0:00');
   assert.equal(L.formatDuration(9_000), '0:09');

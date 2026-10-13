@@ -145,37 +145,42 @@ record its address and cleanup, without opening a user-visible viewer.
 
 For each таск that returns done, in this order:
 
-1. **Append what it discovered** to `discovered-interfaces.md` as `D##` rows —
-   one per fact another таск would otherwise learn again. An interface that came
-   back different from `interfaces.md` is such a fact, and the difference is
-   recorded rather than reconciled: `interfaces.md` has one writer and it is not
-   this phase. Each row names the таск it came from — `D## — from таск NN —
-   <fact>` — because step 4 hands a dependent its blockers' rows by that name.
-1a. **Check the return, then import its evidence.** Before reading anything
-    else in it, run
-    `node .maestro/sync.mts --returns-check <return file> --root <its worktree, or the project root> --base <the commit the таск was handed>`.
-    - Exit `1`: send the return back to the same executor once, in this wave,
-      on the same tier, quoting each finding as the command printed it. **A
-      resend is not a retry**: `retries` does not move, no repair is opened,
-      and the executor finishes its own return. A second exit `1` makes the
-      таск come back incomplete, and it goes to the repair phase like any
-      other.
-    - Exit `2`: no return was read. Treat it as a missing return.
-    - `unchecked` facts: git could not decide them. Hand them to the review in
-      one line; they refuse nothing here.
+1. **Check the return, then import its evidence.** Before reading anything
+   else in it, run
+   `node .maestro/sync.mts --returns-check <return file> --root <its worktree, or the project root> --base <the commit the таск was handed>`.
+   Add `--owns-no-check` when the verification map names no check this таск
+   executes: an implementation таск whose checks a verification-only таск
+   runs returns no block, and without the flag an empty return is refused as
+   a lost one.
+   - Exit `1`: send the return back to the same executor once, in this wave,
+     on the same tier, quoting each finding as the command printed it. **A
+     resend is not a retry**: `retries` does not move, no repair is opened,
+     and the executor finishes its own return. A second exit `1` makes the
+     таск come back incomplete, and it goes to the repair phase like any
+     other. Nothing of a refused return is read, its discoveries included.
+   - Exit `2`: no return was read. Treat it as a missing return.
+   - `unchecked` facts: git could not decide them. Hand them to the review in
+     one line; they refuse nothing here.
 
-    WARN `build` `return refused` with `{ taskId, findings, resend }`, where
-    `findings` lists rules, never text. Then read each check-level result
-    and its task-owned captures. Verify the check/obligation IDs, invocation,
-    assertions, reference and integrated-build identity,
-    fixture/runtime/variant and relevant input hashes. Copy captures into
-    `.maestro/<dir>/evidence/<execution-id>/` under orchestrator ownership,
-    seal them, and add the execution/evidence records to the same state
-    candidate. Publish through `sync.mts --publish` only after validation.
-    Preserve an unavailable or failed result as such. A block the verification
-    procedures refuse for a reason the command cannot see goes back the same
-    way, once, and never in as a pass. Keep earlier executions immutable after
-    replay.
+   WARN `build` `return refused` with `{ taskId, findings, resend }`, where
+   `findings` lists rules, never text. Then read each check-level result
+   and its task-owned captures. Verify the check/obligation IDs, invocation,
+   assertions, reference and integrated-build identity,
+   fixture/runtime/variant and relevant input hashes. Copy captures into
+   `.maestro/<dir>/evidence/<execution-id>/` under orchestrator ownership,
+   seal them, and add the execution/evidence records to the same state
+   candidate. Publish through `sync.mts --publish` only after validation.
+   Preserve an unavailable or failed result as such. A block the verification
+   procedures refuse for a reason the command cannot see goes back the same
+   way, once, and never in as a pass. Keep earlier executions immutable after
+   replay.
+1a. **Append what it discovered** to `discovered-interfaces.md` as `D##` rows —
+    one per fact another таск would otherwise learn again. Only a return
+    step 1 accepted is read for them. An interface that came
+    back different from `interfaces.md` is such a fact, and the difference is
+    recorded rather than reconciled: `interfaces.md` has one writer and it is not
+    this phase. Each row names the таск it came from — `D## — from таск NN —
+    <fact>` — because step 4 hands a dependent its blockers' rows by that name.
 2. **Merge its worktree back**, if it had one.
 3. **Commit**, one commit per finished таск — yours, never the executor's, whose
    `commit:` only names the HEAD it worked on. A прогон survives a compaction and

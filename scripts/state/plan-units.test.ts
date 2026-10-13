@@ -110,6 +110,13 @@ test('rendering twice changes nothing, and a hand edit inside the markers is und
   assert.equal(withFactsSection(once, ''), TASK.replace(/\s+$/, '\n'), 'a section nobody cites any more is removed');
 });
 
+test('a fact holding `$$`, `$&` or `$\'` renders twice to the same task file, never as a replacement pattern', () => {
+  const section = `${FACTS_START}\n### F-1 — Shell\n\nRun \`echo $$\`, \`sed 's/x/$&/'\` and keep $' as written.\n${FACTS_END}`;
+  const once = withFactsSection(TASK, section);
+  assert.equal(withFactsSection(once, section), once);
+  assert.equal(currentFactsSection(withFactsSection(once, section)), section);
+});
+
 test(`a sentence of ${RESTATED_MIN} characters in two task files is restated; one shorter is not`, () => {
   const long = `${'x'.repeat(RESTATED_MIN - 1)}.`;
   const short = `${'y'.repeat(RESTATED_MIN - 2)}.`;

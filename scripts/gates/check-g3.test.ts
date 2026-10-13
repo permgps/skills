@@ -134,6 +134,27 @@ test('a таск building a dropped требование is reported the same wa
   assert.deepEqual(ids(findings), ['R02']);
 });
 
+test('a таск building a placeholder требование is asked-for work, not a finding', () => {
+  assert.deepEqual(checkG3(stateWith(
+    [
+      { id: 'R01', status: 'in-spec' },
+      { id: 'R02', status: 'placeholder', reason: 'the delivery price is not known yet' },
+    ],
+    [task('01', ['R01']), task('02', ['R02'])],
+  )), []);
+});
+
+test('a placeholder требование no таск builds is reported like an in-spec one', () => {
+  const findings = checkG3(stateWith(
+    [
+      { id: 'R01', status: 'in-spec' },
+      { id: 'R02', status: 'placeholder', reason: 'the delivery price is not known yet' },
+    ],
+    [task('01', ['R01'])],
+  ));
+  assert.deepEqual(ids(findings), ['R02']);
+});
+
 test('a deferred требование reached by no таск is not a finding', () => {
   // Only in-spec требования must reach a таск. A deferred one reaching none is
   // exactly what deferring it meant.

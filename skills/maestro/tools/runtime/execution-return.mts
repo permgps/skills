@@ -10,7 +10,7 @@
 // tooling is a rule a прогон does not have. An outside report (2026-10-13)
 // found formal acceptance dragging on tests nobody had seen fail: the parser
 // existed, but nothing in a run called it, so a missing red run was caught only
-// by the reviewer, a whole phase later. Build step 1a now runs it on every
+// by the reviewer, a whole phase later. Build step 1 now runs it on every
 // return before reading anything else (`--returns-check`).
 //
 // What the parser does not check, because it never sees the worktree:
@@ -386,7 +386,6 @@ function blockFindings(block: ExecutionReturnBlock): Finding[] {
   return [...findings, ...redFindings(block, result)];
 }
 
-
 /** Every reason each block cannot be imported, one finding per broken rule. */
 export function returnFindings(blocks: readonly ExecutionReturnBlock[]): ReturnFinding[] {
   const findings: ReturnFinding[] = [];
@@ -540,7 +539,7 @@ function option(args: readonly string[], name: string): string | null {
 }
 
 /**
- * `--returns-check <file> [--root <dir>] [--base <sha>]`: one JSON result.
+ * `--returns-check <file> [--root <dir>] [--base <sha>] [--owns-no-check]`: one JSON result.
  * Exit 0 when nothing is found, 1 on any finding, 2 on a missing or unreadable
  * file. It reads and reports; the orchestrator decides, and nothing is written.
  */
@@ -550,7 +549,7 @@ export async function returnsCheckCommand(
   const file = args[1];
   if (!file || file.startsWith('--')) {
     log.error('check', 'no return file named', { args });
-    return { result: { error: 'usage: --returns-check <return file> [--root <worktree>] [--base <commit handed>]' }, code: 2 };
+    return { result: { error: 'usage: --returns-check <return file> [--root <worktree>] [--base <commit handed>] [--owns-no-check]' }, code: 2 };
   }
 
   let text: string;
@@ -565,7 +564,12 @@ export async function returnsCheckCommand(
   const root = path.resolve(option(args, '--root') ?? path.dirname(runDir));
   const blocks = parseExecutionReturns(text);
   const findings = returnFindings(blocks);
-  if (blocks.length === 0) {
+  // An implementation таск whose checks another таск executes owns none, so
+  // it returns no block. Only the orchestrator, holding the verification map,
+  // can say so; without the flag an empty return is a lost block, not a quiet one.
+  const ownsNoCheck = args.includes('--owns-no-check');
+  if (blocks.length === 0 && ownsNoCheck) log.info('check', 'no block expected', { ownsNoCheck });
+  if (blocks.length === 0 && !ownsNoCheck) {
     findings.push({ rule: 'no-block', checkId: null, line: 0, message:
       `the return holds no "format: ${RETURN_FORMAT}" block — return one block per check, in the template's shape` });
   }

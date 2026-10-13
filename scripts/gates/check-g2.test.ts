@@ -68,6 +68,20 @@ test('deferred and dropped each need the user reason to carry over', () => {
   );
 });
 
+test('a placeholder требование naming what is missing is settled: it is built, around a visible gap', () => {
+  assert.deepEqual(checkG2(stateWith([
+    { id: 'R01', status: 'in-spec' },
+    { id: 'R02', status: 'placeholder', reason: 'the delivery price is not known yet' },
+  ])), []);
+});
+
+test('a placeholder требование with no reason is not settled — the gap has to be named', () => {
+  assert.deepEqual(ids(checkG2(stateWith([
+    { id: 'R01', status: 'placeholder' },
+    { id: 'R02', status: 'placeholder', reason: '  ' },
+  ]))), ['R01', 'R02']);
+});
+
 test('an empty manifest fails', () => {
   const findings = checkG2(stateWith([]));
   assert.equal(findings.length, 1);

@@ -1,4 +1,4 @@
-// `sync.mts --returns-check`: build step 1a's mechanical half, run on every
+// `sync.mts --returns-check`: build step 1's mechanical half, run on every
 // executor return before anything in it is read.
 //
 // Driven through the copied `sync.mts` inside a real temporary project, the way
@@ -161,6 +161,27 @@ test('a return that holds no block at all is refused, never read as nothing to r
     const outcome = await target.check('All checks passed.\n');
     assert.equal(outcome.code, 1);
     assert.deepEqual(rules(outcome), ['no-block']);
+  } finally { await target.dispose(); }
+});
+
+test('a таск that owns no check returns no block, and --owns-no-check accepts that', needsGit, async () => {
+  const target = await project();
+  try {
+    const outcome = await target.check('Implemented the search page; T07 runs its checks.\n',
+      ['--root', target.root, '--base', target.base, '--owns-no-check']);
+    assert.equal(outcome.code, 0, JSON.stringify(outcome));
+    assert.deepEqual(rules(outcome), []);
+    assert.equal(outcome.blocks, 0);
+  } finally { await target.dispose(); }
+});
+
+test('--owns-no-check still checks a block the таск returned anyway', needsGit, async () => {
+  const target = await project();
+  try {
+    const outcome = await target.check(await cleanBlock(target, { red: [] }),
+      ['--root', target.root, '--base', target.base, '--owns-no-check']);
+    assert.equal(outcome.code, 1);
+    assert.deepEqual(rules(outcome), ['red-missing']);
   } finally { await target.dispose(); }
 });
 

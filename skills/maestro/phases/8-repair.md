@@ -197,7 +197,8 @@ Valid: eight attempts closed no таск; the review finds the schema таск s
 repair and decides to close it first. Invalid: a ninth attempt with no review,
 a review written by the coordinator, or «raise the limit» with no forecast.
 Next action: the attempt the decision allows, or closure as stopped_incomplete,
-then the memory run after a closure, which ends with the closing commit.
+written as the acceptance phase writes its closing candidate, `result`
+included, then the memory run after a closure, which ends with the closing commit.
 
 ### 3. If it is a retry — hand it over again
 
@@ -210,7 +211,7 @@ and write the state at that transition. **Every repair and retry executor runs
 all for `session` or for a run with no `models` (contract 7), effort equal to
 the session's.
 
-Its return goes through the build phase's step 1a check, with
+Its return goes through the build phase's step 1 check, with
 `--base <the parent commit>`: the commit this attempt started from. The same
 single resend applies, and it spends no retry.
 

@@ -2671,8 +2671,12 @@ globalThis.MAESTRO_LOGIC = (function () {
     if (!state) return null;
     var say = words(language).UI;
     if (state.contractVersion >= 4) {
-      try { return say.verificationNotice(verificationOf(state)); }
-      catch (error) { return language === 'en' ? 'Verification record cannot be read.' : 'Запись проверки не читается.'; }
+      // An interruption is said first: the verification line alone left the
+      // clocks frozen with no word on why. A closed run's stale stamp is not one.
+      var interrupted = state.interruptedAt && state.lifecycle !== 'closed' && !state.finishedAt
+        ? say.interruptedNotice(formatMoment(state.interruptedAt)) + ' ' : '';
+      try { return interrupted + say.verificationNotice(verificationOf(state)); }
+      catch (error) { return interrupted + (language === 'en' ? 'Verification record cannot be read.' : 'Запись проверки не читается.'); }
     }
     if (state.finishedAt) return say.verificationNotice(verificationOf(state));
     if (state.interruptedAt) return say.interruptedNotice(formatMoment(state.interruptedAt));

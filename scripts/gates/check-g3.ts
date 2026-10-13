@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // G3 — the gate after the plan phase.
 //
-// Pass condition, from docs/spec/gates.md: every in-spec требование maps to at
-// least one таск, every таск traces back to at least one требование, and a
-// reader given exactly what an executor will be given finds each task file
-// buildable without asking a question. Two mechanical rules came from a run
+// Pass condition, from docs/spec/gates.md: every in-spec or placeholder
+// требование maps to at least one таск, every таск traces back to at least one
+// требование, and a reader given exactly what an executor will be given finds
+// each task file buildable without asking a question. Two mechanical rules came from a run
 // whose repairs kept reopening each other: таски sharing a path in `files` or
 // `zone` are ordered by `blockedBy`, and a check's execution owner transitively
 // depends on every integration prerequisite of that check.
@@ -44,6 +44,10 @@ import { runGate, targetFromArgv, type GateFinding } from './cli.ts';
 export type { GateFinding };
 
 const log = createLogger('gate-g3');
+
+// Statuses a таск builds. `placeholder` is S3's: the требование is built around
+// a visible gap, so it needs a таск and an obligation exactly as `in-spec` does.
+const BUILT: readonly string[] = ['in-spec', 'placeholder'];
 
 /**
  * Every таск reachable through `blockedBy` from `id`, the таск itself excluded.
@@ -102,7 +106,7 @@ export function checkG3(state: RunState): GateFinding[] {
         });
         continue;
       }
-      if (requirementStatus !== 'in-spec') {
+      if (!BUILT.includes(requirementStatus)) {
         findings.push({
           requirementId,
           message: `таск ${taskId} traces to ${requirementId}, which is "${requirementStatus}" `
@@ -116,10 +120,10 @@ export function checkG3(state: RunState): GateFinding[] {
 
   // --- backward: every in-spec требование was reached by some таск ----------
   for (const [id, requirementStatus] of status) {
-    if (requirementStatus === 'in-spec' && !reached.has(id)) {
+    if (BUILT.includes(requirementStatus) && !reached.has(id)) {
       findings.push({
         requirementId: id,
-        message: `требование ${id} is in-spec and no таск builds it — it was dropped `
+        message: `требование ${id} is ${requirementStatus} and no таск builds it — it was dropped `
           + 'between the specification and the cut',
       });
     }
@@ -204,7 +208,7 @@ export function checkG3(state: RunState): GateFinding[] {
       }
     }
     for (const [id, requirementStatus] of status) {
-      if (requirementStatus === 'in-spec' && !covered.has(id)) findings.push({ requirementId: id,
+      if (BUILT.includes(requirementStatus) && !covered.has(id)) findings.push({ requirementId: id,
         message: `requirement ${id} has no current observable obligation` });
     }
     const visiting = new Set<string>();
@@ -250,6 +254,7 @@ export function checkG3(state: RunState): GateFinding[] {
     tasks: state.tasks.length,
     requirements: state.requirements.length,
     inSpec: [...status.values()].filter(value => value === 'in-spec').length,
+    placeholder: [...status.values()].filter(value => value === 'placeholder').length,
     edges,
   });
 

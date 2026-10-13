@@ -191,6 +191,7 @@ Every требование leaves this phase with a final status, and **none sta
 | Status | When | Reason required |
 |---|---|---|
 | `in-spec` | it has an entry in `spec.md` | no |
+| `placeholder` | it has an entry in `spec.md` built around a visible placeholder (S3, above) | yes: the missing fact |
 | `deferred` | out of this прогон, with the user's reason from брифинг | yes |
 | `dropped` | withdrawn by the user, in their own words | yes |
 
@@ -212,8 +213,9 @@ If they ever differ anywhere else, one of them is wrong.
 
 **G2 runs after this phase**, and its intent and raw-reference checks must pass.
 
-1. **The statuses.** Every live требование is `in-spec`, `deferred` or `dropped`,
-   with zero left `open` and a reason recorded for each of the last two.
+1. **The statuses.** Every live требование is `in-spec`, `placeholder`,
+   `deferred` or `dropped`, with zero left `open` and a reason recorded for each
+   of the last three.
 2. **The independent intent reader.** Hand `brief.md` and `spec.md` — and
    nothing else — to a reader briefed by
    [`prompts/independent-reader.md`](../prompts/independent-reader.md). It

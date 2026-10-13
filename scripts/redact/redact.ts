@@ -140,6 +140,9 @@ const VALUE_CHARSET = /^[A-Za-z0-9._~+/=:@-]+$/;
 /** Marks of a generated secret rather than a word: digits and token punctuation. */
 const TOKEN_SHAPE = /[0-9_~+/=-]/;
 
+/** Printable ASCII without spaces: what an unquoted value can be at all. */
+const PRINTABLE = /^[\x21-\x7e]+$/;
+
 /**
  * What `key = value` looks like when it is code rather than configuration:
  * `password = getpass()`, `PASSWORD = os.environ["PASSWORD"]`. Applied only
@@ -200,10 +203,33 @@ const RULES: Rule[] = [
     accept: match => !/^\d{1,5}\//.test(match[3] ?? ''),
   },
   {
+    // `[ \t]` and not `\s`: a heading "## Token" over a dotted word on the next
+    // line is prose. `Token` is matched as a header writes it, because in prose
+    // "each token internationalization…" is a word followed by a long word.
     id: 'bearer',
-    pattern: /\b(?:Bearer|Token)\s+([A-Za-z0-9._~+/=-]{16,})/dgi,
+    pattern: /\b(?:[Bb]earer|BEARER|Token|TOKEN)[ \t]+([A-Za-z0-9._~+/=-]{16,})/dg,
     group: 1,
     name: () => 'BEARER_TOKEN',
+  },
+  {
+    // `Basic <base64 of user:password>` is the password itself, merely encoded.
+    // After an `Authorization:` header it is taken as it stands; anywhere else
+    // "Basic" is an English word, so the value must look generated.
+    id: 'basic',
+    pattern: /(?:\bAuthorization:[ \t]*|\b)Basic[ \t]+([A-Za-z0-9+/]{8,}={0,2})(?![A-Za-z0-9+/=])/dgi,
+    group: 1,
+    name: () => 'BASIC_AUTH',
+    accept: match => /^authorization:/i.test(match[0])
+      || ((match[1] ?? '').length >= 16 && TOKEN_SHAPE.test(match[1] ?? '')),
+  },
+  {
+    // `curl -u user:password` and `--user=user:password`. Only the password
+    // goes; `docker run -u 1000:1000` is a uid and gid, not a credential.
+    id: 'user-flag',
+    pattern: /(?<![\w-])(?:-u|--user)(?:[ \t]+|=)(['"]?)([^\s:'"]*):([^\s'"]+)\1/dg,
+    group: 3,
+    name: () => 'HTTP_PASSWORD',
+    accept: match => !/^\d+$/.test(match[3] ?? ''),
   },
 ];
 
@@ -307,6 +333,7 @@ function isCredentialAssignment(
   spaced: boolean,
   value: string,
   quoted: boolean,
+  keyQuoted = false,
 ): boolean {
   if (strength === 'none') return false;
   // An earlier pass already did this; a placeholder is not a second secret.
@@ -319,8 +346,12 @@ function isCredentialAssignment(
 
   if (separator === ':') {
     if (!strong) return false;
-    if (WHITESPACE.test(value)) return false;
-    if (!quoted && !VALUE_CHARSET.test(value)) return false;
+    // Spaces only in a JSON pair, key and value both quoted: that is a
+    // passphrase. Under a bare key it is a label — `password: "Enter yours"`.
+    if (WHITESPACE.test(value) && !(quoted && keyQuoted)) return false;
+    // Under a key that names a credential the charset proves nothing (see
+    // VALUE_CHARSET); only the brackets a type or a call needs rule it out.
+    if (!quoted && (EXPRESSION_SHAPE.test(value) || !PRINTABLE.test(value))) return false;
     return TOKEN_SHAPE.test(value) || value.length >= MIN_COLON_VALUE_LENGTH;
   }
 
@@ -331,6 +362,64 @@ function isCredentialAssignment(
   // string being concatenated — `token = 'Bearer ' + value`.
   if (quoted) return value.trim() === value;
   return !EXPRESSION_SHAPE.test(value);
+}
+
+/** A JSON string inside a JSON string inside a transcript is as deep as it goes. */
+const MAX_ESCAPE_DEPTH = 2;
+
+/** A double-quoted string, escapes included; unambiguous, so linear. */
+const STRING_LITERAL = /"((?:[^"\\\n\r]|\\.)*)"/g;
+
+const ESCAPES: Record<string, string> = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', '"': '"', '\\': '\\', '/': '/' };
+
+interface EscapedLiteral {
+  decoded: string;
+  /** For each decoded code unit, where its escape starts and ends in the text. */
+  starts: number[];
+  ends: number[];
+}
+
+/**
+ * Every double-quoted string in `text` that carries a JSON escape, decoded,
+ * with a map back to the text. A string without one reads the same either way
+ * and is left to the rules; one that does not decode as JSON is not JSON.
+ */
+function escapedLiterals(text: string): EscapedLiteral[] {
+  const literals: EscapedLiteral[] = [];
+  for (const match of text.matchAll(STRING_LITERAL)) {
+    const body = match[1] ?? '';
+    if (!body.includes('\\')) continue;
+    const from = match.index + 1;
+    let decoded = '';
+    const starts: number[] = [];
+    const ends: number[] = [];
+    let valid = true;
+    for (let i = 0; i < body.length && valid; ) {
+      if (body[i] !== '\\') {
+        decoded += body[i];
+        starts.push(from + i);
+        ends.push(from + i + 1);
+        i += 1;
+        continue;
+      }
+      const code = body[i + 1] ?? '';
+      if (code === 'u' && /^[0-9a-fA-F]{4}$/.test(body.slice(i + 2, i + 6))) {
+        decoded += String.fromCharCode(parseInt(body.slice(i + 2, i + 6), 16));
+        starts.push(from + i);
+        ends.push(from + i + 6);
+        i += 6;
+      } else if (code in ESCAPES) {
+        decoded += ESCAPES[code];
+        starts.push(from + i);
+        ends.push(from + i + 2);
+        i += 2;
+      } else {
+        valid = false;
+      }
+    }
+    if (valid) literals.push({ decoded, starts, ends });
+  }
+  return literals;
 }
 
 interface Hit {
@@ -350,11 +439,28 @@ interface Hit {
  * an assignment whose value is the word "Bearer", and what stops
  * `ANTHROPIC_API_KEY=sk-ant-…` from being counted twice.
  */
-function scanRules(text: string): Hit[] {
+function scanRules(text: string, depth = 0): Hit[] {
   const hits: Hit[] = [];
   const claimed: Array<[number, number]> = [];
   const overlapsClaimed = (start: number, end: number): boolean =>
     claimed.some(([from, to]) => start < to && from < end);
+
+  // Escaped strings first, read as what they say. A transcript line is JSON,
+  // so a file it quotes arrives as `password: x\n` or `{\"token\": \"…\"}`, and
+  // no rule below can read a key through those escapes. A hit inside claims
+  // its span, so the rules below do not read the same value a second time.
+  if (depth < MAX_ESCAPE_DEPTH) {
+    for (const literal of escapedLiterals(text)) {
+      for (const inner of scanRules(literal.decoded, depth + 1)) {
+        const start = literal.starts[inner.index]!;
+        const end = literal.ends[inner.index + inner.length - 1]!;
+        const matchIndex = literal.starts[inner.matchIndex]!;
+        if (overlapsClaimed(matchIndex, end)) continue;
+        claimed.push([matchIndex, end]);
+        hits.push({ name: inner.name, index: start, length: end - start, matchIndex });
+      }
+    }
+  }
 
   for (const rule of RULES) {
     for (const match of text.matchAll(rule.pattern)) {
@@ -383,7 +489,7 @@ function scanRules(text: string): Hit[] {
 
     const spaced = (match[3] ?? '') !== '' || (match[5] ?? '') !== '';
     const content = text.slice(value.start, value.end);
-    if (!isCredentialAssignment(strength, match[4] ?? '', spaced, content, value.quoted)) continue;
+    if (!isCredentialAssignment(strength, match[4] ?? '', spaced, content, value.quoted, (match[1] ?? '') !== '')) continue;
     if (overlapsClaimed(match.index, value.constructEnd)) continue;
 
     claimed.push([match.index, value.constructEnd]);

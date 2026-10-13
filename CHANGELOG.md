@@ -18,7 +18,7 @@ number that claimed more than that would be claiming it falsely.
   real build said formal acceptance dragged because some tests had no initial
   failing run. The red-run rule existed, but its parser was repository tooling
   that no прогон ran, so only the reviewer caught a missing red run, a phase
-  later. The parser now ships in the runtime, and build step 1a runs
+  later. The parser now ships in the runtime, and build step 1 runs
   `sync.mts --returns-check` on every return. Besides the format and the red
   run, it holds `commit` and the red run's base to the commit the таск was
   handed, an existing check to that base, and each capture to its SHA-256. A
@@ -42,6 +42,25 @@ number that claimed more than that would be claiming it falsely.
   - the *Disagreements* cell of the acceptance phase said less than its spec
     twin;
   - the dashboard spec pointed at a report section that did not exist.
+- **Fixed after a whole-project review:**
+  - a later write could delete an open finding or promise, flip either
+    without its run, round or decision, or rewrite a coverage review in place,
+    and close the прогон `completed`; these now move only one way;
+  - a finding could be resolved by any run, the one it contradicted
+    included; now only a later passing run of a check it names resolves it;
+  - `closed_with_exceptions` let through a failed or incomplete требование
+    that no accepted finding or obligation named;
+  - an implementation таск that owns no check was always refused at intake
+    (`--owns-no-check`), and its discoveries were read before its return was
+    checked;
+  - the manifest's stop and a repair's stop closed without `result`, so the
+    publish was refused;
+  - a `placeholder` требование could pass neither G2 nor G3;
+  - a second `--plan-render` mangled a shared fact holding `$$` or `$&`;
+  - the dashboard never said a contract-4+ прогон was interrupted;
+  - redaction let through passwords inside JSON-escaped transcript text,
+    `Authorization: Basic`, YAML passwords with `&` or `#`, quoted JSON
+    passphrases and `curl -u`, and read "token" in prose as a bearer token.
 
 - **A plan reader judges every instruction, and a fix rewrites it.** A
   domtut_copy run spent 61 G3 rounds and 1.8 B reader input tokens. Its first
