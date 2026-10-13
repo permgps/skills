@@ -202,6 +202,36 @@ running at the same time agree without talking to each other.
 - `interfaces.md` stays the authority on names. Where `codebase.md` and a
   signature here differ without a `renames` row, the plan is wrong.
 
+### 3b. Write `shared.md`
+
+**A fact two or more task files need is written once**, in
+`.maestro/<dir>/shared.md`, as a third-level heading and its body:
+
+```markdown
+### F-12 — Row 3.24.9: password field
+Old behaviour, new behaviour, the oracle a check compares against, and every
+decision taken about it.
+```
+
+A source row, an oracle, an approved deviation, an expected value, and every
+decision about any of them belong here when more than one таск needs them —
+the таск that builds it, the таск that verifies it, the таск that records it.
+A task file cites the id inside its units (`as F-12 says`) and never restates
+the fact. A fact only one таск needs stays in that task file. Number facts
+`F-1` upward, once each.
+
+Run `node .maestro/sync.mts --plan-render` after every change to `shared.md`.
+It copies each cited entry, verbatim, into the task file's facts section,
+between `<!-- maestro:facts:start -->` and `<!-- maestro:facts:end -->`, so an
+executor and a reader are still handed one task file. Nothing between those
+markers is ever edited by hand: change `shared.md` and render again. A cited id
+`shared.md` does not define stops the render, and nothing is written.
+
+**Why once.** A прогон restated each of its 167 checklist rows in nearly five
+task files, and then recorded decisions about a row in each task separately.
+Three task files came to say three things about one row, and every round of
+G3 found another such pair. A fact with one home cannot disagree with itself.
+
 ### 4. Write the task files
 
 One file per таск at `.maestro/<dir>/tasks/NN-<slug>.md`, numbered in dependency
@@ -217,7 +247,7 @@ Each file carries:
 |---|---|
 | Id and title | `NN` and one line saying what will exist when it is done |
 | Требования | the ids it serves, so the review and G3 can both find them |
-| What to build | the relevant part of the spec, restated in full — not a pointer to it |
+| What to build | the relevant part of the spec, restated in full — not a pointer to it — except a fact cited from `shared.md`, which the render copies in |
 | User contract and authority | exact redacted request/addition quotations with their SRC/CL IDs and source digest, and approved deviations; no unrelated spec or rationale |
 | References | each `REF-*` id this таск follows, in backticks, then its role and location: `` `REF-8` — visual reference: https://domtut2-old.test, 1440 and 390 ``; or `none` |
 | Verification map | obligation/check IDs, observable behavior, implementation owner if needed, execution owner, integration prerequisites, and applicable variants |
@@ -229,6 +259,21 @@ Each file carries:
 | Prerequisites | each thing this таск consumes, named with the таск that produces it and its row in the Seams table of `interfaces.md` |
 | Forbidden writes | always `.maestro/`, plus every zone another таск owns |
 | Completion artifacts | what must exist when the таск is done; every one lies inside the files this таск owns |
+
+**Every instruction is a unit.** *What to build*, *Verification map* and *Done
+means* are written as sections whose items are units: a list item that opens
+with its id in backticks, numbered from `U1` in each task file.
+
+```markdown
+## Done means
+
+- `U7` The search spec passes with `?rooms=2` kept on reload, as F-12 says.
+```
+
+One unit holds one thing an executor acts on or checks. The `| Model |` and
+`| References |` rows stay in the header table, where G3 reads them. Units are
+what a reader is held to in step 5, so an instruction outside a unit is one no
+reader is asked about.
 
 **The References row is how a comparable reaches the таск.** Cite in it, by its
 `REF-*` id from `reference.md`, each reference whose surface, behaviour or look
@@ -293,7 +338,8 @@ Hand every task file to its own subagent, briefed by
 [`../prompts/task-reader.md`](../prompts/task-reader.md), together with
 `interfaces.md`. **Nothing else** — not `spec.md`, not the манифест, not the
 other task files. It is given exactly what its executor will be given, and asked
-one question: could you build this without asking a question?
+one question: could you build this without asking a question? With them goes
+the list of unit ids it must judge, one verdict line each.
 
 A dependent таск's executor will also be handed the `D##` rows its blockers
 record, and those do not exist yet. So a task file is buildable without the
@@ -306,6 +352,29 @@ never fills a gap the task file left.
 
 They are independent of each other, so they go out at once and the wave is as
 wide as the host allows.
+
+**A reader is held to every unit it is asked about.** Save each return as
+`plan-reads/r<round>-<NN>.md` and run
+`node .maestro/sync.mts --plan-coverage <NN> <that file>`. It names the units the
+return skipped, invented or judged twice. An incomplete return goes back to a
+fresh reader for its missing units only, in the same round; a return never
+counts until it is covered. This is what turns a reader from a sampler into an
+enumeration: a reader handed a large task file and an open question reports
+what it happened to notice, and the next fresh reader notices something else.
+
+**Round 1 reads every unit; a later round reads only what changed.** Before
+round 1, run `node .maestro/sync.mts --plan-units`: it lists each task file's
+units and exits 1 on a violation — a unit id twice, a file with no unit, an
+unknown or doubly defined fact, a stale facts section, or a passage restated in
+two task files. Each violation is a finding of this round. When every return
+of a round is covered, run `node .maestro/sync.mts --plan-units --record`. In
+the next round, after the fixes and `--plan-render`, `--plan-units` marks a unit
+changed when its text changed, when a fact it cites changed, or when
+`interfaces.md` changed. Only a таск with a changed unit gets a reader, asked
+for verdicts on its changed units only. It is still handed the whole task file,
+because a rewritten unit can contradict one that did not move, and such a
+contradiction is reported on the changed unit. Log INFO `round` with
+`{ round, readers, requestedUnits, findings }` once per round.
 
 The reader checks ownership and feasibility: **a task requiring a visible
 viewer takeover, a missing headless prerequisite, or work another task owns is
@@ -329,10 +398,46 @@ Log INFO with the verdict and the counts of tasks and findings, and WARN once
 per `CD-N`. The same reader is dispatched again when repair finds a defect
 that crosses tasks.
 
-Act on every finding by editing the task file, here, before any executor sees
-it. Then record them in the G3 entry of the run state, one line per failed
-round as *Gates* below says — an empty list is a real
-answer, and a gate passed while carrying findings is not passed.
+It returns one verdict line per таск it is asked about (`T03: ok`) and per row
+of the Seams table (`seam <Seam cell>: ok`), each `CD-N` under the verdict it
+belongs to. Save it as `plan-reads/r<round>-consistency.md`;
+`--plan-coverage consistency <that file>` holds it to that list. In
+round 1 the list is every таск and every seam. In a later round it is the
+таски with a changed unit and the seams that name them, and the reader goes
+out only when some unit, fact or `interfaces.md` changed. Facts sections are
+generated copies of `shared.md`: identical copies in two task files are not a
+collision.
+
+The reading half of G3 passes when every return of the last round is covered
+and carries no finding, and `--plan-units` exits 0.
+
+**Act on a finding by rewriting the text it quotes, in place, so the file says
+one thing.** Here, before any executor sees it:
+
+- **Rewrite; never append.** Change the unit, or the fact in `shared.md`, that
+  the finding quotes. Never add a later note that overrides earlier text — a
+  second decision about the same thing, «supersedes», «instead of the above».
+  A file carrying both the old instruction and its correction is the
+  contradiction the next reader will find.
+- **A fix to anything two таски need is made in `shared.md`**, then rendered.
+  A `restated` passage from `--plan-units` is such a fact: move it to
+  `shared.md` and cite it.
+- **Fix the class, not the instance.** Before closing a finding, search every
+  task file and `shared.md` for the same term, the same row, the same pattern,
+  and fix every instance in this round. Log INFO `sweep` with
+  `{ finding, swept }`.
+
+Then record them in the G3 entry of the run state, one line per failed round as
+*Gates* below says — an empty list is a real answer, and a gate passed while
+carrying findings is not passed.
+
+**Why units, rewrites and one home for a fact.** A прогон ran G3 for sixty-one
+rounds. Its first round found 244 things, and the tail never ended: in the last
+twenty rounds, two findings in three quoted text that had been in the file for
+ten rounds or more, and that about twenty earlier readers had been given. The
+fixes were appended as new decisions beside the old ones, so contradictions
+between decisions grew from 1% of findings to 11%. One row restated in several
+task files gave the rest. The readers spent 1.8 billion input tokens.
 
 **Why this is a gate half and not a proofread.** The first end-to-end прогон cut
 five таски, and four of the five task files contradicted themselves or left a
@@ -487,7 +592,8 @@ itself.
   reports what cannot be satisfied rather than looping.
 - **G3 runs at most 60 rounds, whatever each one found.** A round is one
   evaluation of the gate: the mechanical half, every reader dispatched for it,
-  and what came back. A failed round appends one line to G3's `findings` that
+  and what came back; an incomplete return sent back for its missing units
+  belongs to the same round. A failed round appends one line to G3's `findings` that
   opens with its round number and says in short what was found and what was
   done; the number on the last line is the count a compaction cannot lose. When
   round 60 fails, and each sixtieth after it, log WARN once with the gate, the
@@ -506,6 +612,9 @@ itself.
 | Artifact | State |
 |---|---|
 | `.maestro/<dir>/interfaces.md` | written once, the boundaries derived from the spec |
+| `.maestro/<dir>/shared.md` | every fact two or more таски need, once, as `### F-<n>`; absent when none is shared |
+| `.maestro/<dir>/tasks/units.json` | the unit, fact and `interfaces.md` hashes `--plan-units --record` took after the last covered round |
+| `.maestro/<dir>/plan-reads/` | each G3 reader return of each round, as `r<round>-<NN>.md` or `r<round>-consistency.md` |
 | `.maestro/<dir>/tasks/NN-<slug>.md` | one file per таск, each self-sufficient |
 | `.maestro/state.js` | `tasks[]` filled whole — ids, `requirementIds`, `blockedBy`, `wave`, `zone`, counters at zero; `G3` recorded as passed |
 

@@ -318,7 +318,7 @@ async function replaceFile(target: string, body: string): Promise<void> {
 }
 
 /**
- * `--plan-units [--record]`, `--plan-render` and `--plan-coverage <NN|consistency> <return-file>`:
+ * `--plan-units [--record]`, `--plan-render` and `--plan-coverage <NN|consistency> <return-file> [--all]`:
  * one JSON result each. See the contract named at the top of this file for
  * every exit code.
  */
@@ -350,9 +350,11 @@ export async function planUnitsCommand(args: string[], runDir: string): Promise<
 
   if (args[0] === '--plan-coverage') {
     const [, scope, returnFile] = args;
+    // `--all` asks about everything, baseline or not: repair re-reads a built plan whose units did not move.
+    const everything = args.includes('--all');
     if (!scope || !returnFile || (scope !== 'consistency' && !plan.tasks.has(scope))) {
       log.error('coverage', 'bad arguments', { scope, returnFile });
-      return { result: { error: 'usage: --plan-coverage <NN|consistency> <return-file>, NN a task file of this run' }, code: 2 };
+      return { result: { error: 'usage: --plan-coverage <NN|consistency> <return-file> [--all], NN a task file of this run' }, code: 2 };
     }
     let returnText: string;
     try { returnText = await readFile(path.resolve(returnFile), 'utf8'); }
@@ -362,18 +364,18 @@ export async function planUnitsCommand(args: string[], runDir: string): Promise<
     }
     const listed = listTasks(plan);
     const changedOf = (task: Record<string, unknown>): string[] =>
-      (task['units'] as Array<{ id: string; changed: boolean }>).filter(unit => unit.changed).map(unit => unit.id);
+      (task['units'] as Array<{ id: string; changed: boolean }>).filter(unit => everything || unit.changed).map(unit => unit.id);
     let requested: string[];
     if (scope === 'consistency') {
       const touched = listed.tasks.filter(task => changedOf(task).length > 0).map(task => String(task['id']));
-      const seams = parseSeams(plan.interfaces).filter(seam => seam.tasks.some(id => touched.includes(id)));
+      const seams = parseSeams(plan.interfaces).filter(seam => everything || seam.tasks.some(id => touched.includes(id)));
       requested = [...touched.map(id => `T${id}`), ...seams.map(seam => `seam ${seam.seam}`)];
     } else {
       requested = changedOf(listed.tasks.find(task => task['id'] === scope)!);
     }
     const coverage = checkCoverage(requested, returnText);
     const covered = coverage.missing.length === 0 && coverage.unknown.length === 0 && coverage.duplicate.length === 0;
-    log.info('coverage', covered ? 'return covered' : 'return incomplete', { scope, requested: requested.length, ...coverage });
+    log.info('coverage', covered ? 'return covered' : 'return incomplete', { scope, all: everything, requested: requested.length, ...coverage });
     return { result: { result: covered ? 'covered' : 'incomplete', requested, ...coverage }, code: covered ? 0 : 1 };
   }
 

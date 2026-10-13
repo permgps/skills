@@ -83,8 +83,22 @@ Each finding is:
 
 ## Your Output
 
-Plain text. Either the findings, one per `CD-N`, or one sentence saying there
-are none. Nothing else — no summary of the plan, no suggested fix, no praise.
+Plain text. **One verdict line per таск and per seam you were asked about**,
+each `CD-N` under the verdict it belongs to:
+
+```text
+T03: ok
+T05: finding — CD-1 таск 05 reads `GET /api/search`, таск 02 produces `POST /api/search`
+seam GET /api/search: finding — CD-1
+seam icons.css: ok
+```
+
+A seam is named as its *Seam* cell in the Seams table of `interfaces.md`. The
+facts section between the `maestro:facts` markers in a task file is a copy of
+`shared.md` that a tool wrote: the same fact copied into two task files is not
+a collision. Nothing else — no summary of the plan, no suggested fix, no
+praise. A таск or seam with no line is one you did not read, and the gate sends
+it back.
 
 A finding is a coordination defect: it is fixed in the task files or
 `interfaces.md` before any executor is dispatched, and it never reduces a

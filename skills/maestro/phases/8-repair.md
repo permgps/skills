@@ -111,7 +111,11 @@ Entry: a blocking finding, failed check or G4 disagreement against one parent
    superseding readiness record. A defect that crosses таски goes back to the
    plan-consistency reader, briefed by
    [plan-consistency-reader.md](../prompts/plan-consistency-reader.md) with every
-   task file and `interfaces.md`, before any executor.
+   task file and `interfaces.md`, before any executor. Its return is held to
+   every таск and seam by `node .maestro/sync.mts --plan-coverage consistency
+   <return file>`, as in the plan phase, and a fix it causes is made the plan
+   phase's way: rewritten in place, in `shared.md` when two таски need it, and
+   rendered with `--plan-render`.
 4. Order repairs: ready upstream first, then by the number of таски the repair
    transitively unlocks. A downstream defect whose upstream prerequisite is
    still open is recorded as an attempt with `outcome: prerequisite_blocked`,

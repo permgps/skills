@@ -96,9 +96,9 @@ Each finding is:
 - one sentence saying what you would have had to decide, and what the two
   readings would produce
 
-Report every finding you have. If you have none, say so explicitly — an empty
-list is a real answer and the gate needs to be able to tell it apart from a
-reader who ran out of attention.
+Judge every unit you are asked about, and report every finding you have. A unit
+with nothing wrong is `ok`, said explicitly — an `ok` is a real answer, and the
+gate needs to tell it apart from a unit nobody read.
 
 ## What Is Not A Finding
 
@@ -118,8 +118,25 @@ reader who ran out of attention.
 
 ## Your Output
 
-Plain text. The task id, then either your findings or one sentence saying you
-have none. Nothing else — no summary of the таск, no suggested fix, no praise.
+Plain text. The task id, then **one verdict line per unit you were asked
+about**, in the order you were given them:
+
+```text
+U1: ok
+U2: finding — a contradiction
+  «the task file's own words» against «the other half»
+  One sentence: what you would have had to decide, and what each reading produces.
+U3: ok
+```
+
+Each unit is an item of the task file that opens with its id, `` `U<n>` ``. The
+units you were not asked about are context: read them, and give them no line.
+A unit you were asked about that contradicts one you were not is a finding on
+the one you were asked about. The facts section between the
+`maestro:facts` markers is part of the task file and is quoted like the rest. A
+unit can carry more than one finding: one verdict line, then each finding
+under it. Nothing else — no summary of the таск, no suggested fix, no praise.
+A unit with no line is a unit you did not read, and the gate sends it back.
 
 Your text is the gate's evidence. Somebody will act on each finding by editing
 the task file before any executor sees it.

@@ -109,6 +109,11 @@ facts, not contract: `interfaces.md` still wins, an executor that finds a row
 disagreeing with it builds to `interfaces.md` and says so, and the review still
 judges the таск against its task file and `interfaces.md` alone.
 
+The task file's facts section, between the `maestro:facts` markers, was copied
+from `shared.md` by the helper. It binds the executor like the rest of the file.
+An executor that finds it wrong reports that in its return and never edits it:
+the fact lives in `shared.md`, and a fix there reaches every таск that cites it.
+
 **Dispatch the executor on its таск's tier**: the model the run state's
 `models` names for `tasks[].model`, none at all for `session` or for a run
 with no `models` (contract 7), and effort equal to the session's, as the

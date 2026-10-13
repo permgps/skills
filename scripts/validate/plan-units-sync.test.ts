@@ -190,6 +190,21 @@ test('a later round asks a reader only about the units that changed', async () =
   } finally { await target.dispose(); }
 });
 
+test('--all asks about every таск and seam even when nothing changed, the way repair re-reads a built plan', async () => {
+  const target = await project();
+  try {
+    target.run('--plan-render');
+    target.run('--plan-units', '--record');
+    await target.write('rc.txt', 'T02: ok\nT03: ok\nseam GET /api/search: ok\n');
+    const narrowed = target.run('--plan-coverage', 'consistency', path.join(target.plan, 'rc.txt'));
+    assert.deepEqual(narrowed['requested'], [], 'nothing changed, so a round asks about nothing');
+    assert.equal(narrowed.code, 1, 'and a full return is then all unknown ids');
+    const all = target.run('--plan-coverage', 'consistency', path.join(target.plan, 'rc.txt'), '--all');
+    assert.equal(all.code, 0, JSON.stringify(all));
+    assert.deepEqual(all['requested'], ['T02', 'T03', 'seam GET /api/search']);
+  } finally { await target.dispose(); }
+});
+
 test('no readable state.js exits 2 and names the fix', async () => {
   const target = await project({ state: false });
   try {
