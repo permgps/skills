@@ -357,8 +357,11 @@ wide as the host allows.
 `plan-reads/r<round>-<NN>.md` and run
 `node .maestro/sync.mts --plan-coverage <NN> <that file>`. It names the units the
 return skipped, invented or judged twice. An incomplete return goes back to a
-fresh reader for its missing units only, in the same round; a return never
-counts until it is covered. This is what turns a reader from a sampler into an
+fresh reader for its missing units only, in the same round. Save that return
+beside the first as `plan-reads/r<round>-<NN>-2.md`, then `-3`, and run
+`--plan-coverage <NN>` with every return file of that таск in this round, first
+one first: the units are covered together, and a unit judged in two returns is
+judged twice. A return never counts until it is covered. This is what turns a reader from a sampler into an
 enumeration: a reader handed a large task file and an open question reports
 what it happened to notice, and the next fresh reader notices something else.
 
@@ -370,7 +373,9 @@ two task files. Each violation is a finding of this round. When every return
 of a round is covered, run `node .maestro/sync.mts --plan-units --record`. In
 the next round, after the fixes and `--plan-render`, `--plan-units` marks a unit
 changed when its text changed, when a fact it cites changed, or when
-`interfaces.md` changed. Only a таск with a changed unit gets a reader, asked
+`interfaces.md` changed. An edit outside every unit — the header table,
+Boundaries, Prerequisites, Forbidden writes, a heading — marks every unit of
+that таск changed, because each unit is judged against it. Only a таск with a changed unit gets a reader, asked
 for verdicts on its changed units only. It is still handed the whole task file,
 because a rewritten unit can contradict one that did not move, and such a
 contradiction is reported on the changed unit. Log INFO `round` with
@@ -613,7 +618,7 @@ itself.
 |---|---|
 | `.maestro/<dir>/interfaces.md` | written once, the boundaries derived from the spec |
 | `.maestro/<dir>/shared.md` | every fact two or more таски need, once, as `### F-<n>`; absent when none is shared |
-| `.maestro/<dir>/tasks/units.json` | the unit, fact and `interfaces.md` hashes `--plan-units --record` took after the last covered round |
+| `.maestro/<dir>/tasks/units.json` | the unit, frame, fact and `interfaces.md` hashes `--plan-units --record` took after the last covered round |
 | `.maestro/<dir>/plan-reads/` | each G3 reader return of each round, as `r<round>-<NN>.md` or `r<round>-consistency.md` |
 | `.maestro/<dir>/tasks/NN-<slug>.md` | one file per таск, each self-sufficient |
 | `.maestro/state.js` | `tasks[]` filled whole — ids, `requirementIds`, `blockedBy`, `wave`, `zone`, counters at zero; `G3` recorded as passed |

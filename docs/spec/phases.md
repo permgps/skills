@@ -448,11 +448,13 @@ handed the list of unit ids it must judge and returns one verdict line per unit,
 consistency reader returns one line per таск (`T03: …`) and per Seams row
 (`seam <Seam cell>: …`). Each return is saved under `plan-reads/` and checked by
 `sync.mts --plan-coverage`. A return that skipped a unit goes back to a fresh
-reader for the missing units only, within the same round, and never counts
-until it is covered. Round 1 asks about every unit. After a round whose returns
+reader for the missing units only, within the same round, and is checked
+together with the first: `--plan-coverage` takes every return file of that
+reader slot in the round. A return never counts until it is covered. Round 1 asks about every unit. After a round whose returns
 are all covered, `--plan-units --record` stores each unit's hash. A later round
-asks only about changed units — rewritten, citing a fact that changed, or every
-unit when `interfaces.md` changed — while still handing the reader the whole
+asks only about changed units — rewritten, citing a fact that changed, every
+unit of a таск whose text outside its units changed (the header table,
+Boundaries, Prerequisites), or every unit when `interfaces.md` changed — while still handing the reader the whole
 file, since a rewritten unit can contradict one that did not move. The
 consistency reader then goes out for the таски with a changed unit and the
 seams that name them; repair's re-dispatch asks about everything (`--all`).

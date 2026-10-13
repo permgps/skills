@@ -132,7 +132,7 @@ as `### F-<n> — <title>` entries. It reaches no reader directly:
 section between `<!-- maestro:facts:start -->` and `<!-- maestro:facts:end -->`,
 so a task file stays the one thing its executor, its reviewer and its G3 reader
 are handed. The section is generated and never edited by hand. `tasks/units.json`
-is the hash of every unit, fact and `interfaces.md` after the last G3 round
+is the hash of every unit, each task file's text outside its units, every fact and `interfaces.md` after the last G3 round
 whose reader returns were all covered, so the next round asks only about what
 changed. `plan-reads/` keeps each reader return as it came back, which is what
 `--plan-coverage` checks. See [`phases.md`](phases.md) › *Task Granularity*.

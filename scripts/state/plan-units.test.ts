@@ -125,22 +125,45 @@ test('text inside the facts section is never counted as restated', () => {
 });
 
 test('a unit is changed by its own text, by a fact it cites, and by interfaces.md', () => {
-  const { units } = parseTaskUnits(TASK);
+  const parsed = parseTaskUnits(TASK);
+  const { units } = parsed;
   const { facts } = parseSharedFacts(SHARED);
   const baseline: Baseline = {
     interfaces: 'i1',
     facts: Object.fromEntries(facts.map(fact => [fact.id, fact.hash])),
     tasks: { '03': Object.fromEntries(units.map(unit => [unit.id, unit.hash])) },
+    frames: { '03': parsed.frame },
   };
-  assert.deepEqual(changedUnits('03', units, facts, 'i1', baseline), []);
-  assert.deepEqual(changedUnits('03', units, facts, 'i1', undefined), ['U1', 'U2', 'U3'], 'no baseline: everything');
-  assert.deepEqual(changedUnits('03', units, facts, 'i2', baseline), ['U1', 'U2', 'U3'], 'interfaces changed: everything');
-  const rewritten = parseTaskUnits(TASK.replace('Render page p.', 'Render page p and q.')).units;
+  assert.deepEqual(changedUnits('03', parsed, facts, 'i1', baseline), []);
+  assert.deepEqual(changedUnits('03', parsed, facts, 'i1', undefined), ['U1', 'U2', 'U3'], 'no baseline: everything');
+  assert.deepEqual(changedUnits('03', parsed, facts, 'i2', baseline), ['U1', 'U2', 'U3'], 'interfaces changed: everything');
+  const rewritten = parseTaskUnits(TASK.replace('Render page p.', 'Render page p and q.'));
   assert.deepEqual(changedUnits('03', rewritten, facts, 'i1', baseline), ['U2']);
   const movedFact = parseSharedFacts(SHARED.replace('address path', 'query string')).facts;
-  assert.deepEqual(changedUnits('03', units, movedFact, 'i1', baseline), ['U1', 'U3'], 'every unit citing F-2');
-  const added = parseTaskUnits(`${TASK}- \`U4\` New.\n`).units;
+  assert.deepEqual(changedUnits('03', parsed, movedFact, 'i1', baseline), ['U1', 'U3'], 'every unit citing F-2');
+  const added = parseTaskUnits(`${TASK}- \`U4\` New.\n`);
   assert.deepEqual(changedUnits('03', added, facts, 'i1', baseline), ['U4']);
+});
+
+test('text outside every unit is the task frame, and a changed frame changes every unit of its task', () => {
+  const parsed = parseTaskUnits(TASK);
+  const { facts } = parseSharedFacts(SHARED);
+  const baseline: Baseline = {
+    interfaces: 'i1',
+    facts: Object.fromEntries(facts.map(fact => [fact.id, fact.hash])),
+    tasks: { '03': Object.fromEntries(parsed.units.map(unit => [unit.id, unit.hash])) },
+    frames: { '03': parsed.frame },
+  };
+  assert.deepEqual(changedUnits('03', parsed, facts, 'i1', baseline), []);
+  const strong = parseTaskUnits(TASK.replace('`standard`', '`strong`'));
+  assert.notEqual(strong.frame, parsed.frame);
+  assert.deepEqual(strong.units.map(unit => unit.hash), parsed.units.map(unit => unit.hash), 'the units themselves did not move');
+  assert.deepEqual(changedUnits('03', strong, facts, 'i1', baseline), ['U1', 'U2', 'U3']);
+  assert.equal(parseTaskUnits(TASK.replace('| Model |', '|  Model  |')).frame, parsed.frame, 'whitespace alone is not a change');
+  assert.equal(parseTaskUnits(withFactsSection(TASK, renderFactsSection(['F-1'], facts).section)).frame, parsed.frame,
+    'the generated facts section is not part of the frame');
+  const { frames: _dropped, ...older } = baseline;
+  assert.deepEqual(changedUnits('03', parsed, facts, 'i1', older), ['U1', 'U2', 'U3'], 'a baseline recorded without frames: everything');
 });
 
 test('coverage names the units a return skipped, invented and judged twice, and counts findings', () => {

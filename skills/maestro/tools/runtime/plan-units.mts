@@ -51,7 +51,9 @@ const FACT_ID = /\bF-\d+\b/g;
 export interface Unit { id: string; hash: string; facts: string[] }
 export interface Fact { id: string; title: string; hash: string; body: string }
 export interface Violation { kind: string; task?: string; id?: string; detail: string }
-export interface Baseline { interfaces: string; facts: Record<string, string>; tasks: Record<string, Record<string, string>> }
+/** `frames` holds, per таск, the hash of its text outside every unit; a baseline recorded before it existed lacks it. */
+export interface Baseline { interfaces: string; facts: Record<string, string>; tasks: Record<string, Record<string, string>>; frames?: Record<string, string> }
+export interface ParsedTask { units: Unit[]; frame: string }
 export interface Coverage { missing: string[]; unknown: string[]; duplicate: string[]; findings: number }
 
 const digest = (text: string): string => createHash('sha256').update(text).digest('hex');
@@ -65,9 +67,14 @@ export function withoutFacts(text: string): string {
   return end === -1 ? text.slice(0, start) : text.slice(0, start) + text.slice(end + FACTS_END.length);
 }
 
-/** Every unit of one task file, in order, and what is wrong with them. */
-export function parseTaskUnits(text: string): { units: Unit[]; violations: Violation[] } {
+/**
+ * Every unit of one task file, in order, what is wrong with them, and the hash
+ * of its frame: the text outside every unit and outside the facts section — the
+ * header table, Boundaries, the headings — which a reader is handed as context.
+ */
+export function parseTaskUnits(text: string): ParsedTask & { violations: Violation[] } {
   const units: Unit[] = [];
+  const frame: string[] = [];
   const violations: Violation[] = [];
   const seen = new Set<string>();
   let current: { id: string; lines: string[] } | undefined;
@@ -87,13 +94,16 @@ export function parseTaskUnits(text: string): { units: Unit[]; violations: Viola
       current = { id, lines: [line] };
     } else if (HEADING.test(line)) {
       close();
+      frame.push(line);
     } else if (current) {
       current.lines.push(line);
+    } else {
+      frame.push(line);
     }
   }
   close();
   if (units.length === 0) violations.push({ kind: 'no-units', detail: 'no item opens with a `U<n>` id, so a reader cannot be held to every instruction' });
-  return { units, violations };
+  return { units, frame: digest(normalise(frame.join('\n'))), violations };
 }
 
 /** Every fact `shared.md` defines, and any id it defines twice. */
@@ -170,16 +180,21 @@ export function restatedPassages(tasks: ReadonlyMap<string, string>): Array<{ te
 
 /**
  * The units a reader must judge again: new, rewritten, or citing a fact that
- * changed. With no baseline, or an `interfaces.md` that changed, every unit.
+ * changed. With no baseline, an `interfaces.md` that changed, or a frame that
+ * changed, every unit of the task: an edit to Boundaries or Prerequisites sits
+ * in no unit, and every unit is judged against it.
  */
 export function changedUnits(
   task: string,
-  units: readonly Unit[],
+  parsed: ParsedTask,
   facts: readonly Fact[],
   interfacesHash: string,
   baseline: Baseline | undefined,
 ): string[] {
-  if (!baseline || baseline.interfaces !== interfacesHash) return units.map(unit => unit.id);
+  const { units } = parsed;
+  if (!baseline || baseline.interfaces !== interfacesHash || baseline.frames?.[task] !== parsed.frame) {
+    return units.map(unit => unit.id);
+  }
   const before = baseline.tasks[task] ?? {};
   const factHash = new Map(facts.map(fact => [fact.id, fact.hash]));
   return units.filter(unit => before[unit.id] !== unit.hash
@@ -296,9 +311,9 @@ function listTasks(plan: Plan): { tasks: Array<Record<string, unknown>>; violati
     if (rendered.unknown.length === 0 && currentFactsSection(text) !== rendered.section) {
       violations.push({ kind: 'stale-facts', task, detail: 'the facts section differs from shared.md — run --plan-render' });
     }
-    const fresh = new Set(changedUnits(task, parsed.units, plan.facts, interfacesHash, plan.baseline));
+    const fresh = new Set(changedUnits(task, parsed, plan.facts, interfacesHash, plan.baseline));
     changed += fresh.size;
-    tasks.push({ id: task, units: parsed.units.map(unit => ({ ...unit, changed: fresh.has(unit.id) })) });
+    tasks.push({ id: task, frame: parsed.frame, units: parsed.units.map(unit => ({ ...unit, changed: fresh.has(unit.id) })) });
     log.debug('units', 'task parsed', { task, units: parsed.units.length, facts: cited.length, changed: fresh.size });
   }
   for (const violation of violations) log.warn('units', violation.detail, { task: violation.task, kind: violation.kind, id: violation.id });
@@ -318,7 +333,7 @@ async function replaceFile(target: string, body: string): Promise<void> {
 }
 
 /**
- * `--plan-units [--record]`, `--plan-render` and `--plan-coverage <NN|consistency> <return-file> [--all]`:
+ * `--plan-units [--record]`, `--plan-render` and `--plan-coverage <NN|consistency> <return-file>... [--all]`:
  * one JSON result each. See the contract named at the top of this file for
  * every exit code.
  */
@@ -349,19 +364,24 @@ export async function planUnitsCommand(args: string[], runDir: string): Promise<
   }
 
   if (args[0] === '--plan-coverage') {
-    const [, scope, returnFile] = args;
+    const scope = args[1];
     // `--all` asks about everything, baseline or not: repair re-reads a built plan whose units did not move.
     const everything = args.includes('--all');
-    if (!scope || !returnFile || (scope !== 'consistency' && !plan.tasks.has(scope))) {
-      log.error('coverage', 'bad arguments', { scope, returnFile });
-      return { result: { error: 'usage: --plan-coverage <NN|consistency> <return-file> [--all], NN a task file of this run' }, code: 2 };
+    // Every return of one reader slot in one round: the first, then each one sent back for the units it skipped.
+    const returnFiles = args.slice(2).filter(arg => arg !== '--all');
+    if (!scope || returnFiles.length === 0 || (scope !== 'consistency' && !plan.tasks.has(scope))) {
+      log.error('coverage', 'bad arguments', { scope, returnFiles });
+      return { result: { error: 'usage: --plan-coverage <NN|consistency> <return-file>... [--all], NN a task file of this run' }, code: 2 };
     }
-    let returnText: string;
-    try { returnText = await readFile(path.resolve(returnFile), 'utf8'); }
-    catch (error) {
-      log.error('coverage', 'return file could not be read', { path: returnFile, reason: (error as Error).message });
-      return { result: { error: `cannot read ${returnFile}` }, code: 2 };
+    const returns: string[] = [];
+    for (const returnFile of returnFiles) {
+      try { returns.push(await readFile(path.resolve(returnFile), 'utf8')); }
+      catch (error) {
+        log.error('coverage', 'return file could not be read', { path: returnFile, reason: (error as Error).message });
+        return { result: { error: `cannot read ${returnFile}` }, code: 2 };
+      }
     }
+    const returnText = returns.join('\n');
     const listed = listTasks(plan);
     const changedOf = (task: Record<string, unknown>): string[] =>
       (task['units'] as Array<{ id: string; changed: boolean }>).filter(unit => everything || unit.changed).map(unit => unit.id);
@@ -375,7 +395,7 @@ export async function planUnitsCommand(args: string[], runDir: string): Promise<
     }
     const coverage = checkCoverage(requested, returnText);
     const covered = coverage.missing.length === 0 && coverage.unknown.length === 0 && coverage.duplicate.length === 0;
-    log.info('coverage', covered ? 'return covered' : 'return incomplete', { scope, all: everything, requested: requested.length, ...coverage });
+    log.info('coverage', covered ? 'return covered' : 'return incomplete', { scope, all: everything, returns: returnFiles.length, requested: requested.length, ...coverage });
     return { result: { result: covered ? 'covered' : 'incomplete', requested, ...coverage }, code: covered ? 0 : 1 };
   }
 
@@ -388,6 +408,7 @@ export async function planUnitsCommand(args: string[], runDir: string): Promise<
       facts: Object.fromEntries(plan.facts.map(fact => [fact.id, fact.hash])),
       tasks: Object.fromEntries(listed.tasks.map(task => [String(task['id']),
         Object.fromEntries((task['units'] as Unit[]).map(unit => [unit.id, unit.hash]))])),
+      frames: Object.fromEntries(listed.tasks.map(task => [String(task['id']), String(task['frame'])])),
     };
     await replaceFile(path.join(plan.planDir, 'tasks', BASELINE_FILE), `${JSON.stringify(baseline, null, 1)}\n`);
     log.info('record', 'baseline recorded', { tasks: listed.tasks.length });

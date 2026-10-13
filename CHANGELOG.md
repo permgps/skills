@@ -22,8 +22,11 @@ number that claimed more than that would be claiming it falsely.
   and each checklist row was restated in nearly five task files. Now every task
   file instruction is a unit (`` - `U<n>` ``). A reader returns one verdict per
   unit it is asked about, `sync.mts --plan-coverage` refuses a return that
-  skipped one, and a later round asks only about the units that changed
-  (`--plan-units [--record]`). A fact two таски need lives once in `shared.md`
+  skipped one (a return sent back for the skipped units is checked together
+  with the first), and a later round asks only about the units that changed
+  (`--plan-units [--record]`); an edit outside every unit, in the header table
+  or Boundaries, makes every unit of that таск changed. Repair's re-dispatch of
+  the consistency reader asks about every таск and seam (`--all`). A fact two таски need lives once in `shared.md`
   and is copied into each citing task file by `--plan-render`. A finding is
   fixed by rewriting the quoted text in place and sweeping its class across
   every task file. `bundle-integrity` holds the calls and the verdict formats,

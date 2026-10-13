@@ -190,6 +190,45 @@ test('a later round asks a reader only about the units that changed', async () =
   } finally { await target.dispose(); }
 });
 
+test('a return sent back for its missing units is checked together with the first one', async () => {
+  const target = await project();
+  try {
+    target.run('--plan-render');
+    await target.write('r1-02.md', '02\nU1: ok\n');
+    await target.write('r1-02-2.md', '02\nU2: ok\n');
+    const first = path.join(target.plan, 'r1-02.md');
+    const resent = path.join(target.plan, 'r1-02-2.md');
+    assert.deepEqual(target.run('--plan-coverage', '02', first)['missing'], ['U2']);
+    const together = target.run('--plan-coverage', '02', first, resent);
+    assert.equal(together.code, 0, JSON.stringify(together));
+    assert.deepEqual(together['requested'], ['U1', 'U2']);
+    await target.write('r1-02-3.md', '02\nU1: ok\n');
+    const twice = target.run('--plan-coverage', '02', first, path.join(target.plan, 'r1-02-3.md'));
+    assert.equal(twice.code, 1, 'a unit judged in two returns is still judged twice');
+    assert.deepEqual(twice['duplicate'], ['U1']);
+    assert.equal(target.run('--plan-coverage', '02', first, path.join(target.plan, 'absent.md')).code, 2);
+  } finally { await target.dispose(); }
+});
+
+test('an edit outside every unit makes every unit of that таск changed, and no other таск', async () => {
+  const target = await project();
+  try {
+    await target.write('tasks/03-verify-search.md', TASK_03.replace('## Done means', '| Boundaries | owns tests/search.spec.ts |\n\n## Done means'));
+    target.run('--plan-render');
+    target.run('--plan-units', '--record');
+    assert.equal(target.run('--plan-units')['changed'], 0);
+    await target.write('tasks/03-verify-search.md', (await target.read('tasks/03-verify-search.md')).replace('tests/search.spec.ts', 'tests/other.spec.ts'));
+    const edited = target.run('--plan-units');
+    assert.deepEqual(unitsOf(edited, '03').filter(unit => unit.changed).map(unit => unit.id), ['U1']);
+    assert.deepEqual(unitsOf(edited, '02').filter(unit => unit.changed), []);
+    target.run('--plan-units', '--record');
+    await target.write('shared.md', SHARED.replace('address path', 'query string'));
+    target.run('--plan-render');
+    assert.deepEqual(unitsOf(target.run('--plan-units'), '02').filter(unit => unit.changed).map(unit => unit.id), ['U1'],
+      'a re-rendered facts section is not an edit outside the units: only the unit citing the fact is changed');
+  } finally { await target.dispose(); }
+});
+
 test('--all asks about every таск and seam even when nothing changed, the way repair re-reads a built plan', async () => {
   const target = await project();
   try {

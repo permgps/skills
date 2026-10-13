@@ -112,9 +112,11 @@ Entry: a blocking finding, failed check or G4 disagreement against one parent
    plan-consistency reader, briefed by
    [plan-consistency-reader.md](../prompts/plan-consistency-reader.md) with every
    task file and `interfaces.md`, before any executor. Its return is held to
-   every таск and seam by `node .maestro/sync.mts --plan-coverage consistency
-   <return file>`, as in the plan phase, and a fix it causes is made the plan
-   phase's way: rewritten in place, in `shared.md` when two таски need it, and
+   every таск and seam by
+   `node .maestro/sync.mts --plan-coverage consistency <return file> --all`:
+   `--all`, because no unit moved since the plan's last round, so without it
+   the check asks about nothing and refuses every line of the return. A fix it
+   causes is made the plan phase's way: rewritten in place, in `shared.md` when two таски need it, and
    rendered with `--plan-render`.
 4. Order repairs: ready upstream first, then by the number of таски the repair
    transitively unlocks. A downstream defect whose upstream prerequisite is

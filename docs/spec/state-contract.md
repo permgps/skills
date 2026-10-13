@@ -803,16 +803,18 @@ exit codes.
 - `--plan-units [--record]` reads the run directory `state.js` names: its
   `tasks/NN-*.md`, `shared.md` (absent means no facts) and `interfaces.md`. It
   reports `{ result: "listed", tasks, facts, changed, violations, restated }`.
-  `tasks` lists `{ id, units: [{ id, hash, facts, changed }] }`. A unit is a
-  list item opening with `` `U<n>` ``, its hash is the sha256 of its
-  whitespace-normalised text, and `changed` compares it with
-  `tasks/units.json`: a new or rewritten unit, a unit citing a fact whose hash
-  moved, or every unit when there is no baseline or `interfaces.md` changed.
+  `tasks` lists `{ id, frame, units: [{ id, hash, facts, changed }] }`. A unit
+  is a list item opening with `` `U<n>` ``, its hash is the sha256 of its
+  whitespace-normalised text, and `frame` is the same hash of the task file's
+  text outside every unit and outside its facts section. `changed` compares
+  them with `tasks/units.json`: a new or rewritten unit, a unit citing a fact
+  whose hash moved, every unit of a таск whose frame moved, or every unit when
+  there is no baseline, the baseline has no frames, or `interfaces.md` changed.
   `violations` are `{ kind, task?, id?, detail }`, with `kind` one of
   `duplicate-unit`, `no-units`, `duplicate-fact`, `unknown-fact` or
   `stale-facts`. `restated` lists each sentence of 160 characters or more that
   two or more task files carry outside their facts sections. `--record` writes
-  `tasks/units.json` — every unit, fact and `interfaces.md` hash — through a
+  `tasks/units.json` — every unit, frame, fact and `interfaces.md` hash — through a
   temporary file and a rename, and adds `recorded: true`.
   - Exit 0: no violation and nothing restated. Exit 1: either. Exit 2: no
     readable `state.js`, no `dir` in it, or no `tasks/` (`{ error }`).
@@ -823,8 +825,9 @@ exit codes.
   reports `{ result: "rendered", changed: [task ids] }`.
   - Exit 1: `{ result: "refused", violations }` for a cited id `shared.md` does
     not define or a fact defined twice; nothing is written. Exit 2 as above.
-- `--plan-coverage <NN|consistency> <return-file> [--all]` reads a G3 reader's
-  return and reports `{ result: "covered"|"incomplete", requested, missing,
+- `--plan-coverage <NN|consistency> <return-file>... [--all]` reads a G3
+  reader's return, or the first return and each one sent back for the units it
+  skipped, read together, and reports `{ result: "covered"|"incomplete", requested, missing,
   unknown, duplicate, findings }`. A verdict line is `U<n>`, `T<NN>` or
   `seam <Seam cell>`, then `: ok` or `: finding`. For `NN` the requested ids
   are that task's changed units; for `consistency`, every таск with a changed
