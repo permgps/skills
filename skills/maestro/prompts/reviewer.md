@@ -203,6 +203,12 @@ check-quality finding when:
 
 ## Repair History Review
 
+For an observed intermittent repair, inspect the plan and all baseline/candidate
+samples under [intermittent-repairs.md](../references/intermittent-repairs.md).
+Both the original and minimized workload must survive review, with comparable
+conditions and current fingerprints. A single green, a discarded failure, or a
+minimized-only fix cannot close it; preserve finite-sample limitations.
+
 A repeated repair retains root/predecessor, finite remaining budgets and actual
 independent diagnosis receipts. Compare the new action and evidence to prior
 hypothesis/result, rather than counting different wording as novelty. Missing

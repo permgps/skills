@@ -19,6 +19,7 @@ import { STATE_FILE } from './paths.mts';
 // back here for them.
 import { parseStateSource } from './read.mts';
 import { InvalidStateError, validateState, type StateViolation } from './validate.mts';
+import { validateInitialIntermittent } from './intermittent.mts';
 import { validateStateTransition } from './closure.mts';
 
 const log = createLogger('state');
@@ -214,9 +215,14 @@ async function writeStateLocked(dir: string, state: RunState, expect?: string): 
       if (previous.contractVersion >= 4 && validateState(previous).length === 0) {
         const transition = validateStateTransition(previous, state);
         if (transition.length > 0) throw new InvalidStateError(transition);
+      } else {
+        const initial = validateInitialIntermittent(state);
+        if (initial.length) throw new InvalidStateError(initial);
       }
     } catch (error) {
       if (error instanceof InvalidStateError) throw error;
+      const initial = validateInitialIntermittent(state);
+      if (initial.length) throw new InvalidStateError(initial);
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         log.warn('write', 'prior snapshot could not be compared as history', { target });
       }

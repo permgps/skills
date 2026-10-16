@@ -262,6 +262,24 @@ a change nobody can explain. Change one variable at a time. For a performance
 defect, measure the baseline before any change and capture it. The return
 template does not change.
 
+## Intermittent Repair Samples
+
+A bounded intermittent preparation brief may explicitly authorize creating
+owned symptom/replay checks and minimizing inputs before a series plan exists.
+Preserve the original, count every probe, return ordinary execution blocks and
+stop within the supplied limits. Do not fix the implementation or run candidate
+samples in preparation.
+
+When handed a published intermittent plan, follow
+[intermittent-repairs.md](../references/intermittent-repairs.md) within the
+supplied remaining budget, using the procedure only when included in the
+task References or embedded in the brief. Return one ordinary execution block per sample and
+all five intermittent labels; preserve every failure and both workloads. Never
+choose new criteria after seeing the candidate, relabel a sample or run until
+green. If intermittency is newly observed without a plan, return the actual
+mixed captures and stop further reproduction for coordinator planning; only an
+explicit bounded preparation brief authorizes the preparation path above.
+
 ## Defect-Scoped Repair
 
 Under contract 6 a repair brief names one defect: its counterexample, the

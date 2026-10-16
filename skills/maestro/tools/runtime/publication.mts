@@ -10,6 +10,7 @@ import { parseStateSource } from './state/read.mts';
 import { validateState, type StateViolation } from './state/validate.mts';
 import { validateEvidence } from './state/evidence.mts';
 import { projectState } from './state/projection.mts';
+import { validateInitialIntermittent } from './state/intermittent.mts';
 import { validateStateTransition } from './state/closure.mts';
 import { deriveVerification } from './state/verification.mts';
 import { keepWaits, type KeptWaits } from './state/waits.mts';
@@ -275,6 +276,7 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
     errors.push({ field: 'heldBy', message: 'holder token does not match candidate' });
   }
   if (errors.length === 0 && previous && !succession) errors.push(...validateStateTransition(previous, state));
+  if (errors.length === 0 && (!previous || succession)) errors.push(...validateInitialIntermittent(state));
   let relocation: Relocation | null = null;
   if (errors.length === 0 && previous && !succession && previous.contractVersion >= 7 && state.contractVersion >= 7) {
     const from = runDirName(previous);

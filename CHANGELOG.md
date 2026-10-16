@@ -14,6 +14,14 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **Intermittent repairs require reproducible evidence.** Observed mixed outcomes
+  trigger finite reproduction budgets and immutable, predeclared replay plans.
+  Both original and minimized workloads retain every baseline/candidate sample.
+  Intake validates sample attribution; finding/defect closure requires complete
+  current passing series. A lucky rerun, discarded failure or minimized-only
+  fix cannot close the defect. Historical states and deterministic repairs keep
+  their existing path; the helper never executes the checks.
+
 - **Uncertain external contracts are researched before they shape tasks.**
   Conditional, bounded read-only research checks installed source/types before
   official version-matched documentation. Immutable research records preserve

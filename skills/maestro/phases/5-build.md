@@ -154,6 +154,13 @@ record its address and cleanup, without opening a user-visible viewer.
 
 ### 5. Take the result back
 
+For an intermittent return, preserve all five attribution labels as execution
+`intermittent` fields and import every sample, including failures. Follow
+[intermittent-repairs.md](../references/intermittent-repairs.md); never import a
+partial series as a completed repair. Newly observed mixed outcomes route through
+repair before further diagnosis or additional unplanned runs.
+
+
 For each таск that returns done, in this order:
 
 1. **Check the return, then import its evidence.** Before reading anything

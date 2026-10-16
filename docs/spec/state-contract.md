@@ -921,3 +921,12 @@ unsafe destinations, history conflicts or a busy writer. Exit 2 returns
 `{ status: "unreadable" }` for unreadable inputs/state/history. Existing
 runs with no research are unaffected. A successful publish proves structure
 and declared provenance only; it never proves the fact is true.
+
+### Optional Intermittent Evidence
+
+Verification 3 may carry `intermittentRepairs[]` and execution `intermittent`
+attribution as defined in `verification.md` under Intermittent Repair Evidence.
+They are optional additions without a contract-version bump. Earlier records
+are never backfilled. Plans and samples are immutable; declaration precedes
+sample publication. The helper validates shape, provenance references, bounded
+series, comparison identity and closure eligibility without running a check.

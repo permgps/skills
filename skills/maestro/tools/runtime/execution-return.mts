@@ -320,6 +320,19 @@ function redFindings(block: ExecutionReturnBlock, result: string): Finding[] {
 
 function blockFindings(block: ExecutionReturnBlock): Finding[] {
   const findings: Finding[] = [];
+  const repeated = ['intermittentPlanId', 'intermittentScenario', 'intermittentPhase',
+    'intermittentSample', 'intermittentElapsedMs'];
+  if (repeated.some(key => block.labels.has(key))) {
+    const sample = block.labels.get('intermittentSample') ?? '';
+    const elapsed = block.labels.get('intermittentElapsedMs') ?? '';
+    if (repeated.some(key => !block.labels.get(key)?.trim())
+      || !['original', 'minimized'].includes(block.labels.get('intermittentScenario') ?? '')
+      || !['baseline', 'candidate'].includes(block.labels.get('intermittentPhase') ?? '')
+      || !/^\d+$/.test(sample) || !Number.isSafeInteger(Number(sample)) || Number(sample) < 1
+      || !/^\d+$/.test(elapsed) || !Number.isSafeInteger(Number(elapsed))) {
+      findings.push({ rule: 'intermittent-attribution', message: 'return all five intermittent labels with a valid scenario, phase, positive sample and nonnegative elapsed milliseconds' });
+    }
+  }
 
   const missing = REQUIRED_LABELS.filter(name => {
     if (!block.labels.has(name)) return true;

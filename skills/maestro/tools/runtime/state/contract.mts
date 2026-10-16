@@ -639,6 +639,35 @@ export interface VerificationCheckV3 extends VerificationCheck {
 export interface CheckExecutionV3 extends CheckExecution {
   readinessId?: string;
   failureCause?: FailureCause;
+  intermittent?: IntermittentSample;
+}
+
+/** Optional bounded evidence protocol, activated only by observed intermittency. */
+export interface IntermittentScenario {
+  role: 'original' | 'minimized';
+  checkId: string;
+  sampleCount: number;
+  invocation: string;
+  conditionsEvidenceId: string;
+}
+
+export interface IntermittentRepair {
+  id: string;
+  rootFindingId: string;
+  declaredAt: string;
+  observedExecutionIds: string[];
+  maxRuns: number;
+  maxDurationMs: number;
+  scenarios: IntermittentScenario[];
+  supersedes?: string;
+}
+
+export interface IntermittentSample {
+  planId: string;
+  scenario: IntermittentScenario['role'];
+  phase: 'baseline' | 'candidate';
+  sample: number;
+  elapsedMs: number;
 }
 
 export interface VerificationDecisionV3 extends Omit<VerificationDecision, 'kind'> {
@@ -715,6 +744,7 @@ export interface VerificationRecordV3 extends Omit<VerificationRecordV2, 'versio
   repairAttempts: Array<RepairAttemptV2 | RepairAttemptV3>;
   inheritedExecutionIds: string[];
   inheritedAttemptIds: string[];
+  intermittentRepairs?: IntermittentRepair[];
 }
 
 /** Verification 2 and 3 both carry the source and completion safeguards. */

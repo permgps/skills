@@ -537,3 +537,42 @@ These checks establish structure and bounded scenario behavior, not source
 truth, live documentation access, or a completed target-project Maestro run.
 Dependency source interpretation and the decision that a fact affects
 feasibility remain judgement. The helper never fetches or executes a source.
+
+## Intermittent Repair Evidence — 2026-10-16
+
+```sh
+node --test scripts/state/intermittent.test.mts
+node --test --test-name-pattern='intermittent' scripts/validate/returns-check-sync.test.ts scripts/validate/sync-contract.test.ts
+npm run check
+```
+
+Deterministic alternating and seeded fixtures exercise both workload shapes on
+faulty, minimized-only-fixed and repaired builds. Public state validation and
+publication check prior declaration, immutable failed samples, consecutive
+ordinals, matching conditions, finite execution budgets, current fingerprints
+and finding/defect closure. Copied-runtime intake checks actual capture hashes
+and the conditional return fields. Legacy states carry no implicit series.
+Copied publication also rejects an imported initial plan, moves nonempty replay
+captures when the run closes, and preserves them when a successor run starts.
+Offline dashboard aggregation agrees with runtime results for incomplete,
+failed, passing and stale series. A final timeout remains publishable evidence.
+
+The intake regression was observed failing before the guard. Additional probes
+exposed late failures hidden by untagged green reruns, time-limit overruns within
+one publication batch, and enum-shaped arrays accepted at the unknown boundary;
+the corrected paths have regressions. A minimized baseline on an unrelated
+build was independently reproduced and is now rejected. Fresh-context reader
+walkthroughs covered alternating failure, seeded failure and a minimized-only
+fix; they exposed a missing first-repair preparation owner and an undeclared
+reference handoff. The bounded executor preparation brief and allowed References
+were corrected and rechecked for consistency. These are synthetic checks,
+not a live target-project Maestro run or proof that recurrence is impossible.
+Replay fidelity and statistical sufficiency remain reviewer judgement.
+
+The full suite exposed a pre-existing occupied-port test fixture that left
+probe bytes unread and could hang on shutdown. A deterministic socket regression
+failed before the fixture began draining incoming bytes; the fixture still
+occupies the port without serving a response. Product server behavior is unchanged.
+
+Final `npm run check`: typecheck, all twelve validator runs and 2,058 tests passed,
+with zero failures, skips or cancellations. `git diff --check` also passed.

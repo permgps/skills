@@ -266,11 +266,11 @@ close.
 
 | Entity | Exact fields (a trailing ? means optional) | Owner / publication |
 |---|---|---|
-| verification-3 record | verification-2 fields plus `version`, `checks[]`, `executions[]`, `decisions[]`, `readiness[]`, `defects[]`, `strategyReviews[]`, `repairAttempts[]`, `inheritedExecutionIds[]`, `inheritedAttemptIds[]` | orchestrator; version 3 only under contract 6 |
+| verification-3 record | verification-2 fields plus `version`, `checks[]`, `executions[]`, `decisions[]`, `readiness[]`, `defects[]`, `strategyReviews[]`, `repairAttempts[]`, `inheritedExecutionIds[]`, `inheritedAttemptIds[]`, `intermittentRepairs?` | orchestrator; version 3 only under contract 6 |
 | `readiness[]` | `id`, `targetFingerprint`, `executedAt`, `probes[]`, `supersedes?` | build or acceptance, before a broad run; immutable; correction is a superseding record |
 | readiness probe | `kind` (`source_identity` / `secrets_excluded` / `autoload` / `bootstrap` / `storage_and_cwd` / `database` / `listener` / `browser` / `write_boundary`), `result` (`passed` / `setup_failed` / `unavailable` / `not_applicable`), `evidenceIds[]`, `limitation?` | probe by trying the capability; captures under `evidence/<RD-N>/` |
 | extended `checks[]` | inherited fields plus `readinessProbes?` | plan; the probes this check's result depends on, besides `source_identity` |
-| extended `executions[]` | inherited fields plus `readinessId?`, `failureCause?` (`product` / `test` / `setup` / `unavailable_capability`) | executor returns, orchestrator imports; required for every non-inherited execution |
+| extended `executions[]` | inherited fields plus `intermittent?`, `readinessId?`, `failureCause?` (`product` / `test` / `setup` / `unavailable_capability`) | executor returns, orchestrator imports; required for every non-inherited execution |
 | extended `decisions[]` | inherited fields plus `kind` (adds `limit_increase`), `strategyReviewId?`, `previousLimits?`, `limits?`, `forecast?` | repair; a raise needs the user's exact words |
 | `defects[]` | `id`, `parentTaskId`, `rootFindingId`, `findingIds[]`, `causeClass` (`product` / `test` / `contract` / `evidence` / `environment`), `counterexample`, `repairCriteriaCheckIds[]`, `residualParentCriteria[]`, `status` (`open` / `verified` / `superseded`), `verifiedExecutionIds[]`, `supersedes?` | repair, before the attempt that targets it; only `status` and `verifiedExecutionIds` change, once |
 | extended `repairAttempts[]` | verification-2 attempt fields plus `outcome` (`defect_verified` / `still_failing` / `unavailable` / `prerequisite_blocked`), `defectId`, `repeatKind` (`first` / `same_action_failed` / `different_action_same_cause` / `new_cause_same_surface` / `prerequisite_blocked` / `coordination_correction`), `expectedProgress` (`defect_verified` / `scenario_verified` / `task_closure`), `readyUpstreamTaskIds[]`, `blockingPrerequisites[]`, `unlocksTaskIds[]`, `commit?` | repair; append after result |
@@ -597,3 +597,89 @@ evidence content or holder credentials. The autonomous TypeScript helper and
 repository consumers share schema, evidence and transition implementations;
 installed-copy tests establish execution independence rather than comparing a
 shared function to itself.
+
+## Intermittent Repair Evidence
+
+Observed intermittency, not a suspicion or a test's label, activates this
+optional verification-3 extension. Ordinary deterministic repairs and historical
+states with no extension retain their existing path. The coordinator preserves
+mixed passed/failed executions of the same original check under the same build
+and conditions, records finite reproduction limits in a conditions capture before further
+diagnosis, then publishes an immutable plan before collecting its series.
+Minimization/probes spend the initial budget; the plan uses only what remains. Missing controllable conditions or an unavailable replay
+leaves the repair incomplete; never manufacture a successful observation.
+
+If the minimized check is missing, the coordinator may dispatch its owning
+executor once with a bounded preparation brief before declaring the series.
+This applies to the first intermittent repair too; the independent diagnostician
+still handles only the existing repeated-repair route. Preparation may create
+owned symptom/replay checks and minimize inputs, but cannot fix implementation
+or run a candidate. It returns every ordinary execution probe and consumed
+run/time counts for intake and check registration. No automatic preparation
+retry or extra repair allowance follows an incomplete return. Include the
+procedure in the task's allowed References or embed applicable instructions;
+preserve ownership, coverage/G3 and blind-reader boundaries.
+
+`verification.intermittentRepairs?` is an append-only array. Each entry has
+`id`, `rootFindingId`, `declaredAt` (zoned timestamp), `observedExecutionIds[]`,
+`maxRuns` (positive safe integer), `maxDurationMs` (positive safe integer),
+`scenarios[]`, and optional `supersedes`. A successor retains the root, consumes
+the existing repair budget and cannot reuse a previously sampled candidate
+build as a fresh chance to obtain green. One linear plan chain exists per root.
+Each plan has exactly two scenarios with distinct check IDs: `original` and
+`minimized`. A scenario has `role`, `checkId`, `sampleCount` (safe integer >= 2),
+`invocation`, and `conditionsEvidenceId`. The original check belongs to the
+root finding. Both checks remain required and cover that finding's obligations.
+`maxRuns` equals twice the sum of the scenario sample counts (baseline and
+candidate); the time budget covers all four series. Plan the counts and the
+zero-candidate-failure criterion before inspecting any candidate results.
+
+Conditions captures are immutable, sanitized evidence containing the runnable
+symptom/oracle, environment and reset, workload, original trigger, seed or
+schedule/input replay where controllable, and limitations where not. Preserve
+both the original and minimized inputs. If minimization cannot be completed
+within the budget, keep the missing series incomplete. Never replace the
+original scenario with the minimized one. Conditions are fixed before samples;
+a material change requires a successor plan, retaining the previous evidence.
+
+Each sample is an ordinary execution, with its own assertions and hashed
+captures, plus `intermittent: { planId, scenario, phase, sample, elapsedMs }`.
+`scenario` is `original` or `minimized`; `phase` is `baseline` or `candidate`;
+`sample` is a positive consecutive safe integer within that series, and
+`elapsedMs` is a nonnegative safe integer. Keep every failed/unavailable sample;
+no rerun overwrites it. Counts and failure rates are derived from executions,
+not trusted aggregate claims. The return block conditionally carries the scalar
+labels `intermittentPlanId`, `intermittentScenario`, `intermittentPhase`,
+`intermittentSample`, and `intermittentElapsedMs`; all five are required together.
+The helper validates and publishes evidence; it never executes the checks.
+
+A sample is appended only after its plan was published, with timestamps after
+the declaration. A candidate series starts only after both complete baseline
+series exist and each has demonstrated at least one symptom failure. Both
+baseline workloads use the observed triggering build. Within a
+scenario, invocation, reference/data/runtime/acceptance identities and
+viewport/locale/auth variant match the baseline; source/build hashes may change
+for the repair. Each baseline series uses one fingerprint and each candidate
+series uses one fingerprint. A completed candidate must have exactly the
+planned count for both scenarios, all passing, within the shared time/run
+budget. A timed-out sample is retained, but no further sample starts once the
+budget is exhausted. Existing readiness, controls, safety and repair limits
+still apply; reproduction is not a new unbounded retry loop.
+
+An incomplete series yields an incomplete check even if its last sample passed;
+a current failed candidate sample yields failed. Every candidate sample must
+match the current check fingerprint and acceptance input when deriving current
+results or closing a finding/defect. Closing a finding or verifying a defect
+under the plan's stable root requires both complete series. This rule also
+covers records first appearing closed. Historical closure is checked against
+the evidence available at that closure, not against later builds. Published
+plans and samples cannot be edited, deleted or retagged. A successor invalidates
+current series eligibility but does not erase prior closure history.
+
+Review judges whether the recorded workload, replay and minimized cause are
+meaningful and the observed behavior was attributed honestly; hashes and labels
+alone cannot prove that. Acceptance receives ordinary behavior checks/evidence,
+not producer diagnosis. Report both sample counts and observed failure rates,
+conditions and budget limits. Zero failures in a finite sample is bounded
+evidence, never proof that recurrence is impossible. An incomplete series
+remains incomplete in the report and existing closure routes.

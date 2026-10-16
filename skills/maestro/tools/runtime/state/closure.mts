@@ -35,6 +35,7 @@ import {
   activeControls, controlResult, deriveVerification, effectiveExecution, validateFingerprint,
   validateInputHashes, validateVerificationTransition, type VerificationViolation,
 } from './verification.mts';
+import { validateIntermittentRecord, validateIntermittentTransition } from './intermittent.mts';
 import { validateWaitsTransition } from './waits.mts';
 
 const log = createLogger('state');
@@ -516,7 +517,7 @@ export function validateClosureRecord(state: RunState): VerificationViolation[] 
     readiness: record.readiness.length, defects: record.defects.length,
     reviews: record.strategyReviews.length, violations: errors.length,
   });
-  return errors;
+  return [...errors, ...validateIntermittentRecord(record)];
 }
 
 /** What a defect promises cannot move; only its verdict can, once. */
@@ -714,6 +715,6 @@ export function validateClosureTransition(previous: RunState, next: RunState): V
 /** Every rule a write must satisfy against the state it replaces. */
 export function validateStateTransition(previous: RunState, next: RunState): VerificationViolation[] {
   return [...validateVerificationTransition(previous, next), ...validateClosureTransition(previous, next),
-    ...validateWaitsTransition(previous, next)];
+    ...validateWaitsTransition(previous, next), ...validateIntermittentTransition(previous, next)];
 }
 

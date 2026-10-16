@@ -1934,7 +1934,7 @@ new user-facing dial.
     source interpretation remains judgement; citation presence alone proves
     nothing. Ordinary local changes incur no research dispatch.
 
-- [ ] **Intermittent Repairs Have Reproducible Evidence** — give flaky failures
+- [x] **Intermittent Repairs Have Reproducible Evidence** — give flaky failures
   a bounded diagnosis and closure procedure that cannot mistake a lucky rerun
   for a demonstrated repair.
   - **Gap:** the failure catalogue recommends three runs, and diagnosis requires
@@ -1978,6 +1978,7 @@ tests and per-task handoffs already cover those parts of the source material.
 
 | Milestone | Date |
 |-----------|------|
+| Intermittent Repairs Have Reproducible Evidence | 2026-10-16 |
 | Uncertain External Contracts Are Researched Before They Shape Tasks | 2026-10-16 |
 | Existing Architectural Decisions Reach The Spec | 2026-10-16 |
 | Behavior Specification | 2026-08-19 |

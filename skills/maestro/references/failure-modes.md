@@ -17,7 +17,7 @@ of* the fact underneath it.
 | The sentence | What it usually means | What to do instead |
 |---|---|---|
 | "The требование was ambiguous, so I built the narrower reading." | A decision about scope was made by whoever was least equipped to make it, and nothing recorded that it happened. | Build the reading you can defend, and put the other one in the отчёт under Assumptions. Ambiguity is reported, never silently resolved. |
-| "The test is flaky." | The test is failing and nobody has looked at why. | Run it three times and say what happened each time. A test that fails once in three is a finding about the build, not about the test. |
+| "The test is flaky." | The test is failing and nobody has looked at why. | Preserve every observed outcome. Mixed outcomes trigger the bounded original/minimized replay procedure in [intermittent-repairs.md](intermittent-repairs.md); a lucky green never closes the finding. |
 | "It works when I run it by hand." | The build depends on state the running build does not have. | That is the finding. Name the state. |
 | "The reviewer misread the таск." | Either the task file is unclear or the finding is right. | Quote both, side by side. If the task file supports the finding, it is a finding. |
 | "That is out of scope now." | Scope was decided at G3 and is being re-decided after the fact. | Scope changes are `S1`'s territory: only the user removes a требование, in their own words. |

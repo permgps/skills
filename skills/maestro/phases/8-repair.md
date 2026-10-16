@@ -140,6 +140,18 @@ and DF-4 (empty state never renders), each with its own check. Invalid: one
 defect «fix the orders page», or a split that names fresh roots to restart the
 count. Next action: brief the first ready repair.
 
+### Observed intermittent behavior
+
+On mixed outcomes of the same symptom check under the same conditions, open
+[intermittent-repairs.md](../references/intermittent-repairs.md) before further
+diagnosis, including on the first repair. Record finite reproduction limits in
+conditions captures, then publish the immutable `intermittentRepairs` plan
+before collecting its series. If checks/minimization are missing, dispatch the
+owning executor once with the bounded preparation brief defined there; include
+the procedure in its allowed References. No implementation fix or candidate
+sampling in preparation. Preserve both original and minimized workloads.
+No lucky rerun, incomplete series or unchanged candidate resets the repair limit.
+
 ### 2a. Diagnose before repeating a failed repair
 
 Entry: stable root and previous attempt, actual failure evidence and finite

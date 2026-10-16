@@ -15,6 +15,7 @@ import { projectState } from '../state/projection.ts';
 import { parseStateSource } from '../state/read.ts';
 import { AWAITING_KINDS } from '../state/contract.ts';
 import { retrospectiveState } from '../state/fixtures/retrospective.ts';
+import { intermittentFixture } from '../state/fixtures/intermittent.mts';
 import { deriveVerification } from '../state/verification.ts';
 import { cleanCell, parseTables } from './spec-integrity.ts';
 
@@ -72,7 +73,7 @@ interface Logic {
     readiness: { status: string; kinds: string[] };
   } | null;
   verificationOf: (state: unknown) => {
-    legacy: boolean; g4: string; outcome?: string; requirementResults: Record<string, string>;
+    legacy: boolean; g4: string; outcome?: string; checkResults: Record<string, string>; requirementResults: Record<string, string>;
     failedIds: string[]; incompleteIds: string[]; verificationEstablished: boolean; currentRoundId?: string;
   };
   formatGap: (ms: unknown, language?: string) => string;
@@ -3711,5 +3712,18 @@ test('the plain closed-run lines say no word the vocabulary calls shorthand', as
         assert.ok(!found, `${language}/${key}: "${said}" says "${word}"`);
       }
     }
+  }
+});
+
+
+test('intermittent series yield the same incomplete, failed, current and stale results offline as in the helper', async () => {
+  for (const build of ['fixed','partial'] as const) {
+    const f = intermittentFixture();
+    f.append('baseline','faulty');
+    assert.deepEqual(plain(L.verificationOf(f.state).checkResults), deriveVerification(f.state).checkResults);
+    f.append('candidate',build);
+    assert.deepEqual(plain(L.verificationOf(f.state).checkResults), deriveVerification(f.state).checkResults);
+    f.record.checks[0]!.currentFingerprint.build='new-build';
+    assert.deepEqual(plain(L.verificationOf(f.state).checkResults), deriveVerification(f.state).checkResults);
   }
 });

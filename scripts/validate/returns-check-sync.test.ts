@@ -296,3 +296,20 @@ test('the check writes nothing anywhere in the project', needsGit, async () => {
     assert.equal(await snapshot(target.root), before);
   } finally { await target.dispose(); }
 });
+
+test('intermittent sample intake requires all attribution fields while preserving ordinary returns', needsGit, async () => {
+  const target = await project();
+  try {
+    const ordinary = await cleanBlock(target);
+    const partial = ordinary.replace('checkId: C03', 'checkId: C03\nintermittentPlanId: IP-1');
+    assert.ok(rules(await target.check(partial)).includes('intermittent-attribution'));
+    const attributed = ordinary.replace('checkId: C03', [
+      'checkId: C03', 'intermittentPlanId: IP-1', 'intermittentScenario: original',
+      'intermittentPhase: candidate', 'intermittentSample: 2', 'intermittentElapsedMs: 20',
+    ].join('\n'));
+    assert.equal((await target.check(attributed)).code, 0);
+    assert.ok(rules(await target.check(attributed.replace('intermittentSample: 2', 'intermittentSample: 0'))).includes('intermittent-attribution'));
+    assert.ok(rules(await target.check(attributed.replace('intermittentElapsedMs: 20', 'intermittentElapsedMs: NaN'))).includes('intermittent-attribution'));
+    assert.equal((await target.check(ordinary)).code, 0);
+  } finally { await target.dispose(); }
+});

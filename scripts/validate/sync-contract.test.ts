@@ -27,6 +27,7 @@ import { mkdtemp, mkdir, writeFile, copyFile, readFile, rm, unlink, cp, readdir 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, sha256, planningOwnershipState, correctedSourceAuditState, deferredScopeState, sourceVerifiedState, controlledState, verifiedState, contract6State, activeContract6State, activeContract9State, contract9State, activeContract10State, contract10State } from '../state/fixtures/verification.ts';
+import { intermittentFixture, stamp as intermittentStamp } from '../state/fixtures/intermittent.mts';
 import type { RunState } from '../state/contract.ts';
 import { prepareLegacyResume } from '../state/projection.ts';
 
@@ -224,11 +225,34 @@ async function session(state: unknown, raw?: string): Promise<Session> {
 /** Hold a port the way an unrelated program would — nothing to do with this run. */
 function occupy(port: number): Promise<net.Server> {
   return new Promise((resolve, reject) => {
-    const held = net.createServer();
+    // Drain probes without answering: unread bytes would delay EOF and close().
+    const held = net.createServer(socket => socket.resume());
     held.once('error', reject);
     held.listen(port, '127.0.0.1', () => resolve(held));
   });
 }
+
+test('the occupied-port fixture drains probe bytes before closing', async () => {
+  const held = await occupy(0);
+  const address = held.address(); assert.ok(address && typeof address !== 'string');
+  const connected = once(held, 'connection');
+  const client = net.createConnection({ port: address.port, host: '127.0.0.1' });
+  await once(client, 'connect');
+  const [accepted] = await connected as [net.Socket];
+  const closed = new Promise<void>(resolve => held.close(() => resolve()));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    client.end('probe bytes\r\n');
+    const drained = await Promise.race([
+      closed.then(() => true),
+      new Promise<boolean>(resolve => { timer = setTimeout(() => resolve(false), 1000); }),
+    ]);
+    assert.equal(drained, true, 'unread probe bytes must not keep fixture shutdown waiting');
+  } finally {
+    clearTimeout(timer);
+    client.destroy(); accepted.destroy(); await closed;
+  }
+});
 
 /** Kill a server and wait for its port to actually come free before asking again. */
 async function stop(pid: number, port: number): Promise<void> {
@@ -1664,4 +1688,70 @@ test('reopening a closed contract-10 run that keeps its result is refused', asyn
     const dropped = target.publish(reopened, closing.updatedAt);
     assert.equal(dropped.code, 0, JSON.stringify(dropped));
   } finally { await target.dispose(); }
+});
+
+test('copied runtime enforces intermittent plan publication, full evidence and capture integrity', async () => {
+  const target = await session(null);
+  try {
+    const f = intermittentFixture('seeded');
+    const declared = structuredClone(f.state);
+    f.append('baseline','faulty'); const baseline = structuredClone(f.state);
+    f.append('candidate','fixed'); const complete = structuredClone(f.state);
+    f.close(); f.state.updatedAt=intermittentStamp(60);
+    for (const [relative, body] of Object.entries({ ...f.captureBodies, 'manifest.md': SOURCE_MANIFEST })) {
+      const file=path.join(target.root,f.state.slug,relative);
+      await mkdir(path.dirname(file),{recursive:true}); await writeFile(file,body);
+    }
+    const candidate=path.join(target.root,'candidate.json');
+    async function publish(state: RunState, expect?: string) {
+      await writeFile(candidate,JSON.stringify(state));
+      return target.run({},['--publish',candidate,'--no-open',...(expect ? ['--expect',expect] : [])]);
+    }
+    const imported=await publish(f.state);
+    assert.equal(imported.status,1); assert.match(imported.out,/publish initial observations first/);
+    let done=await publish(f.beforePlan); assert.equal(done.status,0,done.out);
+    done=await publish(baseline,f.beforePlan.updatedAt); assert.equal(done.status,1); assert.match(done.out,/publish the plan in a prior write/);
+    done=await publish(declared,f.beforePlan.updatedAt); assert.equal(done.status,0,done.out);
+    done=await publish(baseline,declared.updatedAt); assert.equal(done.status,0,done.out);
+    const premature=structuredClone(baseline); premature.updatedAt=intermittentStamp(55);
+    premature.verification!.findings[0]!.status='resolved'; premature.verification!.findings[0]!.resolutionExecutionId=baseline.verification!.executions.find(e=>e.intermittent?.scenario==='original' && e.result==='passed')!.id;
+    done=await publish(premature,baseline.updatedAt); assert.equal(done.status,1); assert.match(done.out,/intermittent resolution/);
+    done=await publish(complete,baseline.updatedAt); assert.equal(done.status,0,done.out);
+    done=await publish(f.state,complete.updatedAt); assert.equal(done.status,0,done.out);
+    const conditions=f.record.evidence.find(e=>e.id===f.plan.scenarios[0]!.conditionsEvidenceId)!;
+    await writeFile(path.join(target.root,f.state.slug,conditions.path),'changed replay\n');
+    await writeFile(candidate,JSON.stringify(f.state));
+    done=await target.run({},['--validate',candidate]); assert.equal(done.status,1); assert.match(done.out,/hash|SHA-256|digest/i);
+  } finally { await target.dispose(); }
+});
+
+test('intermittent captures survive closing relocation and a successor run in the same project', async () => {
+  const target=await waitingProject();
+  try {
+    const f=intermittentFixture(); const declared=structuredClone(f.state);
+    f.append('baseline','faulty'); const baseline=structuredClone(f.state);
+    f.append('candidate','fixed'); const complete=structuredClone(f.state);
+    f.close(); f.state.updatedAt=intermittentStamp(60);
+    const active=(state:RunState):RunState=>({...state,contractVersion:7,dir:WAIT_WIP});
+    for(const [relative,body] of Object.entries({...f.captureBodies,'manifest.md':SOURCE_MANIFEST})){
+      const file=path.join(target.maestro,WAIT_WIP,relative); await mkdir(path.dirname(file),{recursive:true}); await writeFile(file,body);
+    }
+    let expected:string|undefined;
+    for(const state of [f.beforePlan,declared,baseline,complete,f.state]){
+      const done=target.publish(active(state),expected); assert.equal(done.code,0,JSON.stringify(done)); expected=state.updatedAt;
+    }
+    const closed:RunState={...active(structuredClone(f.state)),dir:WAIT_WIP.replace('--wip',''),lifecycle:'closed',outcome:'stopped_incomplete',stopReason:'Synthetic remaining parent criterion',finishedAt:intermittentStamp(70),updatedAt:intermittentStamp(70)};
+    closed.stages[0]!.status='failed';closed.stages[0]!.finishedAt=closed.finishedAt!;
+    let done=target.publish(closed,expected);assert.equal(done.code,0,JSON.stringify(done));
+    const capture=f.record.evidence.find(e=>e.id===f.plan.scenarios[0]!.conditionsEvidenceId)!;
+    assert.equal(await readFile(path.join(target.maestro,closed.dir!,capture.path),'utf8'),f.captureBodies[capture.path]);
+    const next=activeContract6State();next.contractVersion=7;next.slug='second-repair';next.runId='second-repair-run';
+    next.startedAt='2026-10-05T09:00:00Z';next.updatedAt='2026-10-05T09:20:00Z';next.dir='2026-10-05-second-repair--wip';
+    for(const [relative,body] of Object.entries({...CAPTURES,'manifest.md':SOURCE_MANIFEST})){
+      const file=path.join(target.maestro,next.dir,relative);await mkdir(path.dirname(file),{recursive:true});await writeFile(file,body);
+    }
+    done=target.publish(next,closed.updatedAt);assert.equal(done.code,0,JSON.stringify(done));
+    assert.equal((await target.published()).runId,next.runId);
+    assert.equal(await readFile(path.join(target.maestro,closed.dir!,capture.path),'utf8'),f.captureBodies[capture.path]);
+  } finally {await target.dispose();}
 });

@@ -1673,3 +1673,23 @@ and an observed final return. The coordinator owns orchestration, worktree
 integration and state publication; executors own project edits in their named
 absolute workspaces. Missing concurrency or worktrees narrows editing waves to
 one without removing independent sequential readers.
+
+### Observed Intermittent Repairs
+
+On observed mixed outcomes under the same conditions, build/review/acceptance
+route the finding through repair's intermittent procedure. Repair records finite
+reproduction limits before further diagnosis and publishes the bounded
+`intermittentRepairs` plan before its series, retaining the original
+trigger alongside the minimized case. When the minimized check is missing, one
+bounded preparation dispatch to the owning executor creates the checks and
+returns all probes and consumed budget before declaration; it cannot fix the
+implementation or run a candidate. Include the procedure in allowed task
+References or embed its applicable instructions. Preparation applies to the
+first intermittent repair without adding a retry allowance; repeated repair
+still uses its independent diagnostician. Repair plans both baseline and candidate
+series before seeing candidate results. The executor returns every sample with
+its `intermittent` attribution; build intake preserves it. Review checks both
+workloads and their comparability; acceptance reports finite-sample limitations
+and incomplete series. The exact fields and closure rules live in
+`verification.md`, Intermittent Repair Evidence. No new dispatch for ordinary
+deterministic failures and no increase in the existing repair budgets.

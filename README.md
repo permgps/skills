@@ -475,7 +475,10 @@ Two more phases run outside that sequence:
   **strategy review** — which may change the approach, stop the run incomplete,
   or ask you to raise the total limit. Only your words raise it. When the
   build shows that something cannot be built as specified, the scope
-  amendment is your decision.
+  amendment is your decision. Observed intermittent failures require bounded
+  baseline and post-fix series for both the original and minimized workload.
+  One lucky green cannot close the defect; incomplete evidence stays incomplete.
+  See `docs/spec/verification.md`, Intermittent Repair Evidence, for the contract.
 - **Memory** — runs once during the build and again after every closure,
   acceptance's or repair's, and asks nothing. It writes what should outlive the
   run into the instruction file your host loads, appends to `decisions.md`, and

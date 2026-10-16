@@ -1267,3 +1267,11 @@ suppression remain supported. MAESTRO_SYNC_OPENER is parsed into argv and never
 executed through interpolated shell text. An opener failure preserves the state
 and address. Localized address, moved, folded and opening messages retain their
 ordering; JSON actions keep these messages off stdout.
+
+### Intermittent Check Results
+
+The offline verification projection applies the same optional intermittent-series
+eligibility as the helper. A last green sample cannot display a passing check
+while either original/minimized series is incomplete, stale or failed. It reads
+only state metadata, never capture files. Runtime/dashboard parity tests hold
+these derived results together; no new card or duplicate counter is introduced.

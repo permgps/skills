@@ -2589,6 +2589,48 @@ globalThis.MAESTRO_LOGIC = (function () {
     };
   }
 
+  // Offline mirror of state/intermittent.mts, held by dashboard-logic parity tests.
+  // Published states already passed shape validation; the page reads no captures.
+  function intermittentResult(checkId, record) {
+    if (record.version !== 3) return null;
+    var plans = record.intermittentRepairs || [];
+    var replaced = plans.map(function (p) { return p.supersedes; });
+    var results = plans.filter(function (p) {
+      return replaced.indexOf(p.id) === -1 && p.scenarios.some(function (s) { return s.checkId === checkId; });
+    }).map(function (plan) {
+      var all = record.executions.filter(function (e) { return e.intermittent && e.intermittent.planId === plan.id; });
+      function series(role, phase) {
+        return all.filter(function (e) { return e.intermittent.scenario === role && e.intermittent.phase === phase; })
+          .sort(function (a,b) { return a.intermittent.sample - b.intermittent.sample; });
+      }
+      if (all.length > plan.maxRuns || all.reduce(function (n,e) { return n + e.intermittent.elapsedMs; },0) > plan.maxDurationMs) return 'unavailable';
+      var baseline = plan.scenarios.every(function (s) {
+        var runs = series(s.role,'baseline');
+        return runs.length === s.sampleCount && runs.every(function (e) { return e.result === 'passed' || e.result === 'failed'; })
+          && runs.some(function (e) { return e.result === 'failed'; });
+      });
+      if (!baseline) return 'unavailable';
+      for (var i=0; i<plan.scenarios.length; i++) {
+        var scenario = plan.scenarios[i];
+        var runs = series(scenario.role,'candidate');
+        var check = record.checks.filter(function (c) { return c.id === scenario.checkId; })[0];
+        if (runs.some(function (e) { return !check || !sameFingerprint(e.fingerprint,check.currentFingerprint)
+          || e.fingerprint.acceptanceInput !== record.acceptanceInputDigest; })) return 'stale';
+        if (runs.some(function (e) { return e.result === 'failed'; })) return 'failed';
+        var first = runs[0];
+        if (first && record.executions.some(function (e) { return e.checkId === scenario.checkId
+          && e.fingerprint.build === first.fingerprint.build && Date.parse(e.executedAt) >= Date.parse(first.executedAt)
+          && e.result === 'failed'; })) return 'failed';
+      }
+      return plan.scenarios.every(function (s) {
+        var runs = series(s.role,'candidate');
+        return runs.length === s.sampleCount && runs.every(function (e) { return e.result === 'passed'; });
+      }) ? 'passed' : 'unavailable';
+    });
+    return !results.length ? null : results.indexOf('failed') !== -1 ? 'failed' : results.indexOf('stale') !== -1 ? 'stale'
+      : results.every(function (r) { return r === 'passed'; }) ? 'passed' : 'unavailable';
+  }
+
   function verificationOf(state) {
     if (!state || state.contractVersion < 4 || !state.verification) {
       var old = ((state && state.gates) || []).filter(function (item) { return item.id === 'G4'; })[0];
@@ -2602,6 +2644,10 @@ globalThis.MAESTRO_LOGIC = (function () {
       var execution = effectiveExecution(check, record);
       checks[check.id] = record.version >= 2 && check.currentFingerprint.acceptanceInput !== record.acceptanceInputDigest ? 'stale' : !execution ? 'not_run'
         : sameFingerprint(execution.fingerprint, check.currentFingerprint) ? execution.result : 'stale';
+      if (execution && checks[check.id] !== 'stale') {
+        var repeated = intermittentResult(check.id, record);
+        if (repeated && repeated !== 'passed') checks[check.id] = repeated;
+      }
     });
     var obligationResults = {};
     obligations.forEach(function (item) {

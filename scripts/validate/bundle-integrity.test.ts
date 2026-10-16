@@ -18,7 +18,7 @@ import {
   REVIEW_ANCHORS,
   SIGNAL_ANCHORS,
   CODEBASE_ANCHORS,
-  RESEARCH_ANCHORS,
+  RESEARCH_ANCHORS, INTERMITTENT_ANCHORS,
   PROGRESS_LINE_ANCHORS,
   SIZE_ANCHORS,
   STOP_ANCHORS,
@@ -1784,6 +1784,19 @@ for (const anchor of RESEARCH_ANCHORS) {
       assert.ok(flat.includes(anchor.literal));
       await writeFile(file, flat.split(anchor.literal).join('removed'));
       const findings = (await checkBundle(copy)).filter(v => v.check === 'research');
+      assert.deepEqual(findings.map(v => v.file), [anchor.file]);
+    });
+  });
+}
+
+for (const anchor of INTERMITTENT_ANCHORS) {
+  test(anchor.file + ' losing its intermittent rule is detected', async () => {
+    await withShippedCopy(async copy => {
+      const file = path.join(copy, anchor.file);
+      const flat = (await readFile(file, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal));
+      await writeFile(file, flat.split(anchor.literal).join('removed'));
+      const findings = (await checkBundle(copy)).filter(v => v.check === 'intermittent');
       assert.deepEqual(findings.map(v => v.file), [anchor.file]);
     });
   });

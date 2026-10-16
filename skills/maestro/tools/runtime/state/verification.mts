@@ -16,6 +16,10 @@ import type {
   VerificationFinding, PromisedWork,
 } from './contract.mts';
 
+import { sameFingerprint } from './fingerprint.mts';
+export { sameFingerprint } from './fingerprint.mts';
+import { intermittentCheckResult, validateIntermittentShape } from './intermittent.mts';
+
 const log = createLogger('state');
 
 export interface VerificationSummary {
@@ -26,26 +30,6 @@ export interface VerificationSummary {
   incompleteIds: string[];
   g4: 'passed' | 'failed' | 'pending';
   currentRoundId?: string;
-}
-
-/** JSON objects in state have a stable serialization independent of key order. */
-export function sameFingerprint(left: unknown, right: unknown): boolean {
-  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
-  const a = left as Record<string, unknown>;
-  const b = right as Record<string, unknown>;
-  const keys = ['reference', 'build', 'data', 'runtime', 'acceptanceInput'];
-  if (!keys.every(key => a[key] === b[key])) return false;
-  const pathsA = a['relevantPaths'];
-  const pathsB = b['relevantPaths'];
-  const hashesA = a['inputHashes'];
-  const hashesB = b['inputHashes'];
-  if (!Array.isArray(pathsA) || !Array.isArray(pathsB)
-    || !hashesA || !hashesB || typeof hashesA !== 'object' || typeof hashesB !== 'object') return false;
-  const paths = [...new Set([...pathsA, ...pathsB])].sort();
-  return pathsA.length === pathsB.length
-    && pathsA.every(path => pathsB.includes(path))
-    && paths.every(path => (hashesA as Record<string, unknown>)[String(path)]
-      === (hashesB as Record<string, unknown>)[String(path)]);
 }
 
 /**
@@ -108,7 +92,8 @@ function checkResult(check: VerificationCheck, record: VerificationRecord): Chec
   if (record.version !== 1 && check.currentFingerprint.acceptanceInput !== record.acceptanceInputDigest) return 'stale';
   if (!execution) return 'not_run';
   if (!sameFingerprint(execution.fingerprint, check.currentFingerprint)) return 'stale';
-  return execution.result;
+  const repeated = intermittentCheckResult(check.id, record);
+  return repeated && repeated !== 'passed' ? repeated : execution.result;
 }
 
 function obligationResult(
@@ -411,6 +396,8 @@ export function validateFingerprint(
 
 /** Validate referential integrity, ownership, verdict consistency, and closure. */
 export function validateVerificationRecord(state: RunState): VerificationViolation[] {
+  const intermittentShape = validateIntermittentShape(state.verification);
+  if (intermittentShape.length) return intermittentShape;
   const errors = validateShape(state.verification);
   if (errors.length > 0) return errors;
   const record = state.verification!;
@@ -740,6 +727,7 @@ export const TRANSITION_RULES = {
   strategyReviews: 'guarded',
   inheritedExecutionIds: 'guarded',
   inheritedAttemptIds: 'guarded',
+  intermittentRepairs: 'guarded',
 } as const satisfies Record<string, 'immutable' | 'append-only' | 'one-way' | 'guarded' | 'current'>;
 
 const keysWithRule = (rule: string): string[] =>

@@ -676,6 +676,16 @@ export const REPORT_ANCHORS: readonly Anchor[] = [
     why: 'the отчёт on disk is English, and the person who knows the answer may not read it' },
 ];
 
+/** Repeated evidence reaches the exact producers and consumers that must retain it. */
+export const INTERMITTENT_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/8-repair.md', literal: 'intermittent-repairs.md', why: 'observed intermittency must reach the bounded protocol' },
+  { file: 'phases/5-build.md', literal: 'import every sample, including failures', why: 'intake cannot discard inconvenient samples' },
+  { file: 'prompts/executor.md', literal: 'all five intermittent labels', why: 'sample attribution must survive the executor return' },
+  { file: 'prompts/repair-diagnostician.md', literal: 'preserve the original alongside the minimized case', why: 'minimization must not replace the trigger' },
+  { file: 'prompts/reviewer.md', literal: 'Both the original and minimized workload', why: 'review must cover both workload shapes' },
+  { file: 'phases/7-acceptance.md', literal: 'partial/stale series stay incomplete', why: 'acceptance must report insufficient evidence' },
+];
+
 /** Conditional research and freshness anchors; semantic source judgement stays with the reader. */
 export const RESEARCH_ANCHORS: readonly Anchor[] = [
   { file: 'phases/3-spec.md', literal: 'No material uncertainty means no artifact and no dispatch',
@@ -1483,6 +1493,7 @@ export async function checkBundle(
   // --- existing code is read once, before the spec ----------------------------
   // Only a bundle with a spec phase reads the existing code; Scout has none.
   if (byFile.has('phases/3-spec.md')) {
+    for (const v of missingAnchors(byFile, INTERMITTENT_ANCHORS, 'intermittent')) add(v.check, v.file, v.line, v.message);
     for (const v of missingAnchors(byFile, RESEARCH_ANCHORS, 'research')) add(v.check, v.file, v.line, v.message);
     for (const v of missingAnchors(byFile, CODEBASE_ANCHORS, 'codebase')) add(v.check, v.file, v.line, v.message);
   }

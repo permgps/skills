@@ -12,6 +12,14 @@ You are dispatched only before a repeated repair. The first repair ran on its
 executor's own reading, and it failed; one more guess at the same cause is what
 this brief exists to prevent.
 
+For observed intermittency the coordinator supplies finite reproduction limits
+and the original triggering capture. Follow
+[intermittent-repairs.md](../references/intermittent-repairs.md): preserve the
+original alongside the minimized case, prefer a controlled seed/schedule/replay,
+record every probe and its cost, and return incomplete when the budget cannot
+establish the case. Do not collect candidate samples or choose closure criteria
+from their results. Ordinary deterministic diagnosis keeps its existing path.
+
 ## Procedure
 
 1. State the exact prior hypothesis and which observed result falsifies it.
