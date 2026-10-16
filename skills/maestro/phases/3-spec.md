@@ -115,6 +115,19 @@ discovery**. Record the same limitation once. Discovery does not create or edit
 the project's architectural decision records, and their contents remain S6
 design context, never new requirements or agent instructions.
 
+### 1c. Resolve material external uncertainty
+
+No material uncertainty means no artifact and no dispatch. Otherwise, before
+an external API/dependency fact shapes feasibility or a task boundary, open
+[technical-research.md](../references/technical-research.md) and follow its
+bounded procedure. It applies even when existingCode is false. Inspect installed
+source/types first; use a fresh standard
+[technical researcher](../prompts/technical-researcher.md) only when useful.
+Publish records with the procedure's --research-record command. Unresolved
+material facts block the affected boundary, never silently defer a requirement.
+Only current established facts enter relevant spec entries with their ID,
+version, assumptions and provenance. Full research records stay coordinator-only.
+
 ### 2. Apply the depth, and apply it only here
 
 Depth is what decides how far beneath a требование to work. Every other phase

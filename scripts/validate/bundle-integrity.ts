@@ -676,6 +676,26 @@ export const REPORT_ANCHORS: readonly Anchor[] = [
     why: 'the отчёт on disk is English, and the person who knows the answer may not read it' },
 ];
 
+/** Conditional research and freshness anchors; semantic source judgement stays with the reader. */
+export const RESEARCH_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/3-spec.md', literal: 'No material uncertainty means no artifact and no dispatch',
+    why: 'ordinary changes must not acquire a research stage' },
+  { file: 'phases/3-spec.md', literal: 'technical-research.md',
+    why: 'material uncertainty must reach the bounded procedure' },
+  { file: 'phases/4-plan.md', literal: 'Copy only relevant established facts',
+    why: 'task contracts must not present unresolved evidence as established' },
+  { file: 'phases/5-build.md', literal: 'A new unresolved record invalidates the old fact',
+    why: 'dispatch must recheck changed assumptions' },
+  { file: 'phases/8-repair.md', literal: 'A new unresolved record invalidates the old fact',
+    why: 'repair must not reuse obsolete evidence' },
+  { file: 'prompts/technical-researcher.md', literal: 'Inspect installed source/types first',
+    why: 'research must establish the installed contract before reading newer documentation' },
+  { file: 'prompts/technical-researcher.md', literal: 'mismatch requires two known different versions',
+    why: 'unknown versions cannot be classified as a resolved mismatch' },
+  { file: 'prompts/technical-researcher.md', literal: 'never more than eight source inspections and ten minutes',
+    why: 'research is bounded even when access fails' },
+];
+
 /**
  * The literal text that carries «existing code is read once, before the spec».
  *
@@ -1463,6 +1483,7 @@ export async function checkBundle(
   // --- existing code is read once, before the spec ----------------------------
   // Only a bundle with a spec phase reads the existing code; Scout has none.
   if (byFile.has('phases/3-spec.md')) {
+    for (const v of missingAnchors(byFile, RESEARCH_ANCHORS, 'research')) add(v.check, v.file, v.line, v.message);
     for (const v of missingAnchors(byFile, CODEBASE_ANCHORS, 'codebase')) add(v.check, v.file, v.line, v.message);
   }
 

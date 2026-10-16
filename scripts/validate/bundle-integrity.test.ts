@@ -18,6 +18,7 @@ import {
   REVIEW_ANCHORS,
   SIGNAL_ANCHORS,
   CODEBASE_ANCHORS,
+  RESEARCH_ANCHORS,
   PROGRESS_LINE_ANCHORS,
   SIZE_ANCHORS,
   STOP_ANCHORS,
@@ -1774,3 +1775,16 @@ test('architectural decision discovery and reconciliation have anchors at each a
     assert.ok(CODEBASE_ANCHORS.some(anchor => anchor.file === file && anchor.literal === literal), `${file}: ${literal}`);
   }
 });
+
+for (const anchor of RESEARCH_ANCHORS) {
+  test(anchor.file + ' losing its research rule is detected', async () => {
+    await withShippedCopy(async copy => {
+      const file = path.join(copy, anchor.file);
+      const flat = (await readFile(file, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal));
+      await writeFile(file, flat.split(anchor.literal).join('removed'));
+      const findings = (await checkBundle(copy)).filter(v => v.check === 'research');
+      assert.deepEqual(findings.map(v => v.file), [anchor.file]);
+    });
+  });
+}

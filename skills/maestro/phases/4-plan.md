@@ -36,6 +36,17 @@ Read `.maestro/<dir>/codebase.md` too, when the прогон has one. It is what
 repository held before this прогон, as the existing-code reader returned it.
 Signatures in `interfaces.md` take the names it records.
 
+### 1b. Carry only current external-contract facts
+
+For each cited research fact, compare the selected version and assumptions
+before using it. If stale or unresolved, open
+[technical-research.md](../references/technical-research.md) for a bounded
+recheck; do not cut tasks around an invented interface. Copy only relevant
+established facts with record ID, version/version source, assumptions and
+supporting locators into the owning task. Facts shared by tasks belong in
+shared.md and are copied by --plan-render. The task must be self-contained;
+no executor or gate reader receives research/ or producer research notes.
+
 ### 2. Size the work
 
 | Project size | Signal | Таски | Wave width |

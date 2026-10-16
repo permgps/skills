@@ -14,6 +14,7 @@ import { updateCommand } from './runtime/update-check.mts';
 import { commitsCheckCommand } from './runtime/commits-check.mts';
 import { returnsCheckCommand } from './runtime/execution-return.mts';
 import { planUnitsCommand } from './runtime/plan-units.mts';
+import { researchRecordCommand } from './runtime/technical-research.mts';
 import { openPage, openingMessage } from './runtime/opener.mts';
 import { ensureViewer, serveDirectory } from './runtime/server.mts';
 import { extractStateLiteral } from './runtime/state/read.mts';
@@ -73,6 +74,11 @@ async function refresh(args: string[]): Promise<number> {
   return reports.length ? 1 : 0;
 }
 export async function main(args = process.argv.slice(2)): Promise<number> {
+  if (args[0] === '--research-record') {
+    const outcome = await researchRecordCommand(args, RUN_DIR);
+    process.stdout.write(JSON.stringify(outcome.result) + '\n');
+    return outcome.code;
+  }
   if (args[0] === '--serve') {
     try { await serveDirectory(RUN_DIR, Number(args[args.indexOf('--port') + 1]), args[args.indexOf('--instance') + 1] ?? ''); return 0; }
     catch { log.error('serve', 'listener could not start', { dir: RUN_DIR }); return 2; }

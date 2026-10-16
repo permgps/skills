@@ -14,6 +14,14 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **Uncertain external contracts are researched before they shape tasks.**
+  Conditional, bounded read-only research checks installed source/types before
+  official version-matched documentation. Immutable research records preserve
+  provenance, uncertainty and supersession; the copied helper publishes them
+  without fetching documentation. Only current relevant facts enter owning
+  tasks. Changed versions trigger rechecks, unresolved material contracts stay
+  blocked, and blind readers receive no producer research records.
+
 - **Existing architectural decisions reach the specification.** Bounded
   discovery records relevant decision paths, statuses, constraints and rationale
   in `codebase.md`, including absent or incomplete coverage. A conditional G2

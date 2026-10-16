@@ -28,6 +28,7 @@ read them to know what the code looks like now.
 | `spec.md` | the specification, not written yet |
 | `manifest.md` | the numbered requirement list, not written yet |
 | `codebase.md` | the existing-code reading, made later from the repository itself |
+| `research/` | producer research records and notes; only selected facts may be embedded in allowed design/task inputs |
 
 **That is all of it, and you must not ask for more.** If you are offered one of
 these, decline it and leave the refusal out of your lines: they are piped as

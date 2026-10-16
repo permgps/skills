@@ -108,29 +108,32 @@ So the list gets a machine-readable form. `scripts/validate/gate-readers.ts`
 holds every reader's brief to the `Given` and `Withheld` columns below, name for name: a name
 present in one and not the other is a finding that names both places.
 
-Three more readers are held here and gate nothing. The standards reader is
+Four more readers are held here and gate nothing. The standards reader is
 dispatched once after review over the whole прогон; its output is observations
 only. The existing-code reader is dispatched once at the start of the spec
 phase, in a project with code; its text becomes `codebase.md`, which only the
 plan-consistency and conditional G2 architecture readers below are given. The
 commit reader is dispatched by preflight only when more than thirty commits over code landed
 since the last closure; its at most ten lines replace the list in `prior.md`.
-The blindness of all three is held the same way as the gate readers'. The same check holds the places the
+The technical researcher answers one material external-contract question with
+a bounded read-only search; it receives only its question envelope and project
+root. The blindness of all four is held the same way as the gate readers'. The same check holds the places the
 standards reader's one input is gathered from, named alike in phase 6, in
 [`phases.md`](phases.md) and in the brief.
 
 | Gate | Reader's brief | Given | Withheld |
 |---|---|---|---|
-| G1 source | `manifest-reader.md` | redacted source snapshots, candidate manifest | coordinator clause inventory, spec.md, answers.md, tasks, prior audit conclusions, `prior.md`, `codebase.md` |
-| G3 task | `task-reader.md` | the task file, `interfaces.md` | `spec.md`, `manifest.md`, the other task files, `prior.md`, `codebase.md` |
-| G3 consistency | `plan-consistency-reader.md` | every task file, `interfaces.md`, `codebase.md` | `spec.md`, `manifest.md`, `prior.md` |
-| G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning, `prior.md`, `codebase.md` |
-| G2 architecture | `spec-architecture-reader.md` | `spec.md`, `codebase.md`, `manifest.md`, `answers.md` | `brief.md`, `prior.md`, the plan, prior verdicts, the repository |
-| G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts, `prior.md`, `codebase.md` |
-| G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, neutral raw reference register and capture identity, the running build | `spec.md`, the plan, the task files, `reviews/`, prior dispositions, the бриф's original text, `prior.md`, `codebase.md` |
-| standards (no gate) | `standards-reader.md` | every таск's per-commit diffs, the project's documented standards | `spec.md`, `manifest.md`, the task files, `interfaces.md`, `reviews/`, `prior.md`, `codebase.md` |
-| existing code (no gate) | `existing-code-reader.md` | `manifest.md`, `answers.md`, the repository, changed since the last closure | `brief.md`, `spec.md`, `prior.md`, `codebase.md` |
-| commits (no gate) | `commit-reader.md` | the project root, the range | `prior.md`, `PROGRESS.md`, `brief.md`, `spec.md`, `manifest.md`, `codebase.md` |
+| G1 source | `manifest-reader.md` | redacted source snapshots, candidate manifest | coordinator clause inventory, spec.md, answers.md, tasks, prior audit conclusions, `prior.md`, `codebase.md`, `research/` |
+| G3 task | `task-reader.md` | the task file, `interfaces.md` | `spec.md`, `manifest.md`, the other task files, `prior.md`, `codebase.md`, `research/` |
+| G3 consistency | `plan-consistency-reader.md` | every task file, `interfaces.md`, `codebase.md` | `spec.md`, `manifest.md`, `prior.md`, `research/` |
+| G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning, `prior.md`, `codebase.md`, `research/` |
+| G2 architecture | `spec-architecture-reader.md` | `spec.md`, `codebase.md`, `manifest.md`, `answers.md` | `brief.md`, `prior.md`, the plan, prior verdicts, the repository, `research/` |
+| G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts, `prior.md`, `codebase.md`, `research/` |
+| G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, neutral raw reference register and capture identity, the running build | `spec.md`, the plan, the task files, `reviews/`, prior dispositions, the бриф's original text, `prior.md`, `codebase.md`, `research/` |
+| standards (no gate) | `standards-reader.md` | every таск's per-commit diffs, the project's documented standards | `spec.md`, `manifest.md`, the task files, `interfaces.md`, `reviews/`, `prior.md`, `codebase.md`, `research/` |
+| existing code (no gate) | `existing-code-reader.md` | `manifest.md`, `answers.md`, the repository, changed since the last closure | `brief.md`, `spec.md`, `prior.md`, `codebase.md`, `research/` |
+| technical research (no gate) | `technical-researcher.md` | question envelope, the project root | `brief.md`, `spec.md`, `manifest.md`, `prior.md`, `codebase.md`, `research/` |
+| commits (no gate) | `commit-reader.md` | the project root, the range | `prior.md`, `PROGRESS.md`, `brief.md`, `spec.md`, `manifest.md`, `codebase.md`, `research/` |
 
 The G2 architecture reader is contextual, not blind: it is dispatched only when
 `codebase.md` contains relevant decision records. It compares the spec with

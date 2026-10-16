@@ -440,6 +440,15 @@ request may override a decision with an explicit explanation. When relevant
 records exist, a separate G2 reader checks for silent contradictions. Missing
 or incomplete discovery stays visible, and your decision records are never edited.
 
+**Uncertain external contracts are checked before they become tasks.** When
+an API or dependency fact changes feasibility or a task boundary, Maestro reads
+installed source/types first and then official documentation for that version.
+It records a bounded answer with provenance in `research/Qnn.json`. Missing
+access or conflicting sources remain explicit blockers. Only relevant current
+facts reach the specification and owning tasks; a version change requires a
+recheck. Ordinary local changes start no research, and blind acceptance receives
+no producer research notes.
+
 **Review reads each таск's commits against the task file it was given — and
 for five risks the task file may never mention.** Whenever the diff touches
 sign-in and permissions, money, deleting data, secrets, or messages sent to
@@ -600,6 +609,7 @@ your-project/.maestro/
 │   ├── manifest.md                 the numbered requirements
 │   ├── prior.md                    what earlier runs decided and left open, your project glossary, and the commits since, read at preflight
 │   ├── answers.md, reference.md    briefing answers and the recorded reference
+│   ├── research/Qnn.json           optional immutable external-contract evidence
 │   ├── codebase.md                 what your repository held before the run, read once before the spec
 │   ├── spec.md, interfaces.md      the specification and the contracts between таски
 │   ├── shared.md                   each fact two таски need, once; copied into the task files that cite it

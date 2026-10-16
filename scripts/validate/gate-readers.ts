@@ -186,7 +186,7 @@ export const JUDGE_BRIEFS: readonly string[] = [
 ];
 
 /** Briefs that are not judges and run on `standard`: reading, not deciding. */
-export const STANDARD_BRIEFS: readonly string[] = ['existing-code-reader.md', 'commit-reader.md'];
+export const STANDARD_BRIEFS: readonly string[] = ['existing-code-reader.md', 'commit-reader.md', 'technical-researcher.md'];
 
 /** The one brief whose tier is the таск's own, marked by the plan. */
 export const TIERED_BRIEFS: readonly string[] = ['executor.md'];
@@ -385,6 +385,10 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
   }
 
   for (const row of rows) {
+    if (row.given.includes('research/') || !row.withheld.includes('research/')) {
+      add('research', specFile, row.line,
+        `gate ${row.gate} must withhold research/ producer records; only selected facts embedded in allowed inputs may travel`);
+    }
     const withholdsPrior = row.withheld.includes(PRIOR_MEMORY_INPUT);
     log.debug('memory', 'reader checked for prior memory', { gate: row.gate, withholdsPrior });
     if (row.given.includes(PRIOR_MEMORY_INPUT)) {

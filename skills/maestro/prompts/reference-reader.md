@@ -19,6 +19,7 @@ You are the reference-discovery half of G2 for preservation work.
 | prior verdicts | earlier pass or failure decisions |
 | `prior.md` | what earlier runs decided and remembered |
 | `codebase.md` | what the repository held before this прогон, as another reader read it |
+| `research/` | producer research records and notes; only selected facts may be embedded in allowed design/task inputs |
 
 Receive the original request and current user additions, plus the neutral
 reference register with raw locations and access conditions. You may inspect

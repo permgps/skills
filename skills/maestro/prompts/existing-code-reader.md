@@ -29,6 +29,7 @@ discovered only when the build fails. Your text is written verbatim into
 | `spec.md` | the specification, not written yet |
 | `prior.md` | what earlier прогоны decided and remembered |
 | `codebase.md` | the file your text becomes |
+| `research/` | producer research records and notes; only selected facts may be embedded in allowed design/task inputs |
 
 **That is all of it, and you must not ask for more.** If you are offered one of
 these, decline it and say so in your output.

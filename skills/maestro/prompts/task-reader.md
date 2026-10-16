@@ -24,6 +24,7 @@ executor of this таск will be given when the plan is cut, and nothing else.
 | the other task files | every other таск of this прогон |
 | `prior.md` | what earlier прогоны decided and remembered |
 | `codebase.md` | what the repository held before this прогон; a task file must be buildable without it |
+| `research/` | producer research records and notes; only selected facts may be embedded in allowed design/task inputs |
 
 Nor any reasoning that produced the cut, and **you must not ask for any of
 it**. If you are offered one, decline it and say so in your output. The withholding is what makes
@@ -51,6 +52,11 @@ visible viewer takeover, lacks a declared headless prerequisite, or substitutes
 source inspection for required interaction evidence has a finding.
 
 ## What Is A Finding
+
+An external-contract fact in the task must carry its record ID, version and
+version source, assumptions and supporting locator. An unresolved required
+contract, missing condition or instruction to guess an interface is a finding.
+Do not open research/ or treat a citation as runtime evidence.
 
 Seven shapes, and every one of them is about these two documents rather than
 about the project:

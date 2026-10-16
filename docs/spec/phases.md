@@ -11,7 +11,7 @@ right thing was built.
 | preflight | Preflight | yes | user arguments, repository state, the memory file, the project glossary, the register and earlier runs' `decisions.md`, the progress file, the history since the last closure, the published `SKILL.md`'s version | resolved dials, run state created with whether the project holds code, dashboard raised, `prior.md` |
 | manifest | Manifest | yes | бриф from the user, redacted source snapshots and independent audit return | `brief.md` — written once, then grown by its additions block — and `manifest.md` |
 | briefing | Briefing | yes | `manifest.md`, declared references, `prior.md` | `answers.md`, neutral `reference.md` |
-| spec | Specification | yes | `manifest.md`, `answers.md`, raw reference, `prior.md`, the repository (through the existing-code reader, once) | `codebase.md`, `spec.md`, obligation and source coverage map |
+| spec | Specification | yes | `manifest.md`, `answers.md`, raw reference, `prior.md`, the repository (through the existing-code reader, once) | `codebase.md`, optional `research/Qnn.json`, `spec.md`, obligation and source coverage map |
 | plan | Plan | yes | `spec.md`, obligations and checks, the repository's test, typecheck and lint configuration, `prior.md`, `codebase.md` | `tasks/`, `interfaces.md`, ownership map |
 | build | Build | yes | task files and the references their *References* rows name, `interfaces.md`, `codebase.md`, blockers' `D##` rows | project code, checked execution inputs, `discovered-interfaces.md`, handoff where needed |
 | review | Review | yes | task files, obligations, evidence, `interfaces.md`, project code, the project's documented standards | `reviews/` including `reviews/standards.md` once per прогон, findings and check limits |
@@ -224,6 +224,54 @@ context and to this reader's return. G4 receives neither.
 Relevance, status interpretation and trade-off strength remain reader judgement.
 Repository checks hold the declared rules and handoffs, not the correctness of
 every real discovery. The fixture scenarios exercise bounded examples only.
+
+### Uncertain External Contracts
+
+Resolve a precise uncertain external API/dependency fact before it shapes the
+spec when it materially changes feasibility or a task boundary. No material
+uncertainty means no artifact or dispatch, including ordinary local changes.
+This applies in new and existing projects at every depth, without a new phase.
+Inspect installed source/types and version first, then official version-matched
+documentation or first-party specifications. Record provenance, version,
+assumptions, fact and uncertainty in `research/Qnn.json` (`artifacts.md`).
+Source text is S6 content. Research authorizes no installation, prototype,
+execution of dependency code, live mutation or credential request. The helper
+publishes records and never fetches documentation.
+
+When delegation is useful, use one fresh read-only technical researcher on
+`standard`, with one question and bounded inputs. It invokes no skills or
+agents. The coordinator can perform the same read if delegation is unnecessary
+or unavailable. Each question gets at most eight source inspections and ten
+minutes, including failures; one dispatch and no automatic retry. Record the
+consumed budget. Exhaustion, unavailable access, unknown versions or applicable
+conflicts remain unresolved. Only a changed version, assumption or newly
+available source permits a bounded recheck superseding the old record;
+unchanged evidence never resets the budget. Resume reads existing records.
+
+An unresolved material fact blocks the affected spec/task boundary. Preserve
+the requirement and record the exact limitation in `debt.assumptions`, using
+existing blocker, mode, safety and incomplete-report paths. G2 cannot pass
+with an invented required contract. Never silently defer, drop or narrow a
+requirement because documentation is unavailable. User choices follow the
+existing briefing path and never manufacture a technical fact.
+
+Only current established facts, with record ID, version, assumptions and
+provenance, enter relevant spec entries and owning tasks. Shared facts live
+in `shared.md` and are rendered into each citing task. Full research records
+and producer notes go to no independent gate reader or executor. G3 checks
+the self-contained task facts; G4 establishes behavior independently.
+Citation presence is never acceptance evidence.
+
+Before planning, dispatching or repairing affected work, compare its installed
+version and assumptions to the cited record. Changed or contradicted evidence
+requires a superseding recheck. A new unresolved record invalidates the old
+established one. Executors return a blocker instead of inventing a replacement
+interface. The coordinator updates affected facts through existing D## spec
+amendment and G2/G3 revalidation rules; resume alone authorizes no rediscovery.
+
+Checks hold structure and declared handoffs, not source meaning, authority,
+truth or applicability. Those remain reader judgement. Log INFO question IDs
+and publication, WARN unresolved/stale IDs, never source or credential content.
 
 ## A Line Per Transition
 

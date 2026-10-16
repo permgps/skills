@@ -22,6 +22,7 @@ facts. Do not ask for withheld inputs. This pass precedes agreement, not G4.
 | prior audit conclusions | Prior verdicts that could bias this pass |
 | `prior.md` | What earlier runs decided, withheld so this pass reads the user's words and not a past run's |
 | `codebase.md` | What the repository held before the прогон, withheld so this pass reads the user's words and not the code's |
+| `research/` | producer research records and notes; only selected facts may be embedded in allowed design/task inputs |
 
 ## Entry
 

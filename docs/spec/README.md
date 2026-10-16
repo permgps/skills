@@ -370,3 +370,23 @@ missing-capability outcomes, examples, and next actions for fifteen owning
 procedures. Existing reader, repair-door, host, and viewer checks preserve their
 handoff boundaries. These structural checks cannot establish source-inventory
 completeness or whether a repair strategy is substantively new.
+
+## External-Contract Research Checks
+
+`node --test scripts/validate/technical-research.test.mts` checks bounded
+provenance records and drives the copied `sync.mts --research-record` command.
+It covers installed/latest version mismatch, conflicting and unavailable
+sources, immutable retries, supersession, malformed history, legacy state,
+closing/reopening relocation, a second run and the repository's real package
+metadata. `npm run readers` holds research withholding even when both sides of
+a declaration drift together; bundle mutation tests hold conditional dispatch
+and freshness at spec, plan, build and repair.
+
+Synthetic source scenarios live in
+`scripts/validate/fixtures/technical-research/scenarios.mts`. Fresh-context
+reader evaluation exercises version mismatch, source conflict and unavailable
+access; a separate handoff evaluation checks no-dispatch local changes and
+superseding unresolved evidence. These are prompt evaluations, not a live
+Maestro run or proof that a real external source was interpreted correctly.
+The helper checks structure and declared provenance only. It never fetches
+sources or establishes their truth.

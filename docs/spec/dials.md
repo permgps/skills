@@ -248,6 +248,7 @@ at that model's default effort.
 | preflight probe | — | `standard` |
 | G1 source reader | `manifest-reader.md` | `strong` |
 | existing-code reader | `existing-code-reader.md` | `standard` |
+| technical researcher | `technical-researcher.md` | `standard` |
 | commit reader | `commit-reader.md` | `standard` |
 | G2 architecture reader | `spec-architecture-reader.md` | `strong` |
 | G2 intent reader | `independent-reader.md` | `strong` |

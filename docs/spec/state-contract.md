@@ -899,3 +899,25 @@ before retrying. Ordinary failures release the lock; after a killed process,
 inspect its recorded PID and verify no writer is running before manually removing
 the lock. Age alone never authorizes removal. Other rejections preserve the last
 state and update diagnostics; a viewer failure may yield the file snapshot.
+
+### Publishing Technical Research
+
+`node .maestro/sync.mts --research-record <candidate.json> --run-dir <dir>`
+validates and publishes one immutable `research/Qnn.json` under the current
+run. `<dir>` must equal the validated current state's run directory (legacy
+slug directories are supported); no new state field/version is required.
+The helper reads no remote source, starts no viewer and changes no run state.
+It holds the existing state-write lock, refuses symlinked destinations and
+path escapes, and uses atomic replacement only for a new record. Identical
+retries return `kept`; a different record with the same ID is refused.
+Supersession must name the current record for the same question/dependency,
+with no branch. The same question/dependency pair cannot acquire a second
+independent history. Requirement IDs must exist in the current run. See
+`artifacts.md` for the bounded schema; every historical record is validated before append.
+
+Exit 0 returns JSON `{ status: "written" | "kept", id, researchStatus }`.
+Exit 1 returns `{ status: "rejected", violations }` for invalid records,
+unsafe destinations, history conflicts or a busy writer. Exit 2 returns
+`{ status: "unreadable" }` for unreadable inputs/state/history. Existing
+runs with no research are unaffected. A successful publish proves structure
+and declared provenance only; it never proves the fact is true.

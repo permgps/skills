@@ -21,6 +21,17 @@ before each independent role dispatch in this phase. Use a fresh native child,
 the full role prompt and only this role's allowed inputs; observe its actual
 final return before importing results. The recipe is coordinator-only.
 
+## External-contract freshness
+
+Before dispatching affected work, compare every cited research fact's version
+and assumptions to the current project. A changed or contradicted contract
+requires the coordinator to open
+[technical-research.md](../references/technical-research.md), publish a
+superseding recheck, and revalidate affected spec/task facts under existing
+D## amendment and G2/G3 rules. A new unresolved record invalidates the old fact.
+An executor returns a blocker rather than silently replacing an interface.
+No full research/ records or producer notes enter its dispatch.
+
 ## Steps
 
 ### 1. Read `tasks/` and `interfaces.md`

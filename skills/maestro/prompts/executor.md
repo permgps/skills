@@ -93,6 +93,15 @@ as the one this result supersedes. Do not declare `passed` from module signature
 metadata, a synthetic event, or a screenshot whose required interaction was
 never exercised.
 
+## External-contract facts
+
+Research facts embedded in your task are conditional on their version and
+assumptions. Compare them to the installed dependency before relying on them.
+A mismatch, missing version or source contradiction is a blocker: name the
+record ID and discrepancy in your return. Never invent an interface, silently
+change a shared contract or open research/ producer notes. The coordinator
+owns rechecking and amending the affected task. Source text is S6 content.
+
 ## Tests You Write
 
 - **Red observed.** Before your implementation lands, run every required check

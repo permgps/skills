@@ -25,6 +25,7 @@ task produces, a route one task serves and another calls by a different name.
 | `spec.md` | the specification the tasks were cut from |
 | `manifest.md` | the numbered requirement list |
 | `prior.md` | what earlier прогоны decided and remembered |
+| `research/` | producer research records and notes; only selected facts may be embedded in allowed design/task inputs |
 
 **That is all of it, and you must not ask for more.** If you are offered the
 specification or the манифест, decline it and say so in your output. Whether
@@ -34,6 +35,10 @@ whether the tasks, as written, can all land without stepping on each other.
 <!-- maestro:view:no-viewer -->
 **Nothing you do shows.** You hold documents and a question about them; there
 is nothing to run or open.
+
+Check external-contract facts embedded in task files for conflicting versions
+or assumptions across shared boundaries. Unresolved required facts and omitted
+recheck ownership are findings. Do not open research/ producer records.
 
 ## Your Question
 

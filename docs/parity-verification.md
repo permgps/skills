@@ -504,3 +504,36 @@ the source identity does not certify the entire installed-bundle matrix.
 - [Installation and development checks](install.md)
 - [Behavior specification](spec/README.md)
 - [Dashboard behavior](dashboard.md)
+
+## External-Contract Research — 2026-10-16
+
+Targeted checks:
+
+```sh
+node --test scripts/validate/technical-research.test.mts
+node --test scripts/validate/gate-readers.test.ts
+npm run check
+```
+
+The copied helper checks immutable research publication, structural provenance,
+version mismatch, applicable/unknown conflicts, unavailable access, supersession,
+legacy state and a second run. A close/reopen test moves an actual research
+record with a nonempty source locator through the runtime relocation routine.
+The real repository package metadata also travels through the publisher.
+Near-limit JSON and non-string enum regressions were observed failing before
+correction; both now pass. Reader-boundary regressions fail when the new guard
+is removed, including when the spec and prompt agree on an invalid handoff.
+
+Fresh-context synthetic reader evaluations returned an established declaration
+fact for installed 1.0.0 against 2.0.0 documentation, unresolved for conflicting
+same-version sources, and unresolved for unavailable access. The first pass
+exposed insufficient instructions for exact versions and inspection counts;
+the corrected prompt and complete envelopes were reevaluated. A separate
+handoff evaluation confirmed no research for a local literal edit, blocking of
+unsupported version-specific task contracts, superseding unresolved evidence,
+and withholding of producer notes from G4.
+
+These checks establish structure and bounded scenario behavior, not source
+truth, live documentation access, or a completed target-project Maestro run.
+Dependency source interpretation and the decision that a fact affects
+feasibility remain judgement. The helper never fetches or executes a source.

@@ -10,6 +10,7 @@ project that was built, not with Maestro.
 │   ├── manifest.md
 │   ├── prior.md
 │   ├── codebase.md
+│   ├── research/Qnn.json
 │   ├── answers.md
 │   ├── reference.md
 │   ├── spec.md
@@ -101,6 +102,7 @@ actually built.
 | `manifest.md` | manifest | briefing, spec, plan, acceptance, G1, G2, G3, G4 | append-only |
 | `prior.md` | preflight | briefing, spec, plan, memory | no |
 | `codebase.md` | spec | spec, plan, build, repair, G2 architecture, G3 consistency | no |
+| `research/Qnn.json` | spec | coordinator in spec, plan, build and repair; only selected facts reach spec/tasks | no |
 | `answers.md` | briefing | spec, G1, G2 architecture | append-only |
 | `reference.md` | briefing | G2 reference reader, acceptance reference reader; the plan cites its ids into task files | append-only |
 | `spec.md` | spec | plan, build, review, G2 intent, G2 architecture | yes, by amendment only |
@@ -434,3 +436,52 @@ authority is introduced. Reports and scope percentages are projections only.
 History is append-only; the agreement baseline is immutable. Negative-control
 captures use their control-run ID directories, separate from production runs.
 Exact shapes and publication conditions: [verification.md](verification.md).
+
+## Technical Research Records
+
+`research/Qnn.json` exists only for a material uncertain external contract.
+The coordinator publishes a redacted JSON object through `--research-record`;
+the researcher returns data and writes nothing. Each record is immutable.
+IDs match `Q` followed by 2–4 digits. A recheck uses a new ID and `supersedes`
+the latest record for the same question and dependency name. No branching or
+rewriting history is allowed. The terminal record is current, even when it is
+unresolved; an earlier established record is then obsolete.
+
+Required fields (no additional fields):
+
+| Field | Shape |
+|---|---|
+| `id`, `question`, `impact` | ID; precise question; `feasibility` or `task-boundary` |
+| `requirementIds` | 1–32 unique R IDs (`R` followed by at least two digits) |
+| `dependency` | `{ name, version, versionSource }`; exact version/revision and its source locator, or literal `unknown` |
+| `assumptions` | 0–8 nonempty strings describing applicability conditions |
+| `status`, `fact`, `uncertainty` | `established` with nonempty fact and empty uncertainty, or `unresolved` with null fact and 1–8 uncertainty strings |
+| `sources` | 0–8 objects `{ kind, location, version, applicability, supports, conflict }` |
+| `budget` | `{ inspections, minutes }`: integer 0–8 and finite number 0–10, including failed accesses |
+| `supersedes` | prior current record ID or null |
+
+Source `kind` is `installed-source`, `installed-types`, `official-docs` or
+`first-party-spec`. `location` contains the path/URL plus precise symbol,
+line or section. `version` identifies that source's version. `applicability`
+is `applicable`, `mismatch` or `unknown`; applicable sources must match the
+dependency version exactly. `supports` is a nonempty statement or null;
+`conflict` is a boolean declaring a contradiction. Installed sources precede
+online ones in inspection order. `budget.inspections` is at least the source
+count; failed inspections may leave no source. Zero sources is legal for an
+unavailable unresolved question. Every string is at most 2,000 characters;
+the candidate and published encoding are each at most 64 KiB, and a run holds
+at most 128 records. Publication uses compact JSON when indentation would
+exceed the read limit.
+
+Establishment requires a known dependency version and version source, at least
+one applicable support, no uncertainty, and no conflicting source except one
+explicitly classified as a different-version mismatch. Unknown applicability
+with a conflict blocks establishment. Partial observations in unresolved
+records stay in `sources[].supports`, never `fact`. A mismatch classification
+requires a known source version different from the dependency version.
+
+These are structural checks, not proof of source meaning, authority or
+exhaustiveness. The read-only procedure must justify classifications. Keep
+locators relative to the project root or absolute external URLs, not the
+run directory, so closing/reopening does not invalidate provenance.
+Blind readers receive neither these records nor producer research notes.

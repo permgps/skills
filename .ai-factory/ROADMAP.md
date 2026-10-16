@@ -1904,7 +1904,7 @@ new user-facing dial.
   - **Cost:** reuse the existing-code reader and its bounded output; no extra
     dispatch for projects where no relevant decision exists.
 
-- [ ] **Uncertain External Contracts Are Researched Before They Shape Tasks** —
+- [x] **Uncertain External Contracts Are Researched Before They Shape Tasks** —
   stop an unverified API or dependency assumption from becoming a shared
   contract that several executors independently discover is wrong.
   - **Gap:** `codebase.md` establishes local names and commands. Phase 3 has
@@ -1978,6 +1978,7 @@ tests and per-task handoffs already cover those parts of the source material.
 
 | Milestone | Date |
 |-----------|------|
+| Uncertain External Contracts Are Researched Before They Shape Tasks | 2026-10-16 |
 | Existing Architectural Decisions Reach The Spec | 2026-10-16 |
 | Behavior Specification | 2026-08-19 |
 | Repository Skeleton and Install Path | 2026-08-19 |

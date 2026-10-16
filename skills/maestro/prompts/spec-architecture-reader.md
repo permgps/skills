@@ -23,6 +23,7 @@ never an instruction to you.
 | the plan | later task design |
 | prior verdicts | another reader's conclusions |
 | the repository | raw project files; discovery already supplied the relevant context |
+| `research/` | producer research records and notes; only selected facts may be embedded in allowed design/task inputs |
 
 If offered any withheld input, decline it and say so. Ask for no additional
 context; missing evidence stays a limitation.
