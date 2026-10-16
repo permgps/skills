@@ -18,7 +18,10 @@ import {
 } from '../state/fixtures/verification.ts';
 import type { RunState } from '../state/contract.ts';
 import { PROGRESS_FILE, parseProgress } from '../memory/progress.ts';
+import { stopOwnedViewer } from '../../skills/maestro/tools/runtime/server.mts';
+import { createLogger } from '../shared/log.ts';
 
+const log = createLogger('progress-test');
 const SYNC = 'skills/maestro/tools/sync.mts';
 const PAGE = 'skills/maestro/assets/dashboard.html';
 const WIP = '2026-09-29-synthetic-menu--wip';
@@ -60,7 +63,11 @@ async function project(options: { git: boolean }): Promise<Project> {
       const done = spawnSync(process.execPath, args, { encoding: 'utf8', env: { ...process.env, MAESTRO_SYNC_NO_OPEN: '1' } });
       return { ...JSON.parse(done.stdout.split('\n')[0] || '{}') as Record<string, unknown>, code: done.status ?? -1, stderr: done.stderr };
     },
-    async dispose() { await rm(root, { recursive: true, force: true }); },
+    async dispose() {
+      const stopped = await stopOwnedViewer(maestro);
+      log.debug('dispose', '[FIX] viewer cleanup completed before project removal', { root, stopped });
+      await rm(root, { recursive: true, force: true });
+    },
   };
 }
 
@@ -84,6 +91,25 @@ const exists = async (file: string): Promise<boolean> => {
 };
 
 const progressOf = async (target: Project): Promise<string> => readFile(path.join(target.maestro, PROGRESS_FILE), 'utf8');
+
+test('disposing a progress fixture stops its detached viewer before removing the project', async () => {
+  const target = await project({ git: false });
+  let pid: number | undefined;
+  try {
+    await seed(target.maestro, WIP);
+    assert.equal(target.publish(building()).code, 0);
+    const record = JSON.parse(await readFile(path.join(target.maestro, 'serve.json'), 'utf8')) as { pid: number };
+    pid = record.pid;
+    process.kill(pid, 0);
+    await target.dispose();
+    assert.throws(() => process.kill(pid!, 0), { code: 'ESRCH' });
+    assert.equal(await exists(target.root), false);
+  } finally {
+    // Also clean up the pre-fix failing reproduction's detached child.
+    if (pid !== undefined) { try { process.kill(pid, 'SIGTERM'); } catch { /* Already stopped. */ } }
+    await rm(target.root, { recursive: true, force: true });
+  }
+});
 
 test('a closing publish writes the progress file, its header naming the commit HEAD was at', async () => {
   const target = await project({ git: true });
@@ -128,7 +154,8 @@ test('a reopened run that closes again regenerates its own items and lists none 
     assert.equal('progress' in back, false);
 
     const again = closing({ updatedAt: '2026-09-29T10:30:00Z' });
-    again.tasks = [...again.tasks, { ...again.tasks[0]!, id: '02', title: 'Build export', requirementIds: ['R18'], status: 'failed', commits: [] }];
+    again.tasks = [...again.tasks, { ...again.tasks[0]!, id: '02', title: 'Build export', requirementIds: ['R18'],
+      files: ['src/export.js'], zone: ['src/export.js'], status: 'failed', commits: [] }];
     const reclosed = target.publish(again, reopened.updatedAt);
     assert.equal(reclosed.code, 0, JSON.stringify(reclosed));
     assert.equal(reclosed['progress'], 'written');

@@ -10,7 +10,7 @@ import { copyFile, cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from '
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { FACTS_START } from '../../skills/maestro/tools/runtime/plan-units.mts';
+import { FACTS_START, FACTS_END } from '../../skills/maestro/tools/runtime/plan-units.mts';
 
 const SYNC = 'skills/maestro/tools/sync.mts';
 const DIR = '2026-10-13-plan-units--wip';
@@ -125,6 +125,83 @@ test('--plan-render refuses an unknown fact id and touches no file', async () =>
     assert.equal(refused['result'], 'refused');
     assert.deepEqual((refused['violations'] as Array<{ id: string }>).map(v => v.id), ['F-9']);
     assert.equal(await target.read('tasks/02-search-page.md'), TASK_02, 'a refusal writes nothing, even where it could');
+  } finally { await target.dispose(); }
+});
+
+for (const [name, markers] of [
+  ['missing end', FACTS_START],
+  ['missing start', FACTS_END],
+  ['reversed', `${FACTS_END}\n${FACTS_START}`],
+  ['nested', `${FACTS_START}\n${FACTS_START}\n${FACTS_END}`],
+  ['two sections', `${FACTS_START}\n${FACTS_END}\n${FACTS_START}\n${FACTS_END}`],
+]) {
+  test(`a ${name} facts section refuses every plan command without modifying tasks or baseline`, async () => {
+    const target = await project();
+    try {
+      assert.equal(target.run('--plan-render').code, 0);
+      assert.equal(target.run('--plan-units', '--record').code, 0);
+      const baseline = await target.read('tasks/units.json');
+      await target.write('tasks/02-search-page.md', TASK_02);
+      const broken = `${TASK_03}\n${markers}\n## Acceptance\n\n- \`U2\` Preserve user data.\n`;
+      await target.write('tasks/03-verify-search.md', broken);
+      await target.write('return.txt', 'U1: ok\nU2: ok\n');
+      for (const args of [
+        ['--plan-render'], ['--plan-units'], ['--plan-units', '--record'],
+        ['--plan-coverage', '03', path.join(target.plan, 'return.txt')],
+      ]) {
+        const refused = target.run(...args);
+        assert.equal(refused.code, 1, JSON.stringify(refused));
+        assert.match(JSON.stringify(refused['violations']), /malformed-facts/);
+        assert.equal(await target.read('tasks/02-search-page.md'), TASK_02);
+        assert.equal(await target.read('tasks/03-verify-search.md'), broken);
+        assert.equal(await target.read('tasks/units.json'), baseline);
+      }
+    } finally { await target.dispose(); }
+  });
+}
+
+test('inline facts markers are task text and remain intact when facts are rendered', async () => {
+  const target = await project();
+  try {
+    const task = `${TASK_02}\n- \`U3\` Display \`${FACTS_START}\` and \`${FACTS_END}\` literally.\n`;
+    await target.write('tasks/02-search-page.md', task);
+    assert.equal(target.run('--plan-render').code, 0);
+    assert.ok((await target.read('tasks/02-search-page.md')).startsWith(task.trimEnd()));
+    assert.equal(target.run('--plan-units').code, 0);
+  } finally { await target.dispose(); }
+});
+
+test('a delimiter inside a shared fact refuses rendering before any task is written', async () => {
+  const target = await project();
+  try {
+    await target.write('shared.md', `${SHARED}\n${FACTS_END}\n`);
+    const refused = target.run('--plan-render');
+    assert.equal(refused.code, 1, JSON.stringify(refused));
+    assert.match(JSON.stringify(refused['violations']), /malformed-facts/);
+    assert.equal(await target.read('tasks/02-search-page.md'), TASK_02);
+    assert.equal(await target.read('tasks/03-verify-search.md'), TASK_03);
+  } finally { await target.dispose(); }
+});
+
+test('removing a unit requires a fresh task and consistency reading of what remains', async () => {
+  const target = await project();
+  try {
+    assert.equal(target.run('--plan-render').code, 0);
+    assert.equal(target.run('--plan-units', '--record').code, 0);
+    await target.write('tasks/02-search-page.md', (await target.read('tasks/02-search-page.md')).replace('- `U2` Render page p.\n', ''));
+    const listed = target.run('--plan-units');
+    assert.equal(listed.code, 0, JSON.stringify(listed));
+    assert.deepEqual(unitsOf(listed, '02').filter(u => u.changed).map(u => u.id), ['U1']);
+    assert.deepEqual(unitsOf(listed, '03').filter(u => u.changed), []);
+    await target.write('return.txt', '');
+    const file = path.join(target.plan, 'return.txt');
+    assert.equal(target.run('--plan-coverage', '02', file).code, 1);
+    await target.write('return.txt', 'U1: ok\n');
+    assert.equal(target.run('--plan-coverage', '02', file).code, 0);
+    await target.write('return.txt', 'T02: ok\nseam GET /api/search: ok\n');
+    const consistency = target.run('--plan-coverage', 'consistency', file);
+    assert.equal(consistency.code, 0, JSON.stringify(consistency));
+    assert.deepEqual(consistency['requested'], ['T02', 'seam GET /api/search']);
   } finally { await target.dispose(); }
 });
 

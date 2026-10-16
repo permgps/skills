@@ -59,12 +59,30 @@ export interface Coverage { missing: string[]; unknown: string[]; duplicate: str
 const digest = (text: string): string => createHash('sha256').update(text).digest('hex');
 const normalise = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
+// Only whole lines delimit generated text; quoted inline markers are ordinary instructions.
+const FACT_MARKER_LINE = /^[\t ]*<!-- maestro:facts:(start|end) -->[\t ]*\r?$/gm;
+class MalformedFactsError extends Error {
+  constructor() {
+    super('facts markers must form exactly one start/end pair in order; repair the markers before rendering or recording coverage');
+    this.name = 'MalformedFactsError';
+  }
+}
+
+function factsSpan(text: string): { start: number; end: number } | null {
+  const markers = [...text.matchAll(FACT_MARKER_LINE)];
+  if (markers.length === 0) return null;
+  if (markers.length !== 2 || markers[0]![1] !== 'start' || markers[1]![1] !== 'end') {
+    throw new MalformedFactsError();
+  }
+  const end = markers[1]!;
+  // The CR is part of the following line break, not the generated section.
+  return { start: markers[0]!.index, end: end.index + end[0].replace(/\r$/, '').length };
+}
+
 /** The task file without its generated facts section, which holds no units. */
 export function withoutFacts(text: string): string {
-  const start = text.indexOf(FACTS_START);
-  if (start === -1) return text;
-  const end = text.indexOf(FACTS_END, start);
-  return end === -1 ? text.slice(0, start) : text.slice(0, start) + text.slice(end + FACTS_END.length);
+  const span = factsSpan(text);
+  return span ? text.slice(0, span.start) + text.slice(span.end) : text;
 }
 
 /**
@@ -73,6 +91,12 @@ export function withoutFacts(text: string): string {
  * header table, Boundaries, the headings — which a reader is handed as context.
  */
 export function parseTaskUnits(text: string): ParsedTask & { violations: Violation[] } {
+  let instructions: string;
+  try { instructions = withoutFacts(text); }
+  catch (error) {
+    if (!(error instanceof MalformedFactsError)) throw error;
+    return { units: [], frame: digest(text), violations: [{ kind: 'malformed-facts', detail: error.message }] };
+  }
   const units: Unit[] = [];
   const frame: string[] = [];
   const violations: Violation[] = [];
@@ -84,7 +108,7 @@ export function parseTaskUnits(text: string): ParsedTask & { violations: Violati
     units.push({ id: current.id, hash: digest(body), facts: [...new Set(body.match(FACT_ID) ?? [])].sort(byNumber) });
     current = undefined;
   };
-  for (const line of withoutFacts(text).split('\n')) {
+  for (const line of instructions.split('\n')) {
     const opened = line.match(UNIT_ITEM);
     if (opened) {
       close();
@@ -114,6 +138,10 @@ export function parseSharedFacts(text: string): { facts: Fact[]; violations: Vio
   const close = (): void => {
     if (!current) return;
     const body = current.lines.join('\n').replace(/^\n+|\s+$/g, '');
+    if ([...body.matchAll(FACT_MARKER_LINE)].length) {
+      violations.push({ kind: 'malformed-facts', id: current.id,
+        detail: `${current.id} contains a reserved facts marker line; quote the marker inline or escape it before rendering` });
+    }
     if (facts.some(fact => fact.id === current!.id)) {
       violations.push({ kind: 'duplicate-fact', id: current.id, detail: `${current.id} is defined more than once in shared.md` });
     } else {
@@ -147,14 +175,13 @@ export function renderFactsSection(cited: readonly string[], facts: readonly Fac
 
 /** The facts section as the file holds it, markers included; empty when absent. */
 export function currentFactsSection(text: string): string {
-  const start = text.indexOf(FACTS_START);
-  if (start === -1) return '';
-  const end = text.indexOf(FACTS_END, start);
-  return end === -1 ? text.slice(start) : text.slice(start, end + FACTS_END.length);
+  const span = factsSpan(text);
+  return span ? text.slice(span.start, span.end) : '';
 }
 
 /** The task file with its facts section replaced by `section`, appended when absent, removed when empty. */
 export function withFactsSection(text: string, section: string): string {
+  factsSpan(section);
   const existing = currentFactsSection(text);
   if (existing) {
     // A function replacer: a fact may quote shell (`$$`, `$&`), and a string
@@ -183,8 +210,8 @@ export function restatedPassages(tasks: ReadonlyMap<string, string>): Array<{ te
 /**
  * The units a reader must judge again: new, rewritten, or citing a fact that
  * changed. With no baseline, an `interfaces.md` that changed, or a frame that
- * changed, every unit of the task: an edit to Boundaries or Prerequisites sits
- * in no unit, and every unit is judged against it.
+ * changed, or a removed unit, every remaining unit of the task: an edit to
+ * Boundaries or Prerequisites sits in no unit, and every unit is judged against it.
  */
 export function changedUnits(
   task: string,
@@ -198,6 +225,12 @@ export function changedUnits(
     return units.map(unit => unit.id);
   }
   const before = baseline.tasks[task] ?? {};
+  const present = new Set(units.map(unit => unit.id));
+  const removed = Object.keys(before).filter(id => !present.has(id));
+  if (removed.length > 0) {
+    log.debug('units', '[FIX] removed instructions require a fresh task reading', { task, removed });
+    return units.map(unit => unit.id);
+  }
   const factHash = new Map(facts.map(fact => [fact.id, fact.hash]));
   return units.filter(unit => before[unit.id] !== unit.hash
     || unit.facts.some(id => baseline.facts[id] !== factHash.get(id))).map(unit => unit.id);
@@ -343,6 +376,21 @@ export async function planUnitsCommand(args: string[], runDir: string): Promise<
   const loaded = await loadPlan(runDir);
   if ('code' in loaded) return loaded;
   const plan = loaded;
+  // Validate the entire input before any command can rewrite a task or baseline,
+  // or claim coverage over instructions hidden by a broken generated section.
+  const malformed = plan.factViolations.filter(item => item.kind === 'malformed-facts');
+  for (const [task, { text }] of plan.tasks) {
+    try { factsSpan(text); }
+    catch (error) {
+      if (!(error instanceof MalformedFactsError)) throw error;
+      malformed.push({ kind: 'malformed-facts', task, detail: error.message });
+    }
+  }
+  if (malformed.length) {
+    for (const item of malformed) log.warn('facts', '[FIX] malformed facts section refused', { task: item.task, id: item.id, detail: item.detail });
+    return { result: { result: 'refused', violations: malformed }, code: 1 };
+  }
+  log.debug('facts', '[FIX] facts delimiters checked before plan command', { action: args[0], tasks: plan.tasks.size });
 
   if (args[0] === '--plan-render') {
     const updates: Array<{ task: string; file: string; body: string }> = [];

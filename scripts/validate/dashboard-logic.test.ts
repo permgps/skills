@@ -1451,6 +1451,28 @@ test('v5 dashboard shares frozen scope and completion blockers with TypeScript',
   }
 });
 
+test('a resolved successor restores dashboard original scope without erasing its open predecessor', () => {
+  const state = contract10State();
+  const record = state.verification!;
+  record.evidence.push({ ...structuredClone(record.evidence.find(item => item.id === 'E-1')!),
+    id: 'E-2', path: 'evidence/X-2/pointer.txt' });
+  record.executions.push({ ...structuredClone(record.executions[0]!), id: 'X-2',
+    executedAt: '2026-09-29T09:18:00Z', evidenceIds: ['E-2'],
+    assertions: [{ name: 'panel opens', result: 'passed', evidenceIds: ['E-2'] }] });
+  record.acceptanceRounds[0]!.executionIds = ['X-2'];
+  record.findings.push(finding('F-1'), finding('F-2', { supersedes: 'F-1', status: 'resolved', resolutionExecutionId: 'X-2' }));
+  assert.equal(L.verificationOf(state).g4, 'passed');
+  assert.equal(projectState(state).scopeProgress.original.passed, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(L.requirementDetailOf(state, 'R01')!.openFindings)), []);
+  assert.deepEqual(JSON.parse(JSON.stringify(L.scopeProgressOf(state))), projectState(state).scopeProgress);
+  assert.equal(record.findings[0]!.status, 'open');
+  record.findings[1]!.status = 'open';
+  delete record.findings[1]!.resolutionExecutionId;
+  assert.deepEqual(JSON.parse(JSON.stringify(L.requirementDetailOf(state, 'R01')!.openFindings)), ['Reviewer finding F-2']);
+  assert.equal(projectState(state).scopeProgress.original.passed, 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(L.scopeProgressOf(state))), projectState(state).scopeProgress);
+});
+
 test('standalone UTF-8 digest matches source/oracle hashes including Russian and emoji', () => {
   for (const value of ['', 'abc', 'Не больше трёх 😀', JSON.stringify([['Save'], 'persist', []])]) {
     assert.equal(L.textDigest(value), sha256(value));

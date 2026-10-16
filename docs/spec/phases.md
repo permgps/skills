@@ -602,6 +602,7 @@ together with the first: `--plan-coverage` takes every return file of that
 reader slot in the round. A return never counts until it is covered. Round 1 asks about every unit. After a round whose returns
 are all covered, `--plan-units --record` stores each unit's hash. A later round
 asks only about changed units — rewritten, citing a fact that changed, every
+remaining unit of a task from which a unit was removed, every
 unit of a таск whose text outside its units changed (the header table,
 Boundaries, Prerequisites), or every unit when `interfaces.md` changed — while still handing the reader the whole
 file, since a rewritten unit can contradict one that did not move. The
@@ -621,6 +622,11 @@ handed one file, and no reader's input list changes. Nothing between the
 markers is edited by hand. `--plan-units` reports a stale section, an unknown or
 doubly defined fact, and any sentence of 160 characters or more that two task
 files restate outside it.
+The markers occupy whole lines and form one ordered pair, or both are absent.
+Malformed pairs and reserved marker lines inside shared facts refuse rendering,
+baseline recording and coverage before any files change. Quote literal marker
+examples inline or escape them in shared facts. Repair malformed delimiters
+while preserving the task's instructions, then render again.
 
 **A finding is fixed by rewriting what it quotes.** The unit, or the fact in
 `shared.md`, is changed in place so the file says one thing. A later note that

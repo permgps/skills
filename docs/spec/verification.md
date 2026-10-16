@@ -717,13 +717,18 @@ strict, regardless of contract version. Current projections treat an invalid
 historical resolution as unresolved until a truthful superseding finding is
 resolved by new evidence or an authorized exception covers the remaining gap.
 Historical output is never rewritten to manufacture a pass.
+Superseded findings remain in history but do not count as current gaps, in
+either historical closure validation or current projections. Exception closure
+covers the current successor; scope progress and dashboard details use the same
+current unresolved findings.
 
 ## Shipped Plan Graph Guard
 
 A new G3 pass (including first publication after Plan) and further active progress
 relying on it require current observable obligations for every in-spec or
 placeholder requirement, required executable checks, valid owners and transitive
-integration prerequisites. Repository G3 and installed publication share these
+integration prerequisites. Tasks sharing a path in `files` or `zone` must be
+ordered through `blockedBy`, directly or transitively. Repository G3 and installed publication share these
 pure rules. Draft planning and explicitly authorized continuation with G3 failed
 remain legal. Historical reads and identical replays do not invent missing graph
 records; recovery repairs the graph before further affected work.

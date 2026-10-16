@@ -113,7 +113,7 @@ function building(commits: string[], second?: { commits: string[]; status?: RunS
   if (second) {
     state.tasks.push({
       ...state.tasks[0]!, id: '02', title: 'Implement footer', status: second.status ?? 'done',
-      files: ['src/footer.js'], commits: second.commits,
+      files: ['src/footer.js'], zone: ['src/footer.js'], commits: second.commits,
     });
   }
   return state;

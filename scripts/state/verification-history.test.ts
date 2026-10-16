@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 
 import { activeContract10State, contract10State, finding } from './fixtures/verification.ts';
 import { validateStateTransition } from './closure.ts';
-import { TRANSITION_RULES, deriveVerification } from './verification.ts';
+import { TRANSITION_RULES, deriveVerification, deriveScopeProgress } from './verification.ts';
 import { validateState } from './validate.ts';
 
 const fields = (violations: Array<{ field: string }>): string[] => violations.map(item => item.field);
@@ -117,6 +117,45 @@ test('a truthful superseding finding repairs current confidence without rewritin
   assert.equal(deriveVerification(next).requirementResults.R01, 'passed');
   assert.deepEqual(validateStateTransition(prior, next), []);
   assert.deepEqual(next.verification!.findings[0], prior.verification!.findings[0]);
+});
+
+test('a resolved successor of an open finding permits historical closure without rewriting its predecessor', () => {
+  const state = contract10State();
+  addResolvingRun(state);
+  state.verification!.findings.push(finding('F-1'), finding('F-2', {
+    supersedes: 'F-1', status: 'resolved', resolutionExecutionId: 'X-2',
+  }));
+  assert.deepEqual(validateState(state), []);
+  assert.deepEqual(validateState(state, { historical: true }), []);
+  assert.equal(state.verification!.findings[0]!.status, 'open');
+});
+
+test('a resolved successor restores original scope progress as well as current scope progress', () => {
+  const state = contract10State();
+  addResolvingRun(state);
+  state.verification!.findings.push(finding('F-1'), finding('F-2', {
+    supersedes: 'F-1', status: 'resolved', resolutionExecutionId: 'X-2',
+  }));
+  const progress = deriveScopeProgress(state);
+  assert.equal(progress.current.passed, 1);
+  assert.equal(progress.original.passed, 1);
+});
+
+test('historical exception closure requires acceptance of the current finding only', () => {
+  const state = contract10State();
+  const record = state.verification!;
+  record.findings.push(finding('F-1'), finding('F-2', { supersedes: 'F-1' }));
+  record.decisions.push({ id: 'D-1', kind: 'accepted_exception', authorizedBy: 'user',
+    authorizedAt: '2026-09-29T09:19:30Z', authorization: 'user accepted F-2',
+    presentedFindingIds: ['F-2'], presentedObligationIds: ['O-1'],
+    selectedFindingIds: ['F-2'], selectedObligationIds: ['O-1'] });
+  record.acceptanceRounds[0]!.findingIds = ['F-2'];
+  record.acceptanceRounds[0]!.requirementResults = { R01: 'failed' };
+  record.acceptanceRounds[0]!.g4 = 'failed';
+  state.gates[3]!.status = 'failed';
+  state.outcome = 'closed_with_exceptions';
+  assert.deepEqual(validateState(state), []);
+  assert.deepEqual(validateState(state, { historical: true }), []);
 });
 
 

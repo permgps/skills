@@ -10,7 +10,7 @@ import path from 'node:path';
 import { candidateMode } from '../../skills/maestro/tools/runtime/publication.mts';
 import { serializeState } from '../state/write.ts';
 import { parseStateSource } from '../state/read.ts';
-import { activeContract10State, CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, finding, repairContract7State, v3Attempt } from '../state/fixtures/verification.ts';
+import { activeContract10State, contract10State, CAPTURES, CONTROL_CAPTURES, SOURCE_MANIFEST, finding, repairContract7State, v3Attempt } from '../state/fixtures/verification.ts';
 import type { RunState } from '../state/contract.ts';
 
 async function project(body: (root: string, state: RunState) => Promise<void>): Promise<void> {
@@ -33,6 +33,69 @@ async function candidate(root: string, state: RunState, name = 'candidate'): Pro
   await writeFile(file, JSON.stringify(state));
   return file;
 }
+
+test('copied publication rejects unordered shared paths before replacing state', async () => {
+  await project(async (root, before) => {
+    before.gates[2]!.status = 'pending';
+    await writeFile(path.join(root, 'state.js'), serializeState(before));
+    const previous = await readFile(path.join(root, 'state.js'), 'utf8');
+    await cp('skills/maestro/tools/runtime', path.join(root, 'runtime'), { recursive: true });
+    await cp('skills/maestro/tools/sync.mts', path.join(root, 'sync.mts'));
+    const next = structuredClone(before);
+    next.updatedAt = '2026-09-29T09:30:00Z';
+    next.gates[2]!.status = 'passed';
+    next.tasks[0]!.files = ['src/shared.ts'];
+    next.tasks.push({ ...structuredClone(next.tasks[0]!), id: '02', files: [], zone: ['src/shared.ts'], blockedBy: [] });
+    const file = await candidate(root, next);
+    const invoke = (...args: string[]) => spawnSync(process.execPath, [path.join(root, 'sync.mts'), '--publish', file, ...args, '--no-open'], { encoding: 'utf8' });
+    const refused = invoke('--expect', before.updatedAt!);
+    assert.equal(refused.status, 1, refused.stdout + refused.stderr);
+    assert.match(refused.stdout + refused.stderr, /both write src\/shared.ts/);
+    assert.equal(await readFile(path.join(root, 'state.js'), 'utf8'), previous);
+    await rm(path.join(root, 'state.js'));
+    const initial = invoke();
+    assert.equal(initial.status, 1, initial.stdout + initial.stderr);
+    assert.match(initial.stdout + initial.stderr, /both write src\/shared.ts/);
+    next.tasks[1]!.blockedBy = ['01'];
+    await candidate(root, next);
+    const ordered = invoke();
+    assert.equal(ordered.status, 0, ordered.stdout + ordered.stderr);
+  });
+});
+
+test('copied publication closes and rereads a repaired successor while preserving the open predecessor', async () => {
+  await project(async (root, before) => {
+    before.verification!.findings.push(finding('F-1'));
+    await writeFile(path.join(root, 'state.js'), serializeState(before));
+    await cp('skills/maestro/tools/runtime', path.join(root, 'runtime'), { recursive: true });
+    await cp('skills/maestro/tools/sync.mts', path.join(root, 'sync.mts'));
+    const next = contract10State();
+    next.updatedAt = '2026-09-29T09:30:00Z';
+    const record = next.verification!;
+    record.executions.push({ ...structuredClone(record.executions[0]!), id: 'X-2',
+      executedAt: '2026-09-29T09:18:00Z', evidenceIds: ['E-2'],
+      assertions: [{ name: 'panel opens', result: 'passed', evidenceIds: ['E-2'] }] });
+    const capture = { ...record.evidence.find(e => e.id === 'E-1')!, id: 'E-2',
+      path: 'evidence/X-2/pointer.txt', capturedAt: '2026-09-29T09:18:00Z' };
+    record.evidence.push(capture);
+    await mkdir(path.dirname(path.join(root, before.dir!, capture.path)), { recursive: true });
+    await writeFile(path.join(root, before.dir!, capture.path), CAPTURES['evidence/X-1/pointer.txt']!);
+    record.findings.push(finding('F-1'), finding('F-2', { supersedes: 'F-1', status: 'resolved', resolutionExecutionId: 'X-2' }));
+    record.acceptanceRounds[0]!.executionIds = ['X-2'];
+    const file = await candidate(root, next);
+    const invoke = (...args: string[]) => spawnSync(process.execPath, [path.join(root, 'sync.mts'), ...args], { encoding: 'utf8' });
+    const checked = invoke('--validate', file);
+    assert.equal(checked.status, 0, checked.stdout + checked.stderr);
+    const published = invoke('--publish', file, '--expect', before.updatedAt!, '--no-open');
+    assert.equal(published.status, 0, published.stdout + published.stderr);
+    const reread = invoke('--project', path.join(root, 'state.js'));
+    assert.equal(reread.status, 0, reread.stdout + reread.stderr);
+    const result = JSON.parse(reread.stdout);
+    assert.equal(result.summary.g4, 'passed');
+    assert.equal(result.scopeProgress.original.passed, 1);
+    assert.equal((parseStateSource(await readFile(path.join(root, 'state.js'), 'utf8')) as RunState).verification!.findings[0]!.status, 'open');
+  });
+});
 
 test('the copied helper reads and carries historical invalid resolutions but refuses new ones', async () => {
   await project(async (root, before) => {

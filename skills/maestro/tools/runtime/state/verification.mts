@@ -100,9 +100,15 @@ function checkResult(check: VerificationCheck, record: VerificationRecord, requi
 
 /** Current confidence excludes superseded findings, but never trusts an invalid resolution. */
 export function unresolvedFindings(record: VerificationRecord): VerificationFinding[] {
+  return currentFindings(record, false);
+}
+
+/** Historical tolerance applies to old resolutions, never to superseded findings. */
+function currentFindings(record: VerificationRecord, historical: boolean): VerificationFinding[] {
   const superseded = new Set(record.findings.flatMap(item => item.supersedes ? [item.supersedes] : []));
+  log.debug('finding', '[FIX] superseded findings excluded from current confidence', { historical, superseded: superseded.size });
   return record.findings.filter(item => !superseded.has(item.id)
-    && (item.status === 'open' || resolutionFindings(item, record.executions).length > 0));
+    && (item.status === 'open' || !historical && resolutionFindings(item, record.executions).length > 0));
 }
 
 /** New resolutions are checked at first publication as well as on transition. */
@@ -151,7 +157,7 @@ function verificationSummary(state: RunState, requireSymptomEvidence: boolean, h
     obligations: record.obligations.length,
   });
 
-  const findings = historical ? record.findings.filter(item => item.status === 'open') : unresolvedFindings(record);
+  const findings = currentFindings(record, historical);
   const currentObligations = record.obligations.filter(item => item.targetRevision === record.targetRevision);
   const checkResults: Record<string, CheckResult> = {};
   for (const check of record.checks) checkResults[check.id] = checkResult(check, record, requireSymptomEvidence);
@@ -696,7 +702,7 @@ function verdictViolations(state: RunState, summary: VerificationSummary, histor
         .flatMap(item => item.selectedFindingIds));
       const acceptedObligations = new Set(record.decisions.filter(item => item.kind === 'accepted_exception')
         .flatMap(item => item.selectedObligationIds));
-      const outstandingFindings = historical ? record.findings.filter(item => item.status === 'open') : unresolvedFindings(record);
+      const outstandingFindings = currentFindings(record, historical);
       const outstandingObligations = Object.entries(summary.obligationResults)
         .filter(([, result]) => result !== 'passed').map(([id]) => id);
       if (outstandingFindings.length === 0 && outstandingObligations.length === 0) {
@@ -1283,11 +1289,12 @@ export function deriveScopeProgress(state: RunState): ScopeProgress {
   const currentIds = state.requirements.filter(item => item.status !== 'deferred' && item.status !== 'dropped').map(item => item.id);
   const baseline = record && record.version !== 1 ? record.scopeBaseline : undefined;
   const originalIds = baseline?.requirementIds ?? [];
+  const findings = record ? unresolvedFindings(record) : [];
   const originalPass = (id: string): boolean => {
     if (!baseline || !record || record.version === 1 || !summary) return false;
     const planning = state.requirements.find(item => item.id === id);
     if (!planning || planning.status === 'deferred' || planning.status === 'dropped') return false;
-    if (record.findings.some(item => item.status === 'open' && item.requirementIds.includes(id))) return false;
+    if (findings.some(item => item.requirementIds.includes(id))) return false;
     const mappings = record.scopeMappings.filter(item => item.originalRequirementId === id
       && item.targetRevision === record.targetRevision);
     const mapping = mappings.at(-1);

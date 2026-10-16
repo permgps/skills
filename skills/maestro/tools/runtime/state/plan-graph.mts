@@ -19,12 +19,48 @@ export function upstreamOf(id: string, blockers: Map<string, string[]>): Set<str
 }
 
 export function checkPlanGraph(state: RunState): GraphFinding[] {
-  if (state.contractVersion < 4 || !state.verification) return [];
-  const record = state.verification;
   const findings: GraphFinding[] = [];
+  const blockers = new Map(state.tasks.map(task => [task.id, task.blockedBy]));
+  const upstream = new Map<string, Set<string>>();
+  const ancestors = (id: string): Set<string> => {
+    let known = upstream.get(id);
+    if (!known) upstream.set(id, known = upstreamOf(id, blockers));
+    return known;
+  };
+
+  // --- two таски writing one path are ordered, or they collide --------------
+  // Waves keep wave-mates apart and say nothing about таски in different waves
+  // that never wait for each other: two such таски that share a route file both
+  // land, and the second one's review judges the first one's code.
+  const writers = new Map<string, string[]>();
+  for (const task of state.tasks) {
+    for (const path of new Set([...(task.files ?? []), ...(task.zone ?? [])])) {
+      writers.set(path, [...(writers.get(path) ?? []), task.id]);
+    }
+  }
+  let collisions = 0;
+  const reportedPairs = new Set<string>();
+  for (const [path, owners] of writers) {
+    for (let i = 0; i < owners.length; i += 1) {
+      for (let j = i + 1; j < owners.length; j += 1) {
+        const [a, b] = [owners[i]!, owners[j]!];
+        if (a === b || ancestors(a).has(b) || ancestors(b).has(a)) continue;
+        const pair = [a, b].sort().join('/');
+        if (reportedPairs.has(pair)) continue;
+        reportedPairs.add(pair);
+        collisions += 1;
+        findings.push({ requirementId: a,
+          message: `таски ${a} and ${b} both write ${path} and neither waits for the other — `
+            + `add one to the other's blockedBy, or move ${path} into one таск` });
+      }
+    }
+  }
+  log.debug('check', '[FIX] file ownership checked', { paths: writers.size, collisions });
+
+
+  if (state.contractVersion < 4 || !state.verification) return findings;
+  const record = state.verification;
   const status = new Map(state.requirements.map(r => [r.id, r.status]));
-  const blockers = new Map(state.tasks.map(t => [t.id, t.blockedBy]));
-  const ancestors = (id: string): Set<string> => upstreamOf(id, blockers);
   const tasks = new Map(state.tasks.map(task => [task.id, task]));
   const checks = new Map(record.checks.map(check => [check.id, check]));
   const obligations = record.obligations.filter(item => item.targetRevision === record.targetRevision);

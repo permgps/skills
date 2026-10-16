@@ -239,6 +239,11 @@ between `<!-- maestro:facts:start -->` and `<!-- maestro:facts:end -->`, so an
 executor and a reader are still handed one task file. Nothing between those
 markers is ever edited by hand: change `shared.md` and render again. A cited id
 `shared.md` does not define stops the render, and nothing is written.
+Markers occupy whole lines and form one ordered pair, or both are absent.
+Malformed pairs or reserved marker lines in shared facts refuse rendering,
+baseline recording and coverage before any files change. Preserve all task
+instructions when repairing delimiters; quote literal marker examples inline or
+escape them in shared facts, then render again.
 
 **Why once.** A прогон restated each of its 167 checklist rows in nearly five
 task files, and then recorded decisions about a row in each task separately.
@@ -410,7 +415,9 @@ the next round, after the fixes and `--plan-render`, `--plan-units` marks a unit
 changed when its text changed, when a fact it cites changed, or when
 `interfaces.md` changed. An edit outside every unit — the header table,
 Boundaries, Prerequisites, Forbidden writes, a heading — marks every unit of
-that таск changed, because each unit is judged against it. Only a таск with a changed unit gets a reader, asked
+that таск changed, because each unit is judged against it. Removing a unit marks
+every remaining unit of that task changed and repeats its consistency reading;
+the removed id is not requested. Only a таск with a changed unit gets a reader, asked
 for verdicts on its changed units only. It is still handed the whole task file,
 because a rewritten unit can contradict one that did not move, and such a
 contradiction is reported on the changed unit. Log INFO `round` with

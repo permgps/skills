@@ -33,6 +33,7 @@ export function retrospectiveState(): ReturnType<typeof repairContract6State> {
   const state = repairContract6State();
   const parent = state.tasks[0]!;
   const task = (id: string, extra: Partial<TaskEntry>): TaskEntry => ({ ...parent, id, title: `Synthetic task ${id}`,
+    files: [`src/task-${id}.js`], zone: [`src/task-${id}.js`],
     status: 'queued', blockedBy: [], repairs: 0, commits: [], ...extra });
   delete parent.finishedAt;
   state.tasks.push(task('02', { title: 'Schema and DTOs', status: 'repair', repairs: 1, commits: ['0a0a0a0'] }));

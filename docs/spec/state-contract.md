@@ -814,23 +814,33 @@ exit codes.
   whitespace-normalised text, and `frame` is the same hash of the task file's
   text outside every unit and outside its facts section. `changed` compares
   them with `tasks/units.json`: a new or rewritten unit, a unit citing a fact
-  whose hash moved, every unit of a таск whose frame moved, or every unit when
+  whose hash moved, every remaining unit of a таск with a removed unit or a
+  changed frame, or every unit when
   there is no baseline, the baseline has no frames, or `interfaces.md` changed.
   `violations` are `{ kind, task?, id?, detail }`, with `kind` one of
   `duplicate-unit`, `no-units`, `duplicate-fact`, `unknown-fact` or
-  `stale-facts`. `restated` lists each sentence of 160 characters or more that
+  `stale-facts` or `malformed-facts`. `restated` lists each sentence of 160 characters or more that
   two or more task files carry outside their facts sections. `--record` writes
   `tasks/units.json` — every unit, frame, fact and `interfaces.md` hash — through a
   temporary file and a rename, and adds `recorded: true`.
   - Exit 0: no violation and nothing restated. Exit 1: either. Exit 2: no
     readable `state.js`, no `dir` in it, or no `tasks/` (`{ error }`).
+  - Malformed facts markers in any task, or a reserved marker line inside a
+    shared fact, return `{ result: "refused", violations }` and exit 1 before
+    any command writes files or records a baseline. This also applies to
+    `--plan-render` and `--plan-coverage`.
 - `--plan-render` rewrites the section between `<!-- maestro:facts:start -->`
   and `<!-- maestro:facts:end -->` of every task file from `shared.md`: each
   cited `### F-<n>` entry, verbatim, in number order. It removes the section
   from a file that cites nothing and appends it to one that had none. It
   reports `{ result: "rendered", changed: [task ids] }`.
+  Markers must occupy whole lines and form exactly one ordered pair per task,
+  or both be absent. Inline quoted markers are ordinary text. Quote inline or
+  escape literal marker examples in shared facts; standalone marker lines are
+  reserved delimiters and cannot be copied verbatim into the generated section.
   - Exit 1: `{ result: "refused", violations }` for a cited id `shared.md` does
-    not define or a fact defined twice; nothing is written. Exit 2 as above.
+    not define, a fact defined twice, or malformed markers; nothing is written.
+    Exit 2 as above.
 - `--plan-coverage <NN|consistency> <return-file>... [--all]` reads a G3
   reader's return, or the first return and each one sent back for the units it
   skipped, read together, and reports `{ result: "covered"|"incomplete", requested, missing,
@@ -839,7 +849,7 @@ exit codes.
   are that task's changed units; for `consistency`, every таск with a changed
   unit and every Seams row whose producer or consumer cell names one. `--all`
   requests everything, whatever the baseline says.
-  - Exit 0: covered. Exit 1: incomplete. Exit 2: bad arguments, an unreadable
+  - Exit 0: covered. Exit 1: incomplete or malformed facts markers. Exit 2: bad arguments, an unreadable
     return file, or as above.
   - Canonical module: `tools/runtime/plan-units.mts`, for all three commands.
 - `--returns-check <return-file> [--root <worktree>] [--base <commit>] [--owns-no-check]` reads
@@ -941,5 +951,9 @@ strict, regardless of contract version. Current projections treat an invalid
 historical resolution as unresolved until a truthful superseding finding is
 resolved by new evidence or an authorized exception covers the remaining gap.
 Historical output is never rewritten to manufacture a pass.
+Superseded findings remain in history but do not count as current gaps, in
+either historical closure validation or current projections. Exception closure
+covers the current successor; scope progress and dashboard details use the same
+current unresolved findings.
 
 Repair dispatch/accounting optional fields follow the lifecycle in [verification](verification.md#durable-repair-reservations). Existing records without them remain readable; all publication writers enforce the protocol once enabled.

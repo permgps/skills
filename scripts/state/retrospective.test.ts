@@ -86,7 +86,7 @@ test('refused: a task that first appears already running waits on its blockers l
   prior.tasks = prior.tasks.filter(item => item.id !== '03');
   const next = structuredClone(prior);
   next.tasks.push({ ...prior.tasks[0]!, id: '03', title: 'Synthetic task 03', status: 'running',
-    blockedBy: ['02'], repairs: 0, commits: [] });
+    files: ['src/task-03.js'], zone: ['src/task-03.js'], blockedBy: ['02'], repairs: 0, commits: [] });
   assert.match(transition(prior, next), /task 03 cannot run while blocker 02 is repair/);
   next.tasks.at(-1)!.blockedBy = [];
   assert.deepEqual(validateStateTransition(prior, next), []);

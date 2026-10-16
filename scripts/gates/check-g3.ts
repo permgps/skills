@@ -38,7 +38,7 @@ import { pathToFileURL } from 'node:url';
 import { createLogger } from '../shared/log.ts';
 import type { ReferenceRole, RunState } from '../state/contract.ts';
 import { forState, ROOT } from '../state/paths.ts';
-import { checkPlanGraph, upstreamOf } from '../state/plan-graph.ts';
+import { checkPlanGraph } from '../state/plan-graph.ts';
 import { validateCompletionRecords } from '../state/verification.ts';
 import { runGate, targetFromArgv, type GateFinding } from './cli.ts';
 
@@ -52,14 +52,6 @@ const BUILT: readonly string[] = ['in-spec', 'placeholder'];
 
 export function checkG3(state: RunState): GateFinding[] {
   const findings: GateFinding[] = [];
-  const blockers = new Map(state.tasks.map(task => [task.id, task.blockedBy]));
-  const upstream = new Map<string, Set<string>>();
-  const ancestors = (id: string): Set<string> => {
-    let known = upstream.get(id);
-    if (!known) upstream.set(id, known = upstreamOf(id, blockers));
-    return known;
-  };
-
   const status = new Map<string, string>();
   for (const requirement of state.requirements) {
     if (requirement.id !== '') status.set(requirement.id, requirement.status);
@@ -114,34 +106,7 @@ export function checkG3(state: RunState): GateFinding[] {
     }
   }
 
-  // --- two таски writing one path are ordered, or they collide --------------
-  // Waves keep wave-mates apart and say nothing about таски in different waves
-  // that never wait for each other: two such таски that share a route file both
-  // land, and the second one's review judges the first one's code.
-  const writers = new Map<string, string[]>();
-  for (const task of state.tasks) {
-    for (const path of new Set([...(task.files ?? []), ...(task.zone ?? [])])) {
-      writers.set(path, [...(writers.get(path) ?? []), task.id]);
-    }
-  }
-  let collisions = 0;
-  const reportedPairs = new Set<string>();
-  for (const [path, owners] of writers) {
-    for (let i = 0; i < owners.length; i += 1) {
-      for (let j = i + 1; j < owners.length; j += 1) {
-        const [a, b] = [owners[i]!, owners[j]!];
-        if (a === b || ancestors(a).has(b) || ancestors(b).has(a)) continue;
-        const pair = [a, b].sort().join('/');
-        if (reportedPairs.has(pair)) continue;
-        reportedPairs.add(pair);
-        collisions += 1;
-        findings.push({ requirementId: a,
-          message: `таски ${a} and ${b} both write ${path} and neither waits for the other — `
-            + `add one to the other's blockedBy, or move ${path} into one таск` });
-      }
-    }
-  }
-  log.debug('g3', 'file ownership checked', { paths: writers.size, collisions });
+  findings.push(...checkPlanGraph(state));
 
   if (state.contractVersion >= 4 && state.verification) {
     const record = state.verification;
@@ -149,7 +114,6 @@ export function checkG3(state: RunState): GateFinding[] {
       for (const violation of validateCompletionRecords(state, record)) findings.push({ requirementId: '',
         message: `${violation.field}: ${violation.message}` });
     }
-    findings.push(...checkPlanGraph(state));;
   }
 
   // --- the task-file reader's verdict was recorded, not filed ---------------

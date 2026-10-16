@@ -2510,11 +2510,12 @@ globalThis.MAESTRO_LOGIC = (function () {
     var currentIds = requirements.filter(function (item) { return item.status !== 'deferred' && item.status !== 'dropped'; }).map(function (item) { return item.id; });
     var baseline = record && record.version >= 2 && record.scopeBaseline;
     var originalIds = baseline ? baseline.requirementIds : [];
+    var findings = record ? unresolvedFindings(record) : [];
     var originalPass = function (id) {
       if (!baseline || !summary || summary.legacy) return false;
       var planning = requirements.filter(function (item) { return item.id === id; })[0];
       if (!planning || planning.status === 'deferred' || planning.status === 'dropped') return false;
-      if (record.findings.some(function (item) { return item.status === 'open' && item.requirementIds.indexOf(id) !== -1; })) return false;
+      if (findings.some(function (item) { return item.requirementIds.indexOf(id) !== -1; })) return false;
       var mappings = record.scopeMappings.filter(function (item) { return item.originalRequirementId === id && item.targetRevision === record.targetRevision; });
       var mapping = mappings[mappings.length - 1];
       var audit = record.manifestAudits.filter(function (item) { return item.id === baseline.auditId; })[0];
@@ -3363,7 +3364,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         if (execution && execution.limitation) line.limitation = lineOf(execution.limitation);
         checks.push(line);
       });
-      var findings = record.findings.filter(function (item) { return item.status === 'open' && names(item); });
+      var findings = unresolvedFindings(record).filter(names);
       var ownFindingIds = record.findings.filter(names).map(function (item) { return item.id; });
       var defects = record.version >= 3 && Array.isArray(record.defects)
         ? record.defects

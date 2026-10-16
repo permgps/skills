@@ -474,7 +474,8 @@ test('C11: a repair commit missing from its task commits is refused, so review c
 
 test('a task leaves repair only when the prerequisite its blocked attempt named is closed', () => {
   const prior = repairContract6State();
-  prior.tasks.push({ ...prior.tasks[0]!, id: '02', title: 'Schema', status: 'repair', commits: ['0a0a0a0'] });
+  prior.tasks.push({ ...prior.tasks[0]!, id: '02', title: 'Schema', status: 'repair',
+    files: ['src/schema.js'], zone: ['src/schema.js'], commits: ['0a0a0a0'] });
   prior.verification!.repairAttempts = [v3Attempt('RA-1', 'F-1', 'DF-1', '2026-09-29T10:00:00Z',
     { outcome: 'prerequisite_blocked', blockingPrerequisites: ['02'] })];
   const next = structuredClone(prior);

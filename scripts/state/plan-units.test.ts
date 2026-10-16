@@ -117,6 +117,21 @@ test('a fact holding `$$`, `$&` or `$\'` renders twice to the same task file, ne
   assert.equal(currentFactsSection(withFactsSection(once, section)), section);
 });
 
+test('a whole-line facts section in the middle preserves surrounding instructions with LF and CRLF', () => {
+  for (const newline of ['\n', '\r\n']) {
+    const before = '# Task\n\n- `U1` Build the page.\n\n'.replaceAll('\n', newline);
+    const after = '\n\n## Done means\n\n- `U2` The acceptance test passes.\n'.replaceAll('\n', newline);
+    const section = `  ${FACTS_START}\nOld generated text.\n\t${FACTS_END}`.replaceAll('\n', newline);
+    const text = before + section + after;
+    const replacement = renderFactsSection(['F-1'], parseSharedFacts(SHARED).facts).section;
+    assert.deepEqual(parseTaskUnits(text).units.map(unit => unit.id), ['U1', 'U2']);
+    const rendered = withFactsSection(text, replacement);
+    assert.equal(rendered, before + replacement + after);
+    assert.deepEqual(parseTaskUnits(rendered).units.map(unit => unit.id), ['U1', 'U2']);
+    assert.equal(withFactsSection(rendered, replacement), rendered);
+  }
+});
+
 test(`a sentence of ${RESTATED_MIN} characters in two task files is restated; one shorter is not`, () => {
   const long = `${'x'.repeat(RESTATED_MIN - 1)}.`;
   const short = `${'y'.repeat(RESTATED_MIN - 2)}.`;
