@@ -71,17 +71,40 @@ function comparable(a: CheckExecutionV3, b: CheckExecutionV3): boolean {
     a.fingerprint[key] === b.fingerprint[key])
     && a.invocation === b.invocation && a.viewport === b.viewport && a.locale === b.locale && a.authVariant === b.authVariant;
 }
-function baselineComplete(plan: IntermittentRepair, record: VerificationRecordV3): boolean {
+// A setup failure never reached the symptom oracle. Test defects can themselves
+// be repaired, but both product and test failures need a captured failed assertion.
+function symptomFailure(execution: CheckExecutionV3): boolean {
+  return execution.result === 'failed' && ['product', 'test'].includes(execution.failureCause ?? '')
+    && execution.assertions.some(assertion => assertion.name.trim().length > 0
+      && assertion.result === 'failed' && assertion.evidenceIds.length > 0);
+}
+
+function observedSymptom(plan: IntermittentRepair, record: VerificationRecordV3): boolean {
+  return record.executions.some(e => plan.observedExecutionIds.includes(e.id) && symptomFailure(e));
+}
+
+function baselineComplete(plan: IntermittentRepair, record: VerificationRecordV3, requireSymptomEvidence = true): boolean {
   return plan.scenarios.every(s => {
     const runs = series(plan, record, s.role, 'baseline');
-    return runs.length === s.sampleCount && runs.every(e => ['passed', 'failed'].includes(e.result)) && runs.some(e => e.result === 'failed');
+    const failed = (e: CheckExecutionV3): boolean => requireSymptomEvidence ? symptomFailure(e) : e.result === 'failed';
+    const failures = runs.filter(failed).length;
+    const unusable = runs.filter(e => e.result !== 'passed' && !failed(e)).length;
+    const complete = runs.length === s.sampleCount && unusable === 0 && failures > 0;
+    log.debug('intermittent', '[FIX] baseline eligibility checked', {
+      planId: plan.id, scenario: s.role, samples: runs.length, expected: s.sampleCount,
+      requireSymptomEvidence, failures, unusable, complete,
+    });
+    return complete;
   });
 }
 
-export function intermittentPlanResult(plan: IntermittentRepair, record: VerificationRecordV3, current = true): CheckResult {
+export function intermittentPlanResult(plan: IntermittentRepair, record: VerificationRecordV3, current = true, requireSymptomEvidence = current): CheckResult {
   const all = samples(plan, record);
   if (all.length > plan.maxRuns || all.reduce((n, e) => n + e.intermittent!.elapsedMs, 0) > plan.maxDurationMs) return 'unavailable';
-  if (!baselineComplete(plan, record)) return 'unavailable';
+  // Historical snapshots keep their original structural rules; current results
+  // and new publication transitions must establish an actual symptom failure.
+  if (requireSymptomEvidence && !observedSymptom(plan, record)) return 'unavailable';
+  if (!baselineComplete(plan, record, requireSymptomEvidence)) return 'unavailable';
   for (const s of plan.scenarios) {
     const runs = series(plan, record, s.role, 'candidate');
     const check = record.checks.find(c => c.id === s.checkId);
@@ -101,11 +124,11 @@ export function intermittentPlanResult(plan: IntermittentRepair, record: Verific
   }) ? 'passed' : 'unavailable';
 }
 
-export function intermittentCheckResult(checkId: string, record: VerificationRecord): CheckResult | undefined {
+export function intermittentCheckResult(checkId: string, record: VerificationRecord, requireSymptomEvidence = true): CheckResult | undefined {
   if (record.version !== 3) return undefined;
   const plans = activePlans(record).filter(p => p.scenarios.some(s => s.checkId === checkId));
   if (!plans.length) return undefined;
-  const results = plans.map(p => intermittentPlanResult(p, record));
+  const results = plans.map(p => intermittentPlanResult(p, record, true, requireSymptomEvidence));
   return results.includes('failed') ? 'failed' : results.includes('stale') ? 'stale'
     : results.every(r => r === 'passed') ? 'passed' : 'unavailable';
 }
@@ -174,7 +197,7 @@ export function validateIntermittentRecord(record: VerificationRecordV3): Proble
           if (phase === 'baseline' && observed[0] && e.fingerprint.build !== observed[0].fingerprint.build) add(at, 'both baselines must retain the observed triggering build');
           if (phase === 'baseline' && scenario.role === 'original' && observed[0]
             && (!sameFingerprint(e.fingerprint, observed[0].fingerprint) || !comparable(e, observed[0]))) add(at, 'original baseline must retain the observed triggering build and conditions');
-          if (phase === 'candidate' && (!baselineComplete(plan, record) || samples(plan, record).some(b => b.intermittent!.phase === 'baseline' && Date.parse(b.executedAt) >= Date.parse(e.executedAt)))) add(at, 'both complete failing baselines must precede candidate samples');
+          if (phase === 'candidate' && (!baselineComplete(plan, record, false) || samples(plan, record).some(b => b.intermittent!.phase === 'baseline' && Date.parse(b.executedAt) >= Date.parse(e.executedAt)))) add(at, 'both complete failing baselines must precede candidate samples');
           if (phase === 'candidate' && plans.some(p => p.rootFindingId === plan.rootFindingId && Date.parse(p.declaredAt) < Date.parse(plan.declaredAt)
             && samples(p, record).some(old => old.intermittent!.phase === 'candidate' && old.fingerprint.build === e.fingerprint.build))) add(at, 'a successor cannot resample the same candidate build to obtain a lucky pass');
         }
@@ -206,6 +229,7 @@ export function validateIntermittentTransition(previous: RunState, next: RunStat
   const add = (field: string, message: string): void => { errors.push({ field, message }); };
   for (const old of oldPlans) if (!isDeepStrictEqual(old, plans.find(p => p.id === old.id))) add(`verification.intermittentRepairs[${old.id}]`, 'published plan is immutable; append a successor');
   for (const plan of plans.filter(p => !oldPlans.some(old => old.id === p.id))) {
+    if (!observedSymptom(plan, current)) add(`verification.intermittentRepairs[${plan.id}]`, '[FIX] observed trigger needs a captured failed symptom assertion with product or test cause');
     if (Date.parse(plan.declaredAt) < Date.parse(previous.updatedAt ?? previous.startedAt ?? "") || Date.parse(plan.declaredAt) > Date.parse(next.updatedAt ?? next.startedAt ?? "")) add(`verification.intermittentRepairs[${plan.id}]`, 'declare a plan at this publication, never backdate it');
     if (plan.observedExecutionIds.some(id => !prior?.executions.some(e => e.id === id))
       || plan.scenarios.some(s => !prior?.evidence.some(e => e.id === s.conditionsEvidenceId))) add(`verification.intermittentRepairs[${plan.id}]`, 'publish observed executions and conditions before the plan');
@@ -218,10 +242,10 @@ export function validateIntermittentTransition(previous: RunState, next: RunStat
     if (!activePlans(prior).some(p => p.id === plan.id)) add(at, 'do not append samples to a superseded plan');
     const before = samples(plan, prior);
     if (before.reduce((n, run) => n + run.intermittent!.elapsedMs, 0) >= plan.maxDurationMs) add(at, 'time budget exhausted; retain incomplete evidence and stop');
-    if (e.intermittent!.phase === 'candidate' && !baselineComplete(plan, prior)) add(at, 'publish complete baseline series before candidate samples');
+    if (e.intermittent!.phase === 'candidate' && (!observedSymptom(plan, prior) || !baselineComplete(plan, prior))) add(at, '[FIX] publish complete baseline series with captured symptom failures before candidate samples');
   }
   for (const finding of current.findings) if (finding.status === 'resolved' && prior?.findings.find(f => f.id === finding.id)?.status !== 'resolved') {
-    if (closureProblems(current, rootOf(finding.id, current), next.updatedAt ?? next.startedAt ?? "", true)) add(`verification.findings[${finding.id}]`, 'new intermittent closure needs every sample on the current candidate');
+    if (closureProblems(current, rootOf(finding.id, current), next.updatedAt ?? next.startedAt ?? "", true)) add(`verification.findings[${finding.id}]`, 'new intermittent closure needs qualifying symptom evidence and every sample on the current candidate');
     for (const plan of activePlans(current).filter(p => p.rootFindingId === rootOf(finding.id, current))) {
       const resolution = current.executions.find(e => e.id === finding.resolutionExecutionId);
       const last = Math.max(...samples(plan, current).map(e => Date.parse(e.executedAt)));
@@ -230,7 +254,7 @@ export function validateIntermittentTransition(previous: RunState, next: RunStat
     }
   }
   for (const defect of current.defects) if (defect.status === 'verified' && (prior?.version !== 3 || prior.defects.find(d => d.id === defect.id)?.status !== 'verified')) {
-    if (closureProblems(current, defect.rootFindingId, next.updatedAt ?? next.startedAt ?? "", true)) add(`verification.defects[${defect.id}]`, 'new intermittent closure needs every sample on the current candidate');
+    if (closureProblems(current, defect.rootFindingId, next.updatedAt ?? next.startedAt ?? "", true)) add(`verification.defects[${defect.id}]`, 'new intermittent closure needs qualifying symptom evidence and every sample on the current candidate');
   }
   for (const error of errors) log.error('intermittent', error.message, { field: error.field });
   return errors;

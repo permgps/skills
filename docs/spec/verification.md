@@ -656,6 +656,13 @@ The helper validates and publishes evidence; it never executes the checks.
 A sample is appended only after its plan was published, with timestamps after
 the declaration. A candidate series starts only after both complete baseline
 series exist and each has demonstrated at least one symptom failure. Both
+qualifying observed triggers and baseline failures require cause `product` or
+`test` and a named failed assertion with nonempty capture evidence. Every
+baseline sample must be passed or such a symptom failure; setup/unavailable
+samples and failed exits without captured failed assertions leave the series
+incomplete even beside a genuine symptom failure. Retain them as evidence,
+correct setup through readiness and use the existing successor-plan/budget
+route; never overwrite a sample to fill the count. Both
 baseline workloads use the observed triggering build. Within a
 scenario, invocation, reference/data/runtime/acceptance identities and
 viewport/locale/auth variant match the baseline; source/build hashes may change
@@ -675,10 +682,26 @@ covers records first appearing closed. Historical closure is checked against
 the evidence available at that closure, not against later builds. Published
 plans and samples cannot be edited, deleted or retagged. A successor invalidates
 current series eligibility but does not erase prior closure history.
+The symptom-evidence qualification applies to current verdicts, newly declared
+triggers, newly appended candidate samples and new closures. Snapshot validation
+of previously published candidate/closure history retains the earlier structural
+rules so immutable captures and stored acceptance verdicts need no rewriting.
+Current derivation still reports insufficient evidence; a new acceptance round,
+successful G4 transition or terminal outcome must satisfy current verdict rules.
+Old evidence cannot authorize new work or a new closure unless it meets the
+current qualification.
 
 Review judges whether the recorded workload, replay and minimized cause are
 meaningful and the observed behavior was attributed honestly; hashes and labels
-alone cannot prove that. Acceptance receives ordinary behavior checks/evidence,
+alone cannot prove that.
+The review handoff includes the root's published intermittent plan and its
+superseded entries, observed executions, both check definitions/current
+fingerprints, conditions and input captures, and every baseline/candidate sample
+and its captures for both scenarios, including failed/unavailable records.
+This bounded evidence slice crosses execution ownership when the two checks
+have different owners; it adds no other task file/diff, overall work plan or
+producer diagnosis. Missing criteria or evidence is a blocking review finding.
+Acceptance receives ordinary behavior checks/evidence,
 not producer diagnosis. Report both sample counts and observed failure rates,
 conditions and budget limits. Zero failures in a finite sample is bounded
 evidence, never proof that recurrence is impossible. An incomplete series

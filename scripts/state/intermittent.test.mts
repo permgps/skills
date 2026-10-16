@@ -37,6 +37,124 @@ test('a single lucky green and an incomplete series cannot resolve a finding or 
   assert.notEqual(deriveVerification(f.state).checkResults['C-1'], 'passed');
 });
 
+for (const failure of ['setup', 'no-assertion', 'passing-assertions'] as const) {
+  test(`an intermittent baseline with ${failure} failures remains evidence but cannot authorize candidate sampling or closure`, () => {
+    const f = intermittentFixture();
+    const declared = structuredClone(f.state);
+    f.append('baseline', 'faulty');
+    for (const run of f.record.executions.filter(e => e.intermittent?.phase === 'baseline' && e.result === 'failed')) {
+      if (failure === 'setup') run.failureCause = 'setup';
+      else if (failure === 'no-assertion') run.assertions = [];
+      else run.assertions.forEach(assertion => { assertion.result = 'passed'; });
+    }
+    const baseline = structuredClone(f.state);
+    assert.deepEqual(validateState(baseline), []);
+    assert.deepEqual(validateStateTransition(declared, baseline), []);
+    f.append('candidate', 'fixed');
+    assert.match(moves(baseline, f.state), /baseline/);
+    assert.equal(deriveVerification(f.state).checkResults['C-1'], 'unavailable');
+    const candidate = structuredClone(f.state);
+    f.close();
+    assert.match(moves(candidate, f.state), /intermittent closure/);
+    // Old snapshots can be read without rewriting their immutable captures.
+    assert.deepEqual(validateState(f.state), []);
+    const resumed = structuredClone(f.state);
+    resumed.updatedAt = stamp(70);
+    assert.deepEqual(validateStateTransition(f.state, resumed), []);
+  });
+}
+
+test('an intermittent baseline can reproduce a test defect with a captured failed assertion', () => {
+  const f = intermittentFixture();
+  f.append('baseline', 'faulty');
+  for (const run of f.record.executions.filter(e => e.intermittent?.phase === 'baseline' && e.result === 'failed')) {
+    run.failureCause = 'test';
+  }
+  const baseline = structuredClone(f.state);
+  f.append('candidate', 'fixed'); f.close();
+  assert.deepEqual(validateState(f.state), []);
+  assert.deepEqual(validateStateTransition(baseline, f.state), []);
+  assert.equal(deriveVerification(f.state).checkResults['C-1'], 'passed');
+});
+
+test('one setup sample leaves an intermittent baseline incomplete even beside genuine symptom failures', () => {
+  const f = intermittentFixture(); f.append('baseline', 'faulty');
+  f.record.executions.find(e => e.intermittent?.phase === 'baseline' && e.result === 'failed')!.failureCause = 'setup';
+  const baseline = structuredClone(f.state);
+  assert.deepEqual(validateState(baseline), []);
+  f.append('candidate', 'fixed');
+  assert.match(moves(baseline, f.state), /baseline/);
+  assert.equal(deriveVerification(f.state).checkResults['C-1'], 'unavailable');
+});
+
+test('setup or assertion-free observations cannot declare a new intermittent plan or establish a current repair', () => {
+  for (const failure of ['setup', 'no-assertion'] as const) {
+    const f = intermittentFixture();
+    for (const state of [f.beforePlan, f.state]) {
+      for (const run of state.verification!.executions.filter(e => f.plan.observedExecutionIds.includes(e.id) && e.result === 'failed')) {
+        if (failure === 'setup') run.failureCause = 'setup';
+        else run.assertions = [];
+      }
+    }
+    assert.deepEqual(validateState(f.state), []);
+    assert.match(moves(f.beforePlan, f.state), /symptom/);
+    f.append('baseline', 'faulty'); f.append('candidate', 'fixed');
+    assert.deepEqual(validateState(f.state), []);
+    assert.equal(deriveVerification(f.state).checkResults['C-1'], 'unavailable');
+  }
+});
+
+test('historical intermittent acceptance stays readable while new acceptance and completion need symptom evidence', () => {
+  const f = intermittentFixture();
+  f.append('baseline', 'faulty'); f.append('candidate', 'fixed'); f.close();
+  f.record.acceptanceRounds.push({
+    id: 'AR-final', inputDigest: f.record.acceptanceInputDigest, targetRevision: f.record.targetRevision,
+    referenceIds: f.record.references.map(e => e.id),
+    executionIds: ['C-1', 'C-2'].map(id => f.record.executions.filter(e => e.checkId === id).at(-1)!.id),
+    findingIds: [], coverageReviewIds: f.record.coverageReviews.map(e => e.id),
+    requirementResults: { R01: 'passed' }, g4: 'passed', performedAt: stamp(60),
+  });
+  f.state.lifecycle = 'closed'; f.state.outcome = 'completed';
+  f.state.finishedAt = stamp(70); f.state.updatedAt = stamp(70);
+  f.state.gates.find(g => g.id === 'G4')!.status = 'passed';
+  assert.deepEqual(validateState(f.state), []);
+  for (const execution of f.record.executions.filter(e => e.intermittent?.phase === 'baseline' && e.result === 'failed')) {
+    execution.failureCause = 'setup';
+  }
+  assert.deepEqual(validateState(f.state), []);
+  assert.equal(deriveVerification(f.state).g4, 'pending');
+  const resumed = structuredClone(f.state); resumed.updatedAt = stamp(80);
+  assert.deepEqual(validateStateTransition(f.state, resumed), []);
+  resumed.verification!.acceptanceRounds.push({ ...structuredClone(f.record.acceptanceRounds.at(-1)!), id: 'AR-new', performedAt: stamp(80) });
+  assert.match(moves(f.state, resumed), /stored requirement results disagree/);
+  const before = structuredClone(f.state);
+  before.lifecycle = 'active'; delete before.outcome; delete before.finishedAt;
+  before.verification!.acceptanceRounds.pop();
+  before.gates.find(g => g.id === 'G4')!.status = 'pending';
+  assert.deepEqual(validateState(before), []);
+  assert.match(moves(before, f.state), /completed requires verified passing G4/);
+  // A truthful superseding round can be published without rewriting history.
+  resumed.lifecycle = 'active'; delete resumed.outcome; delete resumed.finishedAt;
+  resumed.verification!.acceptanceRounds.at(-1)!.requirementResults = { R01: 'incomplete' };
+  resumed.verification!.acceptanceRounds.at(-1)!.g4 = 'pending';
+  resumed.gates.find(g => g.id === 'G4')!.status = 'pending';
+  assert.deepEqual(validateState(resumed), []);
+  assert.deepEqual(validateStateTransition(f.state, resumed), []);
+});
+
+test('a new passing intermittent G4 needs current verification even before an acceptance round', () => {
+  const f = intermittentFixture();
+  f.append('baseline', 'faulty'); f.append('candidate', 'fixed'); f.close();
+  for (const execution of f.record.executions.filter(e => e.intermittent?.phase === 'baseline' && e.result === 'failed')) {
+    execution.failureCause = 'setup';
+  }
+  assert.equal(f.record.acceptanceRounds.length, 0);
+  const before = structuredClone(f.state);
+  f.state.gates.find(g => g.id === 'G4')!.status = 'passed';
+  assert.equal(deriveVerification(f.state).g4, 'pending');
+  assert.match(moves(before, f.state), /G4 must be pending/);
+});
+
 test('fixing only the minimized reproduction retains original failures and blocks closure', () => {
   const f = intermittentFixture('seeded'); f.append('baseline','faulty'); f.append('candidate','partial'); f.close();
   assert.match(messages(f.state), /intermittent resolution/);

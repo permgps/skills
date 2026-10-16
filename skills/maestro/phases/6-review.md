@@ -112,7 +112,8 @@ so in the отчёт. Every other step of this phase runs unchanged.
 Give each reviewer its task file, that таск's per-commit diffs with the list of
 out-of-zone paths, and `interfaces.md` — for a repaired таск also the defect
 under repair with its repair criteria and the residual parent criteria — briefed
-by [`../prompts/reviewer.md`](../prompts/reviewer.md). **Nothing else** — not
+by [`../prompts/reviewer.md`](../prompts/reviewer.md), with the check evidence
+specified below. **Nothing else** — not
 `spec.md`, not the манифест, not another таск's file or diff. The references a
 таск follows reach its reviewer through the task file's *References* row, opened
 read-only; `reference.md` itself is never handed to a reviewer.
@@ -125,6 +126,19 @@ the former cannot turn a missing or unavailable interaction check into `passed`.
 The reviewer may inspect raw reference authority to identify an omitted
 behavior outside the generated task list; report that as an upstream coverage
 finding rather than quietly expanding this task's scope.
+
+For an intermittent repair, also give the published
+`verification.intermittentRepairs` entry for the defect's root, its superseded
+entries, observed executions and conditions captures, both check definitions
+with their current fingerprints, and all baseline/candidate samples for both
+original and minimized scenarios, even when their checks have different
+execution owners. Include the capture index and read-only capture access for
+that evidence slice, preserving original/minimized inputs and every failure or
+unavailable result. This is bounded verification evidence, not another task's
+file/diff or the overall work plan. Include no producer diagnosis or conclusions.
+Log DEBUG `review` `intermittent evidence handed over` with plan/root IDs and
+execution/capture counts; never log capture contents. If this slice is missing,
+keep review incomplete instead of substituting a summary.
 
 A review reads the project and writes nothing into it, so nothing here needs a
 worktree, an order, or a wave. Every таск is reviewed at the same time as every

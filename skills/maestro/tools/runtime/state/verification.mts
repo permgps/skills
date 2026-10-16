@@ -87,12 +87,12 @@ export function effectiveExecution(
     .sort(latestFirst(item => item.executedAt))[0];
 }
 
-function checkResult(check: VerificationCheck, record: VerificationRecord): CheckResult {
+function checkResult(check: VerificationCheck, record: VerificationRecord, requireSymptomEvidence: boolean): CheckResult {
   const execution = effectiveExecution(check, record.executions);
   if (record.version !== 1 && check.currentFingerprint.acceptanceInput !== record.acceptanceInputDigest) return 'stale';
   if (!execution) return 'not_run';
   if (!sameFingerprint(execution.fingerprint, check.currentFingerprint)) return 'stale';
-  const repeated = intermittentCheckResult(check.id, record);
+  const repeated = intermittentCheckResult(check.id, record, requireSymptomEvidence);
   return repeated && repeated !== 'passed' ? repeated : execution.result;
 }
 
@@ -117,6 +117,11 @@ function obligationResult(
 
 /** The current target only; retained old revisions never masquerade as coverage. */
 export function deriveVerification(state: RunState): VerificationSummary {
+  return verificationSummary(state, true);
+}
+
+/** Only stored verdict validation may use the older symptom qualification. */
+function verificationSummary(state: RunState, requireSymptomEvidence: boolean): VerificationSummary {
   const record = state.verification;
   if (!record) throw new Error('contract-4 verification record is missing');
 
@@ -128,7 +133,7 @@ export function deriveVerification(state: RunState): VerificationSummary {
 
   const currentObligations = record.obligations.filter(item => item.targetRevision === record.targetRevision);
   const checkResults: Record<string, CheckResult> = {};
-  for (const check of record.checks) checkResults[check.id] = checkResult(check, record);
+  for (const check of record.checks) checkResults[check.id] = checkResult(check, record, requireSymptomEvidence);
 
   const obligationResults: Record<string, VerificationResult> = {};
   for (const obligation of currentObligations) {
@@ -628,7 +633,24 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
   if (record.version !== 1) errors.push(...validateSourceRecords(state, record), ...validateCompletionRecords(state, record));
   if (errors.length > 0) return errors;
 
-  const summary = deriveVerification(state);
+  const strict = verdictViolations(state, deriveVerification(state));
+  if (!strict.length) return [];
+  // Stored acceptance rounds are immutable too. Keep a historically valid
+  // verdict readable, while public derivation and new verdicts stay strict.
+  if (record.version === 3 && record.intermittentRepairs?.length
+    && !verdictViolations(state, verificationSummary(state, false)).length) {
+    log.debug('verification', '[FIX] historical intermittent verdict retained', { runId: state.runId });
+    return [];
+  }
+  for (const error of strict) log.error('verification', error.message, { field: error.field });
+  return strict;
+}
+
+/** Validate one coherent summary; never mix historical and current verdicts. */
+function verdictViolations(state: RunState, summary: VerificationSummary): VerificationViolation[] {
+  const record = state.verification!;
+  const errors: VerificationViolation[] = [];
+  const add = (field: string, message: string): void => { errors.push({ field, message }); };
   const latestRound = record.acceptanceRounds.find(item => item.id === summary.currentRoundId);
   if (latestRound) {
     if (!isDeepStrictEqual(latestRound.requirementResults, summary.requirementResults)) {
@@ -796,6 +818,18 @@ export function validateVerificationTransition(
   const errors: VerificationViolation[] = [];
   const prior = previous.verification;
   const current = next.verification;
+  const newPassingG4 = next.gates.some(gate => gate.id === 'G4' && gate.status === 'passed'
+    && !previous.gates.some(old => old.id === 'G4' && old.status === 'passed'));
+  const newVerdict = current.acceptanceRounds.some(round => !prior.acceptanceRounds.some(old => old.id === round.id))
+    || newPassingG4
+    || next.lifecycle === 'closed' && (previous.lifecycle !== 'closed' || previous.outcome !== next.outcome);
+  if (current.version === 3 && current.intermittentRepairs?.length && newVerdict) {
+    const summary = deriveVerification(next);
+    errors.push(...verdictViolations(next, summary));
+    if (newPassingG4 && summary.g4 !== 'passed' && !errors.some(error => error.field === 'gates[G4].status')) {
+      errors.push({ field: 'gates[G4].status', message: `G4 must be ${summary.g4} from current verification records` });
+    }
+  }
   const planningOpen = previous.lifecycle === 'active'
     && STAGE_IDS.indexOf(previous.currentStage) <= STAGE_IDS.indexOf('plan')
     && !previous.stages.some(stage => stage.id === 'plan' && stage.status === 'done')

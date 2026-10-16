@@ -6,6 +6,11 @@ adds no capability, viewer, package installation or repair allowance. Under
 verification 1/2 do not write verification-3 fields: retain captures, report the
 limitation and keep the intermittent repair incomplete.
 
+A symptom failure has cause `product` or `test` and at least one named failed
+assertion with capture evidence. A setup failure or a failed exit without that
+assertion cannot establish intermittency. Keep these records, but correct the
+setup through readiness before collecting qualifying observations.
+
 ## Before Further Diagnosis
 
 Preserve the original triggering workload. Record the runnable symptom check,
@@ -55,7 +60,10 @@ input captures. Include this procedure in the task References or embed its
 applicable instructions in the brief; no phase/spec files are supplied. It runs each scenario's baseline series on the triggering build,
 keeping every sample and observing at least one symptom failure in each. Import
 and publish both complete baselines before candidate dispatch. Baselines that
-never reproduce the symptom leave the repair incomplete. Diagnosis novelty,
+never reproduce the symptom, or contain a setup/unavailable sample or a failed
+exit without a captured failed assertion, leave the repair incomplete. Preserve
+them; use the existing successor-plan and budget route instead of replacing a
+sample. Diagnosis novelty,
 readiness and selected negative controls remain required where already applicable.
 
 After the repair, replay both scenarios for exactly the declared sample counts.
@@ -102,7 +110,9 @@ all the intermediate sample IDs. The helper checks the full series separately.
 
 Review checks replay fidelity, minimization and actual provenance; field shape
 cannot prove those judgements. Never hand the diagnosis or producer conclusions
-to blind readers. Report observed baseline and candidate failures/counts for
+to blind readers. Give the reviewer the published series criteria and complete
+evidence for both workloads under its bounded handoff, not just the samples
+owned by the task being reviewed. Report observed baseline and candidate failures/counts for
 both workloads, their conditions and limitations. Zero failures in a finite
 sample is bounded evidence, not proof of impossibility. Partial, unavailable or
 stale evidence stays incomplete and follows the existing report/closure route.

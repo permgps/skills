@@ -11,8 +11,13 @@ You review one таск. You have been given its bounded handoff and nothing els
   criteria as check IDs, and the parent criteria it leaves
 - `interfaces.md` — the boundaries every таск of this прогон agreed on
 - task-owned check results and capture index for checks assigned to this таск
+- for an intermittent repair, the published `verification.intermittentRepairs` entry
+  for the defect's root and its superseded entries, observed executions and conditions captures,
+  both check definitions with current fingerprints, and all baseline/candidate samples for both
+  original and minimized scenarios, even when their checks have different execution owners;
+  their capture index and read-only captures include both inputs and every failed/unavailable result
 
-You have not seen `spec.md`, the манифест, the plan, `codebase.md`,
+You have not seen `spec.md`, the манифест, the overall work plan, `codebase.md`,
 `reference.md`, or any other таск, and **you must not ask for them**. If one is offered, decline it and say so in your
 output. The withholding is the point: this таск was built from its task file, so
 its task file is what it answers to. A reviewer holding the specification
@@ -203,11 +208,17 @@ check-quality finding when:
 
 ## Repair History Review
 
-For an observed intermittent repair, inspect the plan and all baseline/candidate
-samples under [intermittent-repairs.md](../references/intermittent-repairs.md).
+For an observed intermittent repair, inspect the supplied series-plan entry and
+complete evidence slice under [intermittent-repairs.md](../references/intermittent-repairs.md).
 Both the original and minimized workload must survive review, with comparable
 conditions and current fingerprints. A single green, a discarded failure, or a
 minimized-only fix cannot close it; preserve finite-sample limitations.
+Check that each baseline failure counted as reproduction reached a named failed
+assertion with capture evidence and cause `product` or `test`. Setup failures
+and failed exits without such assertions remain incomplete evidence. Missing
+plan, conditions or either series is a blocking evidence finding; never replace
+them with the executor's summary. Cross-owner samples are supplied only for this
+root's verification; unrelated task files, diffs and producer diagnosis remain withheld.
 
 A repeated repair retains root/predecessor, finite remaining budgets and actual
 independent diagnosis receipts. Compare the new action and evidence to prior

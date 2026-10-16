@@ -1801,3 +1801,16 @@ for (const anchor of INTERMITTENT_ANCHORS) {
     });
   });
 }
+
+test('the intermittent review handoff declares the plan and complete evidence at both sender and reader', async () => {
+  for (const file of ['phases/6-review.md', 'prompts/reviewer.md']) {
+    for (const literal of ['`verification.intermittentRepairs` entry',
+      'observed executions and conditions captures',
+      'all baseline/candidate samples for both original and minimized scenarios',
+      'even when their checks have different execution owners']) {
+      assert.ok(INTERMITTENT_ANCHORS.some(anchor => anchor.file === file && anchor.literal === literal), `${file}: ${literal}`);
+      const text = (await readFile(path.join('skills/maestro', file), 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(text.includes(literal), `${file}: ${literal}`);
+    }
+  }
+});

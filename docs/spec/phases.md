@@ -887,6 +887,15 @@ executor never saw is a finding nobody can act on. The task file is that
 contract, and `interfaces.md` is the rest of it — the boundaries the таск was
 told to meet.
 
+An intermittent repair also supplies the root's published series-plan entry
+and superseded entries, observed executions, conditions/input captures, both
+check definitions with current fingerprints, and every baseline/candidate
+sample and associated capture for both original and minimized scenarios.
+Include both series even when the checks have different execution owners.
+This bounded evidence slice adds no other task file/diff, overall work plan or
+producer diagnosis. Missing plan, conditions or either series blocks review;
+a producer summary cannot substitute for them.
+
 A reviewer holding `spec.md` would report the distance between the specification
 and one таск's slice of it as a defect in the таск. It is not one. It is a
 defect in the cut, and the cut is what G3 checks.

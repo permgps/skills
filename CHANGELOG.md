@@ -14,6 +14,13 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **Fixed intermittent repair verification and review inputs.** Setup failures
+  and failed exits without captured failed assertions cannot establish a
+  reproduced symptom or complete a baseline. Current verdicts use this stricter
+  rule while immutable historical verdicts remain readable. Reviewers receive
+  the declared series criteria and complete evidence for both scenarios, even
+  when the checks belong to different execution owners.
+
 - **Intermittent repairs require reproducible evidence.** Observed mixed outcomes
   trigger finite reproduction budgets and immutable, predeclared replay plans.
   Both original and minimized workloads retain every baseline/candidate sample.

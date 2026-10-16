@@ -3727,3 +3727,28 @@ test('intermittent series yield the same incomplete, failed, current and stale r
     assert.deepEqual(plain(L.verificationOf(f.state).checkResults), deriveVerification(f.state).checkResults);
   }
 });
+
+test('intermittent setup failures and missing failed assertions cannot appear as repaired offline', () => {
+  for (const failure of ['setup', 'no-assertion', 'passing-assertions'] as const) {
+    const f = intermittentFixture();
+    f.append('baseline', 'faulty');
+    for (const run of f.record.executions.filter(e => e.intermittent?.phase === 'baseline' && e.result === 'failed')) {
+      if (failure === 'setup') run.failureCause = 'setup';
+      else if (failure === 'no-assertion') run.assertions = [];
+      else run.assertions.forEach(assertion => { assertion.result = 'passed'; });
+    }
+    f.append('candidate', 'fixed');
+    assert.equal(L.verificationOf(f.state).checkResults['C-1'], 'unavailable');
+    assert.deepEqual(plain(L.verificationOf(f.state).checkResults), deriveVerification(f.state).checkResults);
+  }
+});
+
+test('intermittent history with a setup-only trigger remains incomplete offline despite later passing samples', () => {
+  const f = intermittentFixture();
+  for (const execution of f.record.executions.filter(e => f.plan.observedExecutionIds.includes(e.id) && e.result === 'failed')) {
+    execution.failureCause = 'setup';
+  }
+  f.append('baseline', 'faulty'); f.append('candidate', 'fixed');
+  assert.equal(L.verificationOf(f.state).checkResults['C-1'], 'unavailable');
+  assert.deepEqual(plain(L.verificationOf(f.state).checkResults), deriveVerification(f.state).checkResults);
+});

@@ -1725,6 +1725,45 @@ test('copied runtime enforces intermittent plan publication, full evidence and c
   } finally { await target.dispose(); }
 });
 
+test('copied publication preserves intermittent setup evidence and refuses a candidate based on it', async () => {
+  const target = await session(null);
+  try {
+    const f = intermittentFixture();
+    const declared = structuredClone(f.state);
+    f.append('baseline', 'faulty');
+    for (const execution of f.record.executions.filter(e => e.intermittent?.phase === 'baseline' && e.result === 'failed')) {
+      execution.failureCause = 'setup';
+      execution.assertions = [];
+      const capture = f.record.evidence.find(e => execution.evidenceIds.includes(e.id))!;
+      const body = 'Harness failed before the symptom assertion\n';
+      f.captureBodies[capture.path] = body;
+      capture.sha256 = sha256(body);
+    }
+    const baseline = structuredClone(f.state);
+    f.append('candidate', 'fixed');
+    for (const [relative, body] of Object.entries({ ...f.captureBodies, 'manifest.md': SOURCE_MANIFEST })) {
+      const file = path.join(target.root, f.state.slug, relative);
+      await mkdir(path.dirname(file), { recursive: true }); await writeFile(file, body);
+    }
+    const candidate = path.join(target.root, 'candidate.json');
+    let expected: string | undefined;
+    for (const state of [f.beforePlan, declared, baseline]) {
+      await writeFile(candidate, JSON.stringify(state));
+      const done = await target.run({}, ['--publish', candidate, '--no-open', ...(expected ? ['--expect', expected] : [])]);
+      assert.equal(done.status, 0, done.out);
+      expected = state.updatedAt;
+    }
+    const published = await readFile(path.join(target.root, 'state.js'), 'utf8');
+    await writeFile(candidate, JSON.stringify(f.state));
+    const refused = await target.run({ LOG_LEVEL: 'debug' }, ['--publish', candidate, '--no-open', '--expect', expected!]);
+    assert.equal(refused.status, 1, refused.out);
+    assert.match(refused.out, /baseline series with captured symptom failures/);
+    assert.match(refused.err, /DEBUG \[state\.intermittent\] \[FIX\] baseline eligibility checked/);
+    assert.match(refused.err, /"requireSymptomEvidence":true,"failures":0,"unusable":3,"complete":false/);
+    assert.equal(await readFile(path.join(target.root, 'state.js'), 'utf8'), published);
+  } finally { await target.dispose(); }
+});
+
 test('intermittent captures survive closing relocation and a successor run in the same project', async () => {
   const target=await waitingProject();
   try {

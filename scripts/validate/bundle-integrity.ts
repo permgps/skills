@@ -684,6 +684,12 @@ export const INTERMITTENT_ANCHORS: readonly Anchor[] = [
   { file: 'prompts/repair-diagnostician.md', literal: 'preserve the original alongside the minimized case', why: 'minimization must not replace the trigger' },
   { file: 'prompts/reviewer.md', literal: 'Both the original and minimized workload', why: 'review must cover both workload shapes' },
   { file: 'phases/7-acceptance.md', literal: 'partial/stale series stay incomplete', why: 'acceptance must report insufficient evidence' },
+  ...['phases/6-review.md', 'prompts/reviewer.md'].flatMap(file => [
+    { file, literal: '`verification.intermittentRepairs` entry', why: 'review needs the published criteria, not a producer summary' },
+    { file, literal: 'observed executions and conditions captures', why: 'review needs the original trigger and replay conditions' },
+    { file, literal: 'all baseline/candidate samples for both original and minimized scenarios', why: 'review must inspect complete evidence for both workloads' },
+    { file, literal: 'even when their checks have different execution owners', why: 'task ownership must not truncate the repair evidence' },
+  ]),
 ];
 
 /** Conditional research and freshness anchors; semantic source judgement stays with the reader. */

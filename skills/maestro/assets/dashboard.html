@@ -2603,11 +2603,16 @@ globalThis.MAESTRO_LOGIC = (function () {
         return all.filter(function (e) { return e.intermittent.scenario === role && e.intermittent.phase === phase; })
           .sort(function (a,b) { return a.intermittent.sample - b.intermittent.sample; });
       }
+      function symptomFailure(e) {
+        return e.result === 'failed' && (e.failureCause === 'product' || e.failureCause === 'test')
+          && e.assertions.some(function (a) { return a.name.trim().length > 0 && a.result === 'failed' && a.evidenceIds.length > 0; });
+      }
       if (all.length > plan.maxRuns || all.reduce(function (n,e) { return n + e.intermittent.elapsedMs; },0) > plan.maxDurationMs) return 'unavailable';
+      if (!record.executions.some(function (e) { return plan.observedExecutionIds.indexOf(e.id) !== -1 && symptomFailure(e); })) return 'unavailable';
       var baseline = plan.scenarios.every(function (s) {
         var runs = series(s.role,'baseline');
-        return runs.length === s.sampleCount && runs.every(function (e) { return e.result === 'passed' || e.result === 'failed'; })
-          && runs.some(function (e) { return e.result === 'failed'; });
+        return runs.length === s.sampleCount && runs.every(function (e) { return e.result === 'passed' || symptomFailure(e); })
+          && runs.some(symptomFailure);
       });
       if (!baseline) return 'unavailable';
       for (var i=0; i<plan.scenarios.length; i++) {
