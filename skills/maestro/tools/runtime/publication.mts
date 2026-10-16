@@ -13,12 +13,12 @@ import { projectState } from './state/projection.mts';
 import { validateStateTransition } from './state/closure.mts';
 import { deriveVerification } from './state/verification.mts';
 import { keepWaits, type KeptWaits } from './state/waits.mts';
-import { atomicText, serializeState } from './state/write.mts';
+import { atomicText, revisionViolations, serializeState, StateBusyError, withStateLock } from './state/write.mts';
 import { STATE_FILE, WIP_SUFFIX, parseRunDir, runDirName } from './state/paths.mts';
 import { relocateRunDir, restoreRunDir, type Relocation } from './relocation.mts';
 import { upsertRegister } from './register.mts';
 import { headCommit } from './history.mts';
-import { PROGRESS_FILE, buildProgress, fixesReadAtPreflight } from './progress.mts';
+import { PROGRESS_FILE, buildProgress, fixesReadAtPreflight, parseProgress } from './progress.mts';
 
 const log = createLogger('sync');
 export type Viewer = (noOpen: boolean) => Promise<string | null>;
@@ -144,16 +144,25 @@ const readOptional = async (file: string): Promise<string | null> => {
  * hand drifts. Like the register, it cannot fail the publish: a failure is
  * reported and the next closing publish rewrites the file.
  */
-async function writeProgress(runRoot: string, state: RunState): Promise<'written' | 'failed'> {
+async function writeProgress(runRoot: string, state: RunState, repeated: boolean): Promise<'written' | 'failed' | 'kept'> {
   const target = path.join(runRoot, PROGRESS_FILE);
   let commit: string | null = null;
   try {
+    const previous = await readOptional(target);
+    const header = previous === null ? null : parseProgress(previous).header;
+    // A successful closure is the baseline for later code history. Repeating it
+    // must neither advance that commit to today's HEAD nor consume user fixes.
+    if (repeated && header?.dir === runDirName(state)
+      && header.closedAt === (state.finishedAt ?? state.updatedAt ?? state.startedAt)
+      && header.outcome === state.outcome) {
+      log.debug('progress', '[FIX] existing closure progress preserved', { path: target });
+      return 'kept';
+    }
     const head = await headCommit(path.dirname(runRoot));
     commit = 'sha' in head ? head.sha : null;
-    const previous = await readOptional(target);
     const prior = await readOptional(path.join(runRoot, runDirName(state), 'prior.md'));
     await atomicText(target, buildProgress({ state, previous, priorFixes: fixesReadAtPreflight(prior), commit }));
-    log.info('progress', 'progress file rewritten', { action: 'written', path: target, commit });
+    log.info('progress', '[FIX] progress file rewritten', { action: 'written', path: target, commit });
     return 'written';
   } catch (error) {
     log.warn('progress', 'progress file could not be written; the next closing publish rewrites it', {
@@ -176,6 +185,27 @@ async function readPrevious(file: string): Promise<RunState | null> {
 export async function candidateMode(args: string[], dir: string,
   viewer: Viewer = async () => pathToFileURL(path.join(dir, 'dashboard.html')).href,
   snapshots: (candidate: RunState | null, envelope: ValidationEnvelope) => Promise<void> = async () => {}): Promise<CandidateResult> {
+  if (args[0] !== '--publish') return candidateModeLocked(args, dir, viewer, snapshots);
+  try {
+    // Opening the viewer is not part of publication. Keep the state and all
+    // derived writes together, then hand off the URL after releasing the lock.
+    const outcome = await withStateLock(dir, () => candidateModeLocked(args, dir, async () => null, snapshots));
+    if (outcome.code !== 2) {
+      try { outcome.result['url'] = await viewer(args.includes('--no-open')); }
+      catch { log.warn('viewer', 'viewer unavailable; coherent state retained', { dir }); }
+    }
+    return outcome;
+  } catch (error) {
+    if (error instanceof StateBusyError) return { code: 1, result: {
+      status: 'rejected', violations: [{ field: 'state.js', message: error.message }], url: null,
+    } };
+    log.error('publish', '[FIX] publication could not complete', { dir });
+    return { code: 2, result: { status: 'unreadable', reason: 'publication could not complete; reread state.js before retrying' } };
+  }
+}
+
+async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
+  snapshots: (candidate: RunState | null, envelope: ValidationEnvelope) => Promise<void>): Promise<CandidateResult> {
   const action = args[0];
   const file = args[1];
   if (!file) return { code: 2, result: { status: 'unreadable', reason: 'candidate path is required' } };
@@ -240,6 +270,7 @@ export async function candidateMode(args: string[], dir: string,
     }
   }
   errors.push(...checkStamp(previous, expected, holder, succession));
+  if (errors.length === 0 && previous) errors.push(...revisionViolations(previous, state));
   if (isRecord(candidate) && isRecord(candidate['heldBy']) && candidate['heldBy']['token'] !== holder) {
     errors.push({ field: 'heldBy', message: 'holder token does not match candidate' });
   }
@@ -304,9 +335,9 @@ export async function candidateMode(args: string[], dir: string,
         runId: state.runId, reason: error instanceof Error ? error.message : String(error) });
     }
   }
-  let progress: 'written' | 'failed' | null = null;
-  if (errors.length === 0 && state.contractVersion >= 7 && state.lifecycle === 'closed' && previous?.lifecycle !== 'closed') {
-    progress = await writeProgress(dir, state);
+  let progress: 'written' | 'failed' | 'kept' | null = null;
+  if (errors.length === 0 && state.contractVersion >= 7 && state.lifecycle === 'closed') {
+    progress = await writeProgress(dir, state, previous?.lifecycle === 'closed');
   }
   const envelope = validationEnvelope(errors.length ? 'invalid' : 'valid', candidate, errors, errors.length ? previous : state);
   try {

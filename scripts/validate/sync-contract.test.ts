@@ -17,7 +17,9 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFile, fork, spawnSync } from 'node:child_process';
+import { once } from 'node:events';
+import { promisify } from 'node:util';
 import { existsSync, writeFileSync } from 'node:fs';
 import net from 'node:net';
 import { request as httpRequest } from 'node:http';
@@ -1165,18 +1167,20 @@ test('copied publication accepts reordered object keys and rejects changed immut
     const candidate = path.join(target.root, 'candidate.json');
     await writeFile(candidate, JSON.stringify(state));
     assert.equal((await target.run({}, ['--publish', candidate, '--no-open'])).status, 0);
-    const next = structuredClone(state); next.updatedAt = '2026-08-21T12:01:00.000Z';
+    const next = structuredClone(state); next.updatedAt = '2026-09-29T09:21:00Z';
     next.verification!.executions = next.verification!.executions.map(item => Object.fromEntries(Object.entries(item).reverse()) as typeof item);
     await writeFile(candidate, JSON.stringify(next));
     assert.equal((await target.run({}, ['--publish', candidate, '--expect', state.updatedAt!, '--no-open'])).status, 0);
+    const publishedRevision = next.updatedAt;
+    next.updatedAt = '2026-09-29T09:22:00Z';
     const executedAt = next.verification!.executions[0]!.executedAt;
     next.verification!.executions[0]!.executedAt = '2026-08-21T12:02:00.000Z';
     await writeFile(candidate, JSON.stringify(next));
-    assert.equal((await target.run({}, ['--publish', candidate, '--expect', next.updatedAt!, '--no-open'])).status, 1);
+    assert.equal((await target.run({}, ['--publish', candidate, '--expect', publishedRevision!, '--no-open'])).status, 1);
     next.verification!.executions[0]!.executedAt = executedAt;
     next.verification!.checks[0]!.procedure.reverse();
     await writeFile(candidate, JSON.stringify(next));
-    const reorderedArray = await target.run({}, ['--publish', candidate, '--expect', next.updatedAt!, '--no-open']);
+    const reorderedArray = await target.run({}, ['--publish', candidate, '--expect', publishedRevision!, '--no-open']);
     assert.equal(reorderedArray.status, 1);
     assert.ok((jsonResult(reorderedArray)['violations'] as { field: string }[]).some(item => item.field === 'verification.checks[C-1]'));
     assert.ok(!(await readdir(target.root)).some(file => file.endsWith('.tmp')));
@@ -1340,13 +1344,14 @@ test('legacy ownership checks require the exact directory command and ready page
 });
 
 /** One GET with the Host header chosen by the caller, as a rebinding page's browser would send it. */
-function getWithHost(port: number, resource: string, host: string): Promise<{ status: number; nosniff: boolean }> {
+function getWithHost(port: number, resource: string, host: string): Promise<{ status: number; nosniff: boolean; sameOrigin: boolean }> {
   return new Promise((resolve, reject) => {
     const req = httpRequest({ host: '127.0.0.1', port, path: resource, method: 'GET', headers: { Host: host } }, (response) => {
       response.resume();
       response.on('end', () => resolve({
         status: response.statusCode ?? 0,
         nosniff: response.headers['x-content-type-options'] === 'nosniff',
+        sameOrigin: response.headers['cross-origin-resource-policy'] === 'same-origin',
       }));
     });
     req.on('error', reject);
@@ -1373,6 +1378,48 @@ test('the viewer answers only requests addressed to the loopback name it serves 
     }
   } finally {
     await run.dispose();
+  }
+});
+
+test('the viewer prevents other origins from embedding state and diagnostics as scripts', async () => {
+  const target = await session(STATE);
+  try {
+    assert.equal((await target.run()).status, 0);
+    const { port } = await target.record();
+    await writeFile(path.join(target.root, 'validation.js'), 'globalThis.MAESTRO_VALIDATION = {};\n');
+    for (const host of [`localhost:${port}`, `127.0.0.1:${port}`]) {
+      for (const file of ['/state.js', '/validation.js', '/dashboard.html']) {
+        const answer = await getWithHost(port, file, host);
+        assert.equal(answer.status, 200);
+        assert.equal(answer.sameOrigin, true, `${file} can be embedded by another origin`);
+      }
+    }
+  } finally { await target.dispose(); }
+});
+
+test('an already running viewer without origin isolation is replaced before reuse', async () => {
+  const target = await session(STATE);
+  const module = path.join(target.root, 'runtime/server.mts');
+  const current = await readFile(module, 'utf8');
+  await writeFile(module, current.replace("res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');", ''));
+  const old = fork(path.join(target.root, 'sync.mts'), ['--serve', '--port', '0', '--instance', 'old-viewer'],
+    { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] });
+  const exited = once(old, 'exit');
+  try {
+    const [record] = await once(old, 'message');
+    old.disconnect();
+    await writeFile(path.join(target.root, 'serve.json'), JSON.stringify(record));
+    assert.equal((await getWithHost(record.port, '/state.js', `localhost:${record.port}`)).sameOrigin, false);
+    await writeFile(module, current);
+    await promisify(execFile)(process.execPath, [path.join(target.root, 'sync.mts'), '--no-open'],
+      { env: { ...process.env, ...SEALED } });
+    const replacement = await target.record();
+    assert.notEqual(replacement.pid, record.pid, 'the unsafe viewer was reused');
+    assert.equal((await getWithHost(replacement.port, '/state.js', `localhost:${replacement.port}`)).sameOrigin, true);
+  } finally {
+    old.kill('SIGTERM');
+    await exited;
+    await target.dispose();
   }
 });
 
@@ -1580,7 +1627,7 @@ test('a closing contract-10 candidate with its result publishes and moves the fo
   const target = await waitingProject();
   try {
     assert.equal(target.publish(activeContract10State()).code, 0);
-    const done = target.publish(contract10State(), activeContract10State().updatedAt);
+    const done = target.publish({ ...contract10State(), updatedAt: '2026-09-29T09:30:00Z' }, activeContract10State().updatedAt);
     assert.equal(done.code, 0, JSON.stringify(done));
     const relocated = done['relocated'] as { from: string; to: string };
     assert.deepEqual([relocated.from, relocated.to], [WAIT_WIP, CLOSED_DIR]);
@@ -1592,7 +1639,7 @@ test('a closing contract-10 candidate without a result is refused, and the folde
   const target = await waitingProject();
   try {
     assert.equal(target.publish(activeContract10State()).code, 0);
-    const closing = contract10State();
+    const closing = { ...contract10State(), updatedAt: '2026-09-29T09:30:00Z' };
     delete closing.result;
     const done = target.publish(closing, activeContract10State().updatedAt);
     assert.equal(done.code, 1, JSON.stringify(done));
@@ -1606,7 +1653,7 @@ test('reopening a closed contract-10 run that keeps its result is refused', asyn
   const target = await waitingProject();
   try {
     assert.equal(target.publish(activeContract10State()).code, 0);
-    const closing = contract10State();
+    const closing = { ...contract10State(), updatedAt: '2026-09-29T09:30:00Z' };
     assert.equal(target.publish(closing, activeContract10State().updatedAt).code, 0);
     const reopened: RunState = { ...closing, lifecycle: 'active', dir: WAIT_WIP, updatedAt: '2026-09-29T10:00:00Z' };
     delete reopened.outcome; delete reopened.finishedAt;

@@ -143,12 +143,12 @@ Say it in the прогон's own language and ask:
 > запись от 21:27. Значит, кто-то писал параллельно. Я ничего не перезаписал.
 > Перечитать и продолжить с того, что там сейчас?»
 
-The sentence is the point.
-
-A real прогон uses the bundled `sync.mts --publish` path below: supply the
-complete candidate and the last `updatedAt` plus your holder token. The helper
-rechecks them immediately before publication. This is an optimistic guard, not
-a lock; the re-read is still a step you perform.
+Use `sync.mts --publish` with the complete candidate, last `updatedAt` and holder token.
+The helper checks them under an exclusive write lock; you still re-read before
+composing a candidate.
+Every changed candidate advances `updatedAt`; only an identical retry may reuse it.
+If busy, wait for the writer to finish, then re-read before retrying. After interruption,
+remove `.maestro/.state-write.lock` only after verifying no writer is running.
 
 ## Opening A Стадия
 

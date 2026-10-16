@@ -1245,6 +1245,9 @@ only `127.0.0.1` and serves the canonical run directory. Decoded request paths
 and symlinks must stay inside it; `/` and `/dashboard.html` show the same page
 even when an index symlink is unavailable. HTML and JavaScript use their proper
 MIME types. The viewer reads state and diagnostics; it never decides closure.
+Every response carries `Cross-Origin-Resource-Policy: same-origin`: other origins
+cannot embed the executable state or diagnostics. Relative dashboard scripts
+continue to load through either loopback hostname; file snapshots use no HTTP.
 
 `serve.json` retains pid, port and optional previousPort, adding canonical
 root and a per-instance identity. A directory-bound HTTP identity and ready
@@ -1252,8 +1255,11 @@ listener are verified before success, reuse or owned cleanup. Ordinary startup
 and reuse require no process-table command. Forgotten-process discovery uses
 a platform adapter and reports its limitation when unavailable. A foreign PID
 or listener is preserved; the helper never kills one to free a port. A verified
-legacy server may be reused on Unix after exact command/directory validation;
-no new legacy runtime is invoked. All lifecycle callers share ownership logic.
+legacy server is identified on Unix after exact command/directory validation;
+no new legacy runtime is invoked. Before reuse, the helper checks the HTTP
+origin-isolation header. A verified older or legacy viewer without it is stopped
+and replaced; a failure to stop it is reported and yields the file snapshot.
+All lifecycle callers share ownership logic.
 
 `opened.json` retains its URL semantics. Open once per address, again for a
 moved address or `--reopen`. `--no-open`, MAESTRO_SYNC_NO_OPEN and SSH/CI

@@ -258,7 +258,9 @@ moves the folder and returns `relocated`; from then on every path, the отчё�
 included, is under the new name. The same closing publish rewrites
 `.maestro/PROGRESS.md` from the closed state and reports `progress`: `written`,
 or `failed`, which you say to the user in one line and which is not a stop — the
-next closing publish rewrites the file. Record any promised further round before offering
+next closing publish, including an identical retry, repairs a missing progress
+file. A retry with this closure already recorded reports `kept` and preserves
+its commit and user fixes. Record any promised further round before offering
 closure; a promise left open blocks every outcome. The closure ends with the
 memory run and its closing commit, so the commit the `PROGRESS.md` header
 names is `HEAD` before that commit, never the closing commit itself.

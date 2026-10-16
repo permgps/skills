@@ -83,6 +83,10 @@ Past about sixty lines the oldest settled items give way to a count; open work
 is never trimmed. Decisions are not repeated there: each run's `decisions.md`
 and the memory block hold them. A write that fails does not fail the publish,
 which reports `progress: failed`, and the next closing publish rewrites it.
+An identical retry also repairs a missing file or a file still naming the prior
+closure. If the header already names this run, closing instant and outcome,
+the retry reports `progress: kept` and preserves its original commit and user
+fixes. Reopening and closing again regenerates the file normally.
 
 The dashboard is opened directly and there is no second entry point beside it.
 An `index.html` pointing at a self-contained page would be an artifact with no

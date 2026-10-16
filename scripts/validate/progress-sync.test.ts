@@ -171,5 +171,29 @@ test('a progress file that cannot be written leaves the publish standing and say
     assert.equal(closed['status'], 'published');
     assert.equal(closed['progress'], 'failed');
     assert.match(closed.stderr, /WARN \[sync\.progress\]/);
+    await rm(path.join(target.maestro, PROGRESS_FILE), { recursive: true });
+    const retried = target.publish(closing(), closing().updatedAt);
+    assert.equal(retried.code, 0, JSON.stringify(retried));
+    assert.equal(retried['progress'], 'written');
+    assert.equal(parseProgress(await progressOf(target)).header?.dir, LANDED);
+  } finally { await target.dispose(); }
+});
+
+test('repeating a successful closure keeps its commit and user fixes after HEAD moves', async () => {
+  const target = await project({ git: true });
+  try {
+    await seed(target.maestro, WIP);
+    assert.equal(target.publish(building()).code, 0);
+    target.git('add', '.');
+    target.git('commit', '-q', '-m', 'before closure');
+    const head = target.git('rev-parse', 'HEAD').trim();
+    assert.equal(target.publish(closing(), building().updatedAt).code, 0);
+    const text = (await progressOf(target)).replace(/## Fixes Without Maestro\n/, '## Fixes Without Maestro\n\n- User fixed navigation.\n');
+    await writeFile(path.join(target.maestro, PROGRESS_FILE), text);
+    target.git('commit', '--allow-empty', '-q', '-m', 'after closure');
+    const retried = target.publish(closing(), closing().updatedAt);
+    assert.equal(retried.code, 0, JSON.stringify(retried));
+    assert.equal(await progressOf(target), text);
+    assert.equal(parseProgress(await progressOf(target)).header?.commit, head);
   } finally { await target.dispose(); }
 });

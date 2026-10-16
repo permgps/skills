@@ -367,13 +367,18 @@ symlinks outside the run directory are refused. Only a request addressed to
 `localhost:<port>`, `127.0.0.1:<port>` or `[::1]:<port>` is answered: another
 name, such as a page whose domain was rebound to `127.0.0.1` or a custom
 hostname in front of the viewer, gets `403`.
+Every response carries `Cross-Origin-Resource-Policy: same-origin`, so a page
+on another origin cannot embed `state.js` to read the run. The dashboard's
+relative scripts remain available, and direct file snapshots are unaffected.
 
 `serve.json` keeps the address across calls; a dead server may restart on its
 free old port. A foreign listener is preserved, with a new address reported.
 Forgotten-server recovery uses a platform process adapter when available;
 unavailable discovery is reported explicitly. Unix legacy-server adoption
 requires an exact directory/command match and a ready page, without launching
-the old runtime. Failure to start a viewer yields the file snapshot.
+the old runtime. A verified viewer that lacks origin isolation, including an
+older Node or legacy viewer, is stopped and replaced before reuse. Failure to
+stop it is reported; failure to start a viewer yields the file snapshot.
 
 Use `node .maestro/sync.mts --reopen` when the panel disappears. `--no-open` or
 `MAESTRO_SYNC_NO_OPEN` suppresses browser opening, as do SSH/CI sessions. A

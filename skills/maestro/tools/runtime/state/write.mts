@@ -7,9 +7,10 @@
 
 import { open, readFile, rename, unlink } from 'node:fs/promises';
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 import { createLogger } from '../shared/log.mts';
-import type { RunState } from './contract.mts';
+import { isMoment, type RunState } from './contract.mts';
 import { validateEvidence } from './evidence.mts';
 import { STATE_FILE } from './paths.mts';
 // The conditional write has to see what is on disk, and unwrapping the
@@ -17,10 +18,56 @@ import { STATE_FILE } from './paths.mts';
 // `InvalidStateError` live where they belong now, so read.ts does not come
 // back here for them.
 import { parseStateSource } from './read.mts';
-import { InvalidStateError, validateState } from './validate.mts';
+import { InvalidStateError, validateState, type StateViolation } from './validate.mts';
 import { validateStateTransition } from './closure.mts';
 
 const log = createLogger('state');
+
+/** A process already owns the whole publication, including its derived files. */
+export class StateBusyError extends Error {
+  readonly lockPath: string;
+  constructor(lockPath: string) {
+    super(`state writer is busy; retry after it finishes. If it was interrupted, verify no writer is running before removing ${lockPath}`);
+    this.name = 'StateBusyError';
+    this.lockPath = lockPath;
+  }
+}
+
+/**
+ * The lock covers reads, validation, relocation, replacement and derived writes.
+ * Never steal it by age or PID: an interrupted writer needs explicit recovery,
+ * and a mistaken stale-lock takeover would reintroduce two simultaneous owners.
+ */
+export async function withStateLock<T>(dir: string, operation: () => Promise<T>): Promise<T> {
+  const lockPath = path.join(dir, '.state-write.lock');
+  let handle;
+  try { handle = await open(lockPath, 'wx', 0o600); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    log.warn('lock', '[FIX] concurrent state writer refused', { lockPath });
+    throw new StateBusyError(lockPath);
+  }
+  try {
+    await handle.writeFile(JSON.stringify({ pid: process.pid }) + '\n');
+    log.debug('lock', '[FIX] state write lock acquired', { lockPath });
+    return await operation();
+  } finally {
+    await handle.close();
+    await unlink(lockPath).then(
+      () => log.debug('lock', '[FIX] state write lock released', { lockPath }),
+      () => log.error('lock', '[FIX] state write lock could not be removed; verify no writer is running before recovery', { lockPath }),
+    );
+  }
+}
+
+/** A revision identifies one complete state; identical retries do not change it. */
+export function revisionViolations(previous: RunState, candidate: RunState): StateViolation[] {
+  if (isDeepStrictEqual(previous, candidate)) return [];
+  if (isMoment(previous.updatedAt) && isMoment(candidate.updatedAt)
+    && Date.parse(candidate.updatedAt) > Date.parse(previous.updatedAt)) return [];
+  log.warn('revision', '[FIX] changed state requires a later revision');
+  return [{ field: 'updatedAt', message: 'changed state requires updatedAt strictly later than the published revision; only an identical state may reuse it' }];
+}
 
 const HEADER = [
   '// Written by Maestro. Generated file — edit the run, not this.',
@@ -69,6 +116,7 @@ export class StaleStateError extends Error {
 interface Stamp {
   updatedAt: string | undefined;
   token: string | undefined;
+  state: RunState;
 }
 
 /**
@@ -105,7 +153,7 @@ async function readStamp(target: string): Promise<Stamp | null> {
       ? (holder as Record<string, unknown>)['token'] as string
       : undefined;
 
-  return { updatedAt, token };
+  return { updatedAt, token, state: parsed as RunState };
 }
 
 // Distinguishes concurrent writers within one process without a clock or a
@@ -125,7 +173,7 @@ export interface WriteResult {
  * guaranteed to be on the same one.
  *
  * `expect` is the `updatedAt` the caller last read. Supplied, it makes the write
- * conditional: the file is re-read immediately before writing, and a stamp that
+ * conditional: the file is re-read under the exclusive write lock, and a stamp that
  * moved means a second writer got there first, so the write is refused instead
  * of laid over the top. This is the one place in this repository where the race
  * can be made impossible rather than merely visible, which is why it refuses
@@ -142,6 +190,10 @@ export async function writeState(
   state: RunState,
   expect?: string,
 ): Promise<WriteResult> {
+  return withStateLock(dir, () => writeStateLocked(dir, state, expect));
+}
+
+async function writeStateLocked(dir: string, state: RunState, expect?: string): Promise<WriteResult> {
   const violations = validateState(state);
   if (violations.length === 0 && state.contractVersion >= 4) {
     violations.push(...await validateEvidence(state, path.dirname(dir)));
@@ -182,6 +234,8 @@ export async function writeState(
       });
       throw new StaleStateError(expect, found?.updatedAt, found?.token);
     }
+    const revision = revisionViolations(found.state, state);
+    if (revision.length) throw new InvalidStateError(revision);
     log.debug('write', 'the state is where it was read', { target, updatedAt: expect });
   }
 

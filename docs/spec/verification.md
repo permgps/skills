@@ -564,8 +564,9 @@ and promised work; fresh checks are required to complete it.
 The shipped TypeScript helper validates a complete candidate before atomically
 publishing `state.js`. It may inspect declared evidence files and relevant
 fingerprint inputs, but cannot execute checks, invent records, select decisions,
-or author transitions. It rechecks the expected revision and holder at
-publication; the existing optimistic stamp comparison is not a lock. An
+or author transitions. It checks the expected revision and holder under an
+exclusive publication lock; changed candidates advance `updatedAt`, while
+identical retries may reuse it. An
 invalid candidate leaves an accessible diagnostic that names its revision and
 suppresses an old success display, including on first startup. The dashboard
 reads the coherent snapshot and validation envelope only.

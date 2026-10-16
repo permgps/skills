@@ -47,6 +47,19 @@ async function identity(port: number): Promise<ViewerRecord | null> {
       && typeof value.instance === 'string' && value.instance.length > 0 ? value : null;
   } catch { return null; }
 }
+
+/** A remembered process can predate a helper update; its identity alone is not enough. */
+async function isolatesOrigins(port: number): Promise<boolean> {
+  return new Promise(resolve => {
+    const req = request({ host: '127.0.0.1', port, path: '/dashboard.html', method: 'HEAD', timeout: 300 }, response => {
+      response.resume();
+      resolve(response.headers['cross-origin-resource-policy'] === 'same-origin');
+    });
+    req.on('timeout', () => req.destroy());
+    req.on('error', () => resolve(false));
+    req.end();
+  });
+}
 export async function readViewerRecord(dir: string): Promise<Partial<ViewerRecord> | null> {
   try { return JSON.parse(await readFile(path.join(dir, 'serve.json'), 'utf8')) as Partial<ViewerRecord>; }
   catch { return null; }
@@ -167,7 +180,15 @@ async function prepareViewer(dir: string, entrypoint: string): Promise<ViewerAdd
   const root = await realpath(dir);
   const fallback: ViewerAddress = { url: pathToFileURL(path.join(root, 'dashboard.html')).href, record: null };
   const remembered = await readViewerRecord(root);
-  const owned = await findOwnedViewer(root);
+  let owned = await findOwnedViewer(root);
+  if (owned && !await isolatesOrigins(owned.port)) {
+    log.info('viewer', '[FIX] replacing owned viewer without origin isolation', { dir: root, pid: owned.pid });
+    if (!await stopOwnedViewer(root)) {
+      log.warn('viewer', '[FIX] old viewer could not be stopped; origin isolation is not established', { dir: root, pid: owned.pid });
+      return fallback;
+    }
+    owned = null;
+  }
   if (owned) {
     await atomicText(path.join(root, 'serve.json'), JSON.stringify(owned) + '\n');
     log.info('viewer', remembered?.pid === owned.pid ? 'viewer reused' : 'forgotten viewer adopted', { pid: owned.pid, port: owned.port, dir: root });
@@ -188,7 +209,7 @@ async function prepareViewer(dir: string, entrypoint: string): Promise<ViewerAdd
   });
   if (child.connected) child.disconnect();
   child.unref();
-  if (!ready || !await verifyViewer(root, ready).catch(() => null)) {
+  if (!ready || !await verifyViewer(root, ready).catch(() => null) || !await isolatesOrigins(ready.port)) {
     // This handle is the child just spawned, so signalling it needs no PID-file trust.
     child.kill('SIGTERM'); log.warn('viewer', 'viewer startup failed; use the file snapshot', { dir: root }); return fallback;
   }
@@ -207,6 +228,9 @@ const loopbackHost = (host: string | undefined, port: number): boolean =>
   host !== undefined && [`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`].includes(host.toLowerCase());
 async function serveRequest(root: string, record: ViewerRecord, req: IncomingMessage, res: ServerResponse): Promise<void> {
   res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Host checks stop rebinding, not a foreign page's classic script tag. The
+  // dashboard's relative scripts stay same-origin; file snapshots use no HTTP.
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
   if (!loopbackHost(req.headers.host, record.port)) {
     log.warn('viewer', 'foreign host refused', { host: req.headers.host ?? null, port: record.port });
     res.writeHead(403).end(); return;
@@ -238,6 +262,7 @@ export async function serveDirectory(dir: string, port: number, instance: string
   const address = server.address();
   if (!address || typeof address === 'string') throw new Error('listener has no port');
   record = { ...record, port: address.port };
+  log.debug('serve', '[FIX] viewer responses restricted to same-origin embedding', { port: record.port });
   process.send?.(record);
   const stop = (): void => { server.close(); server.closeAllConnections(); };
   process.once('SIGTERM', stop); process.once('SIGINT', stop);

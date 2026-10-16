@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, readFile, readdir, rm, chmod, writeFile } from 'node:fs
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { writeState, serializeState, StaleStateError } from './write.ts';
+import { writeState, serializeState, StaleStateError, StateBusyError, withStateLock } from './write.ts';
 import { InvalidStateError } from './validate.ts';
 import { STATE_FILE } from './paths.ts';
 import type { RunState } from './contract.ts';
@@ -217,4 +217,39 @@ test('a write that launches a task on a blocker still in repair is refused and t
   } finally {
     await rm(project, { recursive: true, force: true });
   }
+});
+
+test('conditional repository writers cannot both replace one revision', async () => {
+  await withDir(async dir => {
+    const before = baseline();
+    await writeState(dir, before);
+    const results = await Promise.allSettled(Array.from({ length: 8 }, (_, index) => writeState(dir,
+      { ...before, updatedAt: `2026-08-19T09:3${index}:00Z`, additions: [`writer ${index}`] }, before.updatedAt)));
+    assert.equal(results.filter(result => result.status === 'fulfilled').length, 1);
+    assert.deepEqual(await readdir(dir), [STATE_FILE]);
+  });
+});
+
+test('conditional writes refuse a reused revision but allow an identical retry', async () => {
+  await withDir(async dir => {
+    const before = baseline();
+    await writeState(dir, before);
+    await assert.rejects(writeState(dir, { ...before, additions: ['new'] }, before.updatedAt), InvalidStateError);
+    await writeState(dir, before, before.updatedAt);
+    assert.deepEqual(evaluate(await readFile(path.join(dir, STATE_FILE), 'utf8')), before);
+  });
+});
+
+test('a failed lock owner releases its lock without letting a competing writer remove it', async () => {
+  await withDir(async dir => {
+    await assert.rejects(withStateLock(dir, async () => {
+      const record = await readFile(path.join(dir, '.state-write.lock'), 'utf8');
+      await assert.rejects(writeState(dir, baseline()), StateBusyError);
+      assert.equal(await readFile(path.join(dir, '.state-write.lock'), 'utf8'), record);
+      throw new Error('synthetic failure');
+    }), /synthetic failure/);
+    assert.deepEqual(await readdir(dir), []);
+    await writeState(dir, baseline());
+    assert.deepEqual(await readdir(dir), [STATE_FILE]);
+  });
 });

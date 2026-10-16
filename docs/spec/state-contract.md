@@ -405,10 +405,10 @@ from one that was met.
   above attribute to `stages[]` where it belongs. A стадия absent from `stages[]`
   is not a finding here, for the same reason the chain steps around one: a record
   that does not mention a стадия says nothing about it.
-- **A writer re-reads the file immediately before writing and compares
+- **A writer re-reads the file under an exclusive write lock and compares
   `updatedAt` with the value it last read.** A stamp that moved means somebody
   else wrote in between, and that write is refused and reported rather than laid
-  over the top. This is the whole of the concurrency rule, and it takes two
+  over the top. The claim and revision take two
   fields to say it: `heldBy` names who claimed the прогон, `updatedAt` says
   whether the claim still held at the moment it mattered. A `heldBy` token that
   belongs to another session is reported with the refusal, because *who* is the
@@ -417,10 +417,13 @@ from one that was met.
   `scripts/state/write.ts` enforces it — `writeState` accepts the `updatedAt`
   the caller last read and refuses when the file on disk carries a different one.
   A real прогон asks `.maestro/sync.mts` to publish the complete candidate with
-  the expected revision and holder. This optimistic check detects a stale
-  candidate; it is not a lock or a full compare-and-swap. That is why
-  [`../../skills/maestro/SKILL.md`](../../skills/maestro/SKILL.md) still states
-  the orchestrator's re-read step.
+  the expected revision and holder. Both writers use `.state-write.lock` in the
+  state directory, created exclusively before reading history and released
+  after all publication writes. A competing writer is refused. A changed
+  candidate must have a strictly later `updatedAt`, compared as an instant;
+  only an identical retry may reuse a revision. The compatibility writer
+  applies the revision rule when `expect` is supplied; its unconditional mode
+  remains available. The orchestrator still re-reads before composing a candidate.
 - Every write is a whole-file write of a valid state. A partially written state
   is a broken dashboard, so the file is written to a temporary name and moved
   into place.
@@ -729,8 +732,11 @@ its candidate `closed`, the published state not — also rewrites
 `.maestro/PROGRESS.md` (see [`artifacts.md`](artifacts.md)), naming in its
 header the commit `git rev-parse HEAD` gives, or `none`. The result carries
 `progress`: `written`, or `failed` when the file could not be written. A
-failure does not undo the publish and is repaired by the next closing publish.
-Any other publish leaves the file alone and carries no `progress`.
+failure does not undo the publish. Repeating a closed publish retries a missing
+file or one whose header names another closure. If the header already matches
+the run, closing instant and outcome, it reports `progress: kept`, preserving
+the original commit and user fixes. Active candidates leave the file alone and
+carry no `progress`. Reopen followed by closure regenerates the file.
 
 `--validate <candidate>` and `--project <candidate>` are read-only: no state,
 diagnostic, snapshot, viewer or opener writes. JSON actions emit one result on
@@ -883,8 +889,13 @@ replacing, publication keeps the closed state in `.maestro/<dir>/state.js` (see
 prior state that is still active, under any `runId`, is never replaced this way.
 
 Each replacement uses an exclusive temporary file in the destination directory,
-write, fsync, close and rename, removing temporary files on failure. Immediately
-before replacing state, publication re-reads the prior revision and holder.
-This detects concurrent changes without claiming a lease, exclusive lock or
-multi-file transaction. Rejection preserves the last state and updates the
-validation envelope/snapshot; a viewer failure may yield the file snapshot.
+write, fsync, close and rename, removing temporary files on failure. Publication
+holds `.state-write.lock` across reading history, validation, relocation, state
+replacement, register/progress and diagnostic/snapshot writes. The viewer opens
+after release. This serializes cooperating writers; it is not a crash-atomic
+multi-file transaction and cannot stop direct filesystem edits. A busy writer
+returns a rejection without changing another writer's diagnostics. Re-read state
+before retrying. Ordinary failures release the lock; after a killed process,
+inspect its recorded PID and verify no writer is running before manually removing
+the lock. Age alone never authorizes removal. Other rejections preserve the last
+state and update diagnostics; a viewer failure may yield the file snapshot.
