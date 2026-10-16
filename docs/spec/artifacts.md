@@ -100,10 +100,10 @@ actually built.
 | `brief.md` | manifest | manifest, G2, acceptance (the manifest plus the additions) | append-only |
 | `manifest.md` | manifest | briefing, spec, plan, acceptance, G1, G2, G3, G4 | append-only |
 | `prior.md` | preflight | briefing, spec, plan, memory | no |
-| `codebase.md` | spec | spec, plan, build, repair, G3 | no |
-| `answers.md` | briefing | spec, G1 | append-only |
+| `codebase.md` | spec | spec, plan, build, repair, G2 architecture, G3 consistency | no |
+| `answers.md` | briefing | spec, G1, G2 architecture | append-only |
 | `reference.md` | briefing | G2 reference reader, acceptance reference reader; the plan cites its ids into task files | append-only |
-| `spec.md` | spec | plan, build, review | yes, by amendment only |
+| `spec.md` | spec | plan, build, review, G2 intent, G2 architecture | yes, by amendment only |
 | `interfaces.md` | plan | build, review, G3, memory | no |
 | `discovered-interfaces.md` | build | build, memory | append-only |
 | `shared.md` | plan | the plan, through `--plan-render` into each citing task file | no |
@@ -154,8 +154,11 @@ not contract: the таск is still judged against its task file and
 what the build added.** The spec phase writes `codebase.md` once, in a project
 with code, from the text the existing-code reader returned, and neither file is
 ever appended to the other. It is handed to build and repair executors and to
-the plan-consistency reader. The task reader, the reviewer, and every reader
-of G1, G2 and G4 are not handed it: a task file is buildable without it, and a
+the plan-consistency reader and, when relevant architectural decisions exist,
+the contextual G2 architecture reader. Its decision section preserves record
+paths, status, constraints, rationale and bounded discovery coverage. The task
+reader, the reviewer, G1, blind G2 intent/reference and G4 readers are not handed
+it: a task file is buildable without it, and a
 blind reader holding the прогон's own reading of the code would check the past
 instead of the work. Where `codebase.md` and `interfaces.md` disagree on a
 name, `interfaces.md` wins, and a deliberate rename is a `renames <old>` row in

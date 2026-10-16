@@ -59,9 +59,10 @@ export const PRIOR_MEMORY_INPUT = 'prior.md';
  *
  * It is the прогон's own reading of the code. A reader judging the прогон's
  * work against the user's words, or a таск against its task file, would inherit
- * that reading and check the past instead of the work. Only the reader that
- * checks whether the plan's names fit together needs it, because a name the
- * code already has is one of the things that must fit. So the rows allowed to
+ * that reading and check the past instead of the work. The plan-consistency
+ * reader checks existing names; the contextual architecture reader checks
+ * the spec against discovered decisions and explicit departures. Neither is
+ * a blind intent/acceptance check. The rows allowed to
  * give it are listed, a listed row must give it, and every other row must
  * withhold it — a reader added later inherits the withholding, as for
  * `prior.md`.
@@ -69,7 +70,7 @@ export const PRIOR_MEMORY_INPUT = 'prior.md';
 export const CODEBASE_INPUT = 'codebase.md';
 
 /** The `Gate` cells of the `gates.md` reader table allowed, and required, to give {@link CODEBASE_INPUT}. */
-export const CODEBASE_GIVEN_ROWS: readonly string[] = ['G3 consistency'];
+export const CODEBASE_GIVEN_ROWS: readonly string[] = ['G3 consistency', 'G2 architecture'];
 
 /**
  * Briefs outside the reader table that are handed {@link CODEBASE_INPUT}. They
@@ -179,7 +180,7 @@ const TIER_TABLE_COLUMNS = ['Role', 'Brief', 'Tier'];
  * `standard` — on any row it appears in.
  */
 export const JUDGE_BRIEFS: readonly string[] = [
-  'manifest-reader.md', 'independent-reader.md', 'reference-reader.md', 'task-reader.md',
+  'manifest-reader.md', 'spec-architecture-reader.md', 'independent-reader.md', 'reference-reader.md', 'task-reader.md',
   'plan-consistency-reader.md', 'reviewer.md', 'standards-reader.md', 'repair-diagnostician.md',
   'strategy-reviewer.md', 'acceptance-reader.md',
 ];
@@ -403,7 +404,7 @@ export async function checkGateReaders(options: CheckOptions = {}): Promise<Viol
     log.debug('codebase', 'reader checked for codebase.md', { gate: row.gate, gives, withholds });
     if (listed && !gives) {
       add('codebase', specFile, row.line,
-        `gate ${row.gate} does not give its reader ${CODEBASE_INPUT} — it checks the plan's names against what the code already calls them; add it to the row's Given cell and to the brief's "${INPUT_HEADING}" table`);
+        `gate ${row.gate} does not give its reader ${CODEBASE_INPUT} — this contextual reader checks consistency against discovered code or architectural decisions; add it to the row's Given cell and to the brief's "${INPUT_HEADING}" table`);
     } else if (!listed && gives) {
       add('codebase', specFile, row.line,
         `gate ${row.gate} gives its reader ${CODEBASE_INPUT} — only ${CODEBASE_GIVEN_ROWS.join(', ')} may hold the прогон's reading of the code; move it to Withheld`);

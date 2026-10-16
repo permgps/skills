@@ -14,6 +14,13 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **Existing architectural decisions reach the specification.** Bounded
+  discovery records relevant decision paths, statuses, constraints and rationale
+  in `codebase.md`, including absent or incomplete coverage. A conditional G2
+  architecture reader checks silent contradictions and sourced departures
+  without treating obsolete records as binding. Blind readers retain their
+  existing input boundary; project decision records remain read-only.
+
 - **An executor's return is checked before it is read.** An outside report on a
   real build said formal acceptance dragged because some tests had no initial
   failing run. The red-run rule existed, but its parser was repository tooling

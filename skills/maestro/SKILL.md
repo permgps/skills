@@ -441,7 +441,7 @@ finding or pass.
 | Gate | After phase | Pass condition |
 |---|---|---|
 | G1 | briefing | Every требование has a status and no unexplained open entry; contract 5 also requires a fresh returned independent source audit and frozen initial agreement |
-| G2 | spec | Every live требование is in-spec, placeholder, deferred, or dropped with zero left open, **and** the independent intent reader and separate raw-reference reader return no unresolved mandatory gap |
+| G2 | spec | Every live требование is in-spec, placeholder, deferred, or dropped with zero left open, **and** the independent intent reader and separate raw-reference reader return no unresolved mandatory gap, and the contextual architecture reader (when relevant decisions exist) finds no unresolved contradiction |
 | G3 | plan | Every in-spec or placeholder требование maps to at least one таск, **and** every таск traces back to at least one требование; таски sharing a file are ordered, and the task and plan-consistency readers find no gap |
 | G4 | acceptance | Current required checks and complete coverage pass after blind discovery against manifest/additions; failures give `failed`, missing or stale evidence gives `pending`; contract 6 closes `completed` with no open defect |
 

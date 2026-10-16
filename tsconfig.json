@@ -21,6 +21,7 @@
   },
   "include": [
     "scripts/**/*.ts",
+    "scripts/**/*.mts",
     "skills/maestro/tools/**/*.mts"
   ]
 }

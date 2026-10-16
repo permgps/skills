@@ -433,6 +433,12 @@ things live, the conventions, the exact run, test and lint commands, the names
 the work will touch, and what not to touch, into `codebase.md`. The spec and the
 plan name things after it — the Terms table gains a *Name in code* column — and
 every executor reads it before exploring. The blind readers never see it.
+The same discovery reads relevant architectural decision records from the
+project's documented locations, preserving their status, constraints and reasons.
+Current decisions shape the spec; superseded decisions and proposals do not bind it. A new
+request may override a decision with an explicit explanation. When relevant
+records exist, a separate G2 reader checks for silent contradictions. Missing
+or incomplete discovery stays visible, and your decision records are never edited.
 
 **Review reads each таск's commits against the task file it was given — and
 for five risks the task file may never mention.** Whenever the diff touches

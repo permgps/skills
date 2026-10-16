@@ -1477,7 +1477,7 @@ test('a hand-off followed only by blank lines, or a phase with no hand-off, is n
 // --- existing code is read once, before the spec -------------------------------
 
 test('every codebase anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
-  assert.equal(CODEBASE_ANCHORS.length, 12);
+  assert.equal(CODEBASE_ANCHORS.length, 22);
   await withShippedCopy(async copy => {
     for (const anchor of CODEBASE_ANCHORS) {
       const body = await readFile(path.join(copy, anchor.file), 'utf8');
@@ -1755,4 +1755,22 @@ test('the closing subject the memory phase commits with is the one the helper gr
   assert.ok(memory.includes(`git commit -m "${closingSubject('<dir>')}"`),
     `9-memory.md commits with a subject other than ${closingSubject('<dir>')}; preflight would never find the closure`);
   assert.ok(TRACE_ANCHORS.some(anchor => anchor.file === 'phases/9-memory.md' && anchor.literal === closingSubject('<dir>')));
+});
+
+test('architectural decision discovery and reconciliation have anchors at each acting role', () => {
+  const required = [
+    ['prompts/existing-code-reader.md', '## Architectural decisions'],
+    ['prompts/existing-code-reader.md', 'Only read documented decision locations'],
+    ['prompts/existing-code-reader.md', 'Never infer acceptance from a filename'],
+    ['prompts/existing-code-reader.md', 'Never create or edit architectural decision records'],
+    ['phases/3-spec.md', 'architectural decisions incomplete'],
+    ['phases/3-spec.md', 'do not redispatch discovery'],
+    ['phases/3-spec.md', 'decision disposition:'],
+    ['phases/3-spec.md', 'No relevant records means no architecture-reader dispatch'],
+    ['prompts/spec-architecture-reader.md', 'A silent contradiction is a finding'],
+    ['prompts/spec-architecture-reader.md', 'Never treat an obsolete record as binding'],
+  ];
+  for (const [file, literal] of required) {
+    assert.ok(CODEBASE_ANCHORS.some(anchor => anchor.file === file && anchor.literal === literal), `${file}: ${literal}`);
+  }
 });

@@ -249,6 +249,7 @@ at that model's default effort.
 | G1 source reader | `manifest-reader.md` | `strong` |
 | existing-code reader | `existing-code-reader.md` | `standard` |
 | commit reader | `commit-reader.md` | `standard` |
+| G2 architecture reader | `spec-architecture-reader.md` | `strong` |
 | G2 intent reader | `independent-reader.md` | `strong` |
 | G2 reference reader | `reference-reader.md` | `strong` |
 | G3 task reader | `task-reader.md` | `strong` |

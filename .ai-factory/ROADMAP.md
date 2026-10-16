@@ -1878,7 +1878,7 @@ technical facts second, then strengthen the evidence for intermittent repairs.
 The items can be planned independently; none requires another dashboard or a
 new user-facing dial.
 
-- [ ] **Existing Architectural Decisions Reach The Spec** — prevent work in an
+- [x] **Existing Architectural Decisions Reach The Spec** — prevent work in an
   existing project from silently reversing an architectural decision made
   outside Maestro.
   - **Gap:** phase 3 checks decisions in `prior.md`, while the existing-code
@@ -1978,6 +1978,7 @@ tests and per-task handoffs already cover those parts of the source material.
 
 | Milestone | Date |
 |-----------|------|
+| Existing Architectural Decisions Reach The Spec | 2026-10-16 |
 | Behavior Specification | 2026-08-19 |
 | Repository Skeleton and Install Path | 2026-08-19 |
 | Run State and Artifact Contract | 2026-08-19 |

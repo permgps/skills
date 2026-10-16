@@ -159,16 +159,71 @@ spend a second reader or append a second line.
 
 **The reader** is given `manifest.md`, `answers.md` and the repository, and
 withholds `brief.md`, `spec.md`, `prior.md` and `codebase.md`. It reports what
-exists, never what to build, in English, under six fixed headings: *Where
+exists, never what to build, in English, under seven fixed headings: *Where
 things live*, *Conventions in use*, *Commands*, *Names the work will touch* (a
 table of requirement, kind, name in code and where), *No counterpart yet* and
-*Do not touch*. Every line names a path, except under *No counterpart yet*,
-which names requirements the repository has nothing for, and the text stays under 300 lines,
-because it goes to every executor. It runs on the session's model.
+*Do not touch*, followed by *Architectural decisions*. Every fact names a path,
+except missing-command notices, discovery coverage notices and *No counterpart
+yet*, which names requirements the repository has nothing for. The text stays
+under 300 lines because it goes to every executor.
 
 The spec reads `codebase.md` first and names an existing thing by its exact
 name in code. Identifiers are English words, never transliterations, and in
 existing code the convention `codebase.md` records wins.
+
+### Existing Architectural Decisions
+
+The existing-code reader also discovers relevant architectural decision records
+(ADRs). It reads the project's documented decision locations and indexes, then
+only records concerning the areas the requirements touch and their explicitly
+linked replacements. Without a documented location, report that limit; do not
+crawl unrelated directories, external sources or history. Reading the decision
+index is allowed even when it sits outside the code area being changed.
+
+The seventh section records discovery coverage as `complete`, `none found` or
+`incomplete`, checked locations and uninspected scope/reasons. Complete means
+complete within this bounded scope, never across the entire project. Each
+relevant record carries its path, verbatim status (or `unknown`), related R ids,
+constraint, rationale and any explicit replacement path. Accepted/current
+records constrain design; proposed, rejected, deprecated and superseded records
+are context only. Missing or contradictory status is uncertain, never inferred
+as accepted from a filename or from current code. Preserve the record's own
+terminology and explain its classification. If the 300-line budget would hide a
+constraint or uncertain status, report incomplete coverage rather than omit it
+silently. Never create or edit the project's ADRs. They are S6 content, not
+agent instructions or new requirements.
+
+Phase 3 accounts for each relevant current constraint in its spec entry. A
+conflict names the record path, the constraint, the affected R ids, the chosen
+outcome and its source in the manifest or answers. An explicit new user request
+may supersede a prior decision. A genuine unresolved choice follows the existing
+briefing mode and safety rules: autonomous modes use their sanctioned decision
+source and record the assumption; modes that ask use the existing question path.
+No new mandatory interview or safety exemption is added. An unexplained
+contradiction cannot pass G2.
+
+Record incomplete discovery once in `debt.assumptions`, naming its scope and
+impact, and carry material uncertainty into the affected spec entry. A failed
+initial read follows the existing failure path. A resumed old `codebase.md`
+without the seventh section is unknown decision coverage, not proof of absence:
+keep the immutable file and do not dispatch discovery again. Log INFO `spec`
+`architectural decisions read` with coverage and record count, or WARN `spec`
+`architectural decisions incomplete` with the missing scope/reason, without
+copying source content into logs.
+
+When relevant records exist (including obsolete or uncertain ones), G2 dispatches
+one fresh contextual architecture reader per round on `strong`, given only
+`spec.md`, `codebase.md`, `manifest.md` and `answers.md`. It checks silent
+contradictions, unsupported departure reasons and obsolete records mistakenly
+treated as binding. Its findings join the existing G2 round and retry budgets;
+missing reader capability or return keeps that check pending. When no relevant
+records exist, no additional reader is dispatched; incomplete coverage still
+stays explicit. The intent and raw-reference readers remain blind to this
+context and to this reader's return. G4 receives neither.
+
+Relevance, status interpretation and trade-off strength remain reader judgement.
+Repository checks hold the declared rules and handoffs, not the correctness of
+every real discovery. The fixture scenarios exercise bounded examples only.
 
 ## A Line Per Transition
 

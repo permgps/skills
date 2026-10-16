@@ -6,7 +6,7 @@ that fails is not a warning: the phase is redone.
 | Gate | After phase | Pass condition |
 |---|---|---|
 | G1 | briefing | Every требование has a status and no unexplained open entry; every `answers.md` entry that offered options marks exactly one recommended and records the chosen option in full; contract 5 also requires a fresh returned independent source audit and frozen initial agreement |
-| G2 | spec | Every live требование is dispositioned; independent intent and raw-reference passes find no unresolved mandatory coverage gap |
+| G2 | spec | Every live требование is dispositioned; independent intent and raw-reference passes find no unresolved mandatory coverage gap; when relevant architectural records exist, the contextual architecture reader finds no unresolved contradiction |
 | G3 | plan | Every in-spec or placeholder требование maps to an obligation and implementation owner; every required check has an execution owner that transitively depends on each integration dependency; no two таски share a file unless one transitively blocks the other; a task reader finds each task executable, and a plan-consistency reader given every task file finds no coordination defect between them, each reader's return covering every unit, таск and seam it was asked about; from contract 8, every producer in the Seams table and the skeleton (the sole таск of wave 1) are `strong`, each task file's `Model` row agrees with `tasks[].model`, and each task file's `References` row cites only ids the register holds, each with a location, while every available visual reference and contextual example is cited by some таск |
 | G4 | acceptance | Current, applicable evidence and independent discovery cover the current contract; failures and incomplete checks are reconciled under [`verification.md`](verification.md); contract 6 also closes `completed` with no open defect, and stops after an exhausted budget only with a `budget_exhausted` strategy review |
 
@@ -15,7 +15,7 @@ that fails is not a warning: the phase is redone.
 | Gate | What proves it |
 |---|---|
 | G1 | The status map has no unexplained open entries; each `answers.md` entry with options carries a gist, one recommendation, an `Answer:` and a `Chosen:` that names an offered option or `own answer`; v5 has a current source/manifest audit and initial agreement baseline |
-| G2 | Status map, obligation/source coverage map, independent intent and raw-reference discovery findings |
+| G2 | Status map, obligation/source coverage map, independent intent and raw-reference discovery findings; conditional architecture-reader findings and sourced decision dispositions |
 | G3 | Requirement → obligation → implementation task and obligation → check → execution task mappings, including verification-only tasks; from contract 8, the Seams table's Producer task ids, and the `Model` and `References` rows of each task file, and nothing else of it, against `tasks[].model` and `verification.references`; the reader returns kept under `plan-reads/`, each covered by `sync.mts --plan-coverage`, and a `sync.mts --plan-units` that reports no violation |
 | G4 | Current check executions, complete coverage reviews, union of substantiated findings, and a fresh acceptance round |
 
@@ -112,8 +112,8 @@ Three more readers are held here and gate nothing. The standards reader is
 dispatched once after review over the whole прогон; its output is observations
 only. The existing-code reader is dispatched once at the start of the spec
 phase, in a project with code; its text becomes `codebase.md`, which only the
-plan-consistency reader among the readers below is given. The commit reader is
-dispatched by preflight only when more than thirty commits over code landed
+plan-consistency and conditional G2 architecture readers below are given. The
+commit reader is dispatched by preflight only when more than thirty commits over code landed
 since the last closure; its at most ten lines replace the list in `prior.md`.
 The blindness of all three is held the same way as the gate readers'. The same check holds the places the
 standards reader's one input is gathered from, named alike in phase 6, in
@@ -125,11 +125,20 @@ standards reader's one input is gathered from, named alike in phase 6, in
 | G3 task | `task-reader.md` | the task file, `interfaces.md` | `spec.md`, `manifest.md`, the other task files, `prior.md`, `codebase.md` |
 | G3 consistency | `plan-consistency-reader.md` | every task file, `interfaces.md`, `codebase.md` | `spec.md`, `manifest.md`, `prior.md` |
 | G2 intent | `independent-reader.md` | `brief.md`, `spec.md` | the манифест, `answers.md`, this phase's own reasoning, `prior.md`, `codebase.md` |
+| G2 architecture | `spec-architecture-reader.md` | `spec.md`, `codebase.md`, `manifest.md`, `answers.md` | `brief.md`, `prior.md`, the plan, prior verdicts, the repository |
 | G2 reference | `reference-reader.md` | user preservation request and current additions, neutral reference register, raw reference sources | generated inventory conclusions, implementation rationale, prior verdicts, `prior.md`, `codebase.md` |
 | G4 | `acceptance-reader.md` | `manifest.md`, the additions block of `brief.md`, neutral raw reference register and capture identity, the running build | `spec.md`, the plan, the task files, `reviews/`, prior dispositions, the бриф's original text, `prior.md`, `codebase.md` |
 | standards (no gate) | `standards-reader.md` | every таск's per-commit diffs, the project's documented standards | `spec.md`, `manifest.md`, the task files, `interfaces.md`, `reviews/`, `prior.md`, `codebase.md` |
 | existing code (no gate) | `existing-code-reader.md` | `manifest.md`, `answers.md`, the repository, changed since the last closure | `brief.md`, `spec.md`, `prior.md`, `codebase.md` |
 | commits (no gate) | `commit-reader.md` | the project root, the range | `prior.md`, `PROGRESS.md`, `brief.md`, `spec.md`, `manifest.md`, `codebase.md` |
+
+The G2 architecture reader is contextual, not blind: it is dispatched only when
+`codebase.md` contains relevant decision records. It compares the spec with
+current constraints and explicit, sourced departures; obsolete records cannot
+block a spec. Incomplete discovery remains a limitation, never proof of absence.
+Its return participates in the existing G2 budgets. It is never handed to the
+blind intent, reference or acceptance readers. See `phases.md` under *Existing
+Architectural Decisions* for discovery and conflict handling.
 
 The reference reader's first discovery pass is not bounded by the generated
 inventory. The orchestrator then reconciles its findings with all other

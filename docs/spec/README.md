@@ -227,9 +227,17 @@ against a list nobody had agreed. `gates.md` therefore carries the list a second
 time as a table, and this check holds each brief's own declaration to it name
 for name, naming both places when they disagree.
 
+Architectural-decision scenarios live in
+`scripts/validate/fixtures/architectural-decisions/scenarios.mts`. Its
+`prepareDecisionScenarios(root)` creates disposable projects and separate reader
+inputs for accepted, superseded, absent, conflicting, incomplete and unknown
+records. Expected outcomes stay outside those inputs. Fresh reader runs exercise
+the shipped prompts; they are separate from `npm run check`, which holds the
+declared boundaries and anchors rather than judging semantic relevance.
+
 It reads both the `Given` and `Withheld` columns against named tables in each
-reader brief. It also holds who is handed `codebase.md`: the G3 consistency row
-must give it, every other row must withhold it, `executor.md` names it in its
+reader brief. It also holds who is handed `codebase.md`: the G3 consistency and
+conditional G2 architecture rows must give it, every other row must withhold it, `executor.md` names it in its
 opening, `reviewer.md` in what it has not seen, and no other brief mentions it.
 It holds the places the standards reader's documents are gathered from: phase
 6's step, [`phases.md`](phases.md) › *One Standards Pass* and the brief each

@@ -386,7 +386,7 @@ test('a standards row that does not withhold prior memory is reported', async ()
   assert.match(violations[0]!.message, /standards \(no gate\) does not withhold prior\.md/);
 });
 
-// --- codebase.md: only the plan-consistency reader and the executor get it -----
+// --- codebase.md: contextual readers and executors receive it; blind readers do not ---
 
 const CONSISTENCY_ROW = '| G3 consistency | `plan-consistency-reader.md` | every task file, `interfaces.md`, `codebase.md` | `spec.md`, `prior.md` |\n';
 
@@ -476,7 +476,7 @@ test('a G2 row giving codebase.md is reported, because a blind reader would inhe
     },
   });
   assert.deepEqual(checks(violations), ['codebase']);
-  assert.match(violations[0]!.message, /gate G2 gives its reader codebase\.md — only G3 consistency may/);
+  assert.match(violations[0]!.message, /gate G2 gives its reader codebase\.md — only G3 consistency, G2 architecture may/);
 });
 
 test('a G4 row that does not withhold codebase.md is reported', async () => {
@@ -530,7 +530,7 @@ test('a repair diagnostician brief that mentions codebase.md is reported', async
 
 test('codebase.md is given to exactly the rows the list names, and the list names the real table\'s row', () => {
   assert.equal(CODEBASE_INPUT, 'codebase.md');
-  assert.deepEqual([...CODEBASE_GIVEN_ROWS], ['G3 consistency']);
+  assert.deepEqual([...CODEBASE_GIVEN_ROWS], ['G3 consistency', 'G2 architecture']);
   assert.deepEqual([...CODEBASE_HANDED], ['executor.md']);
   assert.deepEqual([...CODEBASE_DENIED], ['reviewer.md']);
 });
@@ -605,9 +605,9 @@ test('a polish-reader.md shipped again is reported, because no tier row runs it 
   assert.ok(found.every(v => /polish-reader\.md/.test(v.message) || /polish-reader\.md$/.test(v.file)), JSON.stringify(found));
 });
 
-test('the shipped tier table runs every shipped brief, and the ten judges on strong', async () => {
+test('the shipped tier table runs every shipped brief, and the eleven judges on strong', async () => {
   const root = path.resolve(import.meta.dirname, '..', '..');
-  assert.equal(JUDGE_BRIEFS.length, 10);
+  assert.equal(JUDGE_BRIEFS.length, 11);
   assert.deepEqual(await checkModelTiers(path.join(root, 'docs', 'spec'), path.join(root, 'skills', 'maestro')), []);
 });
 
@@ -729,4 +729,44 @@ test('what the progress file says reaches a reader only inside prior.md, which e
       for (const name of forbidden) assert.equal(declared.includes(name), false, `${brief} declares ${name} as given`);
     }
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+// Contextual architecture checks must never widen the blind readers' inputs.
+const ARCHITECTURE_ROW = '| G2 architecture | `spec-architecture-reader.md` | `spec.md`, `codebase.md`, `manifest.md`, `answers.md` | `brief.md`, `prior.md`, the plan, prior verdicts, the repository |\n';
+const ARCHITECTURE_READER = `# Architecture Reader
+
+## What You Are Given
+
+| Input | What it is |
+|---|---|
+| spec.md | proposed behavior |
+| codebase.md | discovered decisions |
+| manifest.md | current requirements |
+| answers.md | current decisions |
+
+## What You Are Not Given
+
+| Input | What it is |
+|---|---|
+| brief.md | original request |
+| prior.md | earlier run memory |
+| the plan | later work |
+| prior verdicts | other readers |
+| the repository | raw source |
+`;
+
+test('the contextual G2 architecture reader receives decision context without widening blind inputs', async () => {
+  assert.deepEqual(await codebaseFixture({
+    spec: `${SPEC}${CONSISTENCY_ROW}${ARCHITECTURE_ROW}`,
+    briefs: { 'spec-architecture-reader.md': ARCHITECTURE_READER },
+  }), []);
+});
+
+test('removing decision context from both architecture declarations still fails the reader boundary', async () => {
+  const violations = await codebaseFixture({
+    spec: `${SPEC}${CONSISTENCY_ROW}${ARCHITECTURE_ROW.replace('`codebase.md`, ', '')}`,
+    briefs: { 'spec-architecture-reader.md': ARCHITECTURE_READER.replace('| codebase.md | discovered decisions |\n', '') },
+  });
+  assert.deepEqual(checks(violations), ['codebase']);
+  assert.match(violations[0]!.message, /G2 architecture does not give/);
 });
