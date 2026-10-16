@@ -98,6 +98,32 @@ state requires `--expect` with its last-read `updatedAt`; claimed runs require
 invalid/rejected state and 2 for unreadable input/JSON parsing failure. See the
 [state contract](spec/state-contract.md#autonomous-runtime-and-publication-boundary).
 
+The orchestrator also uses two publication commands:
+
+```bash
+node .maestro/sync.mts --repair-dispatch candidate.json --expect <updatedAt> --holder <token> --no-open
+node .maestro/sync.mts --import-evidence candidate.json --source <workspace> --sources sources.json --expect <updatedAt> --holder <token> --no-open
+```
+
+Omit `--holder` only for an unclaimed run. Both commands take a complete state
+candidate. Repair reservations consume capacity until their actual result is
+published; missing historical accounting blocks new reservations. The import
+map is JSON, for example `{ "E-2": "captures/result.txt", "RT-1": "replay.mts" }`.
+Every new artifact needs a map entry. Only exit 0 with `cleanupEligible: true`
+authorizes source-workspace cleanup. The helper itself deletes no worktree.
+On failure retain sources, correct the reported boundary and retry; identical
+partial imports are reusable, and different bytes cannot replace sealed files.
+Reusable `.mts` tools live under the run's `_orchestrator/`; `--project` verifies
+their declared hashes on resume without running them.
+
+Historical finding resolutions remain readable as recorded, but an unsupported
+resolution does not establish a current pass. Compatibility does not waive
+capture integrity or relevant-input hashes: an archive checked against changed
+project files remains stale. New resolutions require matching,
+later passing execution evidence. New G3 success/progress requires a complete
+verification graph. See [verification](spec/verification.md) for accounting and
+[replay artifacts](spec/artifacts.md#reusable-replay-tools) for durable tooling.
+
 On upgrade, copy `sync.mts` and `runtime/` together, preserving run artifacts,
 state and viewer/opened records. Validate the copied runtime before deleting
 only the obsolete `.maestro/sync.py` file. Never reset the run to change runtime.

@@ -745,6 +745,29 @@ export interface VerificationRecordV3 extends Omit<VerificationRecordV2, 'versio
   inheritedExecutionIds: string[];
   inheritedAttemptIds: string[];
   intermittentRepairs?: IntermittentRepair[];
+  repairDispatches?: RepairDispatch[];
+  replayTools?: ReplayTool[];
+  repairAccounting?: RepairAccounting;
+}
+
+/** A prospective attempt reserves capacity; only a returned result becomes an RA. */
+export interface RepairDispatch {
+  id: string;
+  at: string;
+  base: string;
+  status: 'reserved' | 'dispatched' | 'returned' | 'cancelled';
+  proposal: Omit<RepairAttemptV3, 'at' | 'outcome' | 'commit'>;
+  settledAt?: string;
+  cancellationReason?: string;
+  executionIds?: string[];
+}
+
+/** Activation records an explicit inventory, never an inferred counter equality. */
+export interface RepairAccounting {
+  status: 'complete' | 'incomplete';
+  reviewedAt: string;
+  evidenceIds: string[];
+  note: string;
 }
 
 /** Verification 2 and 3 both carry the source and completion safeguards. */
@@ -1048,4 +1071,13 @@ export interface RunState {
    * orchestrator carries the list as it read it and never writes it.
    */
   waits?: Wait[];
+}
+
+/** Durable replay locator, separate from the immutable original invocation. */
+export interface ReplayTool {
+  id: string;
+  path: string;
+  sha256: string;
+  checkIds: string[];
+  invocation: string;
 }

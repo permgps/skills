@@ -2636,6 +2636,21 @@ globalThis.MAESTRO_LOGIC = (function () {
       : results.every(function (r) { return r === 'passed'; }) ? 'passed' : 'unavailable';
   }
 
+  function unresolvedFindings(record) {
+    var superseded = new Set(record.findings.map(function (f) { return f.supersedes; }));
+    return record.findings.filter(function (f) {
+      if (superseded.has(f.id)) return false;
+      if (f.status === 'open') return true;
+      var run = record.executions.find(function (e) { return e.id === f.resolutionExecutionId; });
+      if (!run) return true;
+      return run.result !== 'passed' || f.checkIds.length && f.checkIds.indexOf(run.checkId) === -1
+        || record.executions.some(function (e) {
+          return e.evidenceIds.some(function (id) { return f.evidenceIds.indexOf(id) !== -1; })
+            && (e.id === run.id || !(Date.parse(run.executedAt) > Date.parse(e.executedAt)));
+        });
+    });
+  }
+
   function verificationOf(state) {
     if (!state || state.contractVersion < 4 || !state.verification) {
       var old = ((state && state.gates) || []).filter(function (item) { return item.id === 'G4'; })[0];
@@ -2643,6 +2658,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         failedIds: [], incompleteIds: [], requirementResults: {}, verificationEstablished: false };
     }
     var record = state.verification;
+    var findings = unresolvedFindings(record);
     var obligations = record.obligations.filter(function (item) { return item.targetRevision === record.targetRevision; });
     var checks = {};
     record.checks.forEach(function (check) {
@@ -2659,8 +2675,8 @@ globalThis.MAESTRO_LOGIC = (function () {
       var required = record.checks.filter(function (check) {
         return check.required && item.checkIds.indexOf(check.id) !== -1;
       });
-      var contradicted = record.findings.some(function (finding) {
-        return finding.status === 'open' && finding.obligationIds.indexOf(item.id) !== -1;
+      var contradicted = findings.some(function (finding) {
+        return finding.obligationIds.indexOf(item.id) !== -1;
       });
       var extension = completionResults(record, item, checks);
       obligationResults[item.id] = contradicted || extension.indexOf('failed') !== -1 || required.some(function (check) { return checks[check.id] === 'failed'; })
@@ -2672,8 +2688,8 @@ globalThis.MAESTRO_LOGIC = (function () {
     (state.requirements || []).forEach(function (requirement) {
       if (requirement.status === 'dropped' || requirement.status === 'deferred') return;
       var own = obligations.filter(function (item) { return item.requirementIds.indexOf(requirement.id) !== -1; });
-      var finding = record.findings.some(function (item) {
-        return item.status === 'open' && item.requirementIds.indexOf(requirement.id) !== -1;
+      var finding = findings.some(function (item) {
+        return item.requirementIds.indexOf(requirement.id) !== -1;
       });
       var reviews = record.coverageReviews.filter(function (item) {
         return item.requirementId === requirement.id && item.targetRevision === record.targetRevision
@@ -2704,7 +2720,7 @@ globalThis.MAESTRO_LOGIC = (function () {
         return item.targetRevision === record.targetRevision && item.inputDigest === record.acceptanceInputDigest
           && requirementResults[item.requirementId] !== undefined;
       }).every(function (item) { return round.coverageReviewIds.indexOf(item.id) !== -1; })
-      && record.findings.filter(function (item) { return item.status === 'open'; })
+      && findings
         .every(function (item) { return round.findingIds.indexOf(item.id) !== -1; });
     var promised = record.promisedWork.some(function (item) { return item.status === 'open'; });
     var safeguardsPending = record.version >= 2 && (!record.scopeBaseline || !freshManifestAudit(record, (state.requirements || []).map(function (item) { return item.id; })));

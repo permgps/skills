@@ -90,6 +90,35 @@ test('a finding is not resolved by the execution its own evidence came from', ()
     JSON.stringify(validateState(next)));
 });
 
+test('historical unresolved resolutions remain readable without establishing a current pass', () => {
+  const state = contract10State();
+  state.verification!.findings.push(finding('F-old', { status: 'resolved', resolutionExecutionId: 'X-1' }));
+  assert.deepEqual(validateState(state, { historical: true }), []);
+  assert.equal(deriveVerification(state).g4, 'failed');
+  assert.ok(validateState(state).some(item => item.field.includes('resolutionExecutionId')));
+  assert.deepEqual(validateStateTransition(state, structuredClone(state)), []);
+});
+
+test('new resolutions cannot use historical-read tolerance, including their first appearance', () => {
+  const prior = activeContract10State();
+  const next = structuredClone(prior);
+  next.verification!.findings.push(finding('F-new', { status: 'resolved', resolutionExecutionId: 'X-1' }));
+  assert.ok(validateStateTransition(prior, next).some(item => item.field.includes('resolutionExecutionId')));
+});
+
+test('a truthful superseding finding repairs current confidence without rewriting the old resolution', () => {
+  const prior = activeContract10State();
+  prior.verification!.findings.push(finding('F-old', { status: 'resolved', resolutionExecutionId: 'X-1' }));
+  const next = structuredClone(prior);
+  addResolvingRun(next);
+  next.verification!.findings.push(finding('F-new', {
+    supersedes: 'F-old', status: 'resolved', resolutionExecutionId: 'X-2',
+  }));
+  assert.equal(deriveVerification(next).requirementResults.R01, 'passed');
+  assert.deepEqual(validateStateTransition(prior, next), []);
+  assert.deepEqual(next.verification!.findings[0], prior.verification!.findings[0]);
+});
+
 
 test('closed_with_exceptions refuses an incomplete требование no decision covers', () => {
   const state = contract10State();
@@ -135,7 +164,7 @@ test('a finding is resolved by a later passing run of a check it names, never by
 // fails here before it can be rewritten in a run.
 
 test('every key of the verification record has a declared transition rule, and no rule names a key that is gone', () => {
-  const keys = Object.keys({ ...contract10State().verification!, intermittentRepairs: [] }).sort();
+  const keys = Object.keys({ ...contract10State().verification!, intermittentRepairs: [], repairDispatches: [], repairAccounting: {}, replayTools: [] }).sort();
   assert.deepEqual(Object.keys(TRANSITION_RULES).sort(), keys);
 });
 

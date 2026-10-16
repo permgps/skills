@@ -32,6 +32,7 @@ import {
   isResultLine,
   type RunState,
 } from './contract.mts';
+import { validateDispatchRecord } from './repair-dispatch.mts';
 import { validateClosureRecord } from './closure.mts';
 import { validateVerificationRecord } from './verification.mts';
 import { LEFTOVER_KEY_PATTERN, WIP_SUFFIX, parseRunDir, toRunDir } from './paths.mts';
@@ -234,7 +235,7 @@ const SIGNAL_LINE = new RegExp(`^(SIG-[1-9][0-9]*) (${SIGNAL_KINDS.join('|')}) â
 /** Statuses whose meaning is incomplete without a reason. */
 const REASON_REQUIRED = ['open', 'deferred', 'dropped', 'placeholder'];
 
-export function validateState(value: unknown): StateViolation[] {
+export function validateState(value: unknown, options: { historical?: boolean } = {}): StateViolation[] {
   const violations: StateViolation[] = [];
   const add = (field: string, message: string): void => {
     violations.push({ field, message });
@@ -982,11 +983,11 @@ export function validateState(value: unknown): StateViolation[] {
     if (!isRecord(value['verification'])) {
       add('verification', 'contract 4 requires a verification object');
     } else if (Array.isArray(tasks) && Array.isArray(requirements) && Array.isArray(gates)) {
-      const record = validateVerificationRecord(value as unknown as RunState);
+      const record = validateVerificationRecord(value as unknown as RunState, options.historical);
       for (const violation of record) add(violation.field, violation.message);
       // The closure graph is traversed only once the graph it hangs from is sound.
       if (record.length === 0) {
-        for (const violation of validateClosureRecord(value as unknown as RunState)) add(violation.field, violation.message);
+        for (const violation of [...validateClosureRecord(value as unknown as RunState), ...validateDispatchRecord(value as unknown as RunState)]) add(violation.field, violation.message);
       }
     }
   }

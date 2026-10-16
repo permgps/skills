@@ -10,6 +10,7 @@ import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
 import { createLogger } from '../shared/log.mts';
+import { validatePlanPublication } from './plan-graph.mts';
 import { isMoment, type RunState } from './contract.mts';
 import { validateEvidence } from './evidence.mts';
 import { STATE_FILE } from './paths.mts';
@@ -20,7 +21,7 @@ import { STATE_FILE } from './paths.mts';
 import { parseStateSource } from './read.mts';
 import { InvalidStateError, validateState, type StateViolation } from './validate.mts';
 import { validateInitialIntermittent } from './intermittent.mts';
-import { validateStateTransition } from './closure.mts';
+import { validateInitialDispatch, validateStateTransition } from './closure.mts';
 
 const log = createLogger('state');
 
@@ -195,7 +196,7 @@ export async function writeState(
 }
 
 async function writeStateLocked(dir: string, state: RunState, expect?: string): Promise<WriteResult> {
-  const violations = validateState(state);
+  const violations = validateState(state, { historical: true });
   if (violations.length === 0 && state.contractVersion >= 4) {
     violations.push(...await validateEvidence(state, path.dirname(dir)));
   }
@@ -212,16 +213,16 @@ async function writeStateLocked(dir: string, state: RunState, expect?: string): 
   if (state.contractVersion >= 4) {
     try {
       const previous = parseStateSource(await readFile(target, 'utf8')) as RunState;
-      if (previous.contractVersion >= 4 && validateState(previous).length === 0) {
+      if (previous.contractVersion >= 4 && validateState(previous, { historical: true }).length === 0) {
         const transition = validateStateTransition(previous, state);
         if (transition.length > 0) throw new InvalidStateError(transition);
       } else {
-        const initial = validateInitialIntermittent(state);
+        const initial = [...validateState(state), ...validateInitialIntermittent(state), ...validatePlanPublication(state), ...validateInitialDispatch(state)];
         if (initial.length) throw new InvalidStateError(initial);
       }
     } catch (error) {
       if (error instanceof InvalidStateError) throw error;
-      const initial = validateInitialIntermittent(state);
+      const initial = [...validateState(state), ...validateInitialIntermittent(state), ...validatePlanPublication(state), ...validateInitialDispatch(state)];
       if (initial.length) throw new InvalidStateError(initial);
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         log.warn('write', 'prior snapshot could not be compared as history', { target });

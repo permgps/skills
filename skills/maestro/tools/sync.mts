@@ -5,6 +5,8 @@ import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createLogger } from './runtime/shared/log.mts';
+import { evidenceImportCommand } from './runtime/evidence-import.mts';
+import { repairDispatchCommand } from './runtime/repair-dispatch.mts';
 import { candidateMode, candidateViolations, isRecord, validationEnvelope, writeValidation } from './runtime/publication.mts';
 import { mirror, snapshots, placeIndex, mirrorValidation } from './runtime/dashboard.mts';
 import { FOLDED, spoken, legacyReports, movedMessage } from './runtime/legacy.mts';
@@ -46,7 +48,7 @@ async function refresh(args: string[]): Promise<number> {
   let state: unknown = null;
   try { state = JSON.parse(text); } catch { log.warn('legacy', 'historical literal is not JSON'); }
   if (isRecord(state) && typeof state['contractVersion'] === 'number' && state['contractVersion'] >= 4) {
-    const errors = await candidateViolations(state, RUN_DIR);
+    const errors = await candidateViolations(state, RUN_DIR, { historical: true });
     const envelope = validationEnvelope(errors.length ? 'invalid' : 'valid', state, errors, errors.length ? null : state);
     await writeValidation(RUN_DIR, envelope);
     await mirrorValidation(RUN_DIR, envelope);
@@ -74,6 +76,16 @@ async function refresh(args: string[]): Promise<number> {
   return reports.length ? 1 : 0;
 }
 export async function main(args = process.argv.slice(2)): Promise<number> {
+  if (args[0] === '--import-evidence') {
+    const outcome = await evidenceImportCommand(args, RUN_DIR, viewer, (state, envelope) => snapshots(RUN_DIR, state, envelope));
+    process.stdout.write(JSON.stringify(outcome.result) + '\n');
+    return outcome.code;
+  }
+  if (args[0] === '--repair-dispatch') {
+    const outcome = await repairDispatchCommand(args, RUN_DIR, viewer, (state, envelope) => snapshots(RUN_DIR, state, envelope));
+    process.stdout.write(JSON.stringify(outcome.result) + '\n');
+    return outcome.code;
+  }
   if (args[0] === '--research-record') {
     const outcome = await researchRecordCommand(args, RUN_DIR);
     process.stdout.write(JSON.stringify(outcome.result) + '\n');

@@ -29,12 +29,14 @@ import {
 } from './contract.mts';
 import type {
   CheckExecutionV3, Defect, ReadinessProbeKind, ReadinessRecord, RepairAttemptV2, RepairAttemptV3,
-  RepairLimits, RunState, TaskEntry, VerificationRecordV3,
+  RepairDispatch, RepairLimits, RunState, TaskEntry, VerificationRecordV3,
 } from './contract.mts';
 import {
   activeControls, controlResult, deriveVerification, effectiveExecution, validateFingerprint,
-  validateInputHashes, validateVerificationTransition, type VerificationViolation,
+  validateInputHashes, validateVerificationTransition, validateCompletionRecords, type VerificationViolation,
 } from './verification.mts';
+import { validateDispatchTransition } from './repair-dispatch.mts';
+import { validatePlanPublication } from './plan-graph.mts';
 import { validateIntermittentRecord, validateIntermittentTransition } from './intermittent.mts';
 import { validateWaitsTransition } from './waits.mts';
 
@@ -714,7 +716,28 @@ export function validateClosureTransition(previous: RunState, next: RunState): V
 
 /** Every rule a write must satisfy against the state it replaces. */
 export function validateStateTransition(previous: RunState, next: RunState): VerificationViolation[] {
-  return [...validateVerificationTransition(previous, next), ...validateClosureTransition(previous, next),
+  return [...validateDispatchTransition(previous, next, admitRepairDispatch), ...validatePlanPublication(next, previous), ...validateVerificationTransition(previous, next), ...validateClosureTransition(previous, next),
     ...validateWaitsTransition(previous, next), ...validateIntermittentTransition(previous, next)];
 }
 
+
+/** Validate intent with the existing attempt gates without publishing a fictional result. */
+function admitRepairDispatch(state: RunState, dispatch: RepairDispatch): VerificationViolation[] {
+  if (state.verification?.version !== 3) return [];
+  const proposed = structuredClone(state);
+  const record = proposed.verification as VerificationRecordV3;
+  delete record.repairDispatches;
+  delete record.repairAccounting;
+  const pending = state.verification.repairDispatches?.filter(d => d.status === 'reserved' || d.status === 'dispatched') ?? [dispatch];
+  const errors: VerificationViolation[] = [];
+  if (record.repairAttempts.some(a => Date.parse(a.at) >= Date.parse(dispatch.at))
+    || pending.some(d => d.id !== dispatch.id && Date.parse(d.at) === Date.parse(dispatch.at))) {
+    errors.push({ field: 'verification.repairDispatches', message: 'reservation time must follow returned attempts and distinguish outstanding dispatch order' });
+  }
+  for (const item of pending) record.repairAttempts.push({ ...item.proposal, at: item.at, outcome: 'still_failing' });
+  return [...errors, ...validateCompletionRecords(proposed, record), ...validateClosureRecord(proposed),
+    ...validateClosureTransition(state, proposed)];
+}
+export function validateInitialDispatch(state: RunState): VerificationViolation[] {
+  return validateDispatchTransition(undefined, state, admitRepairDispatch);
+}

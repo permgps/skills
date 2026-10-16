@@ -838,11 +838,15 @@ MAESTRO_SYNC_DEBUG=1 node .maestro/sync.mts  # diagnostics on stderr
 `LOG_LEVEL=DEBUG` also turns diagnostics on. `--validate` and `--project` are
 read-only checks that print JSON; `--publish`, `--serve`, `--memory-read`,
 `--memory-write`, `--config-models`, `--update-check`, `--commits-check`,
-`--returns-check`, `--plan-units`, `--plan-render` and `--plan-coverage` are
+`--returns-check`, `--repair-dispatch`, `--import-evidence`, `--plan-units`, `--plan-render` and `--plan-coverage` are
 what the orchestrator
 uses, not you. If the loopback server cannot start,
 the page falls back to a file snapshot. More in
 [viewer runtime and recovery](docs/dashboard.md#viewer-runtime-and-recovery).
+
+Repair dispatches reserve budget before work starts. Captures and reusable replay
+tools are preserved before workspace cleanup; failed import keeps the source.
+See [installed helper commands](docs/install.md) for recovery and publication receipts.
 
 ## Scout
 

@@ -930,3 +930,16 @@ They are optional additions without a contract-version bump. Earlier records
 are never backfilled. Plans and samples are immutable; declaration precedes
 sample publication. The helper validates shape, provenance references, bounded
 series, comparison identity and closure eligibility without running a check.
+
+## Historical Finding Resolutions
+
+Historical reads preserve published findings, acceptance rounds and outcomes,
+including resolutions an older helper accepted without a later passing execution
+of the named check. This compatibility is restricted to historical reads and
+unchanged carried records. First publication and newly resolved findings remain
+strict, regardless of contract version. Current projections treat an invalid
+historical resolution as unresolved until a truthful superseding finding is
+resolved by new evidence or an authorized exception covers the remaining gap.
+Historical output is never rewritten to manufacture a pass.
+
+Repair dispatch/accounting optional fields follow the lifecycle in [verification](verification.md#durable-repair-reservations). Existing records without them remain readable; all publication writers enforce the protocol once enabled.

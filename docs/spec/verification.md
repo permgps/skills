@@ -266,7 +266,7 @@ close.
 
 | Entity | Exact fields (a trailing ? means optional) | Owner / publication |
 |---|---|---|
-| verification-3 record | verification-2 fields plus `version`, `checks[]`, `executions[]`, `decisions[]`, `readiness[]`, `defects[]`, `strategyReviews[]`, `repairAttempts[]`, `inheritedExecutionIds[]`, `inheritedAttemptIds[]`, `intermittentRepairs?` | orchestrator; version 3 only under contract 6 |
+| verification-3 record | verification-2 fields plus `version`, `checks[]`, `executions[]`, `decisions[]`, `readiness[]`, `defects[]`, `strategyReviews[]`, `repairAttempts[]`, `inheritedExecutionIds[]`, `inheritedAttemptIds[]`, `intermittentRepairs?`, `repairDispatches?`, `repairAccounting?`, `replayTools?` | orchestrator; version 3 only under contract 6 |
 | `readiness[]` | `id`, `targetFingerprint`, `executedAt`, `probes[]`, `supersedes?` | build or acceptance, before a broad run; immutable; correction is a superseding record |
 | readiness probe | `kind` (`source_identity` / `secrets_excluded` / `autoload` / `bootstrap` / `storage_and_cwd` / `database` / `listener` / `browser` / `write_boundary`), `result` (`passed` / `setup_failed` / `unavailable` / `not_applicable`), `evidenceIds[]`, `limitation?` | probe by trying the capability; captures under `evidence/<RD-N>/` |
 | extended `checks[]` | inherited fields plus `readinessProbes?` | plan; the probes this check's result depends on, besides `source_identity` |
@@ -706,3 +706,53 @@ not producer diagnosis. Report both sample counts and observed failure rates,
 conditions and budget limits. Zero failures in a finite sample is bounded
 evidence, never proof that recurrence is impossible. An incomplete series
 remains incomplete in the report and existing closure routes.
+
+## Historical Finding Resolutions
+
+Historical reads preserve published findings, acceptance rounds and outcomes,
+including resolutions an older helper accepted without a later passing execution
+of the named check. This compatibility is restricted to historical reads and
+unchanged carried records. First publication and newly resolved findings remain
+strict, regardless of contract version. Current projections treat an invalid
+historical resolution as unresolved until a truthful superseding finding is
+resolved by new evidence or an authorized exception covers the remaining gap.
+Historical output is never rewritten to manufacture a pass.
+
+## Shipped Plan Graph Guard
+
+A new G3 pass (including first publication after Plan) and further active progress
+relying on it require current observable obligations for every in-spec or
+placeholder requirement, required executable checks, valid owners and transitive
+integration prerequisites. Repository G3 and installed publication share these
+pure rules. Draft planning and explicitly authorized continuation with G3 failed
+remain legal. Historical reads and identical replays do not invent missing graph
+records; recovery repairs the graph before further affected work.
+
+## Durable Repair Reservations
+
+Verification 3 optionally carries `repairDispatches` and `repairAccounting`.
+Fresh runs initialize both; historical absence remains readable. The inventory
+contains `status: complete | incomplete`, `reviewedAt`, `evidenceIds` and `note`.
+Legacy counters never establish remaining capacity. Activating complete accounting on a published run requires inventory evidence. Preserved actual attempts may be imported during reconciliation without invented dispatches only while accounting was absent/incomplete, tasks do not advance, no dispatch is pending, and each attempt and its historical follow-up captures are included in the inventory evidence. An incomplete inventory
+blocks new reservations; completing it requires preserved evidence. Once complete,
+the inventory is immutable, and an enabled ledger cannot be removed.
+
+A dispatch has `id`, `at`, `base`, `status`, and `proposal` (RA-v3 fields except
+`at`, `outcome`, `commit`). It moves reserved → dispatched → returned, or
+reserved → cancelled before invocation. Returned entries require `settledAt`,
+`executionIds` and exactly one matching actual RA. Cancellation requires
+`settledAt` and `cancellationReason`. Unknown dispatched work remains pending.
+Terminal records and proposal identities are immutable. Outstanding reservations
+plus actual attempts consume existing limits once per attempt, retaining stable
+roots. Only one repair per root may be outstanding. Admission reuses existing
+diagnosis, prerequisite, predecessor and strategy gates, including outstanding repairs in the strategy batch. The helper command
+`--repair-dispatch <candidate>` publishes under the normal revision/holder lock.
+Every repair door uses it before invocation and settles the ledger before task
+advancement. Resends/setup-only corrections do not create RA records. This checks
+published workflow receipts, not arbitrary host actions.
+
+## Atomic Import and Publication
+
+`--import-evidence <candidate> --source <workspace> --sources <map.json>` shares the publication lock and revision/holder checks. The source map covers all new evidence IDs. The canonical importer checks containment, hashes, and immutable destinations before publication. Distinct executions use distinct directories; identical bytes are idempotent, different bytes never overwrite captures. A partial import is unreferenced until publication succeeds. Only exit 0 with `cleanupEligible: true` permits source cleanup. Source checks alone do not. The helper never merges or removes worktrees.
+
+`replayTools` is an optional immutable collection whose artifact contract is specified in [Reusable Replay Tools](artifacts.md#reusable-replay-tools). Absence in historical runs is legal. Declared bytes are checked on read/import/publication and are never executed by the helper.

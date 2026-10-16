@@ -1,5 +1,11 @@
 # Phase 8 — Repair
 
+Publish grounded obligations/checks in Spec and ownership/prerequisites in Plan before a passed G3. Resume, reopening and coverage repair correct missing graph entries before affected work; do not invent historical executions. The installed publisher shares the G3 graph checks. Authorized failed-G3 continuation retains its failed verdict.
+
+Before any product/test repair dispatch, read and follow **Durable repair dispatch** in [verification procedures](../references/verification-procedures.md). Publish the reservation and dispatch receipt before invocation; pending work consumes budget. Settle the actual RA/check/evidence return before task advancement. On resume/reopen, reconcile pending entries and missing legacy accounting; never reset them.
+
+Before discarding a workspace, follow **Durable import before workspace cleanup** and **Preserve reusable tools** in [verification procedures](../references/verification-procedures.md). Require the successful import/publication receipt. On resume verify declared replay bytes with `--project`; missing replay is unavailable. `_orchestrator/` is coordinator-only; blind readers receive none of it.
+
 Read when a таск needs another attempt. It runs outside the sequence, and there
 are six doors into it:
 

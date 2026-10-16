@@ -9,6 +9,8 @@ import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 
 import { createLogger } from '../shared/log.mts';
+import { validateReplayTools, validateReplayTransition } from './replay-tools.mts';
+import { validateDispatchShape } from './repair-dispatch.mts';
 import { REPAIR_OUTCOMES, STAGE_IDS, isMoment } from './contract.mts';
 import type {
   CheckExecution, CheckResult, RunState, VerificationCheck,
@@ -58,9 +60,9 @@ function latestFirst<T extends { id: string }>(stamp: (item: T) => string): (a: 
  * the finding names, must pass, and must come after every run whose evidence
  * the finding cites: a finding is answered by what was observed since.
  */
-function resolutionFindings(item: VerificationFinding, executions: readonly CheckExecution[]): string[] {
+export function resolutionFindings(item: VerificationFinding, executions: readonly CheckExecution[]): string[] {
   const run = executions.find(execution => execution.id === item.resolutionExecutionId);
-  if (!run) return [];
+  if (!run) return ['a resolved finding needs its resolving execution'];
   const problems: string[] = [];
   if (item.checkIds.length > 0 && !item.checkIds.includes(run.checkId)) {
     problems.push(`${run.id} runs ${run.checkId}, which the finding does not name — resolve it with a passing run of ${item.checkIds.join(' or ')}`);
@@ -96,13 +98,31 @@ function checkResult(check: VerificationCheck, record: VerificationRecord, requi
   return repeated && repeated !== 'passed' ? repeated : execution.result;
 }
 
+/** Current confidence excludes superseded findings, but never trusts an invalid resolution. */
+export function unresolvedFindings(record: VerificationRecord): VerificationFinding[] {
+  const superseded = new Set(record.findings.flatMap(item => item.supersedes ? [item.supersedes] : []));
+  return record.findings.filter(item => !superseded.has(item.id)
+    && (item.status === 'open' || resolutionFindings(item, record.executions).length > 0));
+}
+
+/** New resolutions are checked at first publication as well as on transition. */
+export function validateNewResolutions(next: RunState, previous?: RunState): VerificationViolation[] {
+  return (next.verification?.findings ?? []).flatMap((item, index) => {
+    const before = previous?.verification?.findings.find(old => old.id === item.id);
+    if (item.status !== 'resolved' || before && isDeepStrictEqual(before, item)) return [];
+    return resolutionFindings(item, next.verification!.executions).map(message => ({
+      field: `verification.findings[${index}].resolutionExecutionId`, message,
+    }));
+  });
+}
+
 function obligationResult(
   obligation: VerificationObligation,
   record: VerificationRecord,
   checkResults: Record<string, CheckResult>,
+  findings: VerificationFinding[],
 ): VerificationResult {
-  const contradicted = record.findings.some(finding => finding.status === 'open'
-    && finding.obligationIds.includes(obligation.id));
+  const contradicted = findings.some(finding => finding.obligationIds.includes(obligation.id));
   const required = record.checks.filter(check => check.required
     && obligation.checkIds.includes(check.id));
   const controls = record.version !== 1 ? activeControls(record).filter(control => required.some(check => check.id === control.checkId)) : [];
@@ -121,7 +141,7 @@ export function deriveVerification(state: RunState): VerificationSummary {
 }
 
 /** Only stored verdict validation may use the older symptom qualification. */
-function verificationSummary(state: RunState, requireSymptomEvidence: boolean): VerificationSummary {
+function verificationSummary(state: RunState, requireSymptomEvidence: boolean, historical = false): VerificationSummary {
   const record = state.verification;
   if (!record) throw new Error('contract-4 verification record is missing');
 
@@ -131,21 +151,21 @@ function verificationSummary(state: RunState, requireSymptomEvidence: boolean): 
     obligations: record.obligations.length,
   });
 
+  const findings = historical ? record.findings.filter(item => item.status === 'open') : unresolvedFindings(record);
   const currentObligations = record.obligations.filter(item => item.targetRevision === record.targetRevision);
   const checkResults: Record<string, CheckResult> = {};
   for (const check of record.checks) checkResults[check.id] = checkResult(check, record, requireSymptomEvidence);
 
   const obligationResults: Record<string, VerificationResult> = {};
   for (const obligation of currentObligations) {
-    obligationResults[obligation.id] = obligationResult(obligation, record, checkResults);
+    obligationResults[obligation.id] = obligationResult(obligation, record, checkResults, findings);
   }
 
   const requirementResults: Record<string, VerificationResult> = {};
   for (const requirement of state.requirements) {
     if (requirement.status === 'dropped' || requirement.status === 'deferred') continue;
     const obligations = currentObligations.filter(item => item.requirementIds.includes(requirement.id));
-    const openFinding = record.findings.some(item => item.status === 'open'
-      && item.requirementIds.includes(requirement.id));
+    const openFinding = findings.some(item => item.requirementIds.includes(requirement.id));
     const reviews = record.coverageReviews.filter(item => item.requirementId === requirement.id
       && item.inputDigest === record.acceptanceInputDigest
       && item.targetRevision === record.targetRevision);
@@ -178,7 +198,7 @@ function verificationSummary(state: RunState, requireSymptomEvidence: boolean): 
       && review.targetRevision === record.targetRevision
       && requirementResults[review.requirementId] !== undefined)
       .every(review => latestRound.coverageReviewIds.includes(review.id))
-    && record.findings.filter(finding => finding.status === 'open')
+    && findings
       .every(finding => latestRound.findingIds.includes(finding.id));
   const promised = record.promisedWork.some(item => item.status === 'open');
   const safeguardsPending = record.version !== 1 && (!record.scopeBaseline || !hasFreshManifestAudit(record, state.requirements.map(item => item.id)));
@@ -400,11 +420,13 @@ export function validateFingerprint(
 }
 
 /** Validate referential integrity, ownership, verdict consistency, and closure. */
-export function validateVerificationRecord(state: RunState): VerificationViolation[] {
-  const intermittentShape = validateIntermittentShape(state.verification);
+export function validateVerificationRecord(state: RunState, historical = false): VerificationViolation[] {
+  const intermittentShape = [...validateIntermittentShape(state.verification), ...validateDispatchShape(state)];
   if (intermittentShape.length) return intermittentShape;
   const errors = validateShape(state.verification);
   if (errors.length > 0) return errors;
+  errors.push(...validateReplayTools(state));
+  if (errors.length) return errors;
   const record = state.verification!;
   if ((state.contractVersion === 4 && record.version !== 1)
     || (state.contractVersion === 5 && record.version !== 2)
@@ -541,7 +563,7 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
     if (item.resolutionExecutionId) references(`${at}.resolutionExecutionId`, [item.resolutionExecutionId], executionIds);
     if (item.supersedes) references(`${at}.supersedes`, [item.supersedes], findingIds);
     if (item.status === 'resolved' && !item.resolutionExecutionId) add(at, 'resolved finding needs a resolving execution');
-    if (item.status === 'resolved' && item.resolutionExecutionId) {
+    if (!historical && item.status === 'resolved' && item.resolutionExecutionId) {
       for (const message of resolutionFindings(item, record.executions)) add(`${at}.resolutionExecutionId`, message);
     }
     if (!['open', 'resolved'].includes(item.status)) add(`${at}.status`, 'unknown finding status');
@@ -633,12 +655,12 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
   if (record.version !== 1) errors.push(...validateSourceRecords(state, record), ...validateCompletionRecords(state, record));
   if (errors.length > 0) return errors;
 
-  const strict = verdictViolations(state, deriveVerification(state));
+  const strict = verdictViolations(state, historical ? verificationSummary(state, true, true) : deriveVerification(state), historical);
   if (!strict.length) return [];
   // Stored acceptance rounds are immutable too. Keep a historically valid
   // verdict readable, while public derivation and new verdicts stay strict.
   if (record.version === 3 && record.intermittentRepairs?.length
-    && !verdictViolations(state, verificationSummary(state, false)).length) {
+    && !verdictViolations(state, verificationSummary(state, false, historical), historical).length) {
     log.debug('verification', '[FIX] historical intermittent verdict retained', { runId: state.runId });
     return [];
   }
@@ -647,7 +669,7 @@ export function validateVerificationRecord(state: RunState): VerificationViolati
 }
 
 /** Validate one coherent summary; never mix historical and current verdicts. */
-function verdictViolations(state: RunState, summary: VerificationSummary): VerificationViolation[] {
+function verdictViolations(state: RunState, summary: VerificationSummary, historical = false): VerificationViolation[] {
   const record = state.verification!;
   const errors: VerificationViolation[] = [];
   const add = (field: string, message: string): void => { errors.push({ field, message }); };
@@ -674,7 +696,7 @@ function verdictViolations(state: RunState, summary: VerificationSummary): Verif
         .flatMap(item => item.selectedFindingIds));
       const acceptedObligations = new Set(record.decisions.filter(item => item.kind === 'accepted_exception')
         .flatMap(item => item.selectedObligationIds));
-      const outstandingFindings = record.findings.filter(item => item.status === 'open');
+      const outstandingFindings = historical ? record.findings.filter(item => item.status === 'open') : unresolvedFindings(record);
       const outstandingObligations = Object.entries(summary.obligationResults)
         .filter(([, result]) => result !== 'passed').map(([id]) => id);
       if (outstandingFindings.length === 0 && outstandingObligations.length === 0) {
@@ -750,6 +772,9 @@ export const TRANSITION_RULES = {
   inheritedExecutionIds: 'guarded',
   inheritedAttemptIds: 'guarded',
   intermittentRepairs: 'guarded',
+  repairDispatches: 'guarded',
+  repairAccounting: 'guarded',
+  replayTools: 'guarded',
 } as const satisfies Record<string, 'immutable' | 'append-only' | 'one-way' | 'guarded' | 'current'>;
 
 const keysWithRule = (rule: string): string[] =>
@@ -814,8 +839,8 @@ export function validateVerificationTransition(
   previous: RunState,
   next: RunState,
 ): VerificationViolation[] {
-  if (previous.contractVersion < 4 || !previous.verification || !next.verification) return [];
-  const errors: VerificationViolation[] = [];
+  if (previous.contractVersion < 4 || !previous.verification || !next.verification) return validateNewResolutions(next, previous);
+  const errors: VerificationViolation[] = validateNewResolutions(next, previous);
   const prior = previous.verification;
   const current = next.verification;
   const newPassingG4 = next.gates.some(gate => gate.id === 'G4' && gate.status === 'passed'
@@ -823,7 +848,7 @@ export function validateVerificationTransition(
   const newVerdict = current.acceptanceRounds.some(round => !prior.acceptanceRounds.some(old => old.id === round.id))
     || newPassingG4
     || next.lifecycle === 'closed' && (previous.lifecycle !== 'closed' || previous.outcome !== next.outcome);
-  if (current.version === 3 && current.intermittentRepairs?.length && newVerdict) {
+  if (newVerdict) {
     const summary = deriveVerification(next);
     errors.push(...verdictViolations(next, summary));
     if (newPassingG4 && summary.g4 !== 'passed' && !errors.some(error => error.field === 'gates[G4].status')) {
@@ -837,7 +862,7 @@ export function validateVerificationTransition(
   // From TRANSITION_RULES, coverage reviews included: an incomplete review
   // rewritten as complete is a coverage nobody performed.
   const collections = keysWithRule('immutable') as Array<keyof VerificationRecord>;
-  errors.push(...findingAndPromiseTransition(prior, current));
+  errors.push(...findingAndPromiseTransition(prior, current), ...validateReplayTransition(previous, next));
   for (const name of collections) {
     const oldEntries = prior[name] as Array<{ id: string }>;
     const newEntries = current[name] as Array<{ id: string }>;

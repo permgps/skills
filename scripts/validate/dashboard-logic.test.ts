@@ -17,9 +17,12 @@ import { AWAITING_KINDS } from '../state/contract.ts';
 import { retrospectiveState } from '../state/fixtures/retrospective.ts';
 import { intermittentFixture } from '../state/fixtures/intermittent.mts';
 import { deriveVerification } from '../state/verification.ts';
+import { finding } from '../state/fixtures/verification.ts';
 import { cleanCell, parseTables } from './spec-integrity.ts';
 
 const ASSET = 'skills/maestro/assets/dashboard.html';
+
+
 
 type Words = Record<string, Record<string, string>>;
 
@@ -3751,4 +3754,11 @@ test('intermittent history with a setup-only trigger remains incomplete offline 
   f.append('baseline', 'faulty'); f.append('candidate', 'fixed');
   assert.equal(L.verificationOf(f.state).checkResults['C-1'], 'unavailable');
   assert.deepEqual(plain(L.verificationOf(f.state).checkResults), deriveVerification(f.state).checkResults);
+});
+
+test('historical invalid resolutions never produce a passing dashboard projection', async () => {
+  const state = contract10State();
+  state.verification!.findings.push(finding('F-old', { status: 'resolved', resolutionExecutionId: 'X-1' }));
+  assert.equal(L.verificationOf(state).g4, deriveVerification(state).g4);
+  assert.equal(L.verificationOf(state).verificationEstablished, false);
 });

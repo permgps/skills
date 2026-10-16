@@ -1,5 +1,7 @@
 # Phase 3 — Спецификация
 
+Publish grounded obligations/checks in Spec and ownership/prerequisites in Plan before a passed G3. Resume, reopening and coverage repair correct missing graph entries before affected work; do not invent historical executions. The installed publisher shares the G3 graph checks. Authorized failed-G3 continuation retains its failed verdict.
+
 Read when брифинг has passed G1, or the user moved past it at its round budget.
 This phase turns требования and the answers to them into `spec.md` — the one
 document every executor is given and every review judges against. It ends at G2.

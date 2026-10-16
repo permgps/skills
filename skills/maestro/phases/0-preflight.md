@@ -1,5 +1,11 @@
 # Phase 0b — Preflight
 
+Publish grounded obligations/checks in Spec and ownership/prerequisites in Plan before a passed G3. Resume, reopening and coverage repair correct missing graph entries before affected work; do not invent historical executions. The installed publisher shares the G3 graph checks. Authorized failed-G3 continuation retains its failed verdict.
+
+Before any product/test repair dispatch, read and follow **Durable repair dispatch** in [verification procedures](../references/verification-procedures.md). Publish the reservation and dispatch receipt before invocation; pending work consumes budget. Settle the actual RA/check/evidence return before task advancement. On resume/reopen, reconcile pending entries and missing legacy accounting; never reset them.
+
+Before discarding a workspace, follow **Durable import before workspace cleanup** and **Preserve reusable tools** in [verification procedures](../references/verification-procedures.md). Require the successful import/publication receipt. On resume verify declared replay bytes with `--project`; missing replay is unavailable. `_orchestrator/` is coordinator-only; blind readers receive none of it.
+
 Read after the dials are resolved. Prepare the place the прогон will write to,
 create its state, and show the announcement. No requirement is read here and no
 question about the бриф is asked.
@@ -203,7 +209,7 @@ Construct the complete contract-10 candidate in temporary JSON. It carries:
 | `tasks`, `requirements` | empty |
 | `gates` | all four — `G1`, `G2`, `G3`, `G4` — `pending`, with no findings |
 | `lifecycle`, `outcome`, `finishedAt`, `result` | `active`, with no terminal outcome, closure timestamp or result |
-| `verification` | `version: 3`, `targetRevision: 1`, provisional acceptance input digest, `manifestDigest` as SHA-256 of empty draft, empty existing record arrays plus `sourceSnapshots`, `sourceClauses`, `manifestAudits`, `scopeMappings`, `journeys`, `negativeControls`; no invented `scopeBaseline`, `repairLimits: { perFinding: 2, total: 8 }`, and the verification-3 lists `readiness`, `defects`, `strategyReviews`, `inheritedExecutionIds`, `inheritedAttemptIds`, all empty |
+| `verification` | `version: 3`, `targetRevision: 1`, provisional acceptance input digest, `manifestDigest` as SHA-256 of empty draft, empty existing record arrays plus `sourceSnapshots`, `sourceClauses`, `manifestAudits`, `scopeMappings`, `journeys`, `negativeControls`; no invented `scopeBaseline`, `repairLimits: { perFinding: 2, total: 8 }`, and the verification-3 lists `readiness`, `defects`, `strategyReviews`, `inheritedExecutionIds`, `inheritedAttemptIds`, `repairDispatches`, `replayTools`, all empty; `repairAccounting: { status: "complete", reviewedAt: <now>, evidenceIds: [], note: "Fresh run" }` |
 | `debt` | three lists, `placeholders`, `assumptions`, `emptyEnv`, empty but for a models mismatch line from step 1b |
 | `additions` | empty |
 | `oneWay` | empty — the review phase appends what is hard to undo |

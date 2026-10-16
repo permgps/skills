@@ -1,5 +1,7 @@
 # Phase 6 — Ревью
 
+Before any product/test repair dispatch, read and follow **Durable repair dispatch** in [verification procedures](../references/verification-procedures.md). Publish the reservation and dispatch receipt before invocation; pending work consumes budget. Settle the actual RA/check/evidence return before task advancement. On resume/reopen, reconcile pending entries and missing legacy accounting; never reset them.
+
 Read when the build has come back and every таск sits at `review`. This phase
 decides which of them become `done`, and it is the only look at the work against
 the words its executor was actually given.

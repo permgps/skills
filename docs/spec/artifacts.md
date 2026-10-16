@@ -485,3 +485,23 @@ exhaustiveness. The read-only procedure must justify classifications. Keep
 locators relative to the project root or absolute external URLs, not the
 run directory, so closing/reopening does not invalidate provenance.
 Blind readers receive neither these records nor producer research notes.
+
+Evidence source workspaces remain available until the [atomic import/publication receipt](verification.md#atomic-import-and-publication) confirms the exact destination records. An existing sealed execution directory cannot be reused for another attempt.
+
+## Reusable Replay Tools
+
+Run-local `_orchestrator/<tool-id>/<script>.mts` holds coordinator/replay tools
+needed after workspace cleanup. Optional verification-3 `replayTools` entries
+contain `id`, `path`, `sha256`, `checkIds` and original `invocation`. IDs are
+unique across tools and evidence; metadata and bytes are immutable. Record a new
+ID for changed tooling. Original check-execution invocations are never rewritten.
+The installed import command accepts tool IDs in the same source map as captures,
+and issues cleanup eligibility only after publication. Run-relative paths survive
+closure/reopen relocation; a successor run has its own directory and collection.
+
+Resume through `--project` checks hashes without executing scripts. Missing or
+changed tools make replay unavailable, never successful by reconstruction. Recover
+preserved bytes or disclose the limitation. Temporary disposable scratch remains
+legal when it is not the only copy needed later. The coordinator directory and
+its metadata are excluded from blind readers. Executors receive only bounded
+replay material; storage never expands their allowed inputs.

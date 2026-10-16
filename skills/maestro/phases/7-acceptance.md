@@ -1,5 +1,9 @@
 # Phase 7 — Приёмка
 
+Before any product/test repair dispatch, read and follow **Durable repair dispatch** in [verification procedures](../references/verification-procedures.md). Publish the reservation and dispatch receipt before invocation; pending work consumes budget. Settle the actual RA/check/evidence return before task advancement. On resume/reopen, reconcile pending entries and missing legacy accounting; never reset them.
+
+Before discarding a workspace, follow **Durable import before workspace cleanup** and **Preserve reusable tools** in [verification procedures](../references/verification-procedures.md). Require the successful import/publication receipt. On resume verify declared replay bytes with `--project`; missing replay is unavailable. `_orchestrator/` is coordinator-only; blind readers receive none of it.
+
 Read when every таск is `done` and its review is written. This is the last phase
 of the прогон, and the only one that measures what was built against what the
 user actually asked for rather than against something the прогон wrote about it.

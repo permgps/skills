@@ -4,14 +4,15 @@
 // read or published, so a symlink or a changed shared asset cannot certify a
 // stale browser pass while the dashboard receives a new success snapshot.
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { copyFile, mkdir, readFile, realpath, rename, rm, stat } from 'node:fs/promises';
+import { copyFile, link, mkdir, readFile, realpath, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import { createLogger } from '../shared/log.mts';
 import type { EvidenceFingerprint, RunState } from './contract.mts';
 import type { StateViolation } from './validate.mts';
+import { replayTools } from './replay-tools.mts';
 import { sameFingerprint } from './verification.mts';
 import { WIP_SUFFIX, parseRunDir, runDirName } from './paths.mts';
 
@@ -171,6 +172,15 @@ export async function validateEvidence(
       violations.push({ field, message: 'capture SHA-256 does not match the stored artifact' });
     }
   }
+  for (const tool of replayTools(state)) {
+    const field = 'verification.replayTools[' + tool.id + ']';
+    const file = await checkedFile(runDir, tool.path, field, violations);
+    if (!file) { log.warn('replay', 'durable replay is unavailable', { id: tool.id }); continue; }
+    if (await fileHash(file) !== tool.sha256) {
+      violations.push({ field, message: 'replay SHA-256 does not match the preserved tool' });
+      log.error('replay', 'durable replay hash mismatch', { id: tool.id });
+    }
+  }
   for (const [index, check] of record.checks.entries()) {
     await checkFingerprint(check.currentFingerprint, projectRoot,
       `verification.checks[${index}].currentFingerprint`, violations, locate);
@@ -218,6 +228,7 @@ export async function importEvidence(
     [project, maestroDir],
     [maestroDir, runDir],
     [runDir, runEvidence],
+    ...(replayTools(state).length ? [[runDir, path.join(runDir, '_orchestrator')]] : []),
   ] as [string, string][]) {
     try { await mkdir(child); }
     catch (error) {
@@ -228,11 +239,11 @@ export async function importEvidence(
     }
   }
   const planned: { source: string; destination: string; id: string; hash: string }[] = [];
-  for (const [index, evidence] of record.evidence.entries()) {
-    const sourcePath = sources[evidence.id];
+  for (const [index, evidence] of [...record.evidence, ...replayTools(state)].entries()) {
+    const sourcePath = Object.hasOwn(sources, evidence.id) ? sources[evidence.id] : undefined;
     if (sourcePath === undefined) continue;
     const field = `verification.evidence[${index}]`;
-    if (!/^evidence\/[A-Za-z0-9_-]+\/.+/.test(evidence.path) || !HASH.test(evidence.sha256)) {
+    if (!/^(evidence|_orchestrator)\/[A-Za-z0-9_-]+\/.+/.test(evidence.path) || !HASH.test(evidence.sha256)) {
       violations.push({ field, message: 'capture path or SHA-256 is invalid' });
       continue;
     }
@@ -243,8 +254,8 @@ export async function importEvidence(
       violations.push({ field, message: 'task-owned capture does not match declared SHA-256' });
       continue;
     }
-    const destination = path.resolve(runEvidence, evidence.path.slice('evidence/'.length));
-    if (!inside(runEvidence, destination)) {
+    const destination = path.resolve(runDir, evidence.path);
+    if (!inside(runDir, destination)) {
       violations.push({ field, message: 'capture destination escapes the run' });
       continue;
     }
@@ -252,14 +263,21 @@ export async function importEvidence(
   }
   if (violations.length) return violations;
   for (const capture of planned) {
-    await mkdir(path.dirname(capture.destination), { recursive: true });
-    if (!inside(await realpath(runEvidence), await realpath(path.dirname(capture.destination)))) {
+    let parent = runDir;
+    let escaped = false;
+    for (const segment of path.relative(runDir, path.dirname(capture.destination)).split(path.sep).filter(Boolean)) {
+      parent = path.join(parent, segment);
+      try { await mkdir(parent); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; }
+      if (!inside(await realpath(runDir), await realpath(parent))) { escaped = true; break; }
+    }
+    if (escaped) {
       violations.push({ field: capture.id, message: 'capture parent resolves outside the run' });
       continue;
     }
     try {
       const existing = await realpath(capture.destination);
-      if (!inside(await realpath(runEvidence), existing)
+      if (!inside(await realpath(runDir), existing)
         || await fileHash(existing) !== capture.hash) {
         violations.push({ field: capture.id, message: 'immutable capture already exists with different content' });
       }
@@ -270,14 +288,19 @@ export async function importEvidence(
         continue;
       }
     }
-    const temporary = `${capture.destination}.${process.pid}.tmp`;
+    const temporary = `${capture.destination}.${randomUUID()}.tmp`;
     try {
       await copyFile(capture.source, temporary);
       if (await fileHash(temporary) !== capture.hash) {
         violations.push({ field: capture.id, message: 'capture changed during import' });
         continue;
       }
-      await rename(temporary, capture.destination);
+      try { await link(temporary, capture.destination); }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        const existing = await checkedFile(runDir, path.relative(runDir, capture.destination), capture.id, violations);
+        if (!existing || await fileHash(existing) !== capture.hash) violations.push({ field: capture.id, message: 'immutable capture already exists with different content' });
+      }
       log.info('evidence-import', 'capture sealed', { id: capture.id, path: capture.destination });
     } finally {
       await rm(temporary, { force: true });

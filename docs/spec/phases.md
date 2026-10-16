@@ -1702,3 +1702,5 @@ workloads and their comparability; acceptance reports finite-sample limitations
 and incomplete series. The exact fields and closure rules live in
 `verification.md`, Intermittent Repair Evidence. No new dispatch for ordinary
 deterministic failures and no increase in the existing repair budgets.
+
+All repair entrances use the [durable repair reservation protocol](verification.md#durable-repair-reservations), including resumed and reopened runs. Preflight initializes fresh accounting and discloses missing legacy inventory before further repair.

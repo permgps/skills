@@ -298,3 +298,7 @@ Any temporary diagnostic output you add — a print, a log line, a probe — car
 comment, with the defect id from your brief. Remove every tagged line before you
 return. A tagged line left in your change is a blocking finding from a
 mechanical check on the commit made from it, and it sends the таск back to repair.
+
+For a repair, retain the handed dispatch ID and base. Return the actual result and check/capture IDs for its reserved RA; do not replace missing execution with a prose-only success. Keep the workspace until the coordinator confirms durable publication.
+
+Return reusable replay script bytes and hashes with captures before workspace cleanup. The coordinator imports them into the run-local `_orchestrator/<tool-id>/` directory and records the original invocation separately. Use only the bounded tool material handed to you; durable storage grants no access to other coordinator context. Disposable scratch may remain temporary when no later check depends on it.

@@ -38,6 +38,7 @@ import { pathToFileURL } from 'node:url';
 import { createLogger } from '../shared/log.ts';
 import type { ReferenceRole, RunState } from '../state/contract.ts';
 import { forState, ROOT } from '../state/paths.ts';
+import { checkPlanGraph, upstreamOf } from '../state/plan-graph.ts';
 import { validateCompletionRecords } from '../state/verification.ts';
 import { runGate, targetFromArgv, type GateFinding } from './cli.ts';
 
@@ -48,22 +49,6 @@ const log = createLogger('gate-g3');
 // Statuses a таск builds. `placeholder` is S3's: the требование is built around
 // a visible gap, so it needs a таск and an obligation exactly as `in-spec` does.
 const BUILT: readonly string[] = ['in-spec', 'placeholder'];
-
-/**
- * Every таск reachable through `blockedBy` from `id`, the таск itself excluded.
- * A visited set rather than recursion, so a cycle — reported elsewhere — ends the walk.
- */
-function upstreamOf(id: string, blockers: Map<string, string[]>): Set<string> {
-  const reached = new Set<string>();
-  const pending = [...(blockers.get(id) ?? [])];
-  while (pending.length > 0) {
-    const next = pending.pop()!;
-    if (next === id || reached.has(next)) continue;
-    reached.add(next);
-    pending.push(...(blockers.get(next) ?? []));
-  }
-  return reached;
-}
 
 export function checkG3(state: RunState): GateFinding[] {
   const findings: GateFinding[] = [];
@@ -164,74 +149,7 @@ export function checkG3(state: RunState): GateFinding[] {
       for (const violation of validateCompletionRecords(state, record)) findings.push({ requirementId: '',
         message: `${violation.field}: ${violation.message}` });
     }
-    const tasks = new Map(state.tasks.map(task => [task.id, task]));
-    const checks = new Map(record.checks.map(check => [check.id, check]));
-    const obligations = record.obligations.filter(item => item.targetRevision === record.targetRevision);
-    const covered = new Set<string>();
-    for (const obligation of obligations) {
-      for (const requirementId of obligation.requirementIds) covered.add(requirementId);
-      const requiredChecks = obligation.checkIds.map(id => checks.get(id)).filter(check => check?.required);
-      if (requiredChecks.length === 0) findings.push({ requirementId: obligation.requirementIds[0] ?? '',
-        message: `obligation ${obligation.id} has no required executable check` });
-      for (const ownerId of obligation.implementationTaskIds) {
-        const owner = tasks.get(ownerId);
-        if (!owner || !obligation.requirementIds.some(id => owner.requirementIds.includes(id))) {
-          findings.push({ requirementId: obligation.requirementIds[0] ?? '',
-            message: `obligation ${obligation.id} has no matching implementation owner ${ownerId}` });
-        }
-      }
-      for (const check of requiredChecks) {
-        if (!check) continue;
-        const executionOwner = check.executionTaskId ? tasks.get(check.executionTaskId) : undefined;
-        if (!executionOwner || !obligation.requirementIds.some(id => executionOwner.requirementIds.includes(id))) {
-          findings.push({ requirementId: obligation.requirementIds[0] ?? '',
-            message: `check ${check.id} has no matching execution owner` });
-        }
-        for (const dependency of obligation.implementationTaskIds) {
-          if (!check.integrationDependencies.includes(dependency)) findings.push({
-            requirementId: obligation.requirementIds[0] ?? '',
-            message: `check ${check.id} omits implementation prerequisite ${dependency}` });
-        }
-        for (const dependency of check.integrationDependencies) {
-          if (!tasks.has(dependency)) findings.push({ requirementId: obligation.requirementIds[0] ?? '',
-            message: `check ${check.id} has missing integration prerequisite ${dependency}` });
-          else if (executionOwner && dependency !== executionOwner.id
-            && !ancestors(executionOwner.id).has(dependency)) findings.push({
-            requirementId: obligation.requirementIds[0] ?? '',
-            message: `execution owner ${executionOwner.id} of check ${check.id} does not transitively depend on `
-              + `integration prerequisite ${dependency} — add ${dependency} to the blockedBy chain of ${executionOwner.id}` });
-        }
-        if (check.method.includes('source') && /browser|pointer|keyboard|hover|visible/i.test(obligation.expectation)) {
-          findings.push({ requirementId: obligation.requirementIds[0] ?? '',
-            message: `source-only check ${check.id} cannot establish UI behavior ${obligation.id}` });
-        }
-      }
-    }
-    for (const [id, requirementStatus] of status) {
-      if (BUILT.includes(requirementStatus) && !covered.has(id)) findings.push({ requirementId: id,
-        message: `requirement ${id} has no current observable obligation` });
-    }
-    const visiting = new Set<string>();
-    const visited = new Set<string>();
-    const visit = (id: string): void => {
-      if (visited.has(id)) return;
-      if (visiting.has(id)) {
-        findings.push({ requirementId: id, message: `task dependency cycle includes ${id}` });
-        return;
-      }
-      visiting.add(id);
-      for (const dependency of tasks.get(id)?.blockedBy ?? []) {
-        if (!tasks.has(dependency)) findings.push({ requirementId: id,
-          message: `task ${id} has missing prerequisite ${dependency}` });
-        else visit(dependency);
-      }
-      visiting.delete(id);
-      visited.add(id);
-    };
-    for (const id of tasks.keys()) visit(id);
-    log.info('verification', 'ownership graph checked', {
-      obligations: obligations.length, checks: record.checks.length, tasks: tasks.size,
-    });
+    findings.push(...checkPlanGraph(state));;
   }
 
   // --- the task-file reader's verdict was recorded, not filed ---------------

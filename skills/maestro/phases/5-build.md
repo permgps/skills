@@ -1,5 +1,9 @@
 # Phase 5 — Разработка
 
+Before any product/test repair dispatch, read and follow **Durable repair dispatch** in [verification procedures](../references/verification-procedures.md). Publish the reservation and dispatch receipt before invocation; pending work consumes budget. Settle the actual RA/check/evidence return before task advancement. On resume/reopen, reconcile pending entries and missing legacy accounting; never reset them.
+
+Before discarding a workspace, follow **Durable import before workspace cleanup** and **Preserve reusable tools** in [verification procedures](../references/verification-procedures.md). Require the successful import/publication receipt. On resume verify declared replay bytes with `--project`; missing replay is unavailable. `_orchestrator/` is coordinator-only; blind readers receive none of it.
+
 Read when the plan has passed G3, or the user moved past it at its round budget.
 This is the only phase where project code appears, and it is the one phase where
 you do not write any of it.
@@ -159,7 +163,6 @@ For an intermittent return, preserve all five attribution labels as execution
 [intermittent-repairs.md](../references/intermittent-repairs.md); never import a
 partial series as a completed repair. Newly observed mixed outcomes route through
 repair before further diagnosis or additional unplanned runs.
-
 
 For each таск that returns done, in this order:
 

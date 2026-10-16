@@ -12,7 +12,7 @@ import path from 'node:path';
 import { createLogger } from '../shared/log.mts';
 import type { RunState } from './contract.mts';
 import { validateEvidence } from './evidence.mts';
-import { STATE_FILE } from './paths.mts';
+import { STATE_FILE, runDirName } from './paths.mts';
 import { InvalidStateError, validateState } from './validate.mts';
 
 const log = createLogger('state');
@@ -58,9 +58,13 @@ export async function readState(target: string): Promise<RunState> {
   const source = await readFile(file, 'utf8');
   const parsed = parseStateSource(source);
 
-  const violations = validateState(parsed);
+  const violations = validateState(parsed, { historical: true });
   if (violations.length === 0 && (parsed as RunState).contractVersion >= 4) {
-    violations.push(...await validateEvidence(parsed as RunState, path.dirname(path.dirname(file))));
+    const state = parsed as RunState;
+    const containing = path.resolve(path.dirname(file));
+    // Kept closed snapshots sit one level below the live state, beside their captures.
+    const runRoot = path.basename(containing) === runDirName(state) ? path.dirname(containing) : containing;
+    violations.push(...await validateEvidence(state, path.dirname(runRoot), runRoot));
   }
   if (violations.length > 0) throw new InvalidStateError(violations);
 

@@ -1,5 +1,7 @@
 # Phase 4 — План
 
+Publish grounded obligations/checks in Spec and ownership/prerequisites in Plan before a passed G3. Resume, reopening and coverage repair correct missing graph entries before affected work; do not invent historical executions. The installed publisher shares the G3 graph checks. Authorized failed-G3 continuation retains its failed verdict.
+
 Read when the specification has passed G2, or the user moved past it at its round
 budget. This phase cuts `spec.md` into таски and writes down the boundaries
 between them. It ends at G3, and it is the last phase before project code exists.

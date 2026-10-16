@@ -188,3 +188,57 @@ existing check to the base. What it lists as `unchecked`, and what no command
 can see, stays this procedure's and the reviewer's. INFO the review verdict of a
 repaired таск with `{ defectVerified, residualCount }`; WARN a detector that
 fails qualification.
+
+## Durable import before workspace cleanup
+
+Use `--import-evidence <candidate.json> --source <workspace> --sources <map.json>`
+with normal `--expect`, `--holder`, and `--no-open` flags. The JSON map names
+evidence IDs and source-root-relative files. It must cover newly referenced
+captures; the candidate supplies their unique execution destinations and hashes.
+Exit 0 plus `cleanupEligible: true` confirms destination integrity and publication
+of these exact records. Retain sources on every other result, including stale
+revision, holder mismatch, missing/hash-mismatched files, and sealed destination
+collision. Never ignore a copy failure or reuse a previous execution's directory.
+Partial unreferenced files are harmless and reusable only with identical hashes.
+The helper neither deletes a workspace nor changes source captures.
+
+### Preserve reusable tools
+
+Keep reusable coordinator/replay scripts in this run's `_orchestrator/<tool-id>/`,
+as `.mts`. Before cleanup, declare `verification.replayTools` entries with
+`id`, run-relative `path`, `sha256`, `checkIds` (empty for coordinator utilities)
+and the original `invocation`; import their IDs through `--import-evidence`'s
+source map. Preserve historical execution invocations unchanged. New bytes take
+a new tool ID; retain previous tools. On resume, `--project .maestro/state.js`
+checks declared files and hashes. Missing/mutated bytes mean replay is unavailable;
+recover the exact preserved file or disclose the limitation, never recreate an
+evidence claim from memory or transcripts. Disposable scratch needs no record
+when nothing later depends on it. Give executors only their bounded replay tools.
+`_orchestrator/` and its metadata are coordinator material, excluded from blind
+readers; persistence grants no additional access to specs, diagnoses or verdicts.
+
+### Durable repair dispatch
+
+Before every product/test repair, publish a reservation through
+`node .maestro/sync.mts --repair-dispatch <candidate.json> --expect <updatedAt> --holder <token> --no-open`.
+The full candidate adds `verification.repairDispatches`: an immutable dispatch ID,
+timestamp, handed base SHA and proposed RA fields without outcome/commit/time.
+Publish `reserved`, then `dispatched` before invoking the executor. Pending
+reservations consume the existing total and stable-root budgets. On return, publish
+`returned`, `settledAt`, actual follow-up `executionIds`, and the matching real RA
+with its actual outcome, together with imported evidence. Do not advance the task
+until this publication succeeds. Only a reserved, never-dispatched entry may
+be cancelled, with time and reason. Interrupted/unknown dispatches remain pending;
+resends and setup-only corrections do not fabricate attempts or new reservations.
+Resume reconciles pending entries before dispatching further work. Never reset the
+ledger, change the root, or infer attempts from repair/retry counters.
+
+Fresh preflight initializes `repairDispatches: []` and `repairAccounting` with
+`status: complete`, `reviewedAt`, `evidenceIds: []`, and a fresh-run inventory note.
+An older run enables these fields prospectively: inventory preserved actual returns,
+reference each recovered attempt and follow-up capture in the inventory evidence,
+keep tasks unchanged and no dispatch pending during reconciliation, and mark accounting `incomplete` if history is missing.
+Do not invent results from prose. Unknown remaining capacity blocks reservations;
+recover evidence or use the existing user/strategy decision path, without claiming
+that activation grants new allowance. Reopening preserves the ledger and inventory.
+The helper enforces published receipts; it cannot prevent out-of-band host actions.

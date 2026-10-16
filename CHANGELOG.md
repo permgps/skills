@@ -14,6 +14,15 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **Run-history regressions and lost repair evidence fixed.** Historical finding
+  resolutions remain readable without establishing unsupported current passes.
+  The installed publisher now shares G3 graph checks with the repository gate.
+  Durable repair reservations preserve pending budget across interruptions;
+  incomplete legacy accounting cannot silently reset it. The installed evidence
+  importer gates source cleanup on destination integrity and successful
+  publication. Reusable replay tools persist under each run's `_orchestrator/`
+  directory with immutable hashes checked on resume.
+
 - **Fixed intermittent repair verification and review inputs.** Setup failures
   and failed exits without captured failed assertions cannot establish a
   reproduced symptom or complete a baseline. Current verdicts use this stricter

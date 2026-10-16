@@ -3,6 +3,7 @@
 import { lstat, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { validatePlanPublication } from './state/plan-graph.mts';
 import { languageViolations } from './legacy.mts';
 import { createLogger } from './shared/log.mts';
 import type { RunState } from './state/contract.mts';
@@ -11,8 +12,8 @@ import { validateState, type StateViolation } from './state/validate.mts';
 import { validateEvidence } from './state/evidence.mts';
 import { projectState } from './state/projection.mts';
 import { validateInitialIntermittent } from './state/intermittent.mts';
-import { validateStateTransition } from './state/closure.mts';
-import { deriveVerification } from './state/verification.mts';
+import { validateInitialDispatch, validateStateTransition } from './state/closure.mts';
+import { deriveVerification, validateNewResolutions } from './state/verification.mts';
 import { keepWaits, type KeptWaits } from './state/waits.mts';
 import { atomicText, revisionViolations, serializeState, StateBusyError, withStateLock } from './state/write.mts';
 import { STATE_FILE, WIP_SUFFIX, parseRunDir, runDirName } from './state/paths.mts';
@@ -22,6 +23,7 @@ import { headCommit } from './history.mts';
 import { PROGRESS_FILE, buildProgress, fixesReadAtPreflight, parseProgress } from './progress.mts';
 
 const log = createLogger('sync');
+export type PrepareCandidate = (state: RunState, previous: RunState | null) => Promise<StateViolation[]>;
 export type Viewer = (noOpen: boolean) => Promise<string | null>;
 export interface CandidateResult { code: number; result: Record<string, unknown> }
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -55,9 +57,9 @@ export async function pendingRelocation(candidate: RunState, dir: string): Promi
  * for the one caller that must move the folder between the two halves.
  */
 export async function candidateViolations(candidate: unknown, dir: string,
-  options: { evidence?: boolean } = {}): Promise<StateViolation[]> {
+  options: { evidence?: boolean; historical?: boolean } = {}): Promise<StateViolation[]> {
   try {
-    const errors = [...validateState(candidate), ...languageViolations(candidate)];
+    const errors = [...validateState(candidate, { historical: options.historical === true }), ...languageViolations(candidate)];
     if (!isRecord(candidate) || ![4, 5, 6, 7, 8, 9, 10].includes(candidate['contractVersion'] as number)) {
       errors.push({ field: 'contractVersion', message: 'publication requires contract version 4, 5, 6, 7, 8, 9 or 10' });
     }
@@ -185,12 +187,12 @@ async function readPrevious(file: string): Promise<RunState | null> {
 
 export async function candidateMode(args: string[], dir: string,
   viewer: Viewer = async () => pathToFileURL(path.join(dir, 'dashboard.html')).href,
-  snapshots: (candidate: RunState | null, envelope: ValidationEnvelope) => Promise<void> = async () => {}): Promise<CandidateResult> {
-  if (args[0] !== '--publish') return candidateModeLocked(args, dir, viewer, snapshots);
+  snapshots: (candidate: RunState | null, envelope: ValidationEnvelope) => Promise<void> = async () => {}, prepare?: PrepareCandidate): Promise<CandidateResult> {
+  if (args[0] !== '--publish') return candidateModeLocked(args, dir, viewer, snapshots, prepare);
   try {
     // Opening the viewer is not part of publication. Keep the state and all
     // derived writes together, then hand off the URL after releasing the lock.
-    const outcome = await withStateLock(dir, () => candidateModeLocked(args, dir, async () => null, snapshots));
+    const outcome = await withStateLock(dir, () => candidateModeLocked(args, dir, async () => null, snapshots, prepare));
     if (outcome.code !== 2) {
       try { outcome.result['url'] = await viewer(args.includes('--no-open')); }
       catch { log.warn('viewer', 'viewer unavailable; coherent state retained', { dir }); }
@@ -206,7 +208,7 @@ export async function candidateMode(args: string[], dir: string,
 }
 
 async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
-  snapshots: (candidate: RunState | null, envelope: ValidationEnvelope) => Promise<void>): Promise<CandidateResult> {
+  snapshots: (candidate: RunState | null, envelope: ValidationEnvelope) => Promise<void>, prepare?: PrepareCandidate): Promise<CandidateResult> {
   const action = args[0];
   const file = args[1];
   if (!file) return { code: 2, result: { status: 'unreadable', reason: 'candidate path is required' } };
@@ -240,7 +242,9 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
   }
   // Publication checks evidence only after a relocation, which needs the
   // transition checks first; the read-only actions check it straight away.
-  const errors = [...refusedWaits, ...await candidateViolations(candidate, dir, { evidence: action !== '--publish' })];
+  const errors = [...refusedWaits, ...await candidateViolations(candidate, dir, {
+    evidence: action !== '--publish', historical: action !== '--validate',
+  })];
   const state = candidate as RunState;
   const summary = errors.length === 0 ? deriveVerification(state) : null;
   const pending = errors.length === 0 && action !== '--publish' ? await pendingRelocation(state, dir) : null;
@@ -256,7 +260,7 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
       ...(pending ? { relocationPending: pending } : {}) } };
   }
   if (unreadable) errors.push({ field: 'state.js', message: 'existing state cannot be read; recover explicitly' });
-  else if (previous && previous.contractVersion >= 4 && validateState(previous).length) {
+  else if (previous && previous.contractVersion >= 4 && validateState(previous, { historical: true }).length) {
     errors.push({ field: 'state.js', message: 'existing history is invalid; recover explicitly' });
   }
   const expected = option(args, '--expect');
@@ -276,7 +280,7 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
     errors.push({ field: 'heldBy', message: 'holder token does not match candidate' });
   }
   if (errors.length === 0 && previous && !succession) errors.push(...validateStateTransition(previous, state));
-  if (errors.length === 0 && (!previous || succession)) errors.push(...validateInitialIntermittent(state));
+  if (errors.length === 0 && (!previous || succession || previous.contractVersion < 4)) errors.push(...validateState(state), ...validateNewResolutions(state), ...validateInitialIntermittent(state), ...validatePlanPublication(state), ...validateInitialDispatch(state));
   let relocation: Relocation | null = null;
   if (errors.length === 0 && previous && !succession && previous.contractVersion >= 7 && state.contractVersion >= 7) {
     const from = runDirName(previous);
@@ -289,6 +293,10 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
         errors.push({ field: 'dir', message: `${reason}; nothing was moved and the published state stands` });
       }
     }
+  }
+  if (errors.length === 0 && prepare) {
+    try { errors.push(...await prepare(state, succession ? null : previous)); }
+    catch { errors.push({ field: 'import', message: 'artifact import failed; source retained and prior state preserved' }); }
   }
   if (errors.length === 0) errors.push(...await validateEvidence(state, path.dirname(dir), dir));
   let kept: string | null = null;
