@@ -24,6 +24,7 @@ You are the reading half of gate G4, the last check of the прогон.
 | `prior.md` | what earlier прогоны decided; the build is measured against this run's words, not theirs |
 | `codebase.md` | what the repository held before this прогон; the build is measured against this run's words, not the code's |
 | `research/` | producer research records and notes; only selected facts may be embedded in allowed design/task inputs |
+| `openspec/` | the project's OpenSpec specs and changes, earlier прогоны' exports among them; they restate requirements in words a run wrote, so do not open them even though they sit in the build's tree |
 
 **That is all of it, and you have nothing else.** You have not seen `spec.md`,
 the бриф's original text, the plan, the task files, or the reviews, and **you

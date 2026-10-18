@@ -866,6 +866,16 @@ exit codes.
   - Exit 0: covered. Exit 1: incomplete or malformed facts markers. Exit 2: bad arguments, an unreadable
     return file, or as above.
   - Canonical module: `tools/runtime/plan-units.mts`, for all three commands.
+- `--openspec-index` reads the project's OpenSpec tree and reports
+  `{ present, anchor, capabilities: [{ capability, path, requirements: [{ name, scenarios }] }],
+  changes: [{ name, maestroRun }], archived: [{ folder, change }], incomplete, reasons, unreadable }`
+  without writing anything. `present` needs `openspec/config.yaml` or `.yml`
+  as a regular file inside the project; an escaping symlink is absent. At most
+  500 spec files and 256 KB per file are read; past either, `incomplete` is
+  true and `reasons` says why ([`phases.md`](phases.md), *Existing OpenSpec
+  Requirements*).
+  - Exit 0: present or absent. Exit 2: the project root could not be read.
+  - Canonical module: `tools/runtime/openspec.mts`.
 - `--returns-check <return-file> [--root <worktree>] [--base <commit>] [--owns-no-check]` reads
   an executor's return and reports
   `{ ok, blocks, findings: [{ rule, checkId, line, message }], unchecked: [{ checkId, fact, reason }] }`

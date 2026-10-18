@@ -264,3 +264,36 @@ test('a requirement id inside the leftovers gist does not turn the entry into th
   assert.equal(entries[0]?.leftovers, true);
   assert.equal(entries[0]?.requirementId, '');
 });
+
+// --- the OpenSpec line ------------------------------------------------------
+
+const OPENSPEC_ENTRY = [
+  '### R04 — чек по почте',
+  'Asked: В OpenSpec записано «Receipt»: чек всегда уходит на почту. Бриф просит чек только по запросу. Что оставить?',
+  'Options:',
+  '1. Оставить как в OpenSpec (recommended — это одобренное поведение)',
+  '2. Чек только по запросу',
+  'Answer: 2',
+  'Chosen: Чек только по запросу',
+  'OpenSpec: checkout › Receipt — replace',
+  '',
+].join('\n');
+
+test('an OpenSpec line beside Chosen is its own field and leaves the chosen text whole', () => {
+  const [parsed] = parseAnswers(OPENSPEC_ENTRY);
+  assert.equal(parsed!.chosen, 'Чек только по запросу');
+  assert.equal(parsed!.openspec, 'checkout › Receipt — replace');
+  assert.deepEqual(checkAnswers(parseAnswers(OPENSPEC_ENTRY)), []);
+});
+
+test('the OpenSpec label is read in bold and in any case, and a wrapped value joins its line', () => {
+  const bold = OPENSPEC_ENTRY.replace('OpenSpec: checkout › Receipt — replace', '**OpenSpec:** checkout ›\n  Receipt — replace');
+  assert.equal(parseAnswers(bold)[0]!.openspec, 'checkout › Receipt — replace');
+  const lower = OPENSPEC_ENTRY.replace('OpenSpec:', 'openspec:');
+  assert.equal(parseAnswers(lower)[0]!.openspec, 'checkout › Receipt — replace');
+});
+
+test('an entry without an OpenSpec line has none, and an existing entry still passes G1', () => {
+  assert.equal(parseAnswers(entry())[0]!.openspec, null);
+  assert.deepEqual(findingsFor(entry()), []);
+});

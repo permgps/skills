@@ -18,7 +18,7 @@ import {
   REVIEW_ANCHORS,
   SIGNAL_ANCHORS,
   CODEBASE_ANCHORS,
-  RESEARCH_ANCHORS, INTERMITTENT_ANCHORS,
+  RESEARCH_ANCHORS, INTERMITTENT_ANCHORS, OPENSPEC_ANCHORS,
   PROGRESS_LINE_ANCHORS,
   SIZE_ANCHORS,
   STOP_ANCHORS,
@@ -48,7 +48,7 @@ import {
   type Violation,
 } from './bundle-integrity.ts';
 import { KNOWN_MEMORY_FILES } from '../memory/markers.ts';
-import { checkAnswers, parseAnswers } from '../gates/answers.ts';
+import { checkAnswers, parseAnswers, parseOpenSpecDisposition } from '../gates/answers.ts';
 import { checkExecutionReturns, parseExecutionReturns } from '../gates/execution-return.ts';
 
 const FRONTMATTER = `---
@@ -1788,6 +1788,42 @@ for (const anchor of RESEARCH_ANCHORS) {
     });
   });
 }
+
+for (const anchor of OPENSPEC_ANCHORS) {
+  test(anchor.file + ' losing its OpenSpec rule is detected', async () => {
+    await withShippedCopy(async copy => {
+      const file = path.join(copy, anchor.file);
+      const flat = (await readFile(file, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(flat.includes(anchor.literal), anchor.literal);
+      await writeFile(file, flat.split(anchor.literal).join('removed'));
+      const findings = (await checkBundle(copy)).filter(v => v.check === 'openspec');
+      assert.deepEqual(findings.map(v => v.file), [anchor.file]);
+    });
+  });
+}
+
+test('the OpenSpec anchors hold the index command, the line shape, keep as the recommendation and the reader rows', () => {
+  const required: Array<[string, string]> = [
+    ['phases/2-briefing.md', 'node .maestro/sync.mts --openspec-index'],
+    ['phases/2-briefing.md', 'OpenSpec: <capability> › <Requirement name> — keep | replace | remove | rename → <new name>'],
+    ['phases/2-briefing.md', 'It is always the recommended option'],
+    ['prompts/existing-code-reader.md', 'OpenSpec requirements are decision records too'],
+    ['phases/3-spec.md', 'cites the `OpenSpec:` line of its `answers.md` entry'],
+  ];
+  for (const [file, literal] of required) {
+    assert.ok(OPENSPEC_ANCHORS.some(anchor => anchor.file === file && anchor.literal === literal), `${file}: ${literal}`);
+  }
+});
+
+test('the OpenSpec entry the briefing phase ships passes G1 and authorises exactly what it says', async () => {
+  const body = await readFile(SHIPPED_BRIEFING, 'utf8');
+  const match = /  \`\`\`markdown\n((?:  .*\n)+?)  \`\`\`/.exec(body);
+  assert.ok(match, 'phases/2-briefing.md carries no indented OpenSpec entry');
+  const entries = parseAnswers(match[1]!.replace(/^  /gm, ''));
+  assert.equal(entries.length, 1);
+  assert.deepEqual(checkAnswers(entries), []);
+  assert.deepEqual(parseOpenSpecDisposition(entries[0]!.openspec ?? ''), { capability: 'checkout', requirement: 'Receipt', disposition: 'replace', renamedTo: null });
+});
 
 for (const anchor of INTERMITTENT_ANCHORS) {
   test(anchor.file + ' losing its intermittent rule is detected', async () => {

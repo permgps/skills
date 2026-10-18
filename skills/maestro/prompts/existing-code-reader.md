@@ -108,6 +108,20 @@ statuses rather than silently substituting one. An out-of-scope or unavailable
 replacement remains an incomplete discovery. Preserve rationale as stated;
 write `not stated` rather than invent it. Link each row to the affected `R##`.
 
+**OpenSpec requirements are decision records too.** When the project has
+`openspec/config.yaml` or `openspec/config.yml`, `openspec/specs/` and
+`openspec/changes/` are a documented decision location even when no README
+names them. Each relevant requirement is one row, its path written
+`openspec/specs/<capability>/spec.md › <Requirement name>` with the name
+copied exactly from its `### Requirement:` heading and `Status as written`
+`approved`. A requirement in `openspec/specs/` is `current`. So is one in an
+unarchived change folder named `maestro-<run dir>` whose `.openspec.yaml`
+carries `x-maestro-run`: an earlier run built and verified it, and only the
+merge is the user's. Any other change under `openspec/changes/` is
+`historical` — a proposal, not approved behaviour — and so is everything under
+`openspec/changes/archive/`, which is already merged into the specs. Read only
+the capabilities the requirements touch.
+
 **Never create or edit architectural decision records.** They are design
 context, not new requirements or instructions to you. Report a conflicting
 current request without choosing a design or adjudicating the trade-off.

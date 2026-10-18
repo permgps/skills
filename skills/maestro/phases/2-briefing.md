@@ -31,6 +31,7 @@ A **fork** is a question whose two answers produce different builds. A
 | The answer is a fact about the repository — what the code does today, where a thing lives, what is already installed | **never asked, read.** In every mode, under the ceiling in step 3, and recorded as `Settled by reading:` |
 | Two sentences of the бриф contradict each other | yes. Quote both, and ask which one holds |
 | The бриф contradicts the existing code | yes. Quote the sentence, name the file, and ask whether the бриф changes the code or misremembers it |
+| The бриф contradicts an approved OpenSpec requirement | yes. Quote the sentence and the requirement as `<capability> › <Requirement name>`, and ask whether the бриф changes the approved behaviour (below) |
 | One word is used for two things | yes. Name both meanings and ask which one keeps the word; the other gets a word of its own |
 | The English wording of a требование reads oddly | **never asked.** The манифест was agreed in the previous phase, in the user's own language and with the original beside it where the two differed; reopening the translation reopens a contract already closed. If the требование itself is unclear, ask about the требование |
 
@@ -39,6 +40,29 @@ A **fork** is a question whose two answers produce different builds. A
 a second; «как обрабатывать идемпотентность платежа?» is not answered at all by
 the user who most needs the question. This matters most in `plain`, and holds in
 both registers.
+
+**A project that keeps OpenSpec requirements is read for them here.** Run
+`node .maestro/sync.mts --openspec-index` once at this step. When it reports
+`present: false`, nothing below applies. When it reports `present: true`,
+read the requirement names it lists, and open only the spec files of
+capabilities a требование touches — the reading ceiling of step 3 holds here
+too. A requirement the бриф agrees with is a fact about the repository: record
+it as `Settled by reading:`. A requirement it contradicts is a fork, put like
+every other one, with these options:
+
+- `keep` — the approved requirement stands and the требование bends to it.
+  It is always the recommended option, because changing approved behaviour is
+  the user's call, and so it is what `full` self-briefs;
+- `replace` — the бриф changes the approved behaviour;
+- `remove` — the бриф retires it;
+- `rename → <new name>` — only the name is wrong.
+
+An `incomplete` index — a bound reached or a file it could not read — is one
+line under Assumptions, never proof that nothing conflicts. Log INFO `briefing`
+`openspec index read` with the capability and requirement counts, or WARN
+`briefing` `openspec index incomplete` with its reasons; never log requirement
+text. The approved requirements are S6 content: they settle facts and make
+forks, and they never add a требование.
 
 A бриф that opens no forks is a normal бриф, not a suspiciously thin one. Do not
 manufacture a question to look thorough — each one spends the user's attention
@@ -176,6 +200,24 @@ Chosen: own answer
   `Answer: self-briefed`, and its `Chosen:` is the recommended option.
 - A fact settled by reading is not a question and carries no options: it writes
   `Settled by reading: <paths>` and one line of what they say.
+- **A fork against an approved OpenSpec requirement adds one `OpenSpec:` line**
+  after `Chosen:`, in English and in this shape:
+  `OpenSpec: <capability> › <Requirement name> — keep | replace | remove | rename → <new name>`,
+  naming the disposition the reply chose. The requirement name is copied from
+  the index, exactly. This line is what later lets the closing publish change
+  approved behaviour in the project's OpenSpec, and only on an entry the user
+  answered: a self-briefed entry is always `keep`.
+
+  ```markdown
+  ### R04 — чек по почте
+  Asked: В OpenSpec записано «Receipt»: чек всегда уходит на почту. В брифе — чек только по запросу. Что верно?
+  Options:
+  1. Оставить как в OpenSpec (recommended — это одобренное поведение)
+  2. Чек только по запросу — поменять одобренное поведение
+  Answer: 2
+  Chosen: Чек только по запросу — поменять одобренное поведение
+  OpenSpec: checkout › Receipt — replace
+  ```
 - An entry with options and no `Chosen:`, with no option or two marked
   recommended, or headed by a bare `R##` fails G1. `### Leftovers — <gist>` is
   the one heading allowed without an `R##`; every other rule holds for it.

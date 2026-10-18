@@ -209,6 +209,10 @@ act on without asking you, and a reviewer can check without guessing.
   ask use the existing question path. No mandatory interview is added. Never
   silently reverse a decision or invent approval. Do not copy raw ADR content
   into the spec beyond the relevant constraint and sourced disposition.
+  An OpenSpec requirement row is held the same way: a departure from a
+  `current` one cites the `OpenSpec:` line of its `answers.md` entry as the
+  source, and without a user-answered `replace`, `remove` or `rename` there is
+  no departure — the requirement stands.
 - **Identifiers are English words, never transliterations:** `order`, not
   `zakaz`. This holds for every name that travels through the spec, whatever
   the прогон's language. In existing code, the convention `codebase.md` records

@@ -14,6 +14,7 @@ import { configCommand } from './runtime/config.mts';
 import { memoryCommand } from './runtime/memory.mts';
 import { updateCommand } from './runtime/update-check.mts';
 import { commitsCheckCommand } from './runtime/commits-check.mts';
+import { openSpecIndexCommand } from './runtime/openspec.mts';
 import { returnsCheckCommand } from './runtime/execution-return.mts';
 import { planUnitsCommand } from './runtime/plan-units.mts';
 import { researchRecordCommand } from './runtime/technical-research.mts';
@@ -117,6 +118,11 @@ export async function main(args = process.argv.slice(2)): Promise<number> {
   }
   if (args[0] === '--commits-check') {
     const outcome = await commitsCheckCommand(args, RUN_DIR);
+    process.stdout.write(JSON.stringify(outcome.result) + '\n');
+    return outcome.code;
+  }
+  if (args[0] === '--openspec-index') {
+    const outcome = await openSpecIndexCommand(args, RUN_DIR);
     process.stdout.write(JSON.stringify(outcome.result) + '\n');
     return outcome.code;
   }

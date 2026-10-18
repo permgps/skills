@@ -713,6 +713,30 @@ export const RESEARCH_ANCHORS: readonly Anchor[] = [
 ];
 
 /**
+ * The literal text that carries «a project's OpenSpec requirements are read, and
+ * a closed run exports what it verified».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. Briefing runs the
+ * index and records the disposition on one line the closing publish reads for
+ * authority; the existing-code reader turns the requirements into decision
+ * rows; the spec cites the line for a departure. Whether a requirement is
+ * relevant to a требование is reader judgement, so no anchor stands for it.
+ * Who is handed `openspec/`, and who is denied it, is held by `npm run readers`.
+ */
+export const OPENSPEC_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/2-briefing.md', literal: 'node .maestro/sync.mts --openspec-index',
+    why: 'the index is read by the helper, so briefing and the export compare the same names' },
+  { file: 'phases/2-briefing.md', literal: 'OpenSpec: <capability> › <Requirement name> — keep | replace | remove | rename → <new name>',
+    why: 'the line is the only authority the export accepts for changing approved behaviour' },
+  { file: 'phases/2-briefing.md', literal: 'It is always the recommended option',
+    why: 'keep is what full self-briefs, so no self-briefed fork changes approved behaviour' },
+  { file: 'prompts/existing-code-reader.md', literal: 'OpenSpec requirements are decision records too',
+    why: 'approved requirements reach the spec and the G2 architecture reader as current records' },
+  { file: 'phases/3-spec.md', literal: 'cites the `OpenSpec:` line of its `answers.md` entry',
+    why: 'a spec departure from an approved requirement has a user-answered source' },
+];
+
+/**
  * The literal text that carries «existing code is read once, before the spec».
  *
  * Matched literally for the reason `MEMORY_ANCHORS` is. Preflight records
@@ -1502,6 +1526,7 @@ export async function checkBundle(
     for (const v of missingAnchors(byFile, INTERMITTENT_ANCHORS, 'intermittent')) add(v.check, v.file, v.line, v.message);
     for (const v of missingAnchors(byFile, RESEARCH_ANCHORS, 'research')) add(v.check, v.file, v.line, v.message);
     for (const v of missingAnchors(byFile, CODEBASE_ANCHORS, 'codebase')) add(v.check, v.file, v.line, v.message);
+    for (const v of missingAnchors(byFile, OPENSPEC_ANCHORS, 'openspec')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- the прогон says when a newer Maestro is out ----------------------------
