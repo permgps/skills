@@ -650,7 +650,7 @@ npm run check
 ```
 
 Final `npm run check` after the fixes: typecheck, all twelve validator runs and
-2,227 tests passed, with zero failures, skips or cancellations.
+2,229 tests passed, with zero failures, skips or cancellations.
 
 ## See Also
 

@@ -204,6 +204,21 @@ async function writeProgress(runRoot: string, state: RunState, repeated: boolean
   }
 }
 
+/**
+ * The export of a closing publish. `exportOpenSpecChange` never throws, but the
+ * context it is handed is read first; anything that raises there is still a
+ * `failed` export, so the publish and `PROGRESS.md` say so rather than
+ * carrying no key. `run` is injected by tests.
+ */
+export async function closingExport(runRoot: string, state: RunState, run: typeof exportForClosure = exportForClosure): Promise<OpenSpecExport | null> {
+  try { return await run(runRoot, state); }
+  catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    log.warn('openspec', '[FIX] export raised; reported as failed', { runId: state.runId, reason });
+    return { status: 'failed', change: `${MAESTRO_CHANGE_PREFIX}${runDirName(state)}`, problems: [`the export could not be run (${reason}) — publish the same closed state again to retry`] };
+  }
+}
+
 async function readPrevious(file: string): Promise<RunState | null> {
   try {
     const value = await loadCandidate(file);
@@ -379,12 +394,7 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
   let openspec: OpenSpecExport | null = null;
   if (errors.length === 0 && state.contractVersion >= 7 && state.lifecycle === 'closed') {
     // Before the progress file, so it can list what the export left to the user.
-    try { openspec = await exportForClosure(dir, state); }
-    catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      log.warn('openspec', '[FIX] export raised; reported as failed', { runId: state.runId, reason });
-      openspec = { status: 'failed', change: `${MAESTRO_CHANGE_PREFIX}${runDirName(state)}`, problems: [`the export could not be run (${reason}) — publish the same closed state again to retry`] };
-    }
+    openspec = await closingExport(dir, state);
     if (openspec) log.info('openspec', 'closing publish exported', { runId: state.runId, status: openspec.status, validation: openspec.validation ?? null });
     const forks = openspec ? [] : await closureForks(dir, state).catch(() => []);
     progress = await writeProgress(dir, state, previous?.lifecycle === 'closed', openSpecProgressItems(runDirName(state), openspec, forks));

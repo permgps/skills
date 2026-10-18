@@ -1995,7 +1995,7 @@ what it does not. D1 is amended above to allow naming the format.
   delta parser then found the check reading only the first copy of a repeated
   delta section, so an untraced SHALL could be exported, and REMOVED and
   RENAMED forms OpenSpec silently skips; both were fixed with regression tests,
-  and `npm run check` passed 2227 tests. No Maestro run on a real OpenSpec
+  and `npm run check` passed 2229 tests. No Maestro run on a real OpenSpec
   project has happened yet; the first one is the evidence D5 asks for.
   - **Gap:** Maestro reads code, memory, the glossary and decision records, but
     not `openspec/specs/`. A requirement there that the brief contradicts is

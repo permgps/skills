@@ -19,6 +19,7 @@ import {
 } from './openspec.ts';
 import { parseAnswers, parseOpenSpecDisposition } from '../gates/answers.ts';
 import type { RunState } from '../state/contract.ts';
+import { closingExport } from '../../skills/maestro/tools/runtime/publication.mts';
 
 const DIR = '2026-10-18-checkout';
 
@@ -454,4 +455,25 @@ test('closed_with_exceptions exports like completed, and the exception covers id
   const derived = await closureContext(path.join(tmpdir(), `maestro-openspec-none-${process.pid}`), state);
   assert.deepEqual([...derived.excepted].sort(), ['R01', 'R02']);
   assert.deepEqual([...derived.notInSpec], ['R03']);
+});
+
+test('an export that raises before it can report is still a failed export, not a missing key', async () => {
+  const state = { runId: 'run-1', contractVersion: 10, slug: 'checkout', dir: DIR } as unknown as RunState;
+  const raised = await closingExport('/nowhere/.maestro', state, async () => { throw new Error('answers.md vanished'); });
+  assert.deepEqual([raised?.status, raised?.change], ['failed', `maestro-${DIR}`]);
+  assert.match(raised!.problems![0]!, /could not be run \(answers\.md vanished\) — publish the same closed state again/);
+  assert.match(openSpecProgressItems(DIR, raised).knownBugs[0]!.text, /OpenSpec export failed/);
+  assert.equal(await closingExport('/nowhere/.maestro', state, async () => null), null, 'nothing to export stays nothing');
+});
+
+test('MODIFIED of the name a RENAMED pair goes to is refused with the reason, not as an unknown requirement', () => {
+  const rename: [string, Authorisation] = ['checkout › Receipt', { requirementId: 'R02', disposition: 'rename', renamedTo: 'Email receipt', userAnswered: true }];
+  const spec = [
+    '## RENAMED Requirements', '- FROM: `### Requirement: Receipt`', '- TO: `### Requirement: Email receipt`', '',
+    '## MODIFIED Requirements', '### Requirement: Email receipt', 'The system MUST email a receipt on request.', '',
+    '#### Scenario: Receipt sent', '- **WHEN** an order is paid', '- **THEN** a receipt is emailed', '',
+  ].join('\n');
+  const problems = checkOpenSpecDraft(draft({ 'specs/checkout/spec.md': spec, '.openspec.yaml': metadata({ 'checkout › Email receipt': ['R02'] }) }), context({}, [rename])).join(' ');
+  assert.match(problems, /MODIFIED "checkout › Email receipt" changes a requirement this change also renames — .*export the rename alone/);
+  assert.doesNotMatch(problems, /is not an approved requirement/);
 });

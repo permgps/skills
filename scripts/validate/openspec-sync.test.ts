@@ -235,6 +235,8 @@ test('row 6: a draft that maps a deferred requirement is refused, nothing is wri
     assert.match(result.problems![0]!, /maps R19, which is dropped, deferred or a placeholder/);
     assert.equal(await exists(changeDir(target)), false);
     assert.match((await progressOf(target)).knownBugs.find(entry => entry.key === `${LANDED}#openspec`)?.text ?? '', /OpenSpec export refused/);
+    assert.match(closed.stderr, /WARN \[openspec\.export\] \[FIX\] draft refused .*"problems":1/);
+    assert.doesNotMatch(closed.stderr, /maps R19/, 'a problem can quote the draft, so it is counted, never logged');
   } finally { await target.dispose(); }
 });
 
