@@ -719,12 +719,20 @@ export async function readDraft(draftDir: string, problems: string[]): Promise<D
 export type OpenSpecRunner = (args: readonly string[], cwd: string, timeoutMs: number) =>
   Promise<{ outcome: 'missing' } | { outcome: 'timeout' } | { outcome: 'exited'; code: number; output: string }>;
 
+/**
+ * The OpenSpec command line reports telemetry and checks for updates over the
+ * network unless told not to. The helper makes one optional outbound request of
+ * its own and no other, so the CLI runs with both switched off through the
+ * variables OpenSpec itself honours.
+ */
+export const QUIET_ENV: Readonly<Record<string, string>> = { DO_NOT_TRACK: '1', OPENSPEC_TELEMETRY: '0', OPENSPEC_NO_UPDATE_CHECK: '1' };
+
 export const defaultRunner: OpenSpecRunner = (args, cwd, timeoutMs) => new Promise(resolve => {
   let output = '';
   let settled = false;
   const finish = (value: Awaited<ReturnType<OpenSpecRunner>>): void => { if (!settled) { settled = true; resolve(value); } };
   let child: ChildProcess;
-  try { child = spawn('openspec', [...args], { cwd, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }); }
+  try { child = spawn('openspec', [...args], { cwd, env: { ...process.env, ...QUIET_ENV }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }); }
   catch { finish({ outcome: 'missing' }); return; }
   const timer = setTimeout(() => { child.kill('SIGKILL'); finish({ outcome: 'timeout' }); }, timeoutMs);
   const take = (chunk: Buffer): void => { if (output.length < 64 * 1024) output += chunk.toString('utf8'); };
@@ -825,6 +833,17 @@ export async function exportOpenSpecChange(input: ExportInput): Promise<OpenSpec
       return { status: 'refused', change, problems: ['openspec/changes resolves outside the project — the export writes only inside it'], ...extra };
     }
 
+    // Archived first: once the user merged the change, its ADDED requirements
+    // are in openspec/specs, and checking the draft again would refuse it for
+    // exactly the merge it asked for.
+    const target = path.join(changesDir, change);
+    let existing: Stats | null = null;
+    try { existing = await lstat(target); } catch { existing = null; }
+    if (existing === null && index.archived.some(item => item.change === change)) {
+      log.info('export', 'change already archived by the user; left alone', { change });
+      return { status: 'archived', change, ...extra };
+    }
+
     const problems: string[] = [];
     const files = await readDraft(draftDir, problems);
     problems.push(...checkOpenSpecDraft(files, { ...input.context, dir: input.dir, index }));
@@ -833,13 +852,6 @@ export async function exportOpenSpecChange(input: ExportInput): Promise<OpenSpec
       return { status: 'refused', change, problems: capped(problems), ...extra };
     }
 
-    const target = path.join(changesDir, change);
-    let existing: Stats | null = null;
-    try { existing = await lstat(target); } catch { existing = null; }
-    if (existing === null && index.archived.some(item => item.change === change)) {
-      log.info('export', 'change already archived by the user; left alone', { change });
-      return { status: 'archived', change, ...extra };
-    }
     if (existing !== null) {
       const owner = existing.isDirectory() && !existing.isSymbolicLink() ? await readMaestroRun(target) : null;
       if (owner !== input.dir) {

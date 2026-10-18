@@ -130,7 +130,7 @@ const exists = async (file: string): Promise<boolean> => { try { await stat(file
 async function fakeOpenSpec(code: number, output: string): Promise<{ pathValue: string; dispose(): Promise<void> }> {
   const bin = await mkdtemp(path.join(tmpdir(), 'maestro-openspec-bin-'));
   const script = path.join(bin, 'openspec');
-  await writeFile(script, `#!/bin/sh\necho "$@" > "${bin}/args"\necho '${output}'\nexit ${code}\n`);
+  await writeFile(script, `#!/bin/sh\necho "$@" > "${bin}/args"\necho "$DO_NOT_TRACK $OPENSPEC_TELEMETRY $OPENSPEC_NO_UPDATE_CHECK" > "${bin}/env"\necho '${output}'\nexit ${code}\n`);
   await chmod(script, 0o755);
   return { pathValue: [bin, BARE_PATH].join(path.delimiter), dispose: () => rm(bin, { recursive: true, force: true }) };
 }
@@ -294,6 +294,7 @@ test('row 11: the OpenSpec CLI is called with the strict flags; exit 1 is a fail
     assert.deepEqual([result.status, result.validation, result.problems], ['written', 'failed', ['ERROR maestro change: Why too short']]);
     const bin = path.dirname(cli.pathValue.split(path.delimiter)[0]! + '/x');
     assert.equal((await readFile(path.join(bin, 'args'), 'utf8')).trim(), `validate ${CHANGE} --type change --strict --json --no-interactive`);
+    assert.equal((await readFile(path.join(bin, 'env'), 'utf8')).trim(), '1 0 1', 'the CLI runs with its telemetry and update check off');
     assert.match((await progressOf(target)).knownBugs.find(entry => entry.key === `${LANDED}#openspec-validation`)?.text ?? '', /openspec validate rejected/);
   } finally { await target.dispose(); await cli.dispose(); }
 });

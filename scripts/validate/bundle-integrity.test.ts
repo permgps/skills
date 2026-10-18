@@ -1822,6 +1822,17 @@ test('the OpenSpec anchors hold the index command, the line shape, keep as the r
   }
 });
 
+test('a bundle file outside the D1 homes that names OpenSpec is a finding, and the shipped bundle has none', async () => {
+  await withShippedCopy(async copy => {
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'openspec-homes'), []);
+    const file = path.join(copy, 'phases/6-review.md');
+    await writeFile(file, (await readFile(file, 'utf8')) + '\nAlso update openspec/specs.\n');
+    const findings = (await checkBundle(copy)).filter(v => v.check === 'openspec-homes');
+    assert.deepEqual(findings.map(v => v.file), ['phases/6-review.md']);
+    assert.match(findings[0]!.message, /outside the homes ROADMAP D1 allows/);
+  });
+});
+
 test('sync.mts dispatches --openspec-index, so briefing and closure reach the index', async () => {
   const sync = await readFile('skills/maestro/tools/sync.mts', 'utf8');
   assert.ok(sync.includes("args[0] === '--openspec-index'"), 'sync.mts dispatches no --openspec-index; the index call would fall through to a refresh');

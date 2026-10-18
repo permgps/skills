@@ -259,3 +259,19 @@ test('sync.mts --openspec-index prints the index of the project the copied scrip
     assert.match(run.stderr, /INFO \[openspec\.index\] openspec index read/);
   } finally { await project.dispose(); }
 });
+
+test('the reader fixture project indexes the way its expected outcome says', async () => {
+  const { prepareOpenSpecProject, RUN_DIR } = await import('../validate/fixtures/openspec/scenarios.mts');
+  const root = await mkdtemp(path.join(tmpdir(), 'maestro-openspec-fixture-'));
+  try {
+    await prepareOpenSpecProject(root, { closedRun: true });
+    const index = await readOpenSpecIndex(root);
+    assert.deepEqual(index.capabilities.map(capability => [capability.capability, capability.requirements.map(requirement => requirement.name)]), [
+      ['checkout', ['Card payment', 'Receipt']],
+      ['identity/user-auth', ['Sign in by email link']],
+    ]);
+    assert.deepEqual(index.changes, [{ name: 'add-dark-mode', maestroRun: null }, { name: 'maestro-2026-10-01-menu', maestroRun: '2026-10-01-menu' }]);
+    assert.deepEqual(index.archived.map(item => item.change), ['maestro-2026-09-19-cart']);
+    assert.match(RUN_DIR, /^\d{4}-\d{2}-\d{2}-[a-z0-9-]+$/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

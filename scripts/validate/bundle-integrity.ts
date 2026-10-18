@@ -723,6 +723,18 @@ export const RESEARCH_ANCHORS: readonly Anchor[] = [
  * relevant to a требование is reader judgement, so no anchor stands for it.
  * Who is handed `openspec/`, and who is denied it, is held by `npm run readers`.
  */
+/**
+ * The bundle files that may name OpenSpec. ROADMAP D1 forbids referencing an
+ * external project, amended for this one format: the name lives only where the
+ * bundle reads or writes it. A new mention elsewhere is either a new home,
+ * added here and to D1 deliberately, or drift. Only Markdown is walked; the
+ * runtime homes D1 lists are held by review.
+ */
+export const OPENSPEC_HOMES: readonly string[] = [
+  'SKILL.md', 'phases/2-briefing.md', 'phases/3-spec.md', 'phases/7-acceptance.md', 'phases/9-memory.md',
+  'phases/10-openspec.md', 'prompts/existing-code-reader.md', 'prompts/acceptance-reader.md', 'prompts/openspec-writer.md',
+];
+
 export const OPENSPEC_ANCHORS: readonly Anchor[] = [
   { file: 'phases/2-briefing.md', literal: 'node .maestro/sync.mts --openspec-index',
     why: 'the index is read by the helper, so briefing and the export compare the same names' },
@@ -1541,6 +1553,11 @@ export async function checkBundle(
     for (const v of missingAnchors(byFile, RESEARCH_ANCHORS, 'research')) add(v.check, v.file, v.line, v.message);
     for (const v of missingAnchors(byFile, CODEBASE_ANCHORS, 'codebase')) add(v.check, v.file, v.line, v.message);
     for (const v of missingAnchors(byFile, OPENSPEC_ANCHORS, 'openspec')) add(v.check, v.file, v.line, v.message);
+    for (const [file, text] of byFile) {
+      if (OPENSPEC_HOMES.includes(file)) continue;
+      const line = text.split('\n').findIndex(row => /openspec/i.test(row));
+      if (line >= 0) add('openspec-homes', file, line + 1, 'names OpenSpec outside the homes ROADMAP D1 allows — move the rule into a phase that reads or writes the format, or add this file to OPENSPEC_HOMES and to D1 together');
+    }
   }
 
   // --- the прогон says when a newer Maestro is out ----------------------------

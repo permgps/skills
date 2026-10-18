@@ -255,6 +255,18 @@ test('a change the user already archived is reported archived and not written ag
   } finally { await p.dispose(); }
 });
 
+test('after the user archived the change, its merged requirements are in the specs, and a retry still reports archived', async () => {
+  const merged = MAIN_SPEC + ADDED.replace('## ADDED Requirements\n', '');
+  const p = await project({
+    'openspec/specs/checkout/spec.md': merged,
+    [`openspec/changes/archive/2026-10-19-maestro-${DIR}/proposal.md`]: 'merged\n',
+  });
+  try {
+    assert.deepEqual(await exportOf(p), { status: 'archived', change: `maestro-${DIR}` });
+    assert.equal(await readFile(path.join(p.root, 'openspec/specs/checkout/spec.md'), 'utf8'), merged);
+  } finally { await p.dispose(); }
+});
+
 test('a refused draft writes nothing, and stopped_incomplete or a missing draft exports nothing', async () => {
   const p = await project({ [`.maestro/${DIR}/openspec/tasks.md`]: '' });
   try {
