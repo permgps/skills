@@ -38,7 +38,14 @@ contradicts — and by then the бриф is the one document nobody is re-readin
   limited to run artifacts, the project memory file, and version control. Run
   artifacts include `.maestro/`'s own files beside the run directories — the
   register `README.md`, `config.json` and `PROGRESS.md`. Every other path in
-  the repository belongs to an executor. The project glossary is
+  the repository belongs to an executor. One more path is a run artifact in a
+  project with OpenSpec: `openspec/changes/maestro-<dir>/`, the change the
+  closing publish writes and owns whole by its `x-maestro-run` key. It is
+  written by the helper, never by hand, never through a symlink that leaves
+  the project, and never beside another change, into `openspec/specs/` or into
+  `openspec/changes/archive/`. S2 covers it: the draft is redacted before the
+  closing publish, and the memory phase's redaction covers it again before the
+  closing commit. The project glossary is
   the user's file, not the project memory file: a прогон reads it at preflight
   and writes into it nowhere.
 - **S4 asks even in the no-questions mode.** That mode buys the user freedom from

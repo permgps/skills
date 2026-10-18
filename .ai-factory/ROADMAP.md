@@ -8,7 +8,7 @@ These were settled in the planning interview on 2026-08-19 and constrain every m
 
 | # | Decision | Consequence |
 |---|---|---|
-| D1 | **Hybrid derivation.** Prompt text (`SKILL.md`, `phases/`) is written from our own behavior spec. Technical artifacts (state schema, dashboard HTML) are our own implementation of the same data contract. | No third-party file is copied, so no attribution file is carried and no external project is referenced anywhere in this repository. |
+| D1 | **Hybrid derivation.** Prompt text (`SKILL.md`, `phases/`) is written from our own behavior spec. Technical artifacts (state schema, dashboard HTML) are our own implementation of the same data contract. | No third-party file is copied, so no attribution file is carried and no external project is referenced anywhere in this repository. **Amended 2026-10-18:** the rule kept derivation clean, and it also forbade naming a format a target project already uses. One external format is now named, OpenSpec, and only as an interoperability target. Maestro reads a project's OpenSpec requirements and, after a closed run, writes one change folder in that format. The name lives in `phases/10-openspec.md`, `prompts/openspec-writer.md`, `tools/runtime/openspec.mts`, their sections in `docs/spec/`, their tests and hand-written fixtures, and the user documentation — nowhere else in the bundle. No OpenSpec file is copied, so the consequence about attribution still holds. |
 | D2 | **One self-contained skill.** A single `maestro` skill; all rules live in `phases/`, read one file at a time, at the moment that phase starts. **Amended 2026-08-19:** the bundle also carries `tools/sync.py`. | The seven companion skills previously drafted in `DESCRIPTION.md` are cancelled. `DESCRIPTION.md` is rewritten, not amended. The amendment is the first non-Markdown file in the bundle: the first end-to-end прогон showed that the state-mirroring ritual runs dozens of times per run, and a ritual performed by hand drifts. Its cost is stated where it lives — `bundle-integrity.ts` walks `.md`, so nothing at `npm run check` covers that file. |
 | D3 | **Claude Code is the v1 host.** Real subagent fan-out and worktree isolation are assumed. **Amended 2026-08-19:** assumed is not established. The first end-to-end прогон committed normally and could not raise a worktree — the host settles whether it is inside a repository at session start, and the прогон's `git init` came later. | Other hosts are a later milestone with their degradation documented, not silently tolerated. The amendment makes the same true of this host: the three degrading capabilities are probed in preflight on every host, the phase that spends one carries the cost of its absence, and `npm run hosts` fails when a degradation declared in `docs/spec/hosts.md` has no home in the bundle. |
 | D4 | **Everything a прогон writes to a file is English.** Russian appears only in the chat and in dashboard labels. **Narrowed 2026-08-21:** the rule said "everything written to a file", and the second skill made the width matter. | The brief is translated once, in Phase 1. The numbered manifest is shown to the user before any other work, so the contract is agreed rather than silently substituted. In the no-questions mode it is shown without a prompt, and doubtful wordings are listed under Assumptions in the final report. The narrowing is a stated scope boundary rather than an exception: D4's own reason is that a run's artifacts "are read by the next прогон and by whoever maintains the project afterwards", and Scout's ТЗ draft is read by neither — it is read once, by its author, deciding what to paste. Writing it in English would perform a translation nothing checks and then break the check that exists: Maestro translates an already-English бриф **zero times**, and shows the манифест with no original line beneath each требование, which switches off the round-trip check precisely where the contract was not the user's own words. Everything Scout writes that a maintainer reads — its specification, its bundle — is English exactly as before. **Narrowed again 2026-09-27:** the additions block of `brief.md` is a second, and its reason is a different one. Everything the user says about the бриф after it was frozen is appended there verbatim, in the language they said it in. It is a **quotation**, and a quotation keeps the language it was said in — the same rule the отчёт already follows when it quotes a `ru` прогон's findings inside an English file. The reason this one is not merely consistent but necessary is what reads it: the additions are handed to the G4 reader, which measures the build against the user's words with the прогон's paraphrase taken away, and a ruler the прогон translated is a ruler the прогон wrote. Translating them would perform a translation nothing checks, in the one place whose whole purpose is to not be measuring against something the прогон wrote. Everything else the прогон writes, `brief.md`'s own frozen text included, stays English. |
@@ -1973,6 +1973,48 @@ require writing new ADRs; targeted technical research does not make Scout a
 producer of run artifacts; stronger intermittent evidence does not remove any
 repair limit. Existing task-frontier scheduling, vertical slices, red-observed
 tests and per-task handoffs already cover those parts of the source material.
+
+### OpenSpec Interoperability — 2026-10-18
+
+Requested by the user after an exploration recorded in `.ai-factory/RESEARCH.md`.
+No прогон on an OpenSpec project has run yet, so this is not evidence of the D5
+kind; it is a requested capability, and the milestone states what it proves and
+what it does not. D1 is amended above to allow naming the format.
+
+- [ ] **OpenSpec Requirements Are Read, And A Closed Run Exports What It Verified**
+  — a project that keeps its behaviour in OpenSpec gets a run that cannot
+  silently break an approved requirement, and that hands back what it verified
+  in the project's own format.
+  - **Gap:** Maestro reads code, memory, the glossary and decision records, but
+    not `openspec/specs/`. A requirement there that the brief contradicts is
+    invisible until something breaks. And what a run verified at G4 stays
+    inside `.maestro/`, in a shape the project's own specification tool cannot
+    merge.
+  - **Scope, read side:** a project is OpenSpec-initialised when
+    `openspec/config.yaml` or `.yml` exists. Briefing reads the requirement
+    index and treats a contradiction as the existing «бриф contradicts the
+    existing code» fork, with every mode keeping its handling. The
+    existing-code reader carries the relevant requirements as rows of its
+    *Architectural decisions* section. G4 withholds `openspec/`.
+  - **Scope, write side:** after the closure decision, and only for `completed`
+    or `closed_with_exceptions`, a writer drafts one change in
+    `.maestro/<dir>/openspec/`. The closing publish checks it against the
+    verification projection and `answers.md`, then writes
+    `openspec/changes/maestro-<dir>/`. Only passed requirements are exported,
+    each scenario comes from a recorded check, and MODIFIED, REMOVED and
+    RENAMED appear only where the user answered a fork. Maestro never writes
+    `openspec/specs/` and never runs `openspec archive`; `PROGRESS.md` lists
+    the unarchived change. An export failure never fails the publish.
+  - **Acceptance evidence:** hand-written fixtures exercise detection, the
+    index bounds, every export status and every refusal together with the
+    legal inputs it must still accept. A second run in the same project sees
+    the first run's change. A real OpenSpec CLI validates and archives a
+    fixture export; that check is manual, needs network and stays outside
+    `npm run check`. Whether a requirement is relevant to the brief remains
+    reader judgement.
+  - **Cost:** nothing for a project without OpenSpec. The phase file and the
+    writer brief are read only when OpenSpec is present and the run closed
+    with an outcome that exports.
 
 ## Completed
 

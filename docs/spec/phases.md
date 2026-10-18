@@ -18,10 +18,14 @@ right thing was built.
 | acceptance | Acceptance | yes | current manifest/additions, raw reference, integrated build, verification record | reconciled acceptance round, `report.md`, `PROGRESS.md` (through the closing publish) |
 | memory | Memory | no | `discovered-interfaces.md`, `spec.md`, the Terms table of `interfaces.md`, the seam-level items of `reviews/standards.md`, the `noCorrectSeam:` lines of repeated repairs' diagnoses, `prior.md`, project code, run state | the memory block in the host's memory file, `decisions.md` |
 | repair | Repair | no | whatever one of its six doors provides | retried таск, `amendments.md` |
+| openspec | OpenSpec Export | no | the OpenSpec index, `manifest.md`, `answers.md`, `spec.md`, task titles, the verification projection | the draft in `.maestro/<dir>/openspec/`; the closing publish writes `openspec/changes/maestro-<dir>/` |
 
 `memory` runs twice — once during `build`, when the
 build discovers something worth outliving the run, and once after `acceptance`,
 when the finished code can be described. `repair` runs on demand, through the six doors its own section lists.
+`openspec` runs at most once per closure, after the closure decision and before
+the closing publish, and only in a project that keeps OpenSpec requirements
+(*OpenSpec Export* below).
 
 ## A Change That Arrives Mid-Прогон
 
@@ -122,6 +126,49 @@ already knows.
   `Chosen:` line, and that text is shown back to the user. The entry shape is in
   [`artifacts.md`](artifacts.md), and [`gates.md`](gates.md) states what G1
   checks of it.
+
+### Existing OpenSpec Requirements
+
+A project may keep its approved behaviour in OpenSpec: one `spec.md` per
+capability under `openspec/specs/`, each requirement under a
+`### Requirement: <name>` heading. A requirement there was approved by the
+user, so a бриф that contradicts it is the row above — a бриф that contradicts
+the existing code — and nothing new.
+
+**Detection is a file, not a directory.** A project is OpenSpec-initialised
+when `openspec/config.yaml` or `openspec/config.yml` is a regular file inside
+the project root. A bare `openspec/` directory, or a legacy tree with only
+`openspec/project.md`, is not. Nothing is recorded in the run state: the
+helper derives the answer from the tree on every read, so a resumed phase gets
+the same answer.
+
+**The index.** At briefing entry the phase runs
+`node .maestro/sync.mts --openspec-index`. The helper prints, as JSON, whether
+OpenSpec is present, each capability (nested paths allowed) with its
+requirement names and their scenario names, the in-flight changes with the run
+that wrote them when one did, and the archived changes a Maestro run wrote. A
+requirement name is compared as OpenSpec compares it: trimmed, a trailing run of
+`#` removed, case kept. The index is bounded: at most 500 spec files and 256 KB
+per file. Past either bound, or with a file it could not read, it says
+`incomplete` and why, and never throws.
+
+**The reading.** The phase reads the names, then opens only the spec files of
+capabilities a требование touches. A contradiction is a fork. The sentence of
+the бриф and the requirement, named `<capability> › <Requirement name>`, are both
+quoted, and the options are `keep` (the approved requirement stands and the
+требование bends to it), `replace` or `remove` (the user changes the approved
+behaviour), and `rename` where only the name is wrong. An agreement is a fact
+about the repository: `Settled by reading:`. Every mode keeps its own handling
+of a fork. `full` self-briefs the recommended option, which is `keep`, because
+changing approved behaviour is the user's call. An incomplete index is one
+stated assumption, never proof that no requirement conflicts.
+
+**The record.** The entry in `answers.md` carries one `OpenSpec:` line beside
+its `Chosen:` line:
+`OpenSpec: <capability> › <Requirement name> — keep | replace | remove | rename → <new name>`.
+Only a line on an entry the user answered authorises a change to approved
+behaviour later. A self-briefed `replace` does not exist, because `full`
+self-briefs `keep`.
 
 ## Specification
 
@@ -224,6 +271,17 @@ context and to this reader's return. G4 receives neither.
 Relevance, status interpretation and trade-off strength remain reader judgement.
 Repository checks hold the declared rules and handoffs, not the correctness of
 every real discovery. The fixture scenarios exercise bounded examples only.
+
+**OpenSpec requirements are decision records here.** In a project with
+OpenSpec, `openspec/specs/` and `openspec/changes/` are a documented decision
+location. Relevant requirements become rows of the seventh section, keyed
+`openspec/specs/<capability>/spec.md › <Requirement name>`. A requirement in the
+main specs is `current`. So is one in an unarchived change a Maestro run wrote,
+`openspec/changes/maestro-<dir>/`, because that behaviour was built and
+verified and only the merge is the user's. Any other in-flight change is
+`historical`: a proposal, not approved behaviour. No eighth section is added,
+and the reader never edits these files. An unexplained contradiction cannot
+pass G2, as for any current record.
 
 ### Uncertain External Contracts
 
@@ -1243,6 +1301,82 @@ behaviour of every gate lives: G4 is the one gate that cannot send its phase
 back, so each disagreement travels to repair through the таски carrying its
 `R##`, and приёмка runs again once the build has changed.
 
+## OpenSpec Export
+
+A run that closed knows, requirement by requirement, what it verified. In a
+project that keeps OpenSpec requirements, this phase hands that back as one
+OpenSpec change, so the project's own tool can merge it. It is read only when
+the index reports OpenSpec present and the closure decision is `completed` or
+`closed_with_exceptions`. A `stopped_incomplete` closure exports nothing: the
+behaviour is partly built, and a resumed run closes again anyway.
+
+**Never before G4.** Anything derived from the run's own restatement of the
+requirements, placed in the tree before the blind reader finishes, is a ruler
+the run wrote. So the draft is written after the closure decision of
+acceptance's step 5, or of repair's closure, and the export lands with the
+closing publish. G4 also withholds `openspec/` itself, because earlier runs'
+exports sit in the tree the reader inspects ([`gates.md`](gates.md)).
+
+**The draft.** One fresh writer on `strong` writes into `.maestro/<dir>/openspec/`
+and nowhere else:
+
+- `proposal.md`, with `## Why` (50 to 1000 characters) and `## What Changes`.
+  It names every requirement left out and why;
+- `tasks.md`, the run's таски as `## 1. <group>` with `- [x] 1.1 <title>`;
+- `design.md`, optional, drawn from the spec entries of the exported
+  requirements. `decisions.md` does not exist yet: the memory phase writes it
+  after this one;
+- `specs/<capability>/spec.md`, one delta per capability. `## ADDED Requirements`
+  is the default. `## MODIFIED Requirements`, `## REMOVED Requirements` and
+  `## RENAMED Requirements` appear only for a fork the user answered `replace`,
+  `remove` or `rename`. Each requirement states SHALL or MUST and carries at
+  least one `#### Scenario:` drawn from a recorded check execution: no
+  evidence, no scenario. A MODIFIED block restates the whole requirement, with
+  every scenario the current one has;
+- `.openspec.yaml`, with `schema: spec-driven`, `created: <YYYY-MM-DD>`,
+  `x-maestro-run: <dir>` and `x-maestro-requirements`, which maps each exported
+  requirement name to the `R##` it came from. OpenSpec never reads a lowercase
+  `x-` key. A new capability is named once and pinned there, so a re-closure
+  reproduces it; an existing capability is reused when the requirement fits.
+
+**What is never exported.** A requirement that failed or is incomplete in the
+verification projection. A dropped or deferred one. One whose finding an
+accepted exception covers, because the exception keeps the failure. One whose
+fork was answered `keep`, or self-briefed. Each is named in `proposal.md`. A
+deferred, placeholder or failed one is already listed in `PROGRESS.md`. A
+`keep` fork adds a *Not Done* item, because the brief and the approved
+behaviour still disagree in the user's words.
+
+**The closing publish writes it.** On a closing publish of a `completed` or
+`closed_with_exceptions` state, after the run directory is relocated and before
+`PROGRESS.md` is written, the helper checks the draft against the published
+state and `answers.md`, and writes `openspec/changes/maestro-<dir>/`. A failure
+never fails the publish. The result carries an `openspec` object, and
+`PROGRESS.md` is written knowing it:
+
+| Draft and target | `openspec.status` | `PROGRESS.md` |
+|---|---|---|
+| no OpenSpec, or no draft | key absent | unchanged |
+| the draft passes every check; the folder is absent or ours and different | `written`, with `validation` `passed`, `failed` or `unavailable` | *Not Done*: the change awaits `openspec archive`; *Known Bugs* when `validation` is `failed` |
+| the folder is ours and identical | `kept` | as for `written` |
+| a requirement maps to an `R##` that is not passed, or a delta kind the user did not authorise, or a near-miss name | `refused`, nothing written, `problems[]` | *Known Bugs*: the export was refused, with the first problem |
+| the folder exists and another owner wrote it | `refused` (collision), untouched | *Known Bugs* |
+| the folder is gone and `archive/<date>-maestro-<dir>/` exists | `archived`, untouched | no archive item |
+| a write failed | `failed` | *Known Bugs*; an identical retry repairs it |
+
+`validation` comes from the OpenSpec command line when it is installed:
+`openspec validate maestro-<dir> --type change --strict --json --no-interactive`,
+bounded at 30 seconds. Without it, `validation` is `unavailable` and the
+limitation is said. The helper never runs `openspec archive` and never writes
+`openspec/specs/`, `archive/` or another change: merging is the user's step,
+and the change folder is the only thing outside `.maestro/` a run owns whole.
+
+**After the publish** the phase tells the user in one line where the change
+is, its status, and that `openspec archive maestro-<dir>` is theirs to run. A
+`refused` or `failed` status is said, not stopped on. The memory phase's
+closing commit takes the folder by pathspec when the status is `written` or
+`kept`.
+
 ## Memory
 
 The next session starts cold. Everything the прогон worked out — why a boundary
@@ -1264,7 +1398,9 @@ redaction this phase runs over what it writes, the прогон's last commit is
 by pathspec: `git add -- .maestro <memory file>` and
 `git commit -m "maestro: close <dir>" -m "Maestro-Run: <dir>" -- .maestro <memory file>`,
 where `<dir>` is the run directory without `--wip` and `<memory file>` is the
-file the helper named. Nothing the user staged is taken. That subject is fixed:
+file the helper named. When the closing publish reported `openspec.status`
+`written` or `kept`, `openspec/changes/maestro-<dir>` joins both pathspecs.
+Nothing the user staged is taken. That subject is fixed:
 preflight finds the last closure by it. Without version control the step is
 said once and skipped. During build nothing is committed by this phase, and
 with nothing to write the helper is not called.

@@ -27,12 +27,16 @@ project that was built, not with Maestro.
 │   ├── report.md
 │   ├── decisions.md
 │   ├── amendments.md
+│   ├── openspec/                (the OpenSpec draft, only in a project with OpenSpec)
 │   └── state.js                 (the run's last state, kept when the next run starts)
 ├── README.md                    (the register: one row per run of contract 7 or later)
 ├── PROGRESS.md                  (where the work stands, rewritten by every closing publish)
 ├── config.json
 ├── state.js
 └── dashboard.html
+
+<target-project>/openspec/changes/maestro-<YYYY-MM-DD>-<feature-slug>/
+                                 (one OpenSpec change per closed run, only in a project with OpenSpec)
 ```
 
 **`config.json` is the one setting that outlives the run that created it.** It
@@ -103,7 +107,7 @@ actually built.
 | `prior.md` | preflight | briefing, spec, plan, memory | no |
 | `codebase.md` | spec | spec, plan, build, repair, G2 architecture, G3 consistency | no |
 | `research/Qnn.json` | spec | coordinator in spec, plan, build and repair; only selected facts reach spec/tasks | no |
-| `answers.md` | briefing | spec, G1, G2 architecture | append-only |
+| `answers.md` | briefing | spec, G1, G2 architecture, the OpenSpec writer, the closing publish (its `OpenSpec:` lines) | append-only |
 | `reference.md` | briefing | G2 reference reader, acceptance reference reader; the plan cites its ids into task files | append-only |
 | `spec.md` | spec | plan, build, review, G2 intent, G2 architecture | yes, by amendment only |
 | `interfaces.md` | plan | build, review, G3, memory | no |
@@ -119,6 +123,8 @@ actually built.
 | `evidence/<execution-id>/...` | acceptance | verification validator, acceptance | no |
 | `decisions.md` | memory | the user, a later прогон's preflight | append-only |
 | `amendments.md` | repair | build, review, acceptance | append-only |
+| `openspec/` (in the run directory) | openspec | the closing publish | yes, rewritten whole until the closing publish takes it |
+| `openspec/changes/maestro-<dir>/` | openspec | the user, OpenSpec, a later прогон's briefing and existing-code reader | yes, rewritten whole by its own run's closing publish until the user archives it |
 | `config.json` | preflight | preflight | yes |
 | `README.md` | preflight | the user, a later прогон | yes, its owned rows rewritten by publication |
 | `PROGRESS.md` | acceptance | the user, a later прогон's preflight | yes, rewritten whole by every closing publish |
@@ -263,6 +269,7 @@ Chosen: Оплата картой на сайте
 | `Options:` | the numbered options; exactly one carries `(recommended — <reason>)`, and it is the answer `full` would self-brief |
 | `Answer:` | the user's reply verbatim, or `self-briefed` for a fork the прогон settled itself |
 | `Chosen:` | the full text of the option the reply selected, or `own answer`; an earlier decision's `follows …` / `contradicts …` citation goes at its end |
+| `OpenSpec:` | only on a fork against an approved OpenSpec requirement: `<capability> › <Requirement name> — keep \| replace \| remove \| rename → <new name>`, one line ([`phases.md`](phases.md), *Existing OpenSpec Requirements*) |
 
 A delegated reply — «как советуешь», a bare «да» — is why `Chosen:` exists. The
 acceptance reader never sees the question, so the reply alone has lost the
@@ -363,6 +370,13 @@ comparison of them has two answers to choose from.
   round's `report.md` is written, because the отчёт names files inside the
   directory. The отчёт also cites run artifacts by paths relative to its own
   directory, so a later reopening cannot break it.
+- `openspec/changes/maestro-<dir>/` is the one thing outside `.maestro/` a
+  прогон owns whole. Its `.openspec.yaml` names the run in `x-maestro-run`, and
+  that key, not the folder name, is what makes it the run's. A folder of the
+  same name without it is never overwritten. When the user archives the change,
+  OpenSpec moves it to `openspec/changes/archive/<date>-maestro-<dir>/` and
+  merges it into `openspec/specs/`; neither is ever written by a прогон. The
+  closing commit takes the folder by pathspec, beside `.maestro`.
 - Runs from before contract 7 keep the names they were written under. Commits
   and отчёты the user already has point at them, so they are never renamed.
 

@@ -738,6 +738,20 @@ the run, closing instant and outcome, it reports `progress: kept`, preserving
 the original commit and user fixes. Active candidates leave the file alone and
 carry no `progress`. Reopen followed by closure regenerates the file.
 
+**The OpenSpec export.** The same closing publish, for a `completed` or
+`closed_with_exceptions` candidate whose run directory holds an `openspec/`
+draft, checks the draft and writes `openspec/changes/maestro-<dir>/` after the
+relocation and before `PROGRESS.md`. The result carries
+`openspec: { status, change, validation?, problems? }`, where `status` is
+`written`, `kept`, `refused`, `archived` or `failed`, and `validation` is
+`passed`, `failed` or `unavailable` on `written` and `kept`. `problems` lists
+what to fix, at most twenty entries. No state field records it and the
+contract version does not change: the draft and the tree are the facts, and a
+retry of the same closed publish derives the same answer. A publish without a
+draft, an active candidate, and a `stopped_incomplete` closure carry no
+`openspec` key. A failure never undoes the publish ([`phases.md`](phases.md),
+*OpenSpec Export*).
+
 `--validate <candidate>` and `--project <candidate>` are read-only: no state,
 diagnostic, snapshot, viewer or opener writes. JSON actions emit one result on
 stdout: exit 0 for valid/current/legacy/published, 1 for invalid/rejected state,
