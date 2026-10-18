@@ -586,6 +586,14 @@ test('a judge on a standard row is reported, wherever the row is', async () => {
   assert.match(found[0]!.message, /reviewer\.md is a judge and role "second look" runs it on standard — a judge never runs below what it judges/);
 });
 
+test('a producer on a standard row is reported, and on strong it passes', async () => {
+  const briefs = ['existing-code-reader.md', 'executor.md', 'reviewer.md', 'openspec-writer.md'];
+  assert.deepEqual(await tiersFor([...TIER_ROWS, '| OpenSpec writer | `openspec-writer.md` | `strong` |'], briefs), []);
+  const found = await tiersFor([...TIER_ROWS, '| OpenSpec writer | `openspec-writer.md` | `standard` |'], briefs);
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.message, /openspec-writer\.md is a producer and role "openspec writer" runs it on standard — producers run strong/);
+});
+
 test('the таск\'s tier on a brief that builds no таск is reported', async () => {
   const found = await tiersFor([...TIER_ROWS.slice(0, 4), '| reviewer | `reviewer.md` | the таск\'s |']);
   assert.ok(found.some(v => /role "reviewer" takes the таск's tier, but reviewer\.md builds no таск/.test(v.message)), JSON.stringify(found));
@@ -601,7 +609,7 @@ test('a shipped brief no list classifies is reported on the brief itself', async
   const found = await tiersFor([...TIER_ROWS, '| scout | `scout.md` | `strong` |'], ['existing-code-reader.md', 'executor.md', 'reviewer.md', 'scout.md']);
   assert.equal(found.length, 1);
   assert.match(found[0]!.file, /prompts[\\/]scout\.md$/);
-  assert.match(found[0]!.message, /in none of JUDGE_BRIEFS, STANDARD_BRIEFS or TIERED_BRIEFS/);
+  assert.match(found[0]!.message, /in none of JUDGE_BRIEFS, STANDARD_BRIEFS, PRODUCER_BRIEFS or TIERED_BRIEFS/);
 });
 
 test('a polish-reader.md shipped again is reported, because no tier row runs it and no list classifies it', async () => {

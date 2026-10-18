@@ -734,6 +734,20 @@ export const OPENSPEC_ANCHORS: readonly Anchor[] = [
     why: 'approved requirements reach the spec and the G2 architecture reader as current records' },
   { file: 'phases/3-spec.md', literal: 'cites the `OpenSpec:` line of its `answers.md` entry',
     why: 'a spec departure from an approved requirement has a user-answered source' },
+  { file: 'phases/7-acceptance.md', literal: 'node .maestro/sync.mts --openspec-index',
+    why: 'the closure is where the export phase is reached; without it no draft is ever written' },
+  { file: 'phases/9-memory.md', literal: 'git add -- .maestro <memory file> openspec/changes/maestro-<dir>',
+    why: 'a written change is committed with the closure, or it is left untracked in the user\'s tree' },
+  { file: 'phases/10-openspec.md', literal: 'run the redaction gate over every file of the draft',
+    why: 'the change is merged into the project\'s specification, so S2 holds before the publish reads it' },
+  { file: 'phases/10-openspec.md', literal: 'Maestro never runs it and never writes',
+    why: 'merging into openspec/specs is the user\'s step' },
+  { file: 'prompts/openspec-writer.md', literal: 'Every scenario comes from a recorded check execution',
+    why: 'a scenario the run did not observe is a claim the run did not verify' },
+  { file: 'prompts/openspec-writer.md', literal: 'Export only what passed',
+    why: 'a SHALL for a failed or excepted requirement would state what the build does not do' },
+  { file: 'prompts/openspec-writer.md', literal: 'A MODIFIED block restates the whole requirement',
+    why: 'a MODIFIED block missing a current scenario aborts the user\'s archive' },
 ];
 
 /**

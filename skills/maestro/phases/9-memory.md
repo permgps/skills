@@ -187,6 +187,13 @@ git add -- .maestro <memory file>
 git commit -m "maestro: close <dir>" -m "Maestro-Run: <dir>" -- .maestro <memory file>
 ```
 
+When the closing publish reported `openspec.status` `written` or `kept`, the
+change folder joins both pathspecs, and step 4's redaction covers it too:
+`git add -- .maestro <memory file> openspec/changes/maestro-<dir>` and the same
+`git commit … -- .maestro <memory file> openspec/changes/maestro-<dir>`. Any
+other status leaves it out: nothing was written, or what is there is the
+user's.
+
 Exactly that subject: preflight finds the last closure by it when a rebase has
 rewritten the commit the `PROGRESS.md` header names. Nothing else is staged or
 committed — the pathspecs keep whatever the user had staged where it was, and
@@ -228,7 +235,7 @@ nothing worth keeping rather than failing at something.
 |---|---|
 | the memory file the helper resolved | the owned block replaced or appended; everything outside it byte for byte as it was |
 | `.maestro/<dir>/decisions.md` | one appended entry per decision, each naming the `D##` or `R##` it came from |
-| version control | after a closure, one closing commit, `maestro: close <dir>`, over `.maestro/` and the memory file only |
+| version control | after a closure, one closing commit, `maestro: close <dir>`, over `.maestro/`, the memory file, and `openspec/changes/maestro-<dir>` when the export wrote it, only |
 | project code | unchanged — this phase writes none of it |
 
 ## Scope Progress Projection

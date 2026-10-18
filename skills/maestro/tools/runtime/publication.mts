@@ -20,7 +20,8 @@ import { STATE_FILE, WIP_SUFFIX, parseRunDir, runDirName } from './state/paths.m
 import { relocateRunDir, restoreRunDir, type Relocation } from './relocation.mts';
 import { upsertRegister } from './register.mts';
 import { headCommit } from './history.mts';
-import { PROGRESS_FILE, buildProgress, fixesReadAtPreflight, parseProgress } from './progress.mts';
+import { PROGRESS_FILE, buildProgress, clip, fixesReadAtPreflight, parseProgress, type ProgressItem } from './progress.mts';
+import { exportForClosure, openSpecProgressItems, type OpenSpecExport, type OpenSpecProgressItems } from './openspec.mts';
 
 const log = createLogger('sync');
 export type PrepareCandidate = (state: RunState, previous: RunState | null) => Promise<StateViolation[]>;
@@ -147,7 +148,16 @@ const readOptional = async (file: string): Promise<string | null> => {
  * hand drifts. Like the register, it cannot fail the publish: a failure is
  * reported and the next closing publish rewrites the file.
  */
-async function writeProgress(runRoot: string, state: RunState, repeated: boolean): Promise<'written' | 'failed' | 'kept'> {
+/** Whether the file already carries exactly these export items, so a repeated closure may keep it. */
+function sameExportItems(previous: string, dir: string, extra: OpenSpecProgressItems): boolean {
+  const parsed = parseProgress(previous);
+  const line = (item: ProgressItem): string => `${item.key ?? ''} ${item.text}`;
+  const had = [...parsed.notDone, ...parsed.knownBugs].filter(item => item.key?.startsWith(`${dir}#openspec`)).map(line).sort();
+  const want = [...extra.notDone, ...extra.knownBugs].map(item => line({ key: item.key, text: clip(item.text) })).sort();
+  return JSON.stringify(had) === JSON.stringify(want);
+}
+
+async function writeProgress(runRoot: string, state: RunState, repeated: boolean, extra: OpenSpecProgressItems = { notDone: [], knownBugs: [] }): Promise<'written' | 'failed' | 'kept'> {
   const target = path.join(runRoot, PROGRESS_FILE);
   let commit: string | null = null;
   try {
@@ -155,16 +165,25 @@ async function writeProgress(runRoot: string, state: RunState, repeated: boolean
     const header = previous === null ? null : parseProgress(previous).header;
     // A successful closure is the baseline for later code history. Repeating it
     // must neither advance that commit to today's HEAD nor consume user fixes.
-    if (repeated && header?.dir === runDirName(state)
+    // An export outcome that changed since is the one thing a repeat rewrites,
+    // and it keeps the baseline commit while it does.
+    let baseline: string | null | undefined;
+    if (repeated && previous !== null && header?.dir === runDirName(state)
       && header.closedAt === (state.finishedAt ?? state.updatedAt ?? state.startedAt)
       && header.outcome === state.outcome) {
-      log.debug('progress', '[FIX] existing closure progress preserved', { path: target });
-      return 'kept';
+      if (sameExportItems(previous, runDirName(state), extra)) {
+        log.debug('progress', '[FIX] existing closure progress preserved', { path: target });
+        return 'kept';
+      }
+      baseline = header.commit;
+      log.debug('progress', 'export outcome changed on a repeated closure; rewriting with the original commit', { path: target });
     }
-    const head = await headCommit(path.dirname(runRoot));
-    commit = 'sha' in head ? head.sha : null;
+    if (baseline === undefined) {
+      const head = await headCommit(path.dirname(runRoot));
+      commit = 'sha' in head ? head.sha : null;
+    } else commit = baseline;
     const prior = await readOptional(path.join(runRoot, runDirName(state), 'prior.md'));
-    await atomicText(target, buildProgress({ state, previous, priorFixes: fixesReadAtPreflight(prior), commit }));
+    await atomicText(target, buildProgress({ state, previous, priorFixes: fixesReadAtPreflight(prior), commit, extra }));
     log.info('progress', '[FIX] progress file rewritten', { action: 'written', path: target, commit });
     return 'written';
   } catch (error) {
@@ -346,8 +365,15 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
     }
   }
   let progress: 'written' | 'failed' | 'kept' | null = null;
+  let openspec: OpenSpecExport | null = null;
   if (errors.length === 0 && state.contractVersion >= 7 && state.lifecycle === 'closed') {
-    progress = await writeProgress(dir, state, previous?.lifecycle === 'closed');
+    // Before the progress file, so it can list what the export left to the user.
+    try { openspec = await exportForClosure(dir, state); }
+    catch (error) {
+      log.warn('openspec', 'export raised; reported as failed', { runId: state.runId, reason: error instanceof Error ? error.message : String(error) });
+    }
+    if (openspec) log.info('openspec', 'closing publish exported', { runId: state.runId, status: openspec.status, validation: openspec.validation ?? null });
+    progress = await writeProgress(dir, state, previous?.lifecycle === 'closed', openSpecProgressItems(runDirName(state), openspec));
   }
   const envelope = validationEnvelope(errors.length ? 'invalid' : 'valid', candidate, errors, errors.length ? previous : state);
   try {
@@ -370,6 +396,6 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
   }
   return { code: 0, result: { status: 'published', revision: state.updatedAt, path: target, url, projection: summary,
     ...(waitClosed ? { waitClosed: { by: waitClosed.by, since: waitClosed.since, until: waitClosed.until } } : {}),
-    ...(relocation ? { relocated: relocation } : {}), ...(register ? { register } : {}), ...(progress ? { progress } : {}),
+    ...(relocation ? { relocated: relocation } : {}), ...(register ? { register } : {}), ...(progress ? { progress } : {}), ...(openspec ? { openspec } : {}),
     ...(succession && previous ? { succeeded: { runId: previous.runId, kept: path.relative(dir, kept ?? '') } } : {}) } };
 }

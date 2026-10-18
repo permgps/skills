@@ -36,9 +36,9 @@ right thing was built.
 | 6 | Review | [`phases/6-review.md`](phases/6-review.md) | `reviews/` |
 | 7 | Acceptance | [`phases/7-acceptance.md`](phases/7-acceptance.md) | `report.md` |
 
-Two phases run outside the sequence: **Memory**
+Three phases run outside the sequence: **Memory**
 ([`phases/9-memory.md`](phases/9-memory.md)), once during Build and
-once after every closure, acceptance's or repair's, and **Repair** ([`phases/8-repair.md`](phases/8-repair.md)), which a
+once after every closure, acceptance's or repair's; **OpenSpec Export** ([`phases/10-openspec.md`](phases/10-openspec.md)), after a `completed` or `closed_with_exceptions` closure decision and before its publish, only when `--openspec-index` reports OpenSpec; and **Repair** ([`phases/8-repair.md`](phases/8-repair.md)), which a
 таск reaches three ways — by coming back anything other than done, by failing
 its review, or by carrying a требование G4 disagreed about.
 

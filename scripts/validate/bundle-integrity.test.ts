@@ -1809,10 +1809,22 @@ test('the OpenSpec anchors hold the index command, the line shape, keep as the r
     ['phases/2-briefing.md', 'It is always the recommended option'],
     ['prompts/existing-code-reader.md', 'OpenSpec requirements are decision records too'],
     ['phases/3-spec.md', 'cites the `OpenSpec:` line of its `answers.md` entry'],
+    ['phases/7-acceptance.md', 'node .maestro/sync.mts --openspec-index'],
+    ['phases/9-memory.md', 'git add -- .maestro <memory file> openspec/changes/maestro-<dir>'],
+    ['phases/10-openspec.md', 'run the redaction gate over every file of the draft'],
+    ['phases/10-openspec.md', 'Maestro never runs it and never writes'],
+    ['prompts/openspec-writer.md', 'Every scenario comes from a recorded check execution'],
+    ['prompts/openspec-writer.md', 'Export only what passed'],
+    ['prompts/openspec-writer.md', 'A MODIFIED block restates the whole requirement'],
   ];
   for (const [file, literal] of required) {
     assert.ok(OPENSPEC_ANCHORS.some(anchor => anchor.file === file && anchor.literal === literal), `${file}: ${literal}`);
   }
+});
+
+test('sync.mts dispatches --openspec-index, so briefing and closure reach the index', async () => {
+  const sync = await readFile('skills/maestro/tools/sync.mts', 'utf8');
+  assert.ok(sync.includes("args[0] === '--openspec-index'"), 'sync.mts dispatches no --openspec-index; the index call would fall through to a refresh');
 });
 
 test('the OpenSpec entry the briefing phase ships passes G1 and authorises exactly what it says', async () => {

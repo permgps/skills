@@ -108,7 +108,7 @@ So the list gets a machine-readable form. `scripts/validate/gate-readers.ts`
 holds every reader's brief to the `Given` and `Withheld` columns below, name for name: a name
 present in one and not the other is a finding that names both places.
 
-Four more readers are held here and gate nothing. The standards reader is
+Four more readers and one writer are held here and gate nothing. The standards reader is
 dispatched once after review over the whole прогон; its output is observations
 only. The existing-code reader is dispatched once at the start of the spec
 phase, in a project with code; its text becomes `codebase.md`, which only the
@@ -117,7 +117,10 @@ commit reader is dispatched by preflight only when more than thirty commits over
 since the last closure; its at most ten lines replace the list in `prior.md`.
 The technical researcher answers one material external-contract question with
 a bounded read-only search; it receives only its question envelope and project
-root. The blindness of all four is held the same way as the gate readers'. The same check holds the places the
+root. The OpenSpec writer is dispatched once after a closure that exports, in a
+project with OpenSpec; it drafts one change from verified requirements and is
+withheld `codebase.md` like the blind readers. The blindness of all five is
+held the same way as the gate readers'. The same check holds the places the
 standards reader's one input is gathered from, named alike in phase 6, in
 [`phases.md`](phases.md) and in the brief.
 
@@ -134,6 +137,7 @@ standards reader's one input is gathered from, named alike in phase 6, in
 | existing code (no gate) | `existing-code-reader.md` | `manifest.md`, `answers.md`, the repository, changed since the last closure | `brief.md`, `spec.md`, `prior.md`, `codebase.md`, `research/` |
 | technical research (no gate) | `technical-researcher.md` | question envelope, the project root | `brief.md`, `spec.md`, `manifest.md`, `prior.md`, `codebase.md`, `research/` |
 | commits (no gate) | `commit-reader.md` | the project root, the range | `prior.md`, `PROGRESS.md`, `brief.md`, `spec.md`, `manifest.md`, `codebase.md`, `research/` |
+| OpenSpec writer (no gate) | `openspec-writer.md` | `manifest.md`, `answers.md`, `spec.md`, task titles, the verification projection, the OpenSpec index, the main specs of the forks, the run directory and the closing day | `brief.md`, `reviews/`, `prior.md`, `codebase.md`, `research/` |
 
 The G2 architecture reader is contextual, not blind: it is dispatched only when
 `codebase.md` contains relevant decision records. It compares the spec with

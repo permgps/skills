@@ -188,6 +188,13 @@ export const JUDGE_BRIEFS: readonly string[] = [
 /** Briefs that are not judges and run on `standard`: reading, not deciding. */
 export const STANDARD_BRIEFS: readonly string[] = ['existing-code-reader.md', 'commit-reader.md', 'technical-researcher.md'];
 
+/**
+ * Briefs that are not judges but produce an artifact the project keeps beyond
+ * the run. They run `strong` for the reason the skeleton does: what they write
+ * is built on by people who never saw the run.
+ */
+export const PRODUCER_BRIEFS: readonly string[] = ['openspec-writer.md'];
+
 /** The one brief whose tier is the таск's own, marked by the plan. */
 export const TIERED_BRIEFS: readonly string[] = ['executor.md'];
 
@@ -237,6 +244,9 @@ export async function checkModelTiers(specDir: string, bundleDir: string): Promi
     if (JUDGE_BRIEFS.includes(brief) && tier !== 'strong') {
       add(specFile, row.__line, `${brief} is a judge and role "${role}" runs it on ${tier} — a judge never runs below what it judges; write strong`);
     }
+    if (PRODUCER_BRIEFS.includes(brief) && tier !== 'strong') {
+      add(specFile, row.__line, `${brief} is a producer and role "${role}" runs it on ${tier} — producers run strong`);
+    }
     if (tier === "the таск's" && !TIERED_BRIEFS.includes(brief)) {
       add(specFile, row.__line, `role "${role}" takes the таск's tier, but ${brief} builds no таск — only ${TIERED_BRIEFS.join(', ')} does; write strong or standard`);
     }
@@ -245,8 +255,8 @@ export async function checkModelTiers(specDir: string, bundleDir: string): Promi
     if (!covered.has(brief)) {
       add(specFile, table.line, `${brief} ships in ${promptsDir} and no row of the tier table runs it — add its role and tier`);
     }
-    if (![...JUDGE_BRIEFS, ...STANDARD_BRIEFS, ...TIERED_BRIEFS].includes(brief)) {
-      add(path.join(promptsDir, brief), 0, `${brief} is in none of JUDGE_BRIEFS, STANDARD_BRIEFS or TIERED_BRIEFS — decide whether it judges, and list it`);
+    if (![...JUDGE_BRIEFS, ...STANDARD_BRIEFS, ...PRODUCER_BRIEFS, ...TIERED_BRIEFS].includes(brief)) {
+      add(path.join(promptsDir, brief), 0, `${brief} is in none of JUDGE_BRIEFS, STANDARD_BRIEFS, PRODUCER_BRIEFS or TIERED_BRIEFS — decide whether it judges, and list it`);
     }
   }
   log.info('tiers', 'model tiers checked', { rows: table.rows.length, briefs: briefs.length, violations: violations.length });

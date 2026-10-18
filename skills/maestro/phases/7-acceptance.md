@@ -271,7 +271,11 @@ or `failed`, which you say to the user in one line and which is not a stop — t
 next closing publish, including an identical retry, repairs a missing progress
 file. A retry with this closure already recorded reports `kept` and preserves
 its commit and user fixes. Record any promised further round before offering
-closure; a promise left open blocks every outcome. The closure ends with the
+closure; a promise left open blocks every outcome. **Before the closing publish
+of a `completed` or `closed_with_exceptions` closure**, run
+`node .maestro/sync.mts --openspec-index`; when it reports OpenSpec present,
+read the OpenSpec Export phase file `SKILL.md` names and write its draft, so the
+same closing publish takes it and reports `openspec`. The closure ends with the
 memory run and its closing commit, so the commit the `PROGRESS.md` header
 names is `HEAD` before that commit, never the closing commit itself.
 

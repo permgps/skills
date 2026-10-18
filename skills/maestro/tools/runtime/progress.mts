@@ -92,7 +92,7 @@ const omittedLine = (count: number): string => `- ${count} earlier settled items
  * a closing quotation shortens the quote instead and keeps its `»`, so the
  * user's words never read as running on into the next line.
  */
-function clip(text: string): string {
+export function clip(text: string): string {
   const flat = text.replace(/\s*[\r\n]+\s*/g, ' ').trim();
   if (flat.length <= ITEM_MAX) return flat;
   const quote = /«([^«»]*)»$/.exec(flat);
@@ -311,11 +311,17 @@ export interface BuildProgressInput {
   priorFixes: readonly string[] | null;
   /** `HEAD` at the closing publish, or null when git could not say. */
   commit: string | null;
+  /**
+   * Items the closing publish learned beside the state — the OpenSpec export's
+   * outcome. Keyed under this run like every own item, so a re-closure
+   * regenerates them rather than carrying a stale one.
+   */
+  extra?: { notDone: ReadonlyArray<{ key: string; text: string }>; knownBugs: ReadonlyArray<{ key: string; text: string }> };
 }
 
 /** The whole new file: the carry table applied, then the line budget. */
 export function buildProgress(input: BuildProgressInput): string {
-  const { state, previous, priorFixes, commit } = input;
+  const { state, previous, priorFixes, commit, extra } = input;
   const dir = originDir(state);
   const own = `${dir}#`;
   const fresh = itemsFromState(state);
@@ -370,6 +376,8 @@ export function buildProgress(input: BuildProgressInput): string {
   for (const item of [...dismissed, ...fresh.settled]) keep(settled, item);
   for (const item of fresh.notDone) keep(notDone, item);
   for (const item of fresh.knownBugs) keep(knownBugs, item);
+  for (const item of extra?.notDone ?? []) keep(notDone, { key: item.key, text: clip(item.text) });
+  for (const item of extra?.knownBugs ?? []) keep(knownBugs, { key: item.key, text: clip(item.text) });
 
   const read = priorFixes === null ? null : new Set(priorFixes.map(line => line.trim()));
   const fixes = (prior?.fixes ?? []).filter(line => read === null || !read.has(line.trim()));

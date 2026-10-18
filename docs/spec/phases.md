@@ -1313,8 +1313,8 @@ behaviour is partly built, and a resumed run closes again anyway.
 **Never before G4.** Anything derived from the run's own restatement of the
 requirements, placed in the tree before the blind reader finishes, is a ruler
 the run wrote. So the draft is written after the closure decision of
-acceptance's step 5, or of repair's closure, and the export lands with the
-closing publish. G4 also withholds `openspec/` itself, because earlier runs'
+acceptance's step 5 and the export lands with the closing publish. Repair
+closes a run only as `stopped_incomplete`, so it never reaches this phase. G4 also withholds `openspec/` itself, because earlier runs'
 exports sit in the tree the reader inspects ([`gates.md`](gates.md)).
 
 **The draft.** One fresh writer on `strong` writes into `.maestro/<dir>/openspec/`
@@ -1344,8 +1344,9 @@ verification projection. A dropped or deferred one. One whose finding an
 accepted exception covers, because the exception keeps the failure. One whose
 fork was answered `keep`, or self-briefed. Each is named in `proposal.md`. A
 deferred, placeholder or failed one is already listed in `PROGRESS.md`. A
-`keep` fork adds a *Not Done* item, because the brief and the approved
-behaviour still disagree in the user's words.
+self-briefed fork adds a *Not Done* item keyed `[<dir>#openspec-<R##>]`,
+because the brief and the approved behaviour still disagree and the user never
+decided. A `keep` the user answered adds nothing: they chose it.
 
 **The closing publish writes it.** On a closing publish of a `completed` or
 `closed_with_exceptions` state, after the run directory is relocated and before

@@ -262,6 +262,7 @@ at that model's default effort.
 | repair diagnostician | `repair-diagnostician.md` | `strong` |
 | strategy reviewer | `strategy-reviewer.md` | `strong` |
 | G4 acceptance reader | `acceptance-reader.md` | `strong` |
+| OpenSpec writer | `openspec-writer.md` | `strong` |
 
 - **A judge never runs `standard`.** A gate rests on its judge being no weaker
   than what it judges; `npm run readers` holds every judge brief to `strong`.
