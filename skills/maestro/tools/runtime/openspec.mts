@@ -164,13 +164,37 @@ export interface RequirementBlock {
 export function sectionBlocks(lines: readonly string[], mask: readonly boolean[], heading: RegExp): RequirementBlock[] | null {
   const start = lines.findIndex((line, index) => !mask[index] && heading.test(line));
   if (start < 0) return null;
-  let end = lines.length;
+  return blocksIn(lines, mask, start + 1, sectionEnd(lines, mask, start));
+}
+
+/** The line after the last line of the `##` section whose heading is at `start`. */
+function sectionEnd(lines: readonly string[], mask: readonly boolean[], start: number): number {
   for (let index = start + 1; index < lines.length; index += 1) {
-    if (!mask[index] && TOP_LEVEL_HEADER.test(lines[index]!)) { end = index; break; }
+    if (!mask[index] && TOP_LEVEL_HEADER.test(lines[index]!)) return index;
   }
+  return lines.length;
+}
+
+/**
+ * The body of every `##` section whose title folds to `title`, as OpenSpec
+ * folds a delta heading: the text after `##` and its blanks, trimmed and
+ * lowercased, compared whole. Every copy counts — OpenSpec applies a repeated
+ * `## ADDED Requirements` in full — and `## ADDED  Requirements` is no copy.
+ */
+function sectionRanges(lines: readonly string[], mask: readonly boolean[], title: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]!;
+    if (mask[index] || !TOP_LEVEL_HEADER.test(line)) continue;
+    if (line.replace(TOP_LEVEL_HEADER, '').trim().toLowerCase() === title) ranges.push([index + 1, sectionEnd(lines, mask, index)]);
+  }
+  return ranges;
+}
+
+function blocksIn(lines: readonly string[], mask: readonly boolean[], from: number, end: number): RequirementBlock[] {
   const blocks: RequirementBlock[] = [];
   let current: RequirementBlock | null = null;
-  for (let index = start + 1; index < end; index += 1) {
+  for (let index = from; index < end; index += 1) {
     const line = lines[index]!;
     const header = mask[index] ? null : REQUIREMENT_HEADER.exec(line);
     if (header) {
@@ -193,18 +217,27 @@ export function parseSpecRequirements(text: string): OpenSpecRequirement[] {
   return blocks.map(block => ({ name: block.name, scenarios: block.scenarios }));
 }
 
+/**
+ * A plain YAML scalar as written after `key:`: a quoted value without its
+ * quotes and whatever follows the closing one, an unquoted one without a
+ * ` # comment`. Enough for the flat keys a change's metadata holds.
+ */
+export function yamlScalar(raw: string): string {
+  const value = raw.trim();
+  const quote = value[0];
+  if (quote === '"' || quote === "'") {
+    const close = value.indexOf(quote, 1);
+    if (close > 0) return value.slice(1, close);
+  }
+  const comment = value.search(/[ \t]#/);
+  return (comment >= 0 ? value.slice(0, comment) : value).trim();
+}
+
 /** The `x-maestro-run` value of a `.openspec.yaml`, or `null`. Only a top-level key counts, as OpenSpec reads only top-level `x-` keys. */
 export function maestroRunOf(metadata: string): string | null {
   for (const line of splitLines(metadata)) {
-    const match = /^x-maestro-run:[ \t]*(.*)$/.exec(line);
-    if (!match) continue;
-    let value = match[1]!.trim();
-    const quoted = /^(["'])(.*)\1$/.exec(value);
-    if (quoted) value = quoted[2]!;
-    else {
-      const comment = value.search(/[ \t]#/);
-      if (comment >= 0) value = value.slice(0, comment).trim();
-    }
+    if (!line.startsWith('x-maestro-run:')) continue;
+    const value = yamlScalar(line.slice('x-maestro-run:'.length));
     return value === '' ? null : value;
   }
   return null;
@@ -216,7 +249,7 @@ export async function detectOpenSpec(projectRoot: string): Promise<{ present: bo
   const dir = path.join(projectRoot, OPENSPEC_DIR);
   let dirReal: string;
   try { dirReal = await realpath(dir); }
-  catch { log.debug('detect', 'no openspec directory', { checked: OPENSPEC_DIR }); return { present: false, anchor: null }; }
+  catch { log.info('detect', 'openspec absent: no openspec directory', { checked: OPENSPEC_DIR }); return { present: false, anchor: null }; }
   if (!inside(rootReal, dirReal)) {
     log.warn('detect', 'openspec directory resolves outside the project; treated as absent', { checked: OPENSPEC_DIR });
     return { present: false, anchor: null };
@@ -242,15 +275,39 @@ async function entries(dir: string): Promise<Dirent[]> {
   return list.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 }
 
+/**
+ * A directory under `openspec/` that the index may list: absent is `null` and
+ * says nothing, and one that resolves outside the project — a symlinked
+ * `specs/`, `changes/` or `archive/` — is `null` and makes the index
+ * incomplete, so briefing never reads requirements from outside the project.
+ */
+async function containedDir(projectRoot: string, relative: string, index: OpenSpecIndex): Promise<string | null> {
+  const full = path.join(projectRoot, ...relative.split('/'));
+  let real: string;
+  try { real = await realpath(full); }
+  catch { log.debug('index', 'directory absent', { path: relative }); return null; }
+  if (!inside(await realpath(path.join(projectRoot, OPENSPEC_DIR)), real)) {
+    index.incomplete = true;
+    index.unreadable.push(relative);
+    index.reasons.push(`${relative} resolves outside the project; not read`);
+    log.warn('index', '[FIX] directory resolves outside the project; not read', { path: relative });
+    return null;
+  }
+  return full;
+}
+
 /** Every `spec.md` under `openspec/specs/`, in name order, without following symlinks. */
-async function specFiles(specsDir: string, index: OpenSpecIndex): Promise<string[]> {
+async function specFiles(projectRoot: string, specsDir: string, index: OpenSpecIndex): Promise<string[]> {
   const found: string[] = [];
   const walk = async (dir: string): Promise<void> => {
     let list: Dirent[];
     try { list = await entries(dir); }
     catch (error) {
-      index.unreadable.push(posix(path.relative(path.dirname(path.dirname(specsDir)), dir)));
-      log.warn('index', 'directory could not be listed', { reason: error instanceof Error ? error.message : String(error) });
+      const relative = posix(path.relative(projectRoot, dir));
+      index.incomplete = true;
+      index.unreadable.push(relative);
+      index.reasons.push(`${relative} could not be listed`);
+      log.warn('index', '[FIX] directory could not be listed', { path: relative, reason: error instanceof Error ? error.message : String(error) });
       return;
     }
     for (const entry of list) {
@@ -277,11 +334,10 @@ export async function readOpenSpecIndex(projectRoot: string): Promise<OpenSpecIn
     capabilities: [], changes: [], archived: [], incomplete: false, reasons: [], unreadable: [],
   };
   if (!detected.present) return index;
-  const base = path.join(projectRoot, OPENSPEC_DIR);
   const relativeTo = (full: string): string => posix(path.relative(projectRoot, full));
 
-  const specsDir = path.join(base, 'specs');
-  const files = await specFiles(specsDir, index).catch(() => [] as string[]);
+  const specsDir = await containedDir(projectRoot, `${OPENSPEC_DIR}/specs`, index);
+  const files = specsDir === null ? [] : await specFiles(projectRoot, specsDir, index);
   if (files.length > SPEC_FILE_LIMIT) {
     index.incomplete = true;
     index.reasons.push(`more than ${SPEC_FILE_LIMIT} spec files; the first ${SPEC_FILE_LIMIT} in name order were read`);
@@ -299,7 +355,7 @@ export async function readOpenSpecIndex(projectRoot: string): Promise<OpenSpecIn
         continue;
       }
       const requirements = parseSpecRequirements(await readFile(file, 'utf8'));
-      const capability = posix(path.relative(specsDir, path.dirname(file)));
+      const capability = posix(path.relative(specsDir!, path.dirname(file)));
       index.capabilities.push({ capability, path: relative, requirements });
       log.debug('index', 'spec file read', { path: relative, requirements: requirements.length });
     } catch (error) {
@@ -310,16 +366,17 @@ export async function readOpenSpecIndex(projectRoot: string): Promise<OpenSpecIn
     }
   }
 
-  const changesDir = path.join(base, 'changes');
+  const changesDir = await containedDir(projectRoot, `${OPENSPEC_DIR}/changes`, index);
   let changeEntries: Dirent[] = [];
-  try { changeEntries = await entries(changesDir); }
+  try { if (changesDir !== null) changeEntries = await entries(changesDir); }
   catch { log.debug('index', 'no changes directory', {}); }
   for (const entry of changeEntries) {
     if (!entry.isDirectory() || entry.name === 'archive') continue;
-    index.changes.push({ name: entry.name, maestroRun: await readMaestroRun(path.join(changesDir, entry.name)) });
+    index.changes.push({ name: entry.name, maestroRun: await readMaestroRun(path.join(changesDir!, entry.name)) });
   }
+  const archiveDir = changesDir === null ? null : await containedDir(projectRoot, `${OPENSPEC_DIR}/changes/archive`, index);
   let archiveEntries: Dirent[] = [];
-  try { archiveEntries = await entries(path.join(changesDir, 'archive')); }
+  try { if (archiveDir !== null) archiveEntries = await entries(archiveDir); }
   catch { log.debug('index', 'no archive directory', {}); }
   for (const entry of archiveEntries) {
     const match = /^\d{4}-\d{2}-\d{2}-(maestro-.+)$/.exec(entry.name);
@@ -351,7 +408,7 @@ export async function openSpecIndexCommand(_args: string[], runDir: string): Pro
     return { result: { ...(await readOpenSpecIndex(projectRoot)) }, code: 0 };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    log.error('index', 'project root could not be read; nothing indexed', { reason });
+    log.warn('index', 'project root could not be read; nothing indexed', { reason });
     return { result: { error: `the project root could not be read (${reason}) — run this from the installed .maestro/sync.mts` }, code: 2 };
   }
 }
@@ -378,7 +435,16 @@ export interface OpenSpecExport {
   /** What to fix, at most {@link PROBLEM_LIMIT}; on `refused`, `failed`, or a failed validation. */
   problems?: string[];
   /** Forks self-briefed against an approved requirement: the brief and it still disagree. */
-  unresolved?: Array<{ requirementId: string; target: string }>;
+  unresolved?: UnresolvedFork[];
+  /** On `refused`: this run's change from an earlier closure is still in the tree, unchanged, and no longer this closure's. */
+  stale?: true;
+}
+
+export interface UnresolvedFork { requirementId: string; target: string }
+
+/** The forks the run answered itself: each one is an approved requirement the brief still contradicts. */
+export function unresolvedOf(authorisations: ReadonlyMap<string, Authorisation>): UnresolvedFork[] {
+  return [...authorisations.entries()].filter(([, auth]) => !auth.userAnswered).map(([target, auth]) => ({ requirementId: auth.requirementId, target }));
 }
 
 export const PROBLEM_LIMIT = 20;
@@ -433,15 +499,54 @@ function sectionLines(lines: readonly string[], mask: readonly boolean[], headin
   return body;
 }
 
-const deltaHeading = (kind: DeltaKind): RegExp => new RegExp(`^##\\s+${kind}\\s+Requirements\\s*$`, 'i');
+const deltaTitle = (kind: DeltaKind): string => `${kind.toLowerCase()} requirements`;
 
-/** A REMOVED or RENAMED bullet's requirement name: `- ### Requirement: X`, with or without backticks. */
-function bulletName(text: string): string | null {
-  let value = text.trim();
-  if (value.startsWith('`') && value.endsWith('`') && value.length > 1) value = value.slice(1, -1).trim();
-  const header = REQUIREMENT_HEADER.exec(value);
-  return normalizeRequirementName(header ? header[1]! : value) || null;
+/** Every unfenced line of every copy of a delta section, in file order, each copy closed by `null`. */
+function deltaLines(lines: readonly string[], mask: readonly boolean[], kind: DeltaKind): Array<string | null> {
+  const body: Array<string | null> = [];
+  for (const [from, end] of sectionRanges(lines, mask, deltaTitle(kind))) {
+    for (let index = from; index < end; index += 1) if (!mask[index]) body.push(lines[index]!);
+    body.push(null);
+  }
+  return body;
 }
+
+const blank = (character: string | undefined): boolean => character !== undefined && /\s/.test(character);
+
+/**
+ * The text after a CommonMark bullet marker (`-`, `*` or `+`) and the blanks
+ * around it, or `null` when the line has no marker and one is `required`.
+ * A scan, not a regex: optional blanks on both sides of an optional marker
+ * backtrack quadratically over a long run of blanks.
+ */
+function afterBullet(line: string, required: boolean): string | null {
+  let index = 0;
+  while (blank(line[index])) index += 1;
+  const marker = line[index] === '-' || line[index] === '*' || line[index] === '+';
+  if (!marker && required) return null;
+  if (marker) index += 1;
+  while (blank(line[index])) index += 1;
+  return line.slice(index);
+}
+
+/**
+ * The name a REMOVED or RENAMED reference carries, as OpenSpec reads one:
+ * an optional backtick, `###`, blanks, `Requirement:` in that case, the name,
+ * an optional closing backtick. `null` when the text is no such reference.
+ */
+function requirementRef(text: string): string | null {
+  const value = text.startsWith('`') ? text.slice(1) : text;
+  if (!value.startsWith('###')) return null;
+  let index = 3;
+  while (blank(value[index])) index += 1;
+  if (value.slice(index, index + 12) !== 'Requirement:') return null;
+  let rest = value.slice(index + 12).trimEnd();
+  if (rest.endsWith('`')) rest = rest.slice(0, -1);
+  return normalizeRequirementName(rest);
+}
+
+/** A line quoted in a problem, never longer than a sentence. */
+const quoted = (line: string): string => (line.length > 80 ? `${line.slice(0, 77).trim()}…` : line.trim());
 
 /** Whether a requirement block has text before its first scenario with SHALL or MUST, and a scenario with a body. */
 function blockShape(block: RequirementBlock): { normative: boolean; scenarioWithBody: boolean } {
@@ -486,11 +591,12 @@ function proposalProblems(text: string): string[] {
   return problems;
 }
 
-/** A top-level `key: value` of the metadata file, or null. */
-function metadataValue(metadata: string, key: string): string | null {
+/** A top-level `key: value` of the metadata file, or null. Pass `raw` for a value that is not a YAML scalar. */
+function metadataValue(metadata: string, key: string, raw = false): string | null {
   for (const line of splitLines(metadata)) {
     if (!line.startsWith(`${key}:`)) continue;
-    return line.slice(key.length + 1).trim();
+    const value = line.slice(key.length + 1);
+    return raw ? value.trim() : yamlScalar(value);
   }
   return null;
 }
@@ -509,7 +615,7 @@ function validDate(text: string): boolean {
  * hand-rolled reader of nested YAML is a parser that disagrees with OpenSpec's.
  */
 function requirementMap(metadata: string, problems: string[]): Map<string, string[]> | null {
-  const raw = metadataValue(metadata, 'x-maestro-requirements');
+  const raw = metadataValue(metadata, 'x-maestro-requirements', true);
   if (raw === null) { problems.push('.openspec.yaml has no x-maestro-requirements — map every exported requirement to its R ids, as one line of JSON'); return null; }
   let parsed: unknown;
   try { parsed = JSON.parse(raw); }
@@ -555,7 +661,10 @@ export function checkOpenSpecDraft(files: DraftFiles, context: DraftContext): st
   let mapping: Map<string, string[]> | null = null;
   if (metadata === undefined) problems.push('the draft has no .openspec.yaml — write schema, created, x-maestro-run and x-maestro-requirements');
   else {
-    if (!metadataValue(metadata, 'schema')) problems.push('.openspec.yaml has no schema — write "schema: spec-driven"');
+    // The draft is proposal, specs, design and tasks: the spec-driven schema's
+    // artifacts. Any other schema would describe a change this is not.
+    const schema = metadataValue(metadata, 'schema');
+    if (schema !== 'spec-driven') problems.push(`.openspec.yaml schema is ${schema || 'missing'} — write "schema: spec-driven"`);
     const created = metadataValue(metadata, 'created');
     if (created === null || !validDate(created)) problems.push('.openspec.yaml created is not a YYYY-MM-DD date — write the closing day');
     const owner = maestroRunOf(metadata);
@@ -583,8 +692,11 @@ export function checkOpenSpecDraft(files: DraftFiles, context: DraftContext): st
     const ids = mapping?.get(key);
     if (mapping && !ids) { problems.push(`${label} "${key}" is not in x-maestro-requirements — map it to the R## it came from`); return; }
     for (const id of ids ?? []) {
-      const auth = [...context.authorisations.values()].find(item => item.requirementId === id && item.disposition === 'keep');
-      if (auth) problems.push(`${key} maps ${id}, whose fork kept the approved requirement — leave ${id} out of the export`);
+      // Only the user changes approved behaviour: a fork they answered `keep`,
+      // and any fork the run answered itself, leaves the approved requirement standing.
+      const fork = [...context.authorisations.values()].find(item => item.requirementId === id && (item.disposition === 'keep' || !item.userAnswered));
+      if (fork && !fork.userAnswered) problems.push(`${key} maps ${id}, whose fork was self-briefed, so the approved requirement stands — leave ${id} out of the export`);
+      else if (fork) problems.push(`${key} maps ${id}, whose fork kept the approved requirement — leave ${id} out of the export`);
       else if (context.notInSpec.has(id)) problems.push(`${key} maps ${id}, which is dropped, deferred or a placeholder — leave it out`);
       else if (context.excepted.has(id)) problems.push(`${key} maps ${id}, which an accepted exception covers — the exception keeps the failure, so leave it out`);
       else if (context.results[id] !== 'passed') problems.push(`${key} maps ${id}, which is ${context.results[id] ?? 'not in the verification projection'} — only passed requirements are exported`);
@@ -604,9 +716,66 @@ export function checkOpenSpecDraft(files: DraftFiles, context: DraftContext): st
       if (seen.has(requirement)) problems.push(`${name} names "${requirement}" twice — one delta per requirement`);
       seen.add(requirement);
     };
-    for (const kind of DELTA_KINDS) {
-      if (kind === 'REMOVED' || kind === 'RENAMED') continue;
-      for (const block of sectionBlocks(lines, mask, deltaHeading(kind)) ?? []) {
+    // RENAMED first, as OpenSpec applies it first: a MODIFIED block of the new
+    // name is then recognisable, though answers.md cannot authorise both.
+    const renamedTo = new Set<string>();
+    let from: string | null = null;
+    for (const line of deltaLines(lines, mask, 'RENAMED')) {
+      if (line === null) {
+        if (from !== null) problems.push(`RENAMED "${capability} › ${from}" has no TO line — pair every FROM with a TO`);
+        from = null;
+        continue;
+      }
+      const rest = afterBullet(line, false)!;
+      const side = rest.startsWith('FROM:') ? 'FROM' : rest.startsWith('TO:') ? 'TO' : null;
+      const requirement = side === null ? null : requirementRef(rest.slice(side.length + 1).trimStart());
+      if (!requirement) {
+        if (/^(from|to):/i.test(rest.slice(0, 5))) {
+          problems.push(`RENAMED line "${quoted(line)}" in ${name}: OpenSpec does not read it — write "- FROM: \`### Requirement: <old>\`" and "- TO: \`### Requirement: <new>\`"`);
+        }
+        continue;
+      }
+      if (side === 'FROM') {
+        if (from !== null) problems.push(`RENAMED "${capability} › ${from}" has no TO line — pair every FROM with a TO`);
+        from = requirement;
+        continue;
+      }
+      if (from === null) { problems.push(`a RENAMED TO line in ${name} has no FROM — pair every TO with a FROM`); continue; }
+      deltas += 1;
+      once(from);
+      renamedTo.add(requirement);
+      if (!has(from)) problems.push(`RENAMED "${capability} › ${from}" is not an approved requirement — copy the name from the index exactly`);
+      else {
+        const auth = authorised(capability, from, 'rename', 'RENAMED');
+        if (auth && auth.renamedTo !== null && normalizeRequirementName(auth.renamedTo) !== requirement) {
+          problems.push(`RENAMED "${capability} › ${from}" goes to "${requirement}", but answers.md says "${auth.renamedTo}" — use the user's name`);
+        }
+      }
+      if (has(requirement)) problems.push(`RENAMED "${capability} › ${from}" goes to "${requirement}", which already exists — it would abort the archive`);
+      from = null;
+    }
+    for (const line of deltaLines(lines, mask, 'REMOVED')) {
+      if (line === null) continue;
+      const header = REQUIREMENT_HEADER.exec(line);
+      const bullet = header ? null : afterBullet(line, true);
+      const requirement = header ? normalizeRequirementName(header[1]!) : bullet === null ? null : requirementRef(bullet);
+      if (!requirement) {
+        // Prose under REMOVED (`- **Reason**: …`) is legal; a bare approved name
+        // is a removal OpenSpec silently skips, so the user's answer would not happen.
+        const bare = bullet === null ? '' : normalizeRequirementName(bullet.replace(/^`|`$/g, ''));
+        if (bare && (has(bare) || nearMiss(capability, bare))) {
+          problems.push(`REMOVED line "${quoted(line)}" in ${name}: OpenSpec ignores it, so nothing would be removed — write "- \`### Requirement: ${bare}\`"`);
+        }
+        continue;
+      }
+      deltas += 1;
+      once(requirement);
+      if (!has(requirement)) problems.push(`REMOVED "${capability} › ${requirement}" is not an approved requirement — copy the name from the index exactly`);
+      else authorised(capability, requirement, 'remove', 'REMOVED');
+    }
+    for (const kind of ['ADDED', 'MODIFIED'] as const) {
+      const blocks = sectionRanges(lines, mask, deltaTitle(kind)).flatMap(([start, end]) => blocksIn(lines, mask, start, end));
+      for (const block of blocks) {
         deltas += 1;
         once(block.name);
         const shape = blockShape(block);
@@ -618,7 +787,9 @@ export function checkOpenSpecDraft(files: DraftFiles, context: DraftContext): st
           if (near) problems.push(`ADDED "${capability} › ${block.name}" differs from the approved "${near}" only in case or spacing — use the approved name or a clearly new one`);
         } else {
           const current = has(block.name);
-          if (!current) {
+          if (!current && renamedTo.has(block.name)) {
+            problems.push(`MODIFIED "${capability} › ${block.name}" changes a requirement this change also renames — answers.md holds one decision per requirement, so export the rename alone`);
+          } else if (!current) {
             const near = nearMiss(capability, block.name);
             problems.push(`MODIFIED "${capability} › ${block.name}" is not an approved requirement${near ? ` (did you mean "${near}"?)` : ''} — copy the name from the index exactly`);
           } else {
@@ -630,42 +801,6 @@ export function checkOpenSpecDraft(files: DraftFiles, context: DraftContext): st
         tracedIds(capability, block.name, kind);
       }
     }
-    for (const line of sectionLines(lines, mask, deltaHeading('REMOVED')) ?? []) {
-      const header = REQUIREMENT_HEADER.exec(line);
-      const bullet = /^\s*[-*+]\s+(.*)$/.exec(line);
-      if (!header && !bullet) continue;
-      const requirement = header ? normalizeRequirementName(header[1]!) : bulletName(bullet![1]!);
-      if (!requirement) continue;
-      deltas += 1;
-      once(requirement);
-      if (!has(requirement)) problems.push(`REMOVED "${capability} › ${requirement}" is not an approved requirement — copy the name from the index exactly`);
-      else authorised(capability, requirement, 'remove', 'REMOVED');
-    }
-    const renamed = sectionLines(lines, mask, deltaHeading('RENAMED')) ?? [];
-    let from: string | null = null;
-    for (const line of renamed) {
-      const pair = /^\s*[-*+]?\s*(FROM|TO):\s*(.*)$/i.exec(line);
-      if (!pair) continue;
-      const requirement = bulletName(pair[2]!);
-      if (pair[1]!.toUpperCase() === 'FROM') {
-        if (from !== null) problems.push(`RENAMED "${capability} › ${from}" has no TO line — pair every FROM with a TO`);
-        from = requirement;
-        continue;
-      }
-      if (from === null || !requirement) { problems.push(`a RENAMED TO line in ${name} has no FROM — pair every TO with a FROM`); continue; }
-      deltas += 1;
-      once(from);
-      if (!has(from)) problems.push(`RENAMED "${capability} › ${from}" is not an approved requirement — copy the name from the index exactly`);
-      else {
-        const auth = authorised(capability, from, 'rename', 'RENAMED');
-        if (auth && auth.renamedTo !== null && normalizeRequirementName(auth.renamedTo) !== requirement) {
-          problems.push(`RENAMED "${capability} › ${from}" goes to "${requirement}", but answers.md says "${auth.renamedTo}" — use the user's name`);
-        }
-      }
-      if (has(requirement)) problems.push(`RENAMED "${capability} › ${from}" goes to "${requirement}", which already exists — it would abort the archive`);
-      from = null;
-    }
-    if (from !== null) problems.push(`RENAMED "${capability} › ${from}" has no TO line — pair every FROM with a TO`);
   }
   if (deltas === 0) problems.push('the draft has no requirement delta under specs/<capability>/spec.md — an OpenSpec change needs at least one');
   for (const key of mapping?.keys() ?? []) {
@@ -807,6 +942,10 @@ export interface ExportInput {
 export async function exportOpenSpecChange(input: ExportInput): Promise<OpenSpecExport | null> {
   const change = `${MAESTRO_CHANGE_PREFIX}${input.dir}`;
   const draftDir = path.join(input.runDir, OPENSPEC_DIR);
+  // Computed before anything can fail, so a `failed` export still says which
+  // forks the run answered itself.
+  const unresolved = unresolvedOf(input.context.authorisations);
+  const extra = unresolved.length > 0 ? { unresolved } : {};
   try {
     try { if (!(await lstat(draftDir)).isDirectory()) return null; }
     catch { log.debug('export', 'no draft; nothing to export', { dir: input.dir }); return null; }
@@ -819,10 +958,6 @@ export async function exportOpenSpecChange(input: ExportInput): Promise<OpenSpec
       log.warn('export', 'a draft exists but the project is not OpenSpec-initialised; nothing written', { dir: input.dir });
       return null;
     }
-    const unresolved = [...input.context.authorisations.entries()]
-      .filter(([, auth]) => !auth.userAnswered).map(([target, auth]) => ({ requirementId: auth.requirementId, target }));
-    const extra = unresolved.length > 0 ? { unresolved } : {};
-
     const rootReal = await realpath(input.projectRoot);
     const openspecReal = await realpath(path.join(input.projectRoot, OPENSPEC_DIR));
     const changesDir = path.join(input.projectRoot, OPENSPEC_DIR, 'changes');
@@ -847,15 +982,19 @@ export async function exportOpenSpecChange(input: ExportInput): Promise<OpenSpec
     const problems: string[] = [];
     const files = await readDraft(draftDir, problems);
     problems.push(...checkOpenSpecDraft(files, { ...input.context, dir: input.dir, index }));
+    const owner = existing !== null && existing.isDirectory() && !existing.isSymbolicLink() ? await readMaestroRun(target) : null;
     if (problems.length > 0) {
-      log.warn('export', 'draft refused', { change, problems: problems.length, first: problems[0]! });
-      return { status: 'refused', change, problems: capped(problems), ...extra };
+      // A refused re-closure leaves this run's earlier export where it is: the
+      // folder is the user's to archive or not, and saying it is stale is
+      // honest where deleting it would not be.
+      const stale = existing !== null && owner === input.dir ? { stale: true as const } : {};
+      log.warn('export', '[FIX] draft refused', { change, problems: problems.length, stale: 'stale' in stale });
+      return { status: 'refused', change, problems: capped(problems), ...stale, ...extra };
     }
 
     if (existing !== null) {
-      const owner = existing.isDirectory() && !existing.isSymbolicLink() ? await readMaestroRun(target) : null;
       if (owner !== input.dir) {
-        log.warn('export', 'a change of that name belongs to someone else; left alone', { change, owner });
+        log.warn('export', 'a change of that name belongs to someone else; left alone', { change, owner, problems: 1 });
         return { status: 'refused', change, problems: [`openspec/changes/${change} exists and its x-maestro-run is ${owner ?? 'missing'} — it is not this run's, so it was not overwritten; move it or rename it`], ...extra };
       }
     }
@@ -867,8 +1006,8 @@ export async function exportOpenSpecChange(input: ExportInput): Promise<OpenSpec
     return { status, change, validation: checked.validation, ...(checked.problems.length > 0 ? { problems: capped(checked.problems) } : {}), ...extra };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    log.warn('export', 'export failed; an identical closing publish retries it', { change, reason });
-    return { status: 'failed', change, problems: [`the export could not be written (${reason}) — publish the same closed state again to retry`] };
+    log.warn('export', 'export failed; an identical closing publish retries it', { change, reason, problems: 1 });
+    return { status: 'failed', change, problems: [`the export could not be written (${reason}) — publish the same closed state again to retry`], ...extra };
   }
 }
 
@@ -907,27 +1046,83 @@ export async function exportForClosure(runRoot: string, state: RunState, runner?
   });
 }
 
+/**
+ * The forks a closure leaves unresolved when it wrote no draft — every
+ * requirement failed, was excepted, or was kept against an approved one. The
+ * export reports its own forks; this covers the closure that exports nothing,
+ * so a self-briefed contradiction still reaches *Not Done*.
+ */
+export async function closureForks(runRoot: string, state: RunState): Promise<UnresolvedFork[]> {
+  if (!EXPORTABLE.includes(state.outcome ?? '')) return [];
+  let answers: string;
+  try { answers = await readFile(path.join(runRoot, runDirName(state), 'answers.md'), 'utf8'); }
+  catch { return []; }
+  const forks = unresolvedOf(authorisationsOf(parseAnswers(answers), parseOpenSpecDisposition));
+  if (forks.length === 0 || !(await detectOpenSpec(path.dirname(runRoot))).present) return [];
+  log.info('export', '[FIX] no draft, but self-briefed forks remain', { dir: runDirName(state), forks: forks.length });
+  return forks;
+}
+
+/**
+ * Earlier runs whose `<dir>#openspec` item awaits an archive the user has
+ * since done: the change is gone from `openspec/changes/` and present under
+ * `archive/`. Read from the tree, as the index is, because no later closure
+ * of that run would ever regenerate its item.
+ */
+export async function archivedExports(projectRoot: string, dirs: readonly string[]): Promise<string[]> {
+  if (dirs.length === 0) return [];
+  const index = await readOpenSpecIndex(projectRoot);
+  if (!index.present) return [];
+  const change = (dir: string): string => `${MAESTRO_CHANGE_PREFIX}${dir}`;
+  const archived = dirs.filter(dir => index.archived.some(item => item.change === change(dir)) && !index.changes.some(item => item.name === change(dir)));
+  if (archived.length > 0) log.info('export', '[FIX] earlier exports archived by the user; their items are settled', { archived: archived.length });
+  return archived;
+}
+
 export interface OpenSpecProgressItems {
   notDone: Array<{ key: string; text: string }>;
   knownBugs: Array<{ key: string; text: string }>;
+  /** Items of earlier runs the tree shows settled; they replace the open item of the same key. */
+  settled?: Array<{ key: string; text: string }>;
 }
 
-/** What `PROGRESS.md` says about the export, keyed under the closing run so a re-closure regenerates it. */
-export function openSpecProgressItems(dir: string, result: OpenSpecExport | null): OpenSpecProgressItems {
+/** The *Settled* item for an earlier run's change the user archived. */
+export function archivedItems(dirs: readonly string[]): Array<{ key: string; text: string }> {
+  return dirs.map(dir => ({ key: `${dir}#openspec`, text: `OpenSpec change openspec/changes/${MAESTRO_CHANGE_PREFIX}${dir}/ was archived by the user` }));
+}
+
+/**
+ * What `PROGRESS.md` says about the export, keyed under the closing run so a
+ * re-closure regenerates it. `forks` stands in for the export's own list when
+ * the closure wrote no draft.
+ */
+export function openSpecProgressItems(dir: string, result: OpenSpecExport | null, forks: readonly UnresolvedFork[] = []): OpenSpecProgressItems {
   const items: OpenSpecProgressItems = { notDone: [], knownBugs: [] };
-  if (!result) return items;
+  if (!result) {
+    addForkItems(items, dir, forks);
+    return items;
+  }
   const first = result.problems?.[0] ?? 'no reason given';
   if (result.status === 'written' || result.status === 'kept') {
-    const unchecked = result.validation === 'unavailable' ? ' — not validated: the openspec command line is not installed' : '';
+    // `unavailable` has two causes; a timeout carries its problem, a missing command line none.
+    const why = result.problems?.[0] ?? 'the openspec command line is not installed';
+    const unchecked = result.validation === 'unavailable' ? ` — not validated: ${why}` : '';
     items.notDone.push({ key: `${dir}#openspec`, text: `OpenSpec change openspec/changes/${result.change}/ awaits \`openspec archive ${result.change}\`${unchecked}` });
     if (result.validation === 'failed') items.knownBugs.push({ key: `${dir}#openspec-validation`, text: `openspec validate rejected ${result.change}: ${first}` });
   } else if (result.status === 'refused') {
-    items.knownBugs.push({ key: `${dir}#openspec`, text: `OpenSpec export refused: ${first}` });
+    const stale = result.stale ? ` — openspec/changes/${result.change}/ from an earlier closure is still in the tree and no longer matches this one; do not archive it until the export is fixed` : '';
+    items.knownBugs.push({ key: `${dir}#openspec`, text: `OpenSpec export refused: ${first}${stale}` });
   } else if (result.status === 'failed') {
     items.knownBugs.push({ key: `${dir}#openspec`, text: `OpenSpec export failed: ${first}` });
   }
+  addForkItems(items, dir, result.unresolved ?? forks);
+  return items;
+}
+
+/** One *Not Done* item per self-briefed fork, keyed `<dir>#openspec-<R##>`, numbered when one id has several. */
+function addForkItems(items: OpenSpecProgressItems, dir: string, forks: readonly UnresolvedFork[]): void {
   const used = new Map<string, number>();
-  for (const conflict of result.unresolved ?? []) {
+  for (const conflict of forks) {
     const base = `${dir}#openspec-${conflict.requirementId || 'fork'}`;
     const count = (used.get(base) ?? 0) + 1;
     used.set(base, count);
@@ -936,5 +1131,4 @@ export function openSpecProgressItems(dir: string, result: OpenSpecExport | null
       text: `${conflict.requirementId || 'a fork'} contradicts the approved OpenSpec requirement ${conflict.target}; the run kept the requirement without asking — decide whether the brief changes it`,
     });
   }
-  return items;
 }

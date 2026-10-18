@@ -463,7 +463,7 @@ the whole прогон for what a per-таск review cannot see — duplication
 `reviews/standards.md` once; its observations go to the отчёт and are never
 repaired.
 
-Two more phases run outside that sequence:
+Three more phases run outside that sequence:
 
 - **Repair** — a таск reaches it through one of six doors: it came back not
   done, failed review, carries a final disagreement from acceptance, built
@@ -483,6 +483,10 @@ Two more phases run outside that sequence:
   acceptance's or repair's, and asks nothing. It writes what should outlive the
   run into the instruction file your host loads, appends to `decisions.md`, and
   ends the closure with one commit — see [Between Runs](#between-runs).
+- **OpenSpec Export** — only in a project that keeps OpenSpec requirements, and
+  only after a `completed` or `closed_with_exceptions` closure: a writer drafts
+  one OpenSpec change from what passed, and the closing publish writes it — see
+  [A Project That Keeps OpenSpec Requirements](#a-project-that-keeps-openspec-requirements).
 
 Before any broad, browser or integrated check, the run records **readiness**
 against a disposable source-only copy of the project, so a broken setup is

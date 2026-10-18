@@ -626,6 +626,32 @@ project.
 Final `npm run check`: typecheck, all twelve validator runs and 2,208 tests passed,
 with zero failures, skips or cancellations.
 
+Verification follow-up, the same day. Three read-only passes compared the
+implementation with the plan and with OpenSpec 1.14.3's own delta parser
+(`requirement-blocks.js` of the installed package). They found the draft check
+reading only the first `## ADDED Requirements` section, where OpenSpec applies
+every copy: a second copy carried a SHALL mapped to no passed requirement past
+the check, and `openspec validate --strict` accepted it too. REMOVED took a
+bare `* Name` that OpenSpec ignores — the real CLI then archived with nothing
+removed — and refused legal `- **Reason**:` prose; RENAMED took lower-case
+`from:`, ignored the fence mask and backtracked quadratically: the 200 KB timing
+test took over 20 s on it. The index followed a symlinked `openspec/specs` or
+`openspec/changes` out of the project and called an unlistable directory
+complete. On the closing publish, an earlier run's archive item outlived the
+user's archive, a self-briefed fork without a draft never reached *Not Done*,
+and a timeout was reported as a missing command line. Each finding got a
+regression test, run first against the unfixed runtime: seventeen were red
+there and are green now.
+
+```sh
+node --test scripts/openspec/openspec.test.ts scripts/openspec/openspec-export.test.ts
+node --test scripts/gates/answers.test.ts scripts/validate/openspec-sync.test.ts
+npm run check
+```
+
+Final `npm run check` after the fixes: typecheck, all twelve validator runs and
+2,227 tests passed, with zero failures, skips or cancellations.
+
 ## See Also
 
 - [Installation and development checks](install.md)

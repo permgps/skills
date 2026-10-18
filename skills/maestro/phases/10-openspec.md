@@ -60,21 +60,23 @@ reports `openspec` in its result. A failure never fails the publish.
 |---|---|---|
 | `written` | the change was written, or rewritten whole | say where it is |
 | `kept` | the same change was already there | say where it is |
-| `refused` | a check failed; nothing was written | say the first problem in one line; `PROGRESS.md` lists it |
-| `archived` | the user already merged this run's change | nothing |
+| `refused` | a check failed; nothing was written | say the first problem in one line; `PROGRESS.md` lists it. With `stale`, this run's change from an earlier closure is still in `openspec/changes/`: say it must not be archived until the export is fixed |
+| `archived` | the user already merged this run's change | say it is already archived |
 | `failed` | a write failed | say so in one line; an identical closing publish retries it |
 
 `validation` says whether the OpenSpec command line accepted the change:
 `passed`, `failed` (its first lines are in `problems`), or `unavailable` when
-it is not installed. A `refused` or `failed` export, and a failed validation,
+it is not installed or did not answer within 30 seconds (then `problems` says
+so). A `refused` or `failed` export, and a failed validation,
 are said and not stopped on: the run's own record is complete without them.
 
 ### 4. Tell the user
 
-One line, after the publish, in the прогон's language: the folder, its status,
-and that merging is theirs —
+One line, after the publish, in the прогон's language: the folder and its
+status. For `written` and `kept`, add that merging is theirs —
 `openspec archive maestro-<dir>`. Maestro never runs it and never writes
-`openspec/specs/`. Log INFO `openspec` `draft written` with the file count, and
+`openspec/specs/`. For `archived`, `refused` or `failed`, say the status
+instead and never suggest archiving. Log INFO `openspec` `draft written` with the file count, and
 WARN `openspec` `export <status>` for `refused` and `failed`; never log
 requirement text.
 
@@ -85,7 +87,9 @@ The memory phase's closing commit takes the folder when the status is
 
 **The writer has nothing it may export.** Every requirement failed, is
 excepted, or was kept against an approved one. Then no draft is written: no
-folder appears and the publish carries no `openspec` key. Say so in one line.
+folder appears and the publish carries no `openspec` key. A self-briefed fork
+still reaches `PROGRESS.md` *Not Done*: the closing publish reads it from
+`answers.md`. Say so in one line.
 
 **The draft is refused.** Do not edit the change folder by hand, and do not
 write into `openspec/` yourself. Correct the draft in `.maestro/<dir>/openspec/`

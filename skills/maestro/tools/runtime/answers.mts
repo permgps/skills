@@ -65,8 +65,9 @@ const LABELS: Array<[RegExp, Field | 'options']> = [
   [/^Chosen:\s*/, 'chosen'],
   [/^Settled by reading:\s*/, 'settledByReading'],
   // Bold and any case: the line is written by a model and read for authority,
-  // so a spelling the phase file allows must never fall into `Chosen:`.
-  [/^\s*(?:\*\*)?openspec:(?:\*\*)?\s*/i, 'openspec'],
+  // so a spelling the phase file allows must never fall into `Chosen:` —
+  // `**OpenSpec:**` and `**OpenSpec**:` alike.
+  [/^\s*(?:\*\*)?openspec(?:\*\*)?:(?:\*\*)?\s*/i, 'openspec'],
 ];
 
 const ENTRY_HEADING = /^###\s+(.*)$/;

@@ -21,7 +21,10 @@ import { relocateRunDir, restoreRunDir, type Relocation } from './relocation.mts
 import { upsertRegister } from './register.mts';
 import { headCommit } from './history.mts';
 import { PROGRESS_FILE, buildProgress, clip, fixesReadAtPreflight, parseProgress, type ProgressItem } from './progress.mts';
-import { exportForClosure, openSpecProgressItems, type OpenSpecExport, type OpenSpecProgressItems } from './openspec.mts';
+import {
+  MAESTRO_CHANGE_PREFIX, archivedExports, archivedItems, closureForks, exportForClosure, openSpecProgressItems,
+  type OpenSpecExport, type OpenSpecProgressItems,
+} from './openspec.mts';
 
 const log = createLogger('sync');
 export type PrepareCandidate = (state: RunState, previous: RunState | null) => Promise<StateViolation[]>;
@@ -162,7 +165,15 @@ async function writeProgress(runRoot: string, state: RunState, repeated: boolean
   let commit: string | null = null;
   try {
     const previous = await readOptional(target);
-    const header = previous === null ? null : parseProgress(previous).header;
+    const parsed = previous === null ? null : parseProgress(previous);
+    const header = parsed?.header ?? null;
+    // An earlier run's change awaiting `openspec archive` is carried until the
+    // tree shows the user archived it; no later closure of that run regenerates it.
+    const own = `${runDirName(state)}#`;
+    const waiting = (parsed?.notDone ?? []).map(item => item.key ?? '')
+      .filter(key => key.endsWith('#openspec') && !key.startsWith(own)).map(key => key.slice(0, -'#openspec'.length));
+    const archived = await archivedExports(path.dirname(runRoot), waiting).catch(() => [] as string[]);
+    if (archived.length > 0) extra = { ...extra, settled: archivedItems(archived) };
     // A successful closure is the baseline for later code history. Repeating it
     // must neither advance that commit to today's HEAD nor consume user fixes.
     // An export outcome that changed since is the one thing a repeat rewrites,
@@ -171,7 +182,7 @@ async function writeProgress(runRoot: string, state: RunState, repeated: boolean
     if (repeated && previous !== null && header?.dir === runDirName(state)
       && header.closedAt === (state.finishedAt ?? state.updatedAt ?? state.startedAt)
       && header.outcome === state.outcome) {
-      if (sameExportItems(previous, runDirName(state), extra)) {
+      if (archived.length === 0 && sameExportItems(previous, runDirName(state), extra)) {
         log.debug('progress', '[FIX] existing closure progress preserved', { path: target });
         return 'kept';
       }
@@ -370,10 +381,13 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
     // Before the progress file, so it can list what the export left to the user.
     try { openspec = await exportForClosure(dir, state); }
     catch (error) {
-      log.warn('openspec', 'export raised; reported as failed', { runId: state.runId, reason: error instanceof Error ? error.message : String(error) });
+      const reason = error instanceof Error ? error.message : String(error);
+      log.warn('openspec', '[FIX] export raised; reported as failed', { runId: state.runId, reason });
+      openspec = { status: 'failed', change: `${MAESTRO_CHANGE_PREFIX}${runDirName(state)}`, problems: [`the export could not be run (${reason}) — publish the same closed state again to retry`] };
     }
     if (openspec) log.info('openspec', 'closing publish exported', { runId: state.runId, status: openspec.status, validation: openspec.validation ?? null });
-    progress = await writeProgress(dir, state, previous?.lifecycle === 'closed', openSpecProgressItems(runDirName(state), openspec));
+    const forks = openspec ? [] : await closureForks(dir, state).catch(() => []);
+    progress = await writeProgress(dir, state, previous?.lifecycle === 'closed', openSpecProgressItems(runDirName(state), openspec, forks));
   }
   const envelope = validationEnvelope(errors.length ? 'invalid' : 'valid', candidate, errors, errors.length ? previous : state);
   try {

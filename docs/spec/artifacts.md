@@ -79,7 +79,13 @@ user decided in their own words: dropped требования with their reason,
 carried items they dismissed. *Not Done* holds deferred, placeholder and
 incomplete требования and failed таски. *Known Bugs* holds open findings — with
 the user's authorization quoted when an accepted exception covers one — and
-requirements that failed acceptance with no finding naming them. *Fixes Without
+requirements that failed acceptance with no finding naming them. In an OpenSpec project the closing publish adds the export's own items
+under the same key scheme — `[<run dir>#openspec]` for the change awaiting
+`openspec archive` or for a refused or failed export,
+`[<run dir>#openspec-validation]` for a change the OpenSpec command line
+rejected, `[<run dir>#openspec-<R##>]` for a self-briefed fork — and moves an
+earlier run's `#openspec` item to *Settled* once the tree shows the user
+archived that change ([`phases.md`](phases.md), *OpenSpec Export*). *Fixes Without
 Maestro* is the one section the user writes into; a line this run's preflight
 already read is dropped at its closure, and one added since is kept. Every
 item is keyed `[<run dir>#<id>]`, so an item from another run is carried until
@@ -90,8 +96,9 @@ and the memory block hold them. A write that fails does not fail the publish,
 which reports `progress: failed`, and the next closing publish rewrites it.
 An identical retry also repairs a missing file or a file still naming the prior
 closure. If the header already names this run, closing instant and outcome,
-the retry reports `progress: kept` and preserves its original commit and user
-fixes. Reopening and closing again regenerates the file normally.
+and the export's items have not changed, the retry reports `progress: kept`
+and preserves its original commit and user fixes; a changed export outcome
+rewrites the file under the original commit. Reopening and closing again regenerates the file normally.
 
 The dashboard is opened directly and there is no second entry point beside it.
 An `index.html` pointing at a self-contained page would be an artifact with no
@@ -350,7 +357,8 @@ comparison of them has two answers to choose from.
 - `.maestro/` is committed, not ignored. It is the user's record of what was
   promised and what was delivered; a прогон that leaves nothing behind did not
   happen. The memory run after every closure commits it, together with the
-  memory file and nothing else, as the прогон's last commit:
+  memory file and, in an OpenSpec project, the change folder the export wrote,
+  and nothing else, as the прогон's last commit:
   `maestro: close <dir>` with a `Maestro-Run: <dir>` trailer (see
   [`phases.md`](phases.md), *Memory*). Without version control nothing is
   committed and the прогон says so.

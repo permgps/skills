@@ -1332,8 +1332,16 @@ and nowhere else:
   `remove` or `rename`. Each requirement states SHALL or MUST and carries at
   least one `#### Scenario:` drawn from a recorded check execution: no
   evidence, no scenario. A MODIFIED block restates the whole requirement, with
-  every scenario the current one has;
-- `.openspec.yaml`, with `schema: spec-driven`, `created: <YYYY-MM-DD>`,
+  every scenario the current one has. A REMOVED entry is a
+  `### Requirement: <name>` heading or a bullet carrying one; a RENAMED pair is
+  `- FROM: \`### Requirement: <old>\`` and `- TO: \`### Requirement: <new>\``.
+  Those are the forms OpenSpec applies; a bare name, or `from:` in lower
+  case, is ignored by it, so the check refuses one rather than let the user's
+  answer silently not happen. A repeated section heading is checked in every
+  copy, because OpenSpec applies every copy, and a heading that does not fold
+  to one of the four titles — two blanks inside it — is not a delta section;
+- `.openspec.yaml`, with `schema: spec-driven` (the draft is that schema's
+  artifacts, so no other schema is accepted), `created: <YYYY-MM-DD>`,
   `x-maestro-run: <dir>` and `x-maestro-requirements`, which maps each exported
   requirement name to the `R##` it came from. OpenSpec never reads a lowercase
   `x-` key. A new capability is named once and pinned there, so a re-closure
@@ -1342,11 +1350,14 @@ and nowhere else:
 **What is never exported.** A requirement that failed or is incomplete in the
 verification projection. A dropped or deferred one. One whose finding an
 accepted exception covers, because the exception keeps the failure. One whose
-fork was answered `keep`, or self-briefed. Each is named in `proposal.md`. A
-deferred, placeholder or failed one is already listed in `PROGRESS.md`. A
-self-briefed fork adds a *Not Done* item keyed `[<dir>#openspec-<R##>]`,
-because the brief and the approved behaviour still disagree and the user never
-decided. A `keep` the user answered adds nothing: they chose it.
+fork was answered `keep`, or self-briefed whatever its disposition: only the
+user changes approved behaviour. Each is named in `proposal.md`. A deferred,
+placeholder or failed one is already listed in `PROGRESS.md`. A self-briefed
+fork adds a *Not Done* item keyed `[<dir>#openspec-<R##>]` (numbered
+`-2`, `-3` when one `R##` has several, and `#openspec-fork` when the entry
+names none), because the brief and the approved behaviour still disagree and
+the user never decided — also when no draft was written, and also when the
+export failed. A `keep` the user answered adds nothing: they chose it.
 
 **The closing publish writes it.** On a closing publish of a `completed` or
 `closed_with_exceptions` state, after the run directory is relocated and before
@@ -1358,23 +1369,31 @@ never fails the publish. The result carries an `openspec` object, and
 | Draft and target | `openspec.status` | `PROGRESS.md` |
 |---|---|---|
 | no OpenSpec, or no draft | key absent | unchanged |
-| the draft passes every check; the folder is absent or ours and different | `written`, with `validation` `passed`, `failed` or `unavailable` | *Not Done*: the change awaits `openspec archive`; *Known Bugs* when `validation` is `failed` |
+| the draft passes every check; the folder is absent or ours and different | `written`, with `validation` `passed`, `failed` or `unavailable` | *Not Done* `[<dir>#openspec]`: the change awaits `openspec archive`, with the reason when not validated; *Known Bugs* `[<dir>#openspec-validation]` when `validation` is `failed` |
 | the folder is ours and identical | `kept` | as for `written` |
-| a requirement maps to an `R##` that is not passed, or a delta kind the user did not authorise, or a near-miss name | `refused`, nothing written, `problems[]` | *Known Bugs*: the export was refused, with the first problem |
+| a requirement maps to an `R##` that is not passed, or a delta kind the user did not authorise, or a near-miss name | `refused`, nothing written, `problems[]`; `stale` when this run's change from an earlier closure is still there, left as it was | *Known Bugs* `[<dir>#openspec]`: the export was refused, with the first problem, and with `stale` that the earlier change must not be archived |
 | the folder exists and another owner wrote it | `refused` (collision), untouched | *Known Bugs* |
 | the folder is gone and `archive/<date>-maestro-<dir>/` exists | `archived`, untouched | no archive item |
-| a write failed | `failed` | *Known Bugs*; an identical retry repairs it |
+| a write failed | `failed` | *Known Bugs* `[<dir>#openspec]`; an identical retry repairs it |
 
 `validation` comes from the OpenSpec command line when it is installed:
 `openspec validate maestro-<dir> --type change --strict --json --no-interactive`,
-bounded at 30 seconds. Without it, `validation` is `unavailable` and the
-limitation is said. The helper never runs `openspec archive` and never writes
+bounded at 30 seconds. Without it, or past the bound, `validation` is
+`unavailable` and the reason is said.
+
+A repeated identical closure keeps `PROGRESS.md` only when the export's items
+are the same as the file holds; a changed export outcome rewrites it with the
+original header commit. An earlier run's `[<dir>#openspec]` item is carried
+like any other run's item, until a closing publish finds that change gone from
+`openspec/changes/` and present under `archive/`: the item then moves to
+*Settled*, because no closure of that run would ever regenerate it. The helper never runs `openspec archive` and never writes
 `openspec/specs/`, `archive/` or another change: merging is the user's step,
 and the change folder is the only thing outside `.maestro/` a run owns whole.
 
 **After the publish** the phase tells the user in one line where the change
-is, its status, and that `openspec archive maestro-<dir>` is theirs to run. A
-`refused` or `failed` status is said, not stopped on. The memory phase's
+is and its status; for `written` and `kept`, that `openspec archive
+maestro-<dir>` is theirs to run. A `refused` or `failed` status is said, not
+stopped on, and never followed by a suggestion to archive. The memory phase's
 closing commit takes the folder by pathspec when the status is `written` or
 `kept`.
 

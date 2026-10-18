@@ -9,13 +9,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { copyFile, cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, copyFile, cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
   SPEC_BYTE_LIMIT, SPEC_FILE_LIMIT, detectOpenSpec, foldRequirementName, maestroRunOf,
-  normalizeRequirementName, parseSpecRequirements, readOpenSpecIndex, scenarioName,
+  normalizeRequirementName, openSpecIndexCommand, parseSpecRequirements, readOpenSpecIndex, scenarioName,
 } from './openspec.ts';
 
 async function tree(files: Record<string, string>): Promise<{ root: string; dispose(): Promise<void> }> {
@@ -220,6 +220,59 @@ test('a symlinked spec file is not followed', async () => {
     await symlink(path.join(outside.root, 'spec.md'), path.join(project.root, 'openspec/specs/linked/spec.md'));
     assert.deepEqual((await readOpenSpecIndex(project.root)).capabilities, []);
   } finally { await project.dispose(); await outside.dispose(); }
+});
+
+test('openspec/specs or openspec/changes symlinked out of the project is not read, and the index says incomplete', async () => {
+  const outside = await tree({
+    'specs/checkout/spec.md': SPEC.replace('Card payment', 'Outside secret'),
+    'changes/stolen/.openspec.yaml': 'schema: spec-driven\nx-maestro-run: stolen\n',
+  });
+  for (const linked of ['specs', 'changes']) {
+    const project = await tree({ 'openspec/config.yaml': 'schema: spec-driven\n' });
+    try {
+      await symlink(path.join(outside.root, linked), path.join(project.root, 'openspec', linked));
+      const index = await readOpenSpecIndex(project.root);
+      assert.deepEqual(index.capabilities, [], linked);
+      assert.deepEqual(index.changes, [], linked);
+      assert.equal(index.incomplete, true, linked);
+      assert.match(index.reasons.join(' '), new RegExp(`openspec/${linked} resolves outside the project`), linked);
+    } finally { await project.dispose(); }
+  }
+  await outside.dispose();
+});
+
+test('a directory under openspec/specs that cannot be listed makes the index incomplete, and a missing specs directory does not', { skip: process.getuid?.() === 0 }, async () => {
+  const project = await tree({ 'openspec/config.yaml': 'schema: spec-driven\n', 'openspec/specs/a/spec.md': SPEC, 'openspec/specs/b/spec.md': SPEC });
+  const locked = path.join(project.root, 'openspec/specs/b');
+  try {
+    await chmod(locked, 0o000);
+    const index = await readOpenSpecIndex(project.root);
+    assert.deepEqual(index.capabilities.map(item => item.capability), ['a']);
+    assert.deepEqual(index.unreadable, ['openspec/specs/b']);
+    assert.equal(index.incomplete, true);
+    assert.match(index.reasons.join(' '), /openspec\/specs\/b could not be listed/);
+  } finally { await chmod(locked, 0o755); await project.dispose(); }
+  const bare = await tree({ 'openspec/config.yaml': 'schema: spec-driven\n' });
+  try {
+    const index = await readOpenSpecIndex(bare.root);
+    assert.deepEqual([index.incomplete, index.unreadable, index.reasons], [false, [], []]);
+  } finally { await bare.dispose(); }
+});
+
+test('--openspec-index exits 0 and reports absent in a project without OpenSpec, and 2 when the project root cannot be read', async () => {
+  const project = await tree({ 'README.md': '# x\n' });
+  try {
+    const maestro = path.join(project.root, '.maestro');
+    await mkdir(maestro);
+    await copyFile('skills/maestro/tools/sync.mts', path.join(maestro, 'sync.mts'));
+    await cp('skills/maestro/tools/runtime', path.join(maestro, 'runtime'), { recursive: true });
+    const run = spawnSync(process.execPath, [path.join(maestro, 'sync.mts'), '--openspec-index'], { encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr);
+    assert.equal((JSON.parse(run.stdout) as { present: boolean }).present, false);
+  } finally { await project.dispose(); }
+  const missing = await openSpecIndexCommand([], path.join(tmpdir(), `maestro-openspec-missing-${process.pid}`, '.maestro'));
+  assert.equal(missing.code, 2);
+  assert.match(String(missing.result.error), /project root could not be read/);
 });
 
 test('every parsing rule stays linear on a 200 KB adversarial line', () => {

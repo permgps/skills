@@ -734,18 +734,24 @@ header the commit `git rev-parse HEAD` gives, or `none`. The result carries
 `progress`: `written`, or `failed` when the file could not be written. A
 failure does not undo the publish. Repeating a closed publish retries a missing
 file or one whose header names another closure. If the header already matches
-the run, closing instant and outcome, it reports `progress: kept`, preserving
-the original commit and user fixes. Active candidates leave the file alone and
+the run, closing instant and outcome, and the file already holds the OpenSpec
+export's items for this outcome and no earlier run's change has been archived
+since, it reports `progress: kept`, preserving the original commit and user
+fixes; otherwise it rewrites the file with the original header commit. Active candidates leave the file alone and
 carry no `progress`. Reopen followed by closure regenerates the file.
 
 **The OpenSpec export.** The same closing publish, for a `completed` or
 `closed_with_exceptions` candidate whose run directory holds an `openspec/`
 draft, checks the draft and writes `openspec/changes/maestro-<dir>/` after the
 relocation and before `PROGRESS.md`. The result carries
-`openspec: { status, change, validation?, problems? }`, where `status` is
-`written`, `kept`, `refused`, `archived` or `failed`, and `validation` is
-`passed`, `failed` or `unavailable` on `written` and `kept`. `problems` lists
-what to fix, at most twenty entries. No state field records it and the
+`openspec: { status, change, validation?, problems?, unresolved?, stale? }`,
+where `status` is `written`, `kept`, `refused`, `archived` or `failed`, and
+`validation` is `passed`, `failed` or `unavailable` on `written` and `kept`.
+`problems` lists what to fix, at most twenty entries; on `unavailable` it
+holds the timeout when there was one. `unresolved` lists the forks the run
+answered itself, `{ requirementId, target }`, on any status. `stale: true`
+marks a `refused` export that left this run's change from an earlier closure
+in place. No state field records it and the
 contract version does not change: the draft and the tree are the facts, and a
 retry of the same closed publish derives the same answer. A publish without a
 draft, an active candidate, and a `stopped_incomplete` closure carry no

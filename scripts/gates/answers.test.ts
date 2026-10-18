@@ -293,6 +293,14 @@ test('the OpenSpec label is read in bold and in any case, and a wrapped value jo
   assert.equal(parseAnswers(lower)[0]!.openspec, 'checkout › Receipt — replace');
 });
 
+test('the OpenSpec label with its colon outside the bold is still its own field, and Chosen stays whole', () => {
+  const outside = OPENSPEC_ENTRY.replace('OpenSpec:', '**OpenSpec**:');
+  const [parsed] = parseAnswers(outside);
+  assert.equal(parsed!.openspec, 'checkout › Receipt — replace');
+  assert.doesNotMatch(parsed!.chosen ?? '', /OpenSpec/);
+  assert.deepEqual(findingsFor(outside), []);
+});
+
 test('an entry without an OpenSpec line has none, and an existing entry still passes G1', () => {
   assert.equal(parseAnswers(entry())[0]!.openspec, null);
   assert.deepEqual(findingsFor(entry()), []);

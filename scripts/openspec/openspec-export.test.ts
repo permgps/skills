@@ -14,10 +14,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import {
-  authorisationsOf, checkOpenSpecDraft, exportOpenSpecChange, readOpenSpecIndex,
+  authorisationsOf, checkOpenSpecDraft, closureContext, exportOpenSpecChange, openSpecProgressItems, readOpenSpecIndex,
   type Authorisation, type DraftContext, type DraftFiles, type OpenSpecIndex, type OpenSpecRunner,
 } from './openspec.ts';
 import { parseAnswers, parseOpenSpecDisposition } from '../gates/answers.ts';
+import type { RunState } from '../state/contract.ts';
 
 const DIR = '2026-10-18-checkout';
 
@@ -131,14 +132,83 @@ test('MODIFIED that drops a current scenario, or names no approved requirement, 
   assert.match(problems.join(' '), /is not an approved requirement \(did you mean "Receipt"\?\)/);
 });
 
-test('REMOVED is accepted as a heading or as a bullet, with or without backticks, once the user answered remove', () => {
+test('REMOVED is accepted as a heading or as a bullet carrying one, with any bullet marker and with or without backticks, once the user answered remove', () => {
   const remove: [string, Authorisation] = ['checkout › Receipt', { requirementId: 'R02', disposition: 'remove', renamedTo: null, userAnswered: true }];
-  for (const form of ['### Requirement: Receipt', '- ### Requirement: Receipt', '- `### Requirement: Receipt`', '* Receipt']) {
-    const spec = `${ADDED}\n## REMOVED Requirements\n${form}\n**Reason**: the brief retires it\n`;
+  for (const form of ['### Requirement: Receipt', '- ### Requirement: Receipt', '- `### Requirement: Receipt`', '* ### Requirement: Receipt', '+ `### Requirement: Receipt`']) {
+    const spec = `${ADDED}\n## REMOVED Requirements\n${form}\n- **Reason**: the brief retires it\n**Migration**: none\n`;
     assert.deepEqual(checkOpenSpecDraft(draft({ 'specs/checkout/spec.md': spec }), context({}, [remove])), [], form);
   }
-  const spec = `${ADDED}\n## REMOVED Requirements\n- Receipt\n`;
+  const spec = `${ADDED}\n## REMOVED Requirements\n- ### Requirement: Receipt\n`;
   assert.match(checkOpenSpecDraft(draft({ 'specs/checkout/spec.md': spec }), context()).join(' '), /REMOVED "checkout › Receipt" changes approved behaviour without/);
+});
+
+test('a REMOVED bullet naming an approved requirement without "### Requirement:" is refused, because OpenSpec removes nothing for it', () => {
+  const remove: [string, Authorisation] = ['checkout › Receipt', { requirementId: 'R02', disposition: 'remove', renamedTo: null, userAnswered: true }];
+  for (const form of ['* Receipt', '- Receipt', '- `Receipt`']) {
+    const spec = `${ADDED}\n## REMOVED Requirements\n${form}\n`;
+    assert.match(checkOpenSpecDraft(draft({ 'specs/checkout/spec.md': spec }), context({}, [remove])).join(' '), /OpenSpec ignores it.*### Requirement: Receipt/, form);
+  }
+});
+
+test('a REMOVED or RENAMED line inside a fenced example is text, not a delta', () => {
+  const spec = `${ADDED}\n## REMOVED Requirements\n\`\`\`markdown\n- ### Requirement: Card payment\n\`\`\`\n\n## RENAMED Requirements\n~~~\n- FROM: \`### Requirement: Receipt\`\n~~~\n`;
+  assert.deepEqual(checkOpenSpecDraft(draft({ 'specs/checkout/spec.md': spec }), context()), []);
+});
+
+test('a RENAMED line OpenSpec does not read is refused: lowercase from/to, or a name without "### Requirement:"', () => {
+  const rename: [string, Authorisation] = ['checkout › Receipt', { requirementId: 'R02', disposition: 'rename', renamedTo: 'Email receipt', userAnswered: true }];
+  for (const pair of ['- from: `### Requirement: Receipt`\n- to: `### Requirement: Email receipt`', '- FROM: Receipt\n- TO: Email receipt', '- FROM: `### requirement: Receipt`\n- TO: `### requirement: Email receipt`']) {
+    const spec = `${ADDED}\n## RENAMED Requirements\n${pair}\n`;
+    assert.match(checkOpenSpecDraft(draft({ 'specs/checkout/spec.md': spec }), context({}, [rename])).join(' '), /OpenSpec does not read it/, pair);
+  }
+});
+
+test('every copy of a repeated delta section is checked, as OpenSpec applies every copy', () => {
+  const untraced = `${ADDED}\n## ADDED Requirements\n### Requirement: Untraced\nThe system SHALL do whatever.\n\n#### Scenario: Any\n- **WHEN** anything\n- **THEN** something\n`;
+  assert.match(checkOpenSpecDraft(draft({ 'specs/checkout/spec.md': untraced }), context()).join(' '), /ADDED "checkout › Untraced" is not in x-maestro-requirements/);
+  const existing = `${ADDED}\n## Added Requirements\n### Requirement: Card payment\nThe system SHALL take cards.\n\n#### Scenario: Paid order\n- **WHEN** paid\n- **THEN** marked\n`;
+  assert.match(checkOpenSpecDraft(draft({ 'specs/checkout/spec.md': existing }), context()).join(' '), /ADDED "checkout › Card payment" already exists/);
+  const twice = `${ADDED}\n## ADDED Requirements\n### Requirement: Wallet payment\nThe system SHALL accept wallets.\n\n#### Scenario: Paid\n- **WHEN** paid\n- **THEN** marked\n`;
+  assert.match(checkOpenSpecDraft(draft({ 'specs/checkout/spec.md': twice }), context()).join(' '), /names "Wallet payment" twice/);
+});
+
+test('a delta heading OpenSpec does not fold to a delta section is not one: two blanks inside the title', () => {
+  const spec = ADDED.replace('## ADDED Requirements', '## ADDED  Requirements');
+  assert.match(checkOpenSpecDraft(draft({ 'specs/checkout/spec.md': spec }), context()).join(' '), /no requirement delta/);
+});
+
+test('a self-briefed fork excludes its requirement whatever the disposition, as only the user may change approved behaviour', () => {
+  for (const disposition of ['keep', 'replace', 'remove'] as const) {
+    const fork: [string, Authorisation] = ['checkout › Receipt', { requirementId: 'R01', disposition, renamedTo: null, userAnswered: false }];
+    assert.match(checkOpenSpecDraft(draft(), context({}, [fork])).join(' '), /maps R01, whose fork was self-briefed/, disposition);
+  }
+  const answered: [string, Authorisation] = ['checkout › Receipt', { requirementId: 'R01', disposition: 'replace', renamedTo: null, userAnswered: true }];
+  assert.deepEqual(checkOpenSpecDraft(draft(), context({}, [answered])), []);
+});
+
+test('created and schema are read as YAML scalars: quoted and commented values are legal, a schema other than spec-driven is not', () => {
+  for (const head of ['schema: "spec-driven"\ncreated: "2026-10-18"', "schema: 'spec-driven' # the default\ncreated: 2026-10-18 # closing day"]) {
+    const yaml = metadata().replace('schema: spec-driven\ncreated: 2026-10-18', head);
+    assert.deepEqual(checkOpenSpecDraft(draft({ '.openspec.yaml': yaml }), context()), [], head);
+  }
+  const other = metadata().replace('schema: spec-driven', 'schema: nonsense');
+  assert.match(checkOpenSpecDraft(draft({ '.openspec.yaml': other }), context()).join(' '), /schema is nonsense — write "schema: spec-driven"/);
+});
+
+test('every export rule stays linear on a 200 KB adversarial line', () => {
+  const blanks = ' '.repeat(200_000);
+  const lines = [
+    `${blanks}x`, `- FROM:${blanks}x`, `-${blanks}TO:${blanks}x`, `- FROM: \`###${blanks}Requirement:${blanks}x${blanks}\``,
+    `-${blanks}### Requirement:${blanks}x${blanks}\``, `* ${'`'.repeat(200_000)}`, `## ADDED${blanks}Requirements${blanks}x`,
+  ];
+  for (const line of lines) {
+    for (const section of ['ADDED', 'REMOVED', 'RENAMED']) {
+      const spec = `${ADDED}\n## ${section} Requirements\n${line}\n`;
+      const started = performance.now();
+      checkOpenSpecDraft(draft({ 'specs/checkout/spec.md': spec, '.openspec.yaml': metadata(undefined, `x-other: ${line}\n`) }), context());
+      assert.ok(performance.now() - started < 500, `${section} took ${Math.round(performance.now() - started)} ms`);
+    }
+  }
 });
 
 test('RENAMED pairs FROM and TO, with backticks, and must go to the name the user gave', () => {
@@ -323,4 +393,65 @@ test('a project that is not OpenSpec-initialised exports nothing even with a dra
     assert.equal(await exportOf(p), null);
     assert.equal((await readOpenSpecIndex(p.root)).present, false);
   } finally { await p.dispose(); }
+});
+
+test('a timed-out validation says it timed out, and only a missing command line says it is not installed', () => {
+  const change = `maestro-${DIR}`;
+  const slow = openSpecProgressItems(DIR, { status: 'written', change, validation: 'unavailable', problems: ['openspec validate did not answer within 30 s'] });
+  assert.match(slow.notDone[0]!.text, /not validated: openspec validate did not answer within 30 s$/);
+  const absent = openSpecProgressItems(DIR, { status: 'written', change, validation: 'unavailable' });
+  assert.match(absent.notDone[0]!.text, /not validated: the openspec command line is not installed$/);
+});
+
+test('a refused re-closure leaves the earlier export untouched and says it is stale', async () => {
+  const p = await project();
+  try {
+    assert.equal((await exportOf(p))?.status, 'written');
+    const target = path.join(p.root, 'openspec/changes', `maestro-${DIR}`);
+    const before = await readFile(path.join(target, '.openspec.yaml'), 'utf8');
+    await writeFile(path.join(p.runDir, 'openspec/.openspec.yaml'), metadata({ 'checkout › Wallet payment': ['R03'] }));
+    const refused = await exportOf(p);
+    assert.deepEqual([refused?.status, refused?.stale], ['refused', true]);
+    assert.equal(await readFile(path.join(target, '.openspec.yaml'), 'utf8'), before, 'the earlier export is not deleted or rewritten');
+    assert.match(openSpecProgressItems(DIR, refused).knownBugs[0]!.text, /from an earlier closure is still in the tree.*do not archive it/);
+    const first = await project();
+    try {
+      await writeFile(path.join(first.runDir, 'openspec/.openspec.yaml'), metadata({ 'checkout › Wallet payment': ['R03'] }));
+      assert.equal((await exportOf(first))?.stale, undefined, 'a first closure has nothing stale');
+    } finally { await first.dispose(); }
+  } finally { await p.dispose(); }
+});
+
+test('a failed export still reports the forks the run answered itself', async () => {
+  const p = await project();
+  try {
+    await writeFile(path.join(p.root, 'openspec/changes'), 'not a directory\n');
+    const result = await exportOpenSpecChange({
+      projectRoot: p.root, runDir: p.runDir, dir: DIR, outcome: 'completed', runner: missing,
+      context: { results: { R01: 'passed' }, excepted: new Set(), notInSpec: new Set(), authorisations: new Map([
+        ['checkout › Receipt', { requirementId: 'R02', disposition: 'keep', renamedTo: null, userAnswered: false }],
+      ]) },
+    });
+    assert.equal(result?.status, 'failed');
+    assert.deepEqual(result?.unresolved, [{ requirementId: 'R02', target: 'checkout › Receipt' }]);
+    assert.deepEqual(openSpecProgressItems(DIR, result).notDone.map(item => item.key), [`${DIR}#openspec-R02`]);
+  } finally { await p.dispose(); }
+});
+
+test('closed_with_exceptions exports like completed, and the exception covers ids through findings and obligations alike', async () => {
+  const p = await project();
+  try {
+    assert.equal((await exportOf(p, missing, 'closed_with_exceptions'))?.status, 'written');
+  } finally { await p.dispose(); }
+  const state = {
+    requirements: [{ id: 'R01', status: 'in-spec' }, { id: 'R02', status: 'in-spec' }, { id: 'R03', status: 'deferred' }],
+    verification: {
+      findings: [{ id: 'F-1', requirementIds: ['R01'] }],
+      obligations: [{ id: 'O-1', requirementIds: ['R02'] }],
+      decisions: [{ kind: 'accepted_exception', selectedFindingIds: ['F-1'], selectedObligationIds: ['O-1'] }],
+    },
+  } as unknown as RunState;
+  const derived = await closureContext(path.join(tmpdir(), `maestro-openspec-none-${process.pid}`), state);
+  assert.deepEqual([...derived.excepted].sort(), ['R01', 'R02']);
+  assert.deepEqual([...derived.notInSpec], ['R03']);
 });

@@ -316,7 +316,12 @@ export interface BuildProgressInput {
    * outcome. Keyed under this run like every own item, so a re-closure
    * regenerates them rather than carrying a stale one.
    */
-  extra?: { notDone: ReadonlyArray<{ key: string; text: string }>; knownBugs: ReadonlyArray<{ key: string; text: string }> };
+  extra?: {
+    notDone: ReadonlyArray<{ key: string; text: string }>;
+    knownBugs: ReadonlyArray<{ key: string; text: string }>;
+    /** Items of earlier runs the tree shows settled — an export the user archived. Each replaces the open item of its key. */
+    settled?: ReadonlyArray<{ key: string; text: string }>;
+  };
 }
 
 /** The whole new file: the carry table applied, then the line budget. */
@@ -327,6 +332,7 @@ export function buildProgress(input: BuildProgressInput): string {
   const fresh = itemsFromState(state);
   const prior = previous === null ? null : parseProgress(previous);
   const dispositions = new Map<string, LeftoverEntry>((state.leftovers ?? []).map(entry => [entry.key, entry]));
+  const settledByTree = new Set((extra?.settled ?? []).map(item => item.key));
 
   const settled: ProgressItem[] = [];
   const notDone: ProgressItem[] = [];
@@ -359,6 +365,10 @@ export function buildProgress(input: BuildProgressInput): string {
         log.debug('carry', 'own item regenerated from the state', { key: item.key, outcome: 'regenerated' });
         continue;
       }
+      if (settledByTree.has(item.key)) {
+        log.debug('carry', '[FIX] item settled by the tree', { key: item.key, outcome: 'settled' });
+        continue;
+      }
       const disposition = dispositions.get(item.key);
       if (disposition?.disposition === 'taken') {
         log.debug('carry', 'item taken into this run', { key: item.key, outcome: 'taken' });
@@ -374,6 +384,7 @@ export function buildProgress(input: BuildProgressInput): string {
     }
   }
   for (const item of [...dismissed, ...fresh.settled]) keep(settled, item);
+  for (const item of extra?.settled ?? []) keep(settled, { key: item.key, text: clip(item.text) });
   for (const item of fresh.notDone) keep(notDone, item);
   for (const item of fresh.knownBugs) keep(knownBugs, item);
   for (const item of extra?.notDone ?? []) keep(notDone, { key: item.key, text: clip(item.text) });
