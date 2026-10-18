@@ -565,6 +565,11 @@ a warning: the phase is redone.
 | G3 | plan | each required obligation has an implementation owner, each check has an execution owner, the task reader finds the handoff executable, and the plan-consistency reader, seeing every task file at once, finds no two таски sharing a file without an order between them; every producer and the skeleton laid first are `strong`, and each task file's `Model` and `References` rows agree with the run state |
 | G4 | acceptance | all current required checks and coverage pass; missing evidence remains pending |
 
+The installed helper also checks the G3 ownership rules when publishing a new
+pass or further work that relies on it. Tasks sharing a path in `files` or
+`zone` must be ordered by `blockedBy`, directly or through other tasks; a
+passed label alone does not establish that the plan is safe to execute.
+
 Independent readings withhold earlier conclusions. G2 includes a separate reader
 of raw reference material; G4 can inspect that authority and exercise the
 integrated build with available headless tools. The precise input boundaries
@@ -830,11 +835,12 @@ The commands you might run yourself, from the project root:
 ```bash
 node .maestro/sync.mts                       # refresh the page and print its address
 node .maestro/sync.mts --reopen              # bring the panel back
-node .maestro/sync.mts --no-open             # refresh without opening anything
+node .maestro/sync.mts --no-open             # refresh without opening a browser
 MAESTRO_SYNC_DEBUG=1 node .maestro/sync.mts  # diagnostics on stderr
 ```
 
-`MAESTRO_SYNC_NO_OPEN` in the environment does what `--no-open` does, and
+`--no-open` can still start or reuse the local dashboard server; it suppresses
+opening a browser. `MAESTRO_SYNC_NO_OPEN` in the environment does the same, and
 `LOG_LEVEL=DEBUG` also turns diagnostics on. `--validate` and `--project` are
 read-only checks that print JSON; `--publish`, `--serve`, `--memory-read`,
 `--memory-write`, `--config-models`, `--update-check`, `--commits-check`,
@@ -999,22 +1005,31 @@ same records.
 
 **A прогон says who is driving it.** The session that opens a run with no owner
 mints a token into `heldBy` and re-reads the state immediately before every
-write, comparing `updatedAt` with what it last read; a write that lost the race
-is refused rather than landing on top of somebody else's. This detects a second
-orchestrator instead of preventing one, deliberately — nothing here can expire a
-lease, and a lock that refused would strand the next session in front of a run
-nobody is driving. So you are asked.
+write, comparing `updatedAt` with what it last read. The helper checks the
+expected revision and holder token, and serializes publication through a write
+lock that also covers derived files. A competing writer or stale candidate is
+refused, and changed state must carry a later `updatedAt`. Session ownership
+does not expire automatically: when another owner is recorded, the run asks
+you before taking over.
 
 **A plan reader judges every instruction, once.** Every instruction in a task
 file is a numbered unit, and each G3 reader returns one verdict per unit it is
 asked about; the helper refuses a return that skipped one. After a round whose
 returns are all complete, a later round asks only about the units that
-changed. A fact two таски need — a checklist row, an oracle, a decision about
+changed. Removing a unit requires a fresh reading of every remaining unit in
+that task, plus a consistency reading of the affected task and seams.
+
+A fact two таски need — a checklist row, an oracle, a decision about
 either — is written once in `shared.md` and copied into each task file that
 cites it, and a finding is fixed by rewriting the text it quotes, never by
 appending a correction beside it. One run before this spent sixty-one G3 rounds
 and 1.8 billion tokens because each fresh reader sampled the plan differently
 and each fix was appended.
+
+Generated facts sections use one ordered pair of markers on separate lines.
+Malformed markers stop rendering, baseline recording and coverage checks before
+any file changes. Repair the delimiters while preserving the task instructions,
+then render again; literal marker examples belong inline or must be escaped.
 
 **A таск's commits are a list**, because a repaired таск lands twice. Review
 reads the ordered union of that таск's own commits, one diff per commit — never
@@ -1029,6 +1044,12 @@ contract 10; the helper publishes a state from contract 4 through 10, and the
 dashboard renders an older state as it always did. What each version added is in
 [the state contract](docs/spec/state-contract.md#versioning) and
 [`CHANGELOG.md`](CHANGELOG.md).
+
+Superseded findings stay in the run's history, but current closure checks,
+verified scope and dashboard details follow their successors. A later finding
+resolved by fresh passing evidence can close the gap without rewriting its
+open predecessor. Historical compatibility does not permit a new resolution
+without valid evidence.
 
 The fields, and what may be left out of them, are in
 [`docs/spec/state-contract.md`](docs/spec/state-contract.md); what verification
