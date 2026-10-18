@@ -53,6 +53,8 @@ the target, without replacing the populated run directory:
     shared/owned-block.mts
     publication.mts, relocation.mts, register.mts, legacy.mts, dashboard.mts, server.mts, opener.mts
     config.mts, memory.mts, existing-code.mts, update-check.mts, progress.mts, history.mts, commits-check.mts
+    execution-return.mts, plan-units.mts, technical-research.mts, repair-dispatch.mts, evidence-import.mts
+    openspec.mts, answers.mts
   dashboard.html
   state.js, validation.js
   serve.json, opened.json
@@ -81,6 +83,11 @@ with a 2-second timeout and no query string, header or body of its own. When the
 published version is newer, the announcement names it and `npx skills update`.
 Offline or on any error it says nothing, and it always exits 0. Set
 `MAESTRO_NO_UPDATE_CHECK=1` to turn it off.
+
+In a project that keeps OpenSpec requirements, the closing publish runs the
+project's own `openspec validate` when that command is installed. It runs with
+`DO_NOT_TRACK=1`, `OPENSPEC_TELEMETRY=0` and `OPENSPEC_NO_UPDATE_CHECK=1`, so it
+adds no outbound request of its own.
 
 ```bash
 node .maestro/sync.mts --validate .maestro/.candidate.json

@@ -499,12 +499,6 @@ The external historical change-spec file was restored by the user and read on
 The prior M01–M12/V01–V24 acceptance obligations remain authoritative; verifying
 the source identity does not certify the entire installed-bundle matrix.
 
-## See Also
-
-- [Installation and development checks](install.md)
-- [Behavior specification](spec/README.md)
-- [Dashboard behavior](dashboard.md)
-
 ## External-Contract Research — 2026-10-16
 
 Targeted checks:
@@ -628,3 +622,12 @@ These checks establish the parsing, the refusals, the write boundary and one
 merge with the real tool. They do not establish relevance judgement, which
 stays with the readers, and they are not a completed Maestro run on an OpenSpec
 project.
+
+Final `npm run check`: typecheck, all twelve validator runs and 2,208 tests passed,
+with zero failures, skips or cancellations.
+
+## See Also
+
+- [Installation and development checks](install.md)
+- [Behavior specification](spec/README.md)
+- [Dashboard behavior](dashboard.md)
