@@ -26,7 +26,7 @@ conditional on the other skill existing.
 | 1 | `vocabulary.md` | Every user-facing term, the stage labels, and the banned synonyms |
 | 2 | `safety.md` | The rules that hold at every setting, and what happens when one breaks |
 | 3 | `dials.md` | Registers, languages, modes, depths and models, their triggers and resolution |
-| 4 | `phases.md` | The phase order, what each reads and produces, the per-mode matrix |
+| 4 | `phases.md` | The phase order, what each reads and produces, the OpenSpec reading and export, the per-mode matrix |
 | 5 | `gates.md` | G1–G4: when each runs, what passes it, what a failure does |
 | 6 | `artifacts.md` | Every file a run writes, its single writer, its lifecycle |
 | 7 | `state-contract.md` | The run-state schema, who writes it, how it is versioned |

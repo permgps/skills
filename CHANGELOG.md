@@ -14,6 +14,23 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **OpenSpec requirements are read, and a closed run exports what it verified.**
+  In a project with `openspec/config.yaml`, briefing runs
+  `sync.mts --openspec-index` and turns a contradiction with an approved
+  requirement into a keep/replace/remove/rename fork, recorded on an
+  `OpenSpec:` line. The existing-code reader carries approved requirements as
+  current decisions; G4 withholds `openspec/`. After a `completed` or
+  `closed_with_exceptions` closure, a `strong` writer drafts one change and the
+  closing publish checks it against the verification projection and the
+  user's answers, then writes `openspec/changes/maestro-<dir>/`. Only passed
+  requirements are exported, every scenario comes from a recorded check, and
+  MODIFIED, REMOVED and RENAMED need a user-answered fork. The `openspec`
+  command line validates the change when installed, with its telemetry and
+  update check off. Maestro never archives and never writes `openspec/specs/`;
+  `PROGRESS.md` lists the unarchived change. D1 is amended to allow naming this
+  one format. The `answers.md` parser moved into the runtime so G1 and the
+  export read one shape.
+
 - **Run-history regressions and lost repair evidence fixed.** Historical finding
   resolutions remain readable without establishing unsupported current passes.
   The installed publisher now shares G3 graph checks with the repository gate.

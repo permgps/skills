@@ -576,3 +576,55 @@ occupies the port without serving a response. Product server behavior is unchang
 
 Final `npm run check`: typecheck, all twelve validator runs and 2,058 tests passed,
 with zero failures, skips or cancellations. `git diff --check` also passed.
+
+## OpenSpec Interoperability — 2026-10-18
+
+Targeted checks:
+
+```sh
+node --test scripts/openspec/openspec.test.ts scripts/openspec/openspec-export.test.ts
+node --test scripts/gates/answers.test.ts scripts/gates/openspec-disposition.test.ts
+node --test scripts/validate/openspec-sync.test.ts
+npm run check
+```
+
+The index tests build OpenSpec trees by hand and hold the parsing rules
+OpenSpec applies: `## Requirements` only, fenced blocks ignored, any `####` a
+scenario, a closing `#` run stripped, case kept, the config file as the
+anchor, symlinks not followed, and both bounds. Each export refusal sits beside
+the legal inputs it must still accept. The copied-runtime sync tests drive one
+closing publish per combination-table row, with the OpenSpec command line
+absent from `PATH` or replaced by a small executable that records its
+arguments and environment. Disabling the export call in the closing publish
+turns eleven of those fifteen tests red.
+
+Fresh-context runs used `scripts/validate/fixtures/openspec/scenarios.mts`,
+whose expected outcomes are not handed to any reader:
+
+- the briefing rule raised one fork for the contradicted `checkout › Receipt`,
+  with `keep` recommended, wrote the `OpenSpec:` line on the user-answered
+  entry, and settled the agreeing requirement by reading;
+- the existing-code reader listed the approved requirements and the earlier
+  Maestro change as `current`, the foreign proposal and the archived change as
+  `historical`, and skipped the heading inside a fenced example;
+- the OpenSpec writer drafted ADDED and MODIFIED deltas, kept the current
+  scenario, and left out the failed, the excepted and the deferred
+  requirements with their reasons. The helper's check accepted the draft.
+
+Manual check against the real command line, network required, not part of
+`npm run check`: `@fission-ai/openspec@1.14.3`, installed outside the
+repository, run with `DO_NOT_TRACK=1 OPENSPEC_TELEMETRY=0
+OPENSPEC_NO_UPDATE_CHECK=1`. On the writer's exported change,
+`openspec validate maestro-2026-10-18-checkout-wallet --type change --strict
+--no-interactive` reported the change valid, and
+`openspec archive maestro-2026-10-18-checkout-wallet --yes` merged one added and
+one modified requirement into `openspec/specs/checkout/spec.md`. The export
+then ran again on the archived copy. It refused the draft, because its ADDED
+requirement now existed in the specs. The archived check now runs before the
+draft check, a regression test holds that order, and the same case now
+reports `archived`.
+
+These checks establish the parsing, the refusals, the write boundary and one
+merge with the real tool. They do not establish relevance judgement, which
+stays with the readers, and they are not a completed Maestro run on an OpenSpec
+project.

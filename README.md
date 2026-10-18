@@ -41,7 +41,7 @@ a real прогон — see [Limitations](#limitations) and
 - [Four Gates](#four-gates)
 - [Six Rules Nothing Turns Off](#six-rules-nothing-turns-off)
 - [What A Run Leaves In Your Project](#what-a-run-leaves-in-your-project)
-- [Between Runs](#between-runs) — closing, memory, the next run, resuming, fixing by hand
+- [Between Runs](#between-runs) — closing, memory, OpenSpec, the next run, resuming, fixing by hand
 - [The Dashboard](#the-dashboard) — what each region shows, and where it is described
 - [Scout](#scout)
 - [Hosts](#hosts)
@@ -629,6 +629,7 @@ your-project/.maestro/
 │   ├── report.md                   the отчёт
 │   ├── decisions.md                what was decided, what instead, and why
 │   ├── amendments.md               specification changes the build forced
+│   ├── openspec/                   the OpenSpec draft, only in a project that keeps OpenSpec requirements
 │   └── state.js                    the run's last state, kept when the next run starts
 ├── README.md                       the register: one row per run and how it ended
 ├── PROGRESS.md                     where the work stands: what is settled, not done, known broken, fixed by hand
@@ -637,6 +638,8 @@ your-project/.maestro/
 ├── validation.js                   the helper's verdict on the last state it published, shown on the page
 ├── serve.json, opened.json         the page's local server, and the address already opened for you
 └── sync.mts, runtime/              the helper copied in at preflight
+
+your-project/openspec/changes/maestro-<dir>/   one OpenSpec change per closed run, only in a project that keeps OpenSpec requirements
 ```
 
 The helper's own files are listed module by module in
@@ -686,8 +689,9 @@ Every run that closes — through acceptance or through repair — rewrites
 
 Each item is keyed by the run it came from, and the header names the commit the
 run closed at. The memory phase then writes the memory block, and the closure
-ends with one more commit, `maestro: close <dir>`, holding `.maestro/` and the
-memory file and nothing you had staged.
+ends with one more commit, `maestro: close <dir>`, holding `.maestro/`, the
+memory file, the OpenSpec change when one was written, and nothing you had
+staged.
 
 ### Project Memory
 
@@ -727,6 +731,41 @@ asks you under Assumptions to fix the project glossary or the бриф. All of i
 together is read up to 32 KiB; past that, none of it is read, and the run says
 so. Terms your project glossary already defines are not repeated in the memory
 block.
+
+### A Project That Keeps OpenSpec Requirements
+
+If your project uses [OpenSpec](https://github.com/Fission-AI/OpenSpec) —
+`openspec/config.yaml` (or `.yml`) exists — a run reads your approved
+requirements and, after it closes, hands back what it verified in OpenSpec's
+own format. Nothing changes in a project without it.
+
+**Before the spec.** Briefing runs `node .maestro/sync.mts --openspec-index`
+and reads the requirements of the capabilities your brief touches. A
+requirement your brief agrees with is settled by reading. One it contradicts is
+a question: keep the approved behaviour (always the recommendation), replace
+it, remove it, or rename it. `full` never asks and keeps it. Your answer is
+recorded on an `OpenSpec:` line in `answers.md`. The existing-code reader then
+treats approved requirements as current decisions the spec must respect. The
+blind acceptance reader never opens `openspec/`.
+
+**After the run closes.** For a `completed` or `closed_with_exceptions`
+closure, a writer drafts one change and the closing publish writes it to
+`openspec/changes/maestro-<dir>/`:
+
+- only requirements that passed acceptance, each scenario taken from a check
+  the run actually executed;
+- ADDED by default, and MODIFIED, REMOVED or RENAMED only where you answered
+  that question yourself;
+- left out, and named in `proposal.md`: failed, incomplete, deferred and
+  dropped requirements, those an exception you accepted covers, and those
+  whose question was kept.
+
+If the `openspec` command line is installed, the change is checked with
+`openspec validate --strict`, with its telemetry and update check switched off.
+Maestro never runs `openspec archive` and never writes `openspec/specs/`:
+merging is yours, and `PROGRESS.md` lists the change until you do. A change the
+helper cannot write, or refuses because a requirement is not backed, is
+reported in one line and never fails the run.
 
 ### The Next Run
 
@@ -844,7 +883,7 @@ opening a browser. `MAESTRO_SYNC_NO_OPEN` in the environment does the same, and
 `LOG_LEVEL=DEBUG` also turns diagnostics on. `--validate` and `--project` are
 read-only checks that print JSON; `--publish`, `--serve`, `--memory-read`,
 `--memory-write`, `--config-models`, `--update-check`, `--commits-check`,
-`--returns-check`, `--repair-dispatch`, `--import-evidence`, `--plan-units`, `--plan-render` and `--plan-coverage` are
+`--openspec-index`, `--returns-check`, `--repair-dispatch`, `--import-evidence`, `--plan-units`, `--plan-render` and `--plan-coverage` are
 what the orchestrator
 uses, not you. If the loopback server cannot start,
 the page falls back to a file snapshot. More in
