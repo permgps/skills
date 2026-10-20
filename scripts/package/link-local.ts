@@ -13,7 +13,11 @@ import { createLogger } from '../shared/log.ts';
 
 const log = createLogger('link-local');
 
-/** Agent directories that look for skills in `<dir>/skills/<name>`. */
+/**
+ * Agent directories that look for skills in `<dir>/skills/<name>`. Codex and
+ * DeepSeek Harness (dsh) read `.agents/skills` too, so neither needs a link of
+ * its own; a `.dsh/skills` link would be a second copy of one skill name.
+ */
 export const HOSTS = ['.claude', '.agents', '.gemini'];
 
 export const BUNDLE = path.join('skills', 'maestro');

@@ -351,7 +351,7 @@ your own terminal.
 - a program name built at run time, such as `$(echo git) push`.
 
 It reads the command line it is handed, and nothing else. Codex CLI, the Codex
-app and Gemini CLI get nothing equivalent from this bundle; on those hosts the
+app, Gemini CLI and dsh get nothing equivalent from this bundle; on those hosts the
 question S4 asks is the whole rule. See
 [`docs/spec/hosts.md`](spec/hosts.md#optional-git-guard).
 
@@ -406,7 +406,8 @@ runs in the same project, or when a pinned model is one the host no longer
 offers. Its options are built from the models your host reports at run time —
 `session/session`, `session/next` (recommended), `session/cheapest`, or your
 own `<strong>/<standard>` pair — and on a host that cannot choose a model per
-subagent (Gemini CLI today) it is not asked at all. It is asked in `full` too.
+subagent (Gemini CLI today, and dsh unless the session enables subagent model
+selection) it is not asked at all. It is asked in `full` too.
 
 The answers go to `<project>/.maestro/config.json`, which is **not** part of
 the bundle:
@@ -527,6 +528,65 @@ CLI and app support remain **unverified** until each has complete brief-to-repor
 evidence. Consult the [current execution record](parity-verification.md#codex-compatibility-checkpoint--2026-09-30)
 for what was actually run. Scout and Gemini execution support are outside this
 compatibility change.
+
+## DeepSeek Harness (dsh)
+
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) discovers
+project skills in `<project>/.agents/skills`, the directory Codex and Gemini CLI
+install into, so one copy serves all three. The skills CLI has no `dsh` agent:
+`-a dsh` is rejected with the list of valid agents. Its `universal` agent
+writes exactly that directory:
+
+```bash
+npx skills add /path/to/maestro -s maestro -a universal -y --copy
+```
+
+```text
+■  Invalid agents: dsh
+◇  Installed 1 skill
+│  ✓ maestro (copied)
+│    → ./.agents/skills/maestro
+```
+
+**Verified 2026-10-20** with skills CLI 1.7.4 in an empty git project: `-a dsh`
+was refused, `-a universal` copied the bundle to `./.agents/skills/maestro`,
+and `diff -r` against `skills/maestro` reported no difference. Copying
+`skills/maestro` to `<project>/.agents/skills/maestro` by hand is the same
+install. dsh itself was not run for this record.
+
+Open the project as the session's workspace and start a run with `/maestro` in
+the composer:
+
+```text
+/maestro Build a notes page with local saving.
+```
+
+That token is the only way in. dsh reads `disable-model-invocation: true` from
+`SKILL.md` and keeps the skill out of the model's catalog, so it never starts on
+its own. Supporting files resolve against the base directory dsh prints with the
+skill, including `references/dsh.md`, the prompts, `tools/sync.mts`, the
+`tools/runtime/` tree and the dashboard asset, which opens in your system browser
+beside dsh's own Web UI.
+
+Two dsh settings decide what a run can spend, and Maestro writes neither:
+
+- **Subagent model selection** is off by default. With it off, every subagent
+  runs on the session's model and the models question is not asked. Turn it on
+  in dsh before the session starts if you want `strong` and `standard` work on
+  different models. A pin then names routes, `<provider>:<model>`, as
+  `list_subagent_models` reports them.
+- **The experimental Git Worktrees bundle** is not needed. The coordinator runs
+  `git worktree add` itself; if dsh's sandbox refuses that, editing waves narrow
+  to one таск and the readers still run one after another.
+
+Preflight checks that the `subagent` tool gives a child a fresh context, sends a
+canary child and matches its completion notice before any gate relies on it.
+`subagent_fork` is never used: it hands the child this conversation, which is
+what a blind reader must not see.
+
+dsh is a developer preview and its row in [the hosts specification](spec/hosts.md)
+reads *unverified*: the recipe was written from its documentation, and no run has
+gone from бриф to отчёт there. No git guard ships for it; see [the guard section](#optional-a-guard-against-destructive-git).
 
 ## Developing against the checkout
 

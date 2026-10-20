@@ -652,6 +652,30 @@ npm run check
 Final `npm run check` after the fixes: typecheck, all twelve validator runs and
 2,229 tests passed, with zero failures, skips or cancellations.
 
+## DeepSeek Harness (dsh) Mapping — 2026-10-20
+
+dsh joins as a fourth host id, mapped from its repository documentation
+(`deepseek-ai/deepseek-harness@master`, a developer preview, read 2026-10-20)
+and recorded **unverified** in [the hosts specification](spec/hosts.md). The
+recipe `skills/maestro/references/dsh.md` is held by `npm run hosts` and
+`npm run bundle` through the per-host recipe table in
+`scripts/validate/host-degradation.ts`.
+
+| Check | Result |
+|---|---|
+| `npx skills add <checkout> -s maestro -a dsh -y --copy` (skills CLI 1.7.4) | refused: `Invalid agents: dsh` |
+| `npx skills add <checkout> -s maestro -a universal -y --copy` | copied to `./.agents/skills/maestro`; `diff -r` against `skills/maestro` reports no difference |
+| `dsh --profile headless --dump-config` (dsh 0.2.1-rc.2; composes the profile, calls no model) | `subagent` is bound to provider `spawn` and `subagent_fork` to `fork`; `skill-filesystem`, `tool-skill` and `agent-instructions` are mounted; subagent model selection is not configured, so it is off; the default route is `deepseek-official:deepseek-flash`; the sandbox mode is `workspace-write` unless `DSH_PERMISSION_MODE` says otherwise; no worktree package is mounted |
+| dsh discovers the copy and `/maestro` starts it | not run |
+| live preflight probe on dsh (fresh `subagent`, canary, worktree, model selection) | not run: `dsh --profile headless --json` stopped before its first model request with `MISSING_CREDENTIAL: llm-deepseek: no API key for provider route "deepseek-official"`, both before and after the user saved a key in the web Models page. The probe follows `references/dsh.md` › Preflight Probe in a throwaway git repository with the bundle copied by `-a universal` |
+| brief-to-report прогон on dsh | not run |
+
+```sh
+node --test scripts/validate/host-degradation.test.ts scripts/validate/gate-readers.test.ts
+node --test scripts/memory/markers.test.ts scripts/validate/memory-sync.test.ts scripts/validate/config.test.ts
+npm run check
+```
+
 ## See Also
 
 - [Installation and development checks](install.md)

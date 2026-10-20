@@ -24,7 +24,7 @@ at a block of text.
 
 **Status: `0.0.14-alpha`.** Four прогона have carried a бриф to a finished отчёт
 with all four gates passed on Claude Code. One of the four modes has never been
-run, Codex and Gemini CLI are unverified, and Scout has not yet run in front of
+run, Codex, Gemini CLI and DeepSeek Harness are unverified, and Scout has not yet run in front of
 a real прогон — see [Limitations](#limitations) and
 [`CHANGELOG.md`](CHANGELOG.md).
 
@@ -93,7 +93,8 @@ checking that its commits are still there.
 ## Requirements
 
 - **An agent host that reads Agent Skills.** Claude Code is the supported one;
-  Codex and Gemini CLI install but are unverified — see [Hosts](#hosts).
+  Codex, Gemini CLI and DeepSeek Harness (dsh) install but are unverified —
+  see [Hosts](#hosts).
 - **Node.js 22.18+ with native TypeScript stripping**, for Maestro. Preflight
   runs a real `.mts` probe rather than reading a version string, and stops with
   the prerequisite named if the probe fails. Scout needs no runtime.
@@ -153,6 +154,18 @@ Both install into `./.agents/skills/maestro`. Use `-a gemini-cli`, not
 copy — two installed copies of one skill are ambiguous to the host. See
 [Codex setup](docs/install.md#codex-cli-and-app).
 
+### DeepSeek Harness (dsh)
+
+```bash
+npx skills add permgps/skills -s maestro -a universal -y
+```
+
+The skills CLI has no `dsh` agent; `universal` writes `./.agents/skills/maestro`,
+the directory dsh discovers, so one copy serves Codex, Gemini CLI and dsh. Turn
+on subagent model selection in dsh before the session if you want the models
+dial; Maestro never changes dsh's settings. See
+[dsh setup](docs/install.md#deepseek-harness-dsh).
+
 ### Updating And Removing
 
 `npx skills update` refreshes installed skills. `skills-lock.json` records a
@@ -205,10 +218,11 @@ run time. Remove it by deleting the hook entry; debug it with
 | Claude Code | `/maestro [dials…] <what you want built>` |
 | Codex CLI and app | `$maestro [dials…] <what you want built>` |
 | Gemini CLI | no invocation form is documented yet; see [Hosts](#hosts) |
+| DeepSeek Harness (dsh) | `/maestro [dials…] <what you want built>` in the session composer |
 
 **Only you start it.** On Claude Code the skill declares
-`disable-model-invocation: true`, and on Codex `allow_implicit_invocation:
-false`: however much a request sounds like a build, the agent will not open a
+`disable-model-invocation: true`, which dsh reads too, and on Codex
+`allow_implicit_invocation: false`: however much a request sounds like a build, the agent will not open a
 прогон on its own.
 
 Everything after the command is bare words, no dashes:
@@ -322,7 +336,10 @@ host reports, character for character; a URL, a path or `session/sonnet` stays
 бриф text. The models are fixed for the whole run — a change applies from the
 next run, by editing `models` in `.maestro/config.json`. On Gemini CLI a
 subagent's model cannot be chosen per dispatch, so this dial is not asked and
-everything runs on the session's model; the announcement says so.
+everything runs on the session's model; the announcement says so. dsh is the
+same unless the session enabled subagent model selection, and there a model
+name is a route, `<provider>:<model>`, as dsh lists it — for example
+`deepseek-official:deepseek-flash`, the default route of dsh 0.2.1-rc.2.
 
 ### Where A Value Comes From
 
@@ -506,7 +523,7 @@ alone — you see «R03 — оплата картой», not «R03».
 | Dirty working tree | preflight finds uncommitted changes | not in `full` | continue, or stop and tidy up first |
 | A Latin name for the run | the бриф is entirely in Russian | not in `full` (it uses `run-<date>`) | a short English name for the run directory |
 | Register, then mode | first run in a project | all, `full` included | a register and a mode, or "pin neither" |
-| Models | first run on a host, or a pinned model the host no longer offers — see [The First Run In A Project](#the-first-run-in-a-project) | all, `full` included; never on Gemini CLI | one of the offered pairs (`session/next` is recommended) or your own `<strong>/<standard>` |
+| Models | first run on a host, or a pinned model the host no longer offers — see [The First Run In A Project](#the-first-run-in-a-project) | all, `full` included; never on Gemini CLI, nor on dsh without subagent model selection | one of the offered pairs (`session/next` is recommended) or your own `<strong>/<standard>` |
 | Ambiguous dials | two different words for one dial | not in `full` | which one you meant |
 | A credential in your text | redaction finds one at ingest | all | S2: before going on, it names the redacted variables, advises rotating them, and never echoes a value — a secret found in a file already written stops the run |
 | The manifest | after numbering your words | `semi`, `interview`, `manual` (shown without a question in `full`) | "right, start the briefing" · "R02 is wrong / something is missing" · your own correction · with 2 or fewer requirements, "stop here, I'll make the change directly" |
@@ -714,13 +731,14 @@ by line, never the whole log. Edit it and the next write puts it back.
 | Claude Code | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`; else `AGENTS.md` | `CLAUDE.md` |
 | Codex | `AGENTS.override.md`; else `AGENTS.md` | `AGENTS.md` |
 | Gemini CLI | `GEMINI.md` | `GEMINI.md` |
+| DeepSeek Harness (dsh) | `AGENTS.md`, `CLAUDE.md`, `AGENTS.local.md`, `CLAUDE.local.md`, all of them together | `AGENTS.md` |
 
 The file it writes is, in order: the one already carrying the block; else the
 first file your host loads that exists; else any other existing file from the
 table (`AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md`, `GEMINI.md`) — and then
 it tells you the host does not load it; else it creates the file in the last
 column. A project never gains a second memory file because you switched hosts.
-It never writes `CLAUDE.local.md` or `AGENTS.override.md`. The same block in two
+It never writes `CLAUDE.local.md`, `AGENTS.local.md` or `AGENTS.override.md`. The same block in two
 files, or broken markers, stop the memory phase instead of guessing. Details in
 [the hosts specification](docs/spec/hosts.md).
 
@@ -977,9 +995,10 @@ in [The Language It Speaks](#the-language-it-speaks). Its specification is
 | Codex CLI | **unverified** — partial runs attempted, no complete brief-to-report run established | `$maestro` |
 | Codex app | **unverified** — CLI evidence does not establish app support | `$maestro` |
 | Gemini CLI | **unverified** — the bundle installs, no прогон has run on it; the skill may start implicitly there, because Gemini documents no way to switch that off | not documented |
+| DeepSeek Harness (dsh) | **unverified** — mapped from its documentation (a developer preview, read 2026-10-20); the bundle installs into `.agents/skills`, no прогон has run on it. The models dial needs subagent model selection switched on in dsh | `/maestro` |
 
 A host moves to *supported* when a прогон has run on it from бриф to отчёт, not
-when it installs. Scout has not been run on Codex or Gemini.
+when it installs. Scout has not been run on Codex, Gemini or dsh.
 
 **A missing capability degrades the wave, never a gate.** Preflight tries each
 capability rather than reading it off the host's name, and the announcement
@@ -1105,8 +1124,8 @@ and [`docs/parity-verification.md`](docs/parity-verification.md).
   the four modes has never been run end to end and two findings about concurrent
   orchestrators stand open. Nothing installs by tag; the default branch is what
   ships.
-- **Only Claude Code is verified.** Codex CLI, the Codex app and Gemini CLI are
-  unverified — see [Hosts](#hosts) and
+- **Only Claude Code is verified.** Codex CLI, the Codex app, Gemini CLI and
+  DeepSeek Harness are unverified — see [Hosts](#hosts) and
   [the Codex checkpoint](docs/parity-verification.md#codex-compatibility-checkpoint--2026-09-30).
 - **Scout has not run in front of a real прогон.** Its rules come from the
   specification, not yet from evidence.

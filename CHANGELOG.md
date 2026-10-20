@@ -14,6 +14,19 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **DeepSeek Harness (dsh) is a mapped, unverified host.** `dsh` is a fourth
+  host id. Install with `-a universal` into `.agents/skills/maestro`, the
+  directory dsh discovers, and start with `/maestro`; dsh honours
+  `disable-model-invocation: true`. The new demand-loaded recipe
+  `references/dsh.md` dispatches only through a fresh `subagent` child, proven
+  by a canary probe, never `subagent_fork`, a preset, a reused child or the
+  experimental worktree tool. The coordinator makes the worktrees itself. A
+  models half on dsh is a `<provider>:<model>` route, and the dial degrades
+  while the session has subagent model selection off. The memory file is one
+  group, `AGENTS.md`, `CLAUDE.md` and both local overlays, and
+  `AGENTS.local.md` is never written. The Codex-only recipe check became a
+  per-host table, with the Codex rules and messages unchanged. No прогон has
+  run on dsh.
 - **OpenSpec requirements are read, and a closed run exports what it verified.**
   In a project with `openspec/config.yaml`, briefing runs
   `sync.mts --openspec-index` and turns a contradiction with an approved

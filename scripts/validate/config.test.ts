@@ -68,12 +68,12 @@ test('a second host\'s pin is kept when this host pins its own', async () => {
 test('a dsh pin keeps its provider:model halves verbatim beside another host\'s pin', async () => {
   const before = { configVersion: 1, mode: 'full', models: { 'claude-code': { strong: 'opus', standard: 'sonnet' } } };
   await withMaestro(JSON.stringify(before), async (dir, file) => {
-    const outcome = await pinModels(dir, 'dsh', { strong: 'deepseek:deepseek-v4-pro', standard: 'deepseek:deepseek-v4-flash' });
+    const outcome = await pinModels(dir, 'dsh', { strong: 'session', standard: 'deepseek-official:deepseek-flash' });
     assert.equal(outcome.result, 'written');
     assert.equal(outcome.replaced, false);
     assert.deepEqual((await readJson(file))['models'], {
       'claude-code': { strong: 'opus', standard: 'sonnet' },
-      dsh: { strong: 'deepseek:deepseek-v4-pro', standard: 'deepseek:deepseek-v4-flash' },
+      dsh: { strong: 'session', standard: 'deepseek-official:deepseek-flash' },
     });
   });
 });

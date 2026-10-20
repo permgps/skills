@@ -347,9 +347,9 @@ announcement says the pin was stale. A token beside a valid pin holds for this
 
 A name is what the host reports, in the shape the host takes it. On dsh a
 subagent's model is a route, the provider and the model together, so each half
-is written `<provider>:<model>` — `deepseek:deepseek-v4-pro/deepseek:deepseek-v4-flash`
-— and split at its first `:` when it is passed ([`hosts.md`](hosts.md) *Where
-Each Host Lists Its Models*).
+is written `<provider>:<model>` and split at its first `:` when it is passed
+([`hosts.md`](hosts.md) *Where Each Host Lists Its Models*).
+`deepseek-official:deepseek-flash` is the default route dsh 0.2.1-rc.2 composes.
 
 ### The First Run In A Project
 
