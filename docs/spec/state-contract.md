@@ -793,7 +793,7 @@ exit codes.
   is kept, whatever the flags, with `action: "kept"`.
   Malformed markers are reported under `notRead` and still exit 0. A missing,
   malformed or absent run directory exits 2.
-- `--memory-write --host <claude-code|codex|gemini-cli>` reads the block body
+- `--memory-write --host <claude-code|codex|gemini-cli|dsh>` reads the block body
   from stdin and splices it into the memory file [`hosts.md`](hosts.md)
   resolves for that host. It reports `path`, `file`, `bytes`,
   `action` (`created`, `appended` or `replaced`), `loadedByHost` and `reason`.

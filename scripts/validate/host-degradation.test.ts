@@ -7,6 +7,8 @@ import path from 'node:path';
 import {
   checkHostDegradation,
   checkCodexRuntime,
+  checkDshRuntime,
+  checkHostRecipes,
   checkMemoryFiles,
   checkModelLists,
   findMarkers,
@@ -340,4 +342,89 @@ test('losing the model-per-subagent probe from preflight is the one finding', as
     assert.deepEqual(found.map(v => v.check), ['probes']);
     assert.match(found[0]!.message, /"model per subagent" degrades, but no phase file establishes it/);
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+async function dshViolations(edits: readonly (readonly [file: string, before: string, after: string])[]): Promise<Violation[]> {
+  const root = await mkdtemp(path.join(tmpdir(), 'dsh-runtime-'));
+  try {
+    await cp('skills/maestro', root, { recursive: true });
+    for (const [file, before, after] of edits) {
+      const target = path.join(root, file);
+      const text = await readFile(target, 'utf8');
+      assert.ok(text.includes(before), `fixture edit must apply: ${before}`);
+      await writeFile(target, text.replace(before, after));
+    }
+    return await checkDshRuntime(root);
+  } finally { await rm(root, { recursive: true, force: true }); }
+}
+
+test('the actual bundle declares reachable native dsh dispatch without preloading the recipe', async () => {
+  assert.deepEqual(await checkDshRuntime('skills/maestro'), []);
+  assert.deepEqual(await checkHostRecipes('skills/maestro'), [], 'Codex and dsh together');
+});
+
+test('a dsh recipe that allows the fork, inherits context, or passes a preset is refused, one finding per rule', async () => {
+  for (const [before, after, rule] of [
+    ['| subagent_fork | never |', '| subagent_fork | allowed |', 'subagent_fork'],
+    ['| context | fresh |', '| context | inherited |', 'context'],
+    ['| agent_preset | never |', '| agent_preset | reviewer |', 'agent_preset'],
+    ['| create_worktree | never |', '| create_worktree | allowed |', 'create_worktree'],
+    ['| follow-ups | never |', '| follow-ups | send_message |', 'follow-ups'],
+    ["| model | per tier, from the run state's models as provider:model; session passes none |", '| model | session |', 'model'],
+  ] as const) {
+    const findings = await dshViolations([['references/dsh.md', before, after]]);
+    assert.equal(findings.length, 1, rule);
+    assert.equal(findings[0]!.check, 'dsh-runtime');
+    assert.match(findings[0]!.message, new RegExp(`^declare exactly one runtime rule ${rule} with value `));
+  }
+});
+
+test('a dsh dispatch phase cannot lose its marker or its recipe link', async () => {
+  for (const [before, after] of [
+    ['<!-- maestro:dsh:dispatch -->', ''],
+    ['[the dsh recipe](../references/dsh.md)', 'the dsh recipe'],
+  ] as const) {
+    const findings = await dshViolations([['phases/5-build.md', before, after]]);
+    assert.deepEqual(findings.map(item => [item.file, item.message]), [['phases/5-build.md', 'declare the dsh dispatch marker and demand-loaded recipe link']]);
+  }
+});
+
+test('the dsh recipe stays demand-loaded: not from the router, not from a prompt, and linked from host resolution', async () => {
+  assert.ok((await dshViolations([['SKILL.md', '## Start', '[preload](references/dsh.md)\n\n## Start']]))
+    .some(item => item.file === 'SKILL.md' && /demand/.test(item.message)));
+  assert.ok((await dshViolations([['prompts/standards-reader.md', '## What You Are Not Given', '[recipe](../references/dsh.md)\n\n## What You Are Not Given']]))
+    .some(item => item.file === 'prompts/standards-reader.md'));
+  assert.deepEqual((await dshViolations([['references/hosts.md', '[`dsh.md`](dsh.md)', '`dsh.md`']])).map(item => item.message),
+    ['link the dsh recipe from host resolution']);
+});
+
+test('a specification without the dsh contract skips the dsh recipe, and the Codex recipe is still held', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'dsh-contract-'));
+  try {
+    const specDir = path.join(root, 'spec');
+    await cp('docs/spec', specDir, { recursive: true });
+    await cp('skills/maestro', path.join(root, 'bundle'), { recursive: true });
+    const hosts = path.join(specDir, 'hosts.md');
+    await writeFile(hosts, (await readFile(hosts, 'utf8')).replace('<!-- maestro:dsh:contract -->', ''));
+    await rm(path.join(root, 'bundle', 'references', 'dsh.md'));
+    const found = await checkHostDegradation({ specDir, bundleDir: path.join(root, 'bundle') });
+    assert.deepEqual(found.filter(item => item.check === 'dsh-runtime'), []);
+    const bundleDir = path.join(root, 'bundle');
+    const codex = path.join(bundleDir, 'references', 'codex.md');
+    await writeFile(codex, (await readFile(codex, 'utf8')).replace('| fork_turns | none |', '| fork_turns | all |'));
+    const after = await checkHostDegradation({ specDir, bundleDir });
+    assert.ok(after.some(item => item.check === 'codex-runtime' && /fork_turns/.test(item.message)));
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('the real tables give dsh a model-list row in both homes and a session-start row', async () => {
+  const violations = await checkHostDegradation({ specDir: 'docs/spec', bundleDir: 'skills/maestro' });
+  assert.deepEqual(violations, []);
+  const spec = await readFile('docs/spec/hosts.md', 'utf8');
+  const dials = await readFile('skills/maestro/phases/0-dials.md', 'utf8');
+  const withoutDsh = (markdown: string): string => markdown.split('\n').filter(line => !line.startsWith('| `dsh` |')).join('\n');
+  const found = checkModelLists([{ file: 'hosts.md', markdown: spec }, { file: '0-dials.md', markdown: withoutDsh(dials) }], [...HOSTS, 'dsh']);
+  assert.deepEqual(found.map(v => [v.file, v.message]), [['0-dials.md', 'the model-list table has no row for dsh — say where that host lists its models, or that it has none']]);
+  const coded = { dsh: { groups: [['AGENTS.md', 'CLAUDE.md', 'AGENTS.local.md', 'CLAUDE.local.md']], creates: 'AGENTS.md' } };
+  assert.ok(checkMemoryFiles(withoutDsh(spec), 'hosts.md', coded, 'memory.mts').some(v => /MEMORY_FILES_BY_HOST has dsh/.test(v.message)));
 });

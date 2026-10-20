@@ -20,7 +20,7 @@ no artifact and no dispatch. This rule also applies to a new project.
 4. When delegation is useful, hand one fresh `standard` leaf the complete
    [technical-researcher.md](../prompts/technical-researcher.md) brief, question
    envelope and absolute project root, with only relevant source locations.
-   On Codex, first open [codex.md](codex.md). If delegation is unavailable or
+   On Codex, first open [codex.md](codex.md); on dsh, [dsh.md](dsh.md). If delegation is unavailable or
    unnecessary, perform the same bounded read yourself. The leaf never writes.
 5. Classify each source's applicability and support. Record conflicting sources
    and unavailable access honestly. A citation is not proof: reconcile meanings

@@ -422,8 +422,8 @@ fails is not a warning: the phase is redone.**
 <!-- maestro:delegation:native-explicit -->
 This skill explicitly requests native subagent delegation for its independent
 roles, including executors, audits, readers, review and diagnosis.
-On Codex use the demand-loaded runtime recipe selected by preflight and each
-dispatch phase. Never inherit coordinator history into an independent role.
+On Codex or dsh use the demand-loaded runtime recipe preflight and each dispatch
+phase select. Never inherit coordinator history into an independent role.
 Pass each dispatch its tier's model from `models` (`session`, or a contract-7 run with no
 `models`, passes none), effort as the session's: judges and repairs `strong`, a build executor
 its таск's tier, the existing-code reader, the commit reader and the probe `standard`. A judge never runs `standard`.

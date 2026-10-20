@@ -23,6 +23,10 @@ before each independent role dispatch in this phase. Use a fresh native child,
 the full role prompt and only this role's allowed inputs; observe its actual
 final return before importing results. The recipe is coordinator-only.
 
+<!-- maestro:dsh:dispatch -->
+On dsh, open [the dsh recipe](../references/dsh.md) before each independent
+role dispatch here: a fresh `subagent` child, never a fork or a reused one.
+
 ## Steps
 
 ### 1. Read the таски
@@ -221,7 +225,7 @@ Give the reader, briefed by
   only by following links:
   - the memory file of every host this bundle supports — `CLAUDE.md`,
     `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.override.md`, `AGENTS.md`,
-    `GEMINI.md` — each with the region between `<!-- maestro:begin -->` and
+    `AGENTS.local.md`, `GEMINI.md` — each with the region between `<!-- maestro:begin -->` and
     `<!-- maestro:end -->` cut out;
   - `CONTRIBUTING*`, `CODING_STANDARDS*` and `STYLEGUIDE*`, at the root and in
     `.github/`, in any case;

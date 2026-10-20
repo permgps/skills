@@ -157,6 +157,11 @@ test('every excluded root directory hides what is under it, and only at the root
   assert.equal(qualifies('packages/web/.claude/settings.json', IGNORED), true);
 });
 
+test('DeepSeek Harness\'s project directory is a host install, not code', () => {
+  assert.equal(qualifies('.dsh/skills/maestro/SKILL.md', IGNORED), false);
+  assert.equal(qualifies('packages/web/.dsh/settings.json', IGNORED), true, 'only at the root');
+});
+
 test('a .git segment anywhere hides the path, which covers a submodule', () => {
   assert.equal(qualifies('vendor/lib/.git/config', IGNORED), false);
   assert.equal(qualifies('.git', IGNORED), false);

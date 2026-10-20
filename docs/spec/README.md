@@ -191,9 +191,9 @@ is a file under it, until the constant is lowered to match. So the number can
 only fall, and a shortening that leaves the old ceiling in place fails the run.
 The ceiling makes room costly; it does not keep the reasoning in
 [`phases.md`](phases.md) *What Stays Resident* out of the file — the sentence
-test does that. **Who starts the skill:** only the user, and both hosts are
-told. Claude Code reads `disable-model-invocation: true` from the frontmatter,
-and Codex reads `policy.allow_implicit_invocation: false` from
+test does that. **Who starts the skill:** only the user, and every host with a
+documented declaration is told. Claude Code and dsh read
+`disable-model-invocation: true` from the frontmatter, and Codex reads `policy.allow_implicit_invocation: false` from
 `agents/openai.yaml`. The bundle is refused when either declaration is missing,
 so the two cannot drift apart ([`hosts.md`](hosts.md) *Who Starts The Skill*).
 Two things are not held. One is whether a kept sentence changes the прогон's

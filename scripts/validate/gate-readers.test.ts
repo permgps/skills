@@ -662,10 +662,22 @@ test('a phase step that drops a host memory file is reported on the phase file, 
   assert.match(found[0]!.message, /`GEMINI\.md`.*memory file of gemini-cli/);
 });
 
-test('a memory file two hosts load is reported with both hosts', async () => {
+test('a memory file several hosts load is reported with each of them', async () => {
   const found = await standardsFor({ phase: STANDARDS_PHASE.replace('`AGENTS.md`, ', '') });
   assert.equal(found.length, 1, JSON.stringify(found));
-  assert.match(found[0]!.message, /memory file of claude-code and codex/);
+  assert.match(found[0]!.message, /memory file of claude-code, codex and dsh,/);
+});
+
+test('a dsh local overlay dropped from any standards list is reported, naming dsh alone', async () => {
+  for (const files of [
+    { phase: STANDARDS_PHASE.replace('`AGENTS.local.md`, ', '') },
+    { spec: STANDARDS_SPEC.replace('`AGENTS.local.md`, ', '') },
+    { brief: STANDARDS_BRIEF.replace('`AGENTS.local.md`, ', '') },
+  ]) {
+    const found = await standardsFor(files);
+    assert.equal(found.length, 1, JSON.stringify(found));
+    assert.match(found[0]!.message, /`AGENTS\.local\.md`.*memory file of dsh,/);
+  }
 });
 
 test('a spec section that drops STYLEGUIDE* is reported on phases.md', async () => {

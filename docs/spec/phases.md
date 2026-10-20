@@ -183,8 +183,8 @@ it before the spec is written.
 Git is asked first, for tracked files and untracked files it does not ignore;
 without git, or outside a work tree, the directory is walked in name order
 without following symlinks. A path does not qualify when it lies under
-`.maestro/`, `.git/`, `.claude/`, `.agents/`, `.codex/` or `.gemini/` at the
-root, has a `.git` segment, is named like a memory file or a project glossary
+`.maestro/`, `.git/`, `.claude/`, `.agents/`, `.codex/`, `.gemini/` or `.dsh/`
+at the root, has a `.git` segment, is named like a memory file or a project glossary
 file at any depth, or is a root-level `README`, `LICENSE`, `LICENCE`,
 `COPYING`, `.gitignore`, `.gitattributes` or `skills-lock.json`. Everything
 else qualifies, `.github/` included. `--memory-read` reports the answer, and
@@ -1079,7 +1079,7 @@ per-commit diffs, the project's documented standards and a baseline of nine
 named code smells. The standards are found by searching the project root, not
 only by following links: the memory file of every supported host — `CLAUDE.md`,
 `.claude/CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.override.md`, `AGENTS.md`,
-`GEMINI.md` — each with the Maestro block cut out; `CONTRIBUTING*`,
+`AGENTS.local.md`, `GEMINI.md` — each with the Maestro block cut out; `CONTRIBUTING*`,
 `CODING_STANDARDS*` and `STYLEGUIDE*` at the root and in `.github/`; Markdown
 files under `docs/` whose name holds `convention`, `standard`, `style` or
 `contributing`; and any document the memory file or the README names as the
@@ -1844,6 +1844,18 @@ and an observed final return. The coordinator owns orchestration, worktree
 integration and state publication; executors own project edits in their named
 absolute workspaces. Missing concurrency or worktrees narrows editing waves to
 one without removing independent sequential readers.
+
+## dsh Dispatch And Ownership
+
+On DeepSeek Harness, apply the shared execution contract in
+[`hosts.md`](hosts.md#shared-dsh-execution-contract). Each independent role is
+a fresh `subagent` child, never a fork and never a child reused through
+`send_message`, handed its existing allowed artifact inputs, and its final
+answer is the completion notice matched to its child id. Ownership is the same
+as on Codex: the coordinator orchestrates, creates and integrates the git
+worktrees and publishes state; executors edit only their named absolute
+workspaces. A refused worktree narrows editing waves to one without removing
+independent sequential readers.
 
 ### Observed Intermittent Repairs
 

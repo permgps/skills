@@ -33,6 +33,12 @@ probe before independent work. Inspect the current schema; an enabled tool
 alone is not observed capability. Record identities and limits in existing
 records. Missing fresh context/return leaves the affected gates pending.
 
+<!-- maestro:dsh:preflight -->
+On DeepSeek Harness (dsh), open [the dsh recipe](../references/dsh.md) and run
+its probe: the `subagent` wording, a canary child matched by its completion
+notice, your own `git worktree`, and whether model selection is on. Never
+`subagent_fork`. Missing fresh context/return leaves the affected gates pending.
+
 Three capabilities are established by trying them, on every host, this one
 included. They are the three that narrow a прогон instead of stopping it, and a
 прогон that assumed one and lost it halfway through a wave is worse off than one

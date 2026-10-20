@@ -248,3 +248,13 @@ recipe. Use the declared Given/Withheld inputs and a full role prompt, with
 fresh context explicitly selected. Missing isolation, an actual final return,
 or trustworthy input evidence cannot establish a gate pass. Opaque envelopes
 remain opaque; filesystem visibility and prompt inputs are separate evidence.
+
+## dsh Gate Dispatch
+
+The [shared dsh contract](hosts.md#shared-dsh-execution-contract) applies to
+every gate reader. Each reader is a fresh `subagent` child whose tool description
+and canary probe both showed it does not share the coordinator's conversation;
+`subagent_fork` never runs a reader. No reader receives coordinator history or
+the runtime recipe, and a reader is never re-used through `send_message` for a
+second gate or a retry. Missing isolation or a completion notice that cannot be
+matched to its child cannot establish a gate pass.

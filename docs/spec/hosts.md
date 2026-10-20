@@ -69,6 +69,7 @@ place it can be recorded cheaply.
 | Codex CLI | **unverified** — partial runs have been attempted; no complete successful brief-to-report run is established |
 | Codex app | **unverified** — requires separate discovery and complete-run evidence; CLI evidence does not establish app support |
 | Gemini CLI | **unverified** — the bundle installs, and no прогон has been run on it. It has no model per subagent: a subagent's model is fixed in its definition file or `settings.json`, so the models dial degrades there |
+| DeepSeek Harness (dsh) | **unverified** — mapped from its repository documentation (`deepseek-ai/deepseek-harness`, read 2026-10-20, a developer preview that announces breaking changes); the bundle has not been installed there and no прогон has been run on it. Two degradations are expected by default: the models dial, because subagent model selection is off unless the session enables it, and worktree isolation whenever its sandbox refuses the coordinator's own `git worktree` |
 
 A row moves from *unverified* to *supported* when a прогон has been run on that
 host from бриф to отчёт, and its degradations have been written into the table
@@ -94,6 +95,7 @@ tables to the host ids of the memory module.
 | `claude-code` | the `model` parameter's values in the subagent tool's schema | the `effort` parameter, when the schema carries one | — (the `model` parameter takes precedence over an agent definition's model) |
 | `codex` | the `<model_catalog>` in `spawn_agent`'s description (source tag `rust-v0.161.0`, read 2026-10-09) | `reasoning_effort` | `agent_type` — a role file's model overrides any value passed on the spawn |
 | `gemini-cli` | none per dispatch: a subagent's model is fixed in its definition file or `settings.json` (documentation read 2026-10-11) | — | — |
+| `dsh` | `list_subagent_models` and the `provider`/`model` fields of the `subagent` tool, present only when the session enables subagent model selection, which is off by default (documentation read 2026-10-20). A route is the pair, so each dial half is written `<provider>:<model>` and split at the first `:` | `reasoning_effort` | `agent_preset` — a preset brings its own persona and tools, which the role prompt must not compete with |
 
 **Effort is passed equal to the session's** wherever the host takes it and the
 session's effort is known. When it is not, none is passed, and the announcement
@@ -122,19 +124,23 @@ that a прогон has run on it.
 | `claude-code` | Claude Code | `CLAUDE.md`, `.claude/CLAUDE.md`, `CLAUDE.local.md`; else `AGENTS.md` | `CLAUDE.md` | host documentation, https://code.claude.com/docs/en/memory, read 2026-10-04 |
 | `codex` | Codex CLI and Codex app | `AGENTS.override.md`; else `AGENTS.md` | `AGENTS.md` | host documentation, https://learn.chatgpt.com/docs/agent-configuration/agents-md, read 2026-10-04 |
 | `gemini-cli` | Gemini CLI | `GEMINI.md` | `GEMINI.md` | host documentation, https://geminicli.com/docs/cli/gemini-md/, read 2026-10-04 |
+| `dsh` | DeepSeek Harness | `AGENTS.md`, `CLAUDE.md`, `AGENTS.local.md`, `CLAUDE.local.md` | `AGENTS.md` | host documentation, https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/context/agent-instructions/README.md, read 2026-10-20 |
 
 How to read the third column: each `;`-separated group outranks the ones after
 it, and the host loads the first group that has any file in the project root.
 So Claude Code reads `AGENTS.md` only when none of the three `CLAUDE` files
 exists. Since Claude Code v2.1.277 it does this without an import. Codex reads
-`AGENTS.md` only when there is no `AGENTS.override.md` beside it.
+`AGENTS.md` only when there is no `AGENTS.override.md` beside it. dsh has one
+group and loads every file of it that exists, rendering identical texts once,
+so its `CLAUDE.md` is read beside `AGENTS.md`, never instead of it.
 
-Three files the hosts load are never written into:
+Files the hosts load that are never written into:
 
-- `CLAUDE.local.md` is personal and kept out of version control.
+- `CLAUDE.local.md` and dsh's `AGENTS.local.md` are personal overlays and
+  kept out of version control.
 - `AGENTS.override.md` exists to outrank the team's file.
-- Gemini CLI's file name and Codex's fallback names can be changed in the
-  user's settings.
+- Gemini CLI's file name, Codex's fallback names and dsh's candidate names can
+  be changed in the user's settings.
 
 The table records each host's default. A project that changed it is not
 detected, and the write reports `loadedByHost` from the default alone.
@@ -164,6 +170,7 @@ refuses a bundle that tells one host and not the other.
 | `claude-code` | `disable-model-invocation: true` | `SKILL.md` frontmatter | host documentation, https://code.claude.com/docs/en/skills, read 2026-10-04: `/maestro` still works, and the skill is no longer loaded into the model's context |
 | `codex` | `policy.allow_implicit_invocation: false` | `agents/openai.yaml` | host documentation, https://developers.openai.com/codex/skills, read 2026-10-04: explicit `$maestro` still works |
 | `gemini-cli` | none documented | — | the skill may start implicitly there; nothing is declared, because nothing documented exists to declare |
+| `dsh` | `disable-model-invocation: true` | `SKILL.md` frontmatter | host documentation, https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/skill/tool-skill/README.md, read 2026-10-20: a `/maestro` token in the user's message "is the sole entry point for `disable-model-invocation` skills, which the catalog and the `skill` tool never expose" |
 
 The `description` still matters with implicit start switched off. It is what a
 host shows in its skill list and what the user reads when choosing, and on any
@@ -243,6 +250,58 @@ state contract, adding a writer, or persisting source text or secrets in logs.
 An enabled tool is only a candidate capability; a successful probe is observed
 capability; only a complete client-specific run establishes verified support.
 
+<!-- maestro:dsh:contract -->
+## Shared dsh Execution Contract
+
+DeepSeek Harness discovers the same self-contained bundle in
+`.agents/skills/maestro`, the directory Codex and Gemini CLI install into, and
+starts it only from a `/maestro` token in the user's own message. Resolve
+assets, prompts, references and the TypeScript helper against the base directory
+the host prints with the skill. The runtime recipe is
+`skills/maestro/references/dsh.md`, opened on demand by preflight and dispatch
+sites. It is coordinator guidance and never part of a blind reader's handoff.
+It was written from the host's documentation, read 2026-10-20 from a developer
+preview, so every rule in it is checked by a probe before it is spent.
+
+Dispatch every independent role through the `subagent` tool whose description
+says the child does not share this conversation's context, and never through
+`subagent_fork`, which inherits it. A tool name proves nothing: a composition
+may rename the tool or bind it to a forking provider, so preflight reads the
+wording **and** sends a canary child before relying on it. Never pass
+`agent_preset`. Never reuse a child for another role or a retry through
+`send_message`; a retry is a new `subagent` call with the same inputs, at most
+two of them. Missing fresh context or return support stops the affected
+independent operation with its gate pending.
+
+Hand over the full role prompt and exactly its allowed inputs, with absolute
+artifact paths, as on every host. `subagent` returns a child id at once and the
+final answer arrives in the runtime's completion notice for that id. Match each
+notice to its child before using it, and end the turn while waiting is all that
+is left rather than sleeping or polling. A child's self-report does not
+establish what it could read.
+
+Pass `provider` and `model` from the run state's `models` for the dispatch's
+tier, split at the first `:` of the half, none for `session`, and
+`reasoning_effort` equal to the session's. Both fields exist only when the
+session enabled subagent model selection; without them the models dial degrades
+as the capability table says, and the prompt never asks the user to change a
+host setting mid-прогон.
+
+Executors alone write project code. Concurrent editing requires observed
+concurrency and real git worktrees, which the coordinator creates itself with
+`git worktree add` to an absolute path and hands to the child as `cwd`. Never
+call `create_worktree`: it moves the calling session into the new checkout, and
+the coordinator's directory is the run's. A sandbox that refuses the worktree
+narrows editing waves to one таск. Only the coordinator publishes state via the
+bundled `sync.mts`. The dashboard opens in the system browser, beside the
+host's own Web UI and never in place of it.
+
+Log INFO capability probes, dispatch/return identities and integration results;
+WARN missing tools, a disabled model selection or a refused worktree; ERROR
+isolation/return failure. An enabled tool is only a candidate capability; a
+successful probe is observed capability; only a complete run establishes
+verified support.
+
 ## Installed Runtime Prerequisite
 
 Maestro requires Node.js 22.18+ with native TypeScript stripping actually
@@ -263,7 +322,7 @@ or the прогон, is silent when it fails, and is off under
 
 `tools/guard-git.mts` is a `PreToolUse` hook shipped for Claude Code only. It
 refuses the destructive git commands listed in [`safety.md`](safety.md) under
-S4's raise. Nothing equivalent is shipped for Codex CLI, the Codex app or
+S4's raise. Nothing equivalent is shipped for Codex CLI, the Codex app, dsh or
 Gemini CLI, and on those hosts the prose rule is the floor. This states what
 the bundle ships, not what those hosts could support.
 

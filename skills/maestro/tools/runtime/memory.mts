@@ -60,7 +60,7 @@ export const END_MARKER = '<!-- maestro:end -->';
 const MARKERS: Markers = { begin: BEGIN_MARKER, end: END_MARKER };
 
 /** The hosts whose session-start file is recorded in `docs/spec/hosts.md`. */
-export const HOST_IDS = ['claude-code', 'codex', 'gemini-cli'] as const;
+export const HOST_IDS = ['claude-code', 'codex', 'gemini-cli', 'dsh'] as const;
 export type HostId = typeof HOST_IDS[number];
 
 export interface HostMemory {
@@ -81,15 +81,19 @@ export const MEMORY_FILES_BY_HOST: Readonly<Record<HostId, HostMemory>> = {
   'claude-code': { groups: [['CLAUDE.md', '.claude/CLAUDE.md', 'CLAUDE.local.md'], ['AGENTS.md']], creates: 'CLAUDE.md' },
   codex: { groups: [['AGENTS.override.md'], ['AGENTS.md']], creates: 'AGENTS.md' },
   'gemini-cli': { groups: [['GEMINI.md']], creates: 'GEMINI.md' },
+  // dsh loads every candidate in a directory together rather than the first
+  // that exists, so its files are one group; the two local overlays are additive.
+  dsh: { groups: [['AGENTS.md', 'CLAUDE.md', 'AGENTS.local.md', 'CLAUDE.local.md']], creates: 'AGENTS.md' },
 };
 
 /**
  * Files that count toward a host's precedence and are never written into.
- * `CLAUDE.local.md` is one person's and stays out of version control;
+ * `CLAUDE.local.md` and dsh's `AGENTS.local.md` are one person's and stay out
+ * of version control;
  * `AGENTS.override.md` exists to outrank the team's file, and a block there
  * would outrank it too.
  */
-export const NEVER_WRITTEN: readonly string[] = ['CLAUDE.local.md', 'AGENTS.override.md'];
+export const NEVER_WRITTEN: readonly string[] = ['CLAUDE.local.md', 'AGENTS.override.md', 'AGENTS.local.md'];
 
 /**
  * Every file a block may live in, in the fixed order used when the host loads

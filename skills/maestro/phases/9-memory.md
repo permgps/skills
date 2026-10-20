@@ -66,7 +66,7 @@ an old green G4 into a memory claim that the product was verified.
 ### 2. Write the block
 
 Pipe the block's body to the helper and name the host this session runs on —
-`claude-code`, `codex` or `gemini-cli`, the host preflight resolved:
+`claude-code`, `codex`, `gemini-cli` or `dsh`, the host preflight resolved:
 
 ```text
 node .maestro/sync.mts --memory-write --host <id>

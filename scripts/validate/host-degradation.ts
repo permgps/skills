@@ -92,60 +92,133 @@ export interface CheckOptions {
  */
 export const readsAsStop = (cost: string): boolean => /^\**\s*stops?\b/i.test(cost.trim());
 
-/** Declared Codex mechanics only; live isolation remains the evaluator's job. */
-export async function checkCodexRuntime(bundleDir: string): Promise<Violation[]> {
+/**
+ * One host's demand-loaded runtime recipe: the file, the literal rules it
+ * declares, and the markers that make it reachable from every dispatch site.
+ * The rules are compared as written, because each value is a decision a prose
+ * paraphrase would quietly weaken — `fork_turns: none`, `subagent_fork: never`.
+ */
+export interface HostRecipe {
+  /** The host id, as in `HOST_IDS`. */
+  host: string;
+  /** How findings name the host. */
+  name: string;
+  /** The check id findings carry; Codex keeps the one it shipped with. */
+  check: string;
+  /** Present in `docs/spec/hosts.md` when the specification carries this host's contract. */
+  contractMarker: string;
+  /** Relative to the bundle. */
+  recipeFile: string;
+  expected: Readonly<Record<string, string>>;
+}
+
+/** The phases that dispatch an independent role, plus preflight, which probes for them. */
+export const DISPATCH_SITES = ['0-preflight', '1-manifest', '3-spec', '4-plan', '5-build', '6-review',
+  '7-acceptance', '8-repair'] as const;
+
+export const HOST_RECIPES: readonly HostRecipe[] = [
+  {
+    host: 'codex', name: 'Codex', check: 'codex-runtime',
+    contractMarker: '<!-- maestro:codex:contract -->', recipeFile: 'references/codex.md',
+    expected: {
+      discovery: '.agents/skills/maestro', delegation: 'native-explicit', context: 'fresh',
+      fork_turns: 'none', inputs: 'role-prompt-and-allowed-artifacts', returns: 'observed-final-by-child-id',
+      workspace: 'absolute-explicit-cwd', 'editing-wave': 'one-without-concurrency-or-worktrees',
+      'state-writer': 'coordinator-sync.mts', evidence: 'opaque-remains-unverified', retries: '2',
+      model: "per tier, from the run state's models; session passes none",
+      reasoning_effort: "the session's", agent_type: 'never',
+    },
+  },
+  {
+    host: 'dsh', name: 'dsh', check: 'dsh-runtime',
+    contractMarker: '<!-- maestro:dsh:contract -->', recipeFile: 'references/dsh.md',
+    expected: {
+      discovery: '.agents/skills/maestro', delegation: 'native-explicit', tool: 'subagent', context: 'fresh',
+      subagent_fork: 'never', agent_preset: 'never', create_worktree: 'never',
+      inputs: 'role-prompt-and-allowed-artifacts', returns: 'completion-notice-by-child-id', 'follow-ups': 'never',
+      workspace: 'absolute-explicit-cwd', worktrees: 'coordinator-git-worktree',
+      'editing-wave': 'one-without-concurrency-or-worktrees', 'state-writer': 'coordinator-sync.mts',
+      evidence: 'opaque-remains-unverified', retries: '2',
+      model: "per tier, from the run state's models as provider:model; session passes none",
+      reasoning_effort: "the session's",
+    },
+  },
+];
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Declared mechanics of one host's recipe only; live isolation remains the evaluator's job. */
+export async function checkHostRecipe(bundleDir: string, recipe: HostRecipe): Promise<Violation[]> {
   const violations: Violation[] = [];
   const add = (file: string, message: string): void => {
-    violations.push({ check: 'codex-runtime', file, line: 0, message });
-    log.error('codex-runtime', message, { file });
+    violations.push({ check: recipe.check, file, line: 0, message });
+    log.error(recipe.check, message, { host: recipe.host, file });
   };
   const read = (file: string): Promise<string> => readFile(path.join(bundleDir, file), 'utf8');
-  const recipeFile = 'references/codex.md';
-  const recipe = await read(recipeFile);
-  const rules = findTable(parseTables(recipe), ['Rule', 'Value']);
-  const expected: Record<string, string> = {
-    discovery: '.agents/skills/maestro', delegation: 'native-explicit', context: 'fresh',
-    fork_turns: 'none', inputs: 'role-prompt-and-allowed-artifacts', returns: 'observed-final-by-child-id',
-    workspace: 'absolute-explicit-cwd', 'editing-wave': 'one-without-concurrency-or-worktrees',
-    'state-writer': 'coordinator-sync.mts', evidence: 'opaque-remains-unverified', retries: '2',
-    model: "per tier, from the run state's models; session passes none",
-    reasoning_effort: "the session's", agent_type: 'never',
-  };
-  for (const [rule, value] of Object.entries(expected)) {
+  const recipeName = path.basename(recipe.recipeFile);
+  const text = await read(recipe.recipeFile);
+  const rules = findTable(parseTables(text), ['Rule', 'Value']);
+  for (const [rule, value] of Object.entries(recipe.expected)) {
     const rows = rules?.rows.filter(row => clean(row['Rule']) === rule) ?? [];
     if (rows.length !== 1 || clean(rows[0]?.['Value']) !== value) {
-      add(recipeFile, `declare exactly one runtime rule ${rule} with value ${value}`);
+      add(recipe.recipeFile, `declare exactly one runtime rule ${rule} with value ${value}`);
     }
   }
-  const sites = ['0-preflight', '1-manifest', '3-spec', '4-plan', '5-build', '6-review',
-    '7-acceptance', '8-repair'];
-  for (const site of sites) {
+  const phaseLink = new RegExp(`\\]\\(\\.\\./references/${escapeRegExp(recipeName)}\\)`);
+  for (const site of DISPATCH_SITES) {
     const file = `phases/${site}.md`;
     const body = await read(file);
-    const marker = `<!-- maestro:codex:${site === '0-preflight' ? 'preflight' : 'dispatch'} -->`;
-    if (!body.includes(marker) || !/\]\(\.\.\/references\/codex\.md\)/.test(body)) {
-      add(file, 'declare the Codex dispatch marker and demand-loaded recipe link');
+    const marker = `<!-- maestro:${recipe.host}:${site === '0-preflight' ? 'preflight' : 'dispatch'} -->`;
+    if (!body.includes(marker) || !phaseLink.test(body)) {
+      add(file, `declare the ${recipe.name} dispatch marker and demand-loaded recipe link`);
     }
   }
   const router = await read('SKILL.md');
   if (!router.includes('<!-- maestro:delegation:native-explicit -->')) {
     add('SKILL.md', 'declare explicit native delegation for the independent roles');
   }
-  if (/\]\(references\/codex\.md\)/.test(router)) {
+  if (new RegExp(`\\]\\(references/${escapeRegExp(recipeName)}\\)`).test(router)) {
     add('SKILL.md', 'keep the runtime recipe demand-loaded from preflight and dispatch phases');
   }
-  if (!/\]\(codex\.md\)/.test(await read('references/hosts.md'))) {
-    add('references/hosts.md', 'link the Codex recipe from host resolution');
+  if (!new RegExp(`\\]\\(${escapeRegExp(recipeName)}\\)`).test(await read('references/hosts.md'))) {
+    add('references/hosts.md', `link the ${recipe.name} recipe from host resolution`);
   }
+  const promptLink = new RegExp(`\\]\\([^)]*references/${escapeRegExp(recipeName)}\\)`);
   for (const file of await readdir(path.join(bundleDir, 'prompts'))) {
     if (!file.endsWith('.md')) continue;
-    if (/\]\([^)]*references\/codex\.md\)/.test(await read(`prompts/${file}`))) {
+    if (promptLink.test(await read(`prompts/${file}`))) {
       add(`prompts/${file}`, 'withhold coordinator-only runtime mechanics from independent prompts');
     }
   }
-  log.info('codex-runtime', 'runtime declarations checked', { sites: sites.length, violations: violations.length });
+  log.info(recipe.check, 'runtime declarations checked', { host: recipe.host, sites: DISPATCH_SITES.length, violations: violations.length });
   return violations;
 }
+
+/**
+ * Every recipe the caller names, or all of them. `npm run hosts` passes the
+ * hosts whose contract the specification carries; `npm run bundle` has no
+ * specification to read and checks every recipe the bundle ships.
+ */
+export async function checkHostRecipes(bundleDir: string, hosts?: readonly string[]): Promise<Violation[]> {
+  const violations: Violation[] = [];
+  for (const recipe of HOST_RECIPES) {
+    if (hosts && !hosts.includes(recipe.host)) {
+      log.debug('recipes', 'recipe skipped: the specification carries no contract for it', { host: recipe.host });
+      continue;
+    }
+    log.debug('recipes', 'checking recipe', { host: recipe.host, file: recipe.recipeFile, rules: Object.keys(recipe.expected).length });
+    violations.push(...await checkHostRecipe(bundleDir, recipe));
+  }
+  return violations;
+}
+
+const recipeFor = (host: string): HostRecipe => HOST_RECIPES.find(recipe => recipe.host === host)!;
+
+/** Declared Codex mechanics only; live isolation remains the evaluator's job. */
+export const checkCodexRuntime = (bundleDir: string): Promise<Violation[]> => checkHostRecipe(bundleDir, recipeFor('codex'));
+
+/** Declared dsh mechanics only; the fork and the canary are the live probe's job. */
+export const checkDshRuntime = (bundleDir: string): Promise<Violation[]> => checkHostRecipe(bundleDir, recipeFor('dsh'));
 
 /** The runtime module that restates the session-start table, relative to the bundle. */
 const MEMORY_MODULE = path.join('tools', 'runtime', 'memory.mts');
@@ -267,9 +340,8 @@ export async function checkHostDegradation(options: CheckOptions = {}): Promise<
   };
 
   const spec = await readFile(specFile, 'utf8');
-  if (spec.includes('<!-- maestro:codex:contract -->')) {
-    violations.push(...await checkCodexRuntime(bundleDir));
-  }
+  const contracted = HOST_RECIPES.filter(recipe => spec.includes(recipe.contractMarker)).map(recipe => recipe.host);
+  violations.push(...await checkHostRecipes(bundleDir, contracted));
   // A bundle without the memory module (a synthetic fixture) has nothing to hold the table to.
   const memoryModule = path.join(bundleDir, MEMORY_MODULE);
   if (await access(memoryModule).then(() => true, () => false)) {

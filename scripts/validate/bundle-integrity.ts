@@ -15,7 +15,7 @@ import path from 'node:path';
 import { builtinModules } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { checkCodexRuntime } from './host-degradation.ts';
+import { checkHostRecipes } from './host-degradation.ts';
 import { GLOSSARY_NAMING_MESSAGE, bareGlossaryLines } from './spec-integrity.ts';
 
 import { createLogger } from '../shared/log.ts';
@@ -73,10 +73,10 @@ export interface BundleProfile {
    */
   resident?: { skillLines: number; descriptionChars: number };
   /**
-   * `'explicit-only'` means only the user starts the skill, and both hosts are
-   * told so: `disable-model-invocation: true` in the frontmatter for Claude Code,
-   * `policy.allow_implicit_invocation: false` in `agents/openai.yaml` for Codex.
-   * One declaration without the other is the two hosts drifting apart.
+   * `'explicit-only'` means only the user starts the skill, and both declarations
+   * say so: `disable-model-invocation: true` in the frontmatter, which Claude Code
+   * and dsh read, and `policy.allow_implicit_invocation: false` in
+   * `agents/openai.yaml` for Codex. One without the other is the hosts drifting apart.
    */
   invocation?: 'explicit-only';
   /**
@@ -1650,7 +1650,7 @@ export async function checkBundle(
   }
 
   if (skill.includes('<!-- maestro:delegation:native-explicit -->')) {
-    violations.push(...await checkCodexRuntime(bundleDir));
+    violations.push(...await checkHostRecipes(bundleDir));
   }
 
   if (skill.includes('<!-- maestro:completion-protocols -->')) {

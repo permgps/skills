@@ -130,8 +130,8 @@ says where to read. Anything else stays бриф text: a URL, a path,
 different models token follows the ambiguity rule under *Resolution*. On a host
 with no model list no token is ever a dial.
 
-**The host** is the one this session runs on — `claude-code`, `codex` or
-`gemini-cli`, the ids `9-memory.md` uses. Preflight's probe confirms what you
+**The host** is the one this session runs on — `claude-code`, `codex`,
+`gemini-cli` or `dsh`, the ids `9-memory.md` uses. Preflight's probe confirms what you
 read here; it does not choose the host.
 
 | Host id | Model list | Effort | Never pass |
@@ -139,6 +139,7 @@ read here; it does not choose the host.
 | `claude-code` | the `model` parameter's values in the subagent tool's schema | the `effort` parameter, when the schema carries one | — (the `model` parameter takes precedence over an agent definition's model) |
 | `codex` | the `<model_catalog>` in `spawn_agent`'s description | `reasoning_effort` | `agent_type` — a role file's model overrides any value passed on the spawn |
 | `gemini-cli` | none per dispatch: a subagent's model is fixed in its definition file or the host's own settings | — | — |
+| `dsh` | `list_subagent_models` and the `provider`/`model` fields of `subagent`, present only when the session enables subagent model selection; a half is `<provider>:<model>`, split at the first `:` | `reasoning_effort` | `agent_preset` — a preset brings its own persona and tools |
 
 **Effort is passed equal to the session's** wherever the host takes it and you
 know the session's. When you do not, pass none and say in the announcement that

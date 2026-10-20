@@ -285,6 +285,10 @@ export function standardsSources(): string[] {
   return [...new Set([...memory, ...STANDARDS_DOCUMENTS])];
 }
 
+/** `a`, `a and b`, `a, b and c` — a message names every host without stuttering its conjunction. */
+const listed = (items: readonly string[]): string =>
+  items.length < 3 ? items.join(' and ') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+
 /** The hosts whose memory file a source is; none for a {@link STANDARDS_DOCUMENTS} entry. */
 const hostsOf = (source: string): string[] =>
   Object.entries(MEMORY_FILES_BY_HOST).filter(([, host]) => host.groups.flat().includes(source)).map(([id]) => id);
@@ -345,7 +349,7 @@ export async function checkStandardsSources(specDir: string, bundleDir: string):
       if (body.includes(`\`${source}\``)) continue;
       log.debug('standards', 'source not named', { file, source });
       const hosts = hostsOf(source);
-      const what = hosts.length === 0 ? '' : ` — it is a memory file of ${hosts.join(' and ')}`;
+      const what = hosts.length === 0 ? '' : ` — it is a memory file of ${listed(hosts)}`;
       add(file, 0,
         `\`${source}\` is not named in ${place.file} › ${place.heading}${what}, and the standards reader's documents are gathered from every place the list names; add it`);
     }

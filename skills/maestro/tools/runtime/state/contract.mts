@@ -91,7 +91,7 @@ export const LANGUAGES: readonly Language[] = ['ru', 'en'];
  *
  * `token` is short and random and the session mints it when it opens a прогон
  * that carries none. It is minted rather than discovered because no session
- * identity survives across Claude Code, Codex and Gemini CLI, and a pid or a
+ * identity survives across Claude Code, Codex, Gemini CLI and dsh, and a pid or a
  * hostname would name the machine: two sessions on one laptop would look like
  * one holder, and one session outliving a restart would look like two.
  *

@@ -122,7 +122,7 @@ async function put(dir: string, file: string, text: string): Promise<void> {
 }
 
 test('writeMemoryBlock creates the host\'s own file when the project has no memory file', async () => {
-  for (const [host, expected] of [['claude-code', 'CLAUDE.md'], ['codex', 'AGENTS.md'], ['gemini-cli', 'GEMINI.md']] as const) {
+  for (const [host, expected] of [['claude-code', 'CLAUDE.md'], ['codex', 'AGENTS.md'], ['gemini-cli', 'GEMINI.md'], ['dsh', 'AGENTS.md']] as const) {
     await withDir(async dir => {
       const result = await writeMemoryBlock(dir, 'A fact.', host);
       assert.equal(result.file, expected);
@@ -212,6 +212,37 @@ test('a count-only file is never written and shadows the file the block lands in
     assert.equal(result.action, 'created');
     assert.equal(result.loadedByHost, false, 'AGENTS.override.md outranks AGENTS.md');
     assert.equal(await readFile(path.join(dir, 'AGENTS.override.md'), 'utf8'), 'Override.\n');
+  });
+});
+
+test('dsh loads AGENTS.md and CLAUDE.md together, so a project with only CLAUDE.md gets its block there, loaded', async () => {
+  await withDir(async dir => {
+    await put(dir, 'CLAUDE.md', 'Claude notes.\n');
+    const result = await writeMemoryBlock(dir, 'A fact.', 'dsh');
+    assert.equal(result.file, 'CLAUDE.md');
+    assert.equal(result.reason, 'host-file');
+    assert.equal(result.loadedByHost, true, 'dsh reads CLAUDE.md beside AGENTS.md, not instead of it');
+    assert.deepEqual(await readdir(dir), ['CLAUDE.md'], 'no second memory file');
+  });
+  await withDir(async dir => {
+    await put(dir, 'AGENTS.md', 'Team.\n');
+    await put(dir, 'CLAUDE.md', 'Claude notes.\n');
+    const result = await writeMemoryBlock(dir, 'A fact.', 'dsh');
+    assert.equal(result.file, 'AGENTS.md', 'AGENTS.md is the first candidate in the group');
+    assert.equal(result.loadedByHost, true);
+    assert.equal(await readFile(path.join(dir, 'CLAUDE.md'), 'utf8'), 'Claude notes.\n');
+  });
+});
+
+test('a dsh local overlay is never written: with only AGENTS.local.md the block creates AGENTS.md beside it', async () => {
+  await withDir(async dir => {
+    await put(dir, 'AGENTS.local.md', 'Mine.\n');
+    const result = await writeMemoryBlock(dir, 'A fact.', 'dsh');
+    assert.equal(result.file, 'AGENTS.md');
+    assert.equal(result.action, 'created');
+    assert.equal(result.loadedByHost, true, 'the overlay is additive, so it shadows nothing');
+    assert.equal(await readFile(path.join(dir, 'AGENTS.local.md'), 'utf8'), 'Mine.\n');
+    assert.deepEqual((await readdir(dir)).sort(), ['AGENTS.local.md', 'AGENTS.md']);
   });
 });
 

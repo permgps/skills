@@ -14,6 +14,13 @@ When the actual session exposes Codex native delegation, open
 This explicitly requests the native independent roles; the recipe is
 coordinator-only and never travels to blind readers.
 
+## DeepSeek Harness (dsh)
+
+When the session exposes dsh's `subagent` tool, open [`dsh.md`](dsh.md) for
+preflight and every independent dispatch. Its fresh child is `subagent`, never
+`subagent_fork`, and the coordinator makes the worktrees itself; the recipe is
+coordinator-only and never travels to blind readers.
+
 ## What To Establish
 
 Answer these capabilities by observation rather than by belief about the product:

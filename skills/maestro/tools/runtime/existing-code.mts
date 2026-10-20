@@ -25,10 +25,11 @@ const log = createLogger('existing-code');
 
 /**
  * Root directories that hold Maestro's own record, version control, and host
- * and skill installs (`npx skills add` writes `.claude/skills/…`). Nothing
+ * and skill installs (`npx skills add` writes `.claude/skills/…`; DeepSeek
+ * Harness keeps its project settings and skills under `.dsh/`). Nothing
  * under them is the project's code.
  */
-export const NOT_CODE_ROOT_DIRS: readonly string[] = ['.maestro', '.git', '.claude', '.agents', '.codex', '.gemini'];
+export const NOT_CODE_ROOT_DIRS: readonly string[] = ['.maestro', '.git', '.claude', '.agents', '.codex', '.gemini', '.dsh'];
 
 /** Root-level repository meta files that a repository made by `git init` and its first commit carries. */
 export const NOT_CODE_ROOT_FILES: readonly string[] = ['skills-lock.json', '.gitignore', '.gitattributes'];

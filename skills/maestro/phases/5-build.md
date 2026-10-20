@@ -25,6 +25,10 @@ before each independent role dispatch in this phase. Use a fresh native child,
 the full role prompt and only this role's allowed inputs; observe its actual
 final return before importing results. The recipe is coordinator-only.
 
+<!-- maestro:dsh:dispatch -->
+On dsh, open [the dsh recipe](../references/dsh.md) before each independent
+role dispatch here: a fresh `subagent` child, never a fork or a reused one.
+
 ## External-contract freshness
 
 Before dispatching affected work, compare every cited research fact's version

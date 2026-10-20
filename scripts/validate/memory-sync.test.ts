@@ -205,6 +205,24 @@ test('the write reports a file its host will not load instead of creating a seco
   } finally { await project.dispose(); }
 });
 
+test('on dsh a second прогон in the same project finds the block the first wrote, and no second file appears', async () => {
+  const project = await target();
+  try {
+    await writeFile(path.join(project.root, 'AGENTS.local.md'), 'Mine.\n', 'utf8');
+    const first = project.sync(['--memory-write', '--host', 'dsh'], 'Prices live in menu.json.');
+    assert.equal(first.code, 0, first.stdout);
+    assert.equal(first['file'], 'AGENTS.md');
+    assert.equal(first['action'], 'created');
+    assert.equal(first['loadedByHost'], true);
+    const second = project.sync(['--memory-write', '--host', 'dsh'], 'Taxes live there too.');
+    assert.equal(second.code, 0, second.stdout);
+    assert.equal(second['file'], 'AGENTS.md');
+    assert.equal(second['action'], 'replaced');
+    assert.equal(await readFile(path.join(project.root, 'AGENTS.local.md'), 'utf8'), 'Mine.\n');
+    assert.deepEqual((await readdir(project.root)).sort(), ['.maestro', 'AGENTS.local.md', 'AGENTS.md']);
+  } finally { await project.dispose(); }
+});
+
 test('the block in two files and malformed markers each stop the write with exit 1', async () => {
   const project = await target();
   try {
