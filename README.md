@@ -24,8 +24,8 @@ at a block of text.
 
 **Status: `0.0.14-alpha`.** Four прогона have carried a бриф to a finished отчёт
 with all four gates passed on Claude Code. One of the four modes has never been
-run, Codex, Gemini CLI and DeepSeek Harness are unverified, and Scout has not yet run in front of
-a real прогон — see [Limitations](#limitations) and
+run, Codex, Gemini CLI and DeepSeek Harness are unverified, and Scout has not
+yet run in front of a real прогон — see [Limitations](#limitations) and
 [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Contents
@@ -1184,7 +1184,7 @@ The parity and completion runs need tools `check` does not; see
 
 | Page | What it covers |
 |---|---|
-| [`docs/install.md`](docs/install.md) | every install form, the runtime layout, the first-run questions, Codex and Gemini, the git guard, checking the repository |
+| [`docs/install.md`](docs/install.md) | every install form, the runtime layout, the first-run questions, Codex, Gemini and DeepSeek Harness, the git guard, checking the repository |
 | [`docs/dashboard.md`](docs/dashboard.md) | every region of the page, the switches, what each number means, the silent page, the opener, recovery, and what is checked |
 | [`docs/parity-verification.md`](docs/parity-verification.md) | verification commands, the parity matrix, and execution limits |
 | [`docs/spec/README.md`](docs/spec/README.md) | reading order for the specification, and how to run the checks |

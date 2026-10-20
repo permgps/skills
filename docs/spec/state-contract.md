@@ -153,8 +153,8 @@ nobody claimed has no `heldBy`, and so does every state written before the field
 existed.
 
 The token is **minted, not discovered.** There is no session identity this
-bundle can rely on across Claude Code, Codex and Gemini CLI, and a pid or a
-hostname would name the machine instead — two sessions on one laptop would look
+bundle can rely on across Claude Code, Codex, Gemini CLI and dsh, and a pid or
+a hostname would name the machine instead — two sessions on one laptop would look
 like one holder, and one session that outlived a restart would look like two.
 
 **It detects a second orchestrator; it does not prevent one.** Nothing available

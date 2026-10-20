@@ -425,6 +425,8 @@ test('the real tables give dsh a model-list row in both homes and a session-star
   const withoutDsh = (markdown: string): string => markdown.split('\n').filter(line => !line.startsWith('| `dsh` |')).join('\n');
   const found = checkModelLists([{ file: 'hosts.md', markdown: spec }, { file: '0-dials.md', markdown: withoutDsh(dials) }], [...HOSTS, 'dsh']);
   assert.deepEqual(found.map(v => [v.file, v.message]), [['0-dials.md', 'the model-list table has no row for dsh — say where that host lists its models, or that it has none']]);
+  const fromSpec = checkModelLists([{ file: 'hosts.md', markdown: withoutDsh(spec) }, { file: '0-dials.md', markdown: dials }], [...HOSTS, 'dsh']);
+  assert.deepEqual(fromSpec.map(v => [v.file, v.message]), [['hosts.md', 'the model-list table has no row for dsh — say where that host lists its models, or that it has none']]);
   const coded = { dsh: { groups: [['AGENTS.md', 'CLAUDE.md', 'AGENTS.local.md', 'CLAUDE.local.md']], creates: 'AGENTS.md' } };
   assert.ok(checkMemoryFiles(withoutDsh(spec), 'hosts.md', coded, 'memory.mts').some(v => /MEMORY_FILES_BY_HOST has dsh/.test(v.message)));
 });
