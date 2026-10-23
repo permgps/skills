@@ -101,6 +101,12 @@ export interface Context {
   descriptionSource: DescriptionSource;
   /** Records of a subagent written into its parent's file, as older host versions did. */
   inlineSidechain: boolean;
+  /**
+   * Every skill the host attributed a record of this file's own session to,
+   * replayed records included, sorted. A resumed прогон is recognised by the
+   * records it replayed even when its new calls carry no skill.
+   */
+  skillsSeen: string[];
   /** In time order. */
   calls: Call[];
 }
@@ -270,7 +276,7 @@ export async function readTranscripts(logDir: string): Promise<Transcripts> {
   for (const job of await listFiles(logDir)) {
     const context: Context = {
       kind: job.kind, sessionId: job.sessionId, file: job.file,
-      descriptionSource: 'none', inlineSidechain: false, calls: [],
+      descriptionSource: 'none', inlineSidechain: false, skillsSeen: [], calls: [],
       ...job.agentId === undefined ? {} : { agentId: job.agentId },
     };
     if (job.meta !== undefined && await exists(job.meta)) {
@@ -290,6 +296,7 @@ export async function readTranscripts(logDir: string): Promise<Transcripts> {
     // Older hosts wrote a subagent's records into the parent's file. Each such
     // agent gets a context of its own, so it is never folded into the orchestrator.
     const inline = new Map<string, Context>();
+    const skillsHere = new Set<string>();
 
     const lines = (await readFile(job.file, 'utf8')).split('\n');
     let calls = 0;
@@ -315,6 +322,9 @@ export async function readTranscripts(logDir: string): Promise<Transcripts> {
         continue;
       }
       if (record['type'] !== 'assistant') continue;
+      // Read before the dedupe, so a replayed record still says whose session this is.
+      const skill = text(record['attributionSkill']);
+      if (skill !== undefined && record['isSidechain'] !== true) skillsHere.add(skill);
 
       const message = record['message'];
       const messageId = isObject(message) ? text(message['id']) : undefined;
@@ -345,18 +355,20 @@ export async function readTranscripts(logDir: string): Promise<Transcripts> {
         const agentId = text(record['agentId']) ?? 'unknown';
         owner = inline.get(agentId) ?? {
           kind: 'subagent', sessionId: job.sessionId, agentId, file: job.file,
-          descriptionSource: 'none', inlineSidechain: true, calls: [],
+          descriptionSource: 'none', inlineSidechain: true, skillsSeen: [], calls: [],
         };
         if (!inline.has(agentId)) {
           inline.set(agentId, owner);
           contexts.push(owner);
         }
       }
-      const skill = text(record['attributionSkill']);
       sightings.set(messageId, { context: owner, at, model, usage, lines: 1, ...skill === undefined ? {} : { skill } });
       calls += 1;
     }
-    log.debug('transcripts', 'file read', { file: job.file, kind: job.kind, lines: lines.length, calls, unparsed: unparsedHere });
+    context.skillsSeen = [...skillsHere].sort();
+    log.debug('transcripts', 'file read', {
+      file: job.file, kind: job.kind, lines: lines.length, calls, unparsed: unparsedHere, skills: context.skillsSeen,
+    });
   }
 
   for (const [messageId, sighting] of sightings) {

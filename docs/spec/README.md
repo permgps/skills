@@ -349,8 +349,12 @@ named in the output: the host's transcripts (Claude Code only; any other
   Which Tier* sets, `maestro:<brief> [NN]`. A таск's later executor contexts
   count as repair; a context handoff is counted as repair too. A context without
   a readable label is reported as unattributed with the reason, never guessed.
-  The orchestrator is the main session inside the run window, less calls the
-  host attributes to another skill.
+  The orchestrator is the run's main session inside the window: its calls of
+  the `maestro` skill, and those recording no skill in a session that records
+  `maestro` somewhere, a resumed one's replayed records included. Another
+  skill's calls, and a second terminal's in the same project, are counted
+  apart. A log where no session records `maestro` cannot tell them apart, so
+  every main session is counted and the output says so.
 - **The window** runs from `startedAt` to `finishedAt`, or `updatedAt` while
   the run is open; idle time is the closed `waits` (contract 9 on), and before
   that it is `not recorded`.

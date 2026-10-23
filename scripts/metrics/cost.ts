@@ -42,11 +42,23 @@ import {
 
 const log = createLogger('metrics');
 
-/** The skill a main-session call must carry, when the host records one, to be the orchestrator's. */
+/**
+ * The skill the host records on the прогон's own main-session calls. A call of
+ * another skill is never the orchestrator's; a call recording none is, when its
+ * session records this skill somewhere (see `OrchestratorScope`).
+ */
 export const ORCHESTRATOR_SKILL = 'maestro';
 
 /** A call reads its cache cold when it reads less than this share of the previous call's context. */
 export const COLD_READ_SHARE = 0.5;
+
+/**
+ * Which main sessions the orchestrator's calls are taken from. The host keeps a
+ * skill's attribution for the rest of its session, so once any session records
+ * `maestro`, a session that never does is another terminal in the same project.
+ * A log where none records it has nothing to tell them apart by.
+ */
+export type OrchestratorScope = 'sessions recording maestro' | 'every main session';
 
 export type NotRecorded = 'not recorded';
 const NOT_RECORDED: NotRecorded = 'not recorded';
@@ -120,6 +132,9 @@ export interface CostMeasurement {
     callsOutsideWindow: number;
     contextsOutsideWindow: number;
     callsFromAnotherSkill: number;
+    /** Calls recording no skill, in a main session that never records `maestro`. */
+    callsFromAnotherSession: number;
+    orchestratorSessions: { counted: number; scope: OrchestratorScope };
     callsWithoutWriteSplit: number;
   };
   totalUnits: number;
@@ -203,6 +218,10 @@ export function measureCost(state: RunState, transcripts: Transcripts, git: GitF
   let callsOutsideWindow = 0;
   let contextsOutsideWindow = 0;
   let callsFromAnotherSkill = 0;
+  let callsFromAnotherSession = 0;
+  let orchestratorSessions = 0;
+  const scope: OrchestratorScope = transcripts.contexts.some(context => context.kind === 'main' && context.skillsSeen.includes(ORCHESTRATOR_SKILL))
+    ? 'sessions recording maestro' : 'every main session';
   const attributed: Attributed[] = [];
 
   for (const context of transcripts.contexts) {
@@ -217,9 +236,19 @@ export function measureCost(state: RunState, transcripts: Transcripts, git: GitF
     }
 
     if (context.kind === 'main') {
-      const orchestrator = inside.filter(call => call.skill === undefined || call.skill === ORCHESTRATOR_SKILL);
-      callsFromAnotherSkill += inside.length - orchestrator.length;
-      if (orchestrator.length > 0) attributed.push({ context, calls: orchestrator, role: 'orchestrator' });
+      const runSession = scope === 'every main session' || context.skillsSeen.includes(ORCHESTRATOR_SKILL);
+      const otherSkill = inside.filter(call => call.skill !== undefined && call.skill !== ORCHESTRATOR_SKILL).length;
+      const orchestrator = inside.filter(call => call.skill === ORCHESTRATOR_SKILL || (call.skill === undefined && runSession));
+      callsFromAnotherSkill += otherSkill;
+      callsFromAnotherSession += inside.length - otherSkill - orchestrator.length;
+      log.debug('cost', 'main session scoped', {
+        sessionId: context.sessionId, scope, runSession, orchestrator: orchestrator.length, otherSkill,
+        anotherSession: inside.length - otherSkill - orchestrator.length,
+      });
+      if (orchestrator.length > 0) {
+        attributed.push({ context, calls: orchestrator, role: 'orchestrator' });
+        orchestratorSessions += 1;
+      }
       continue;
     }
     if (context.inlineSidechain) {
@@ -347,6 +376,8 @@ export function measureCost(state: RunState, transcripts: Transcripts, git: GitF
       callsOutsideWindow,
       contextsOutsideWindow,
       callsFromAnotherSkill,
+      callsFromAnotherSession,
+      orchestratorSessions: { counted: orchestratorSessions, scope },
       callsWithoutWriteSplit: allCalls.filter(call => !call.usage.writeSplit).length,
     },
     totalUnits,
@@ -399,6 +430,9 @@ export function render(m: CostMeasurement): string {
   row('  synthetic records', String(m.sources.syntheticRecords));
   row('  outside the window', `${m.sources.callsOutsideWindow} call(s); ${m.sources.contextsOutsideWindow} context(s) wholly outside`);
   row('  another skill', `${m.sources.callsFromAnotherSkill} calls`);
+  row('  another session', `${m.sources.callsFromAnotherSession} calls, recording no skill in a session that never records maestro`);
+  row('  orchestrator sessions', `${m.sources.orchestratorSessions.counted} (${m.sources.orchestratorSessions.scope === 'every main session'
+    ? 'every main session — no session records the maestro skill' : 'sessions recording maestro'})`);
   if (m.sources.callsWithoutWriteSplit > 0) row('  writes without 5m/1h', `${m.sources.callsWithoutWriteSplit} calls, counted as 5-minute`);
 
   lines.push('');

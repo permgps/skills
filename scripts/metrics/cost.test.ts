@@ -91,6 +91,8 @@ async function withProject(body: (project: Project) => Promise<void>): Promise<v
 
     const logDir = path.join(root, 'logs');
     await writeSession(logDir, 'early', [assistantLine({ id: 'msg_early', at: '2026-09-29T08:00:00Z', skill: 'maestro', usage: { input: 50, output: 50 } })]);
+    // A second terminal in the same project during the run, recording no skill.
+    await writeSession(logDir, 'side', [assistantLine({ id: 'msg_side', at: at(6), usage: { input: 70, output: 70 } })]);
     await writeSession(logDir, 'run', [
       userLine(at(0, 30)),
       ...callLines({ id: 'msg_o1', at: at(1), skill: 'maestro', usage: { input: 100, write5m: 20_000, output: 300 } }),
@@ -146,6 +148,8 @@ test('a прогон\'s transcripts, state and git give the figures each source 
     assert.equal(m.sources.duplicateLines, 2);
     assert.equal(m.sources.unparsedLines, 1);
     assert.equal(m.sources.callsFromAnotherSkill, 1);
+    assert.equal(m.sources.callsFromAnotherSession, 1);
+    assert.deepEqual(m.sources.orchestratorSessions, { counted: 1, scope: 'sessions recording maestro' });
     assert.equal(m.sources.callsOutsideWindow, 2);
     assert.equal(m.sources.contextsOutsideWindow, 1);
 
@@ -195,6 +199,26 @@ test('nothing a session said or a dispatch was labelled reaches stdout, the JSON
     }
     assert.equal(file, human.out);
     assert.deepEqual((await readdir(project.root)).sort(), ['.git', '.maestro', 'cost.txt', 'logs', 'menu.js', 'notes.txt']);
+  });
+});
+
+test('the log lines the measurement writes carry ids and counts, never what a session said', async () => {
+  await withProject(async project => {
+    const done = spawnSync(process.execPath, [path.join(import.meta.dirname, 'cost.ts'), project.root, '--log-dir', project.logDir], {
+      encoding: 'utf8', env: { ...process.env, LOG_LEVEL: 'DEBUG' },
+    });
+    assert.equal(done.status, 0, done.stderr);
+    assert.ok(!done.stderr.includes(SENTINEL));
+    assert.ok(!done.stderr.includes('Explore'));
+    const line = (prefix: string): string => {
+      const found = done.stderr.split('\n').find(entry => entry.startsWith(prefix));
+      assert.ok(found, `no line starting ${prefix} in:\n${done.stderr}`);
+      return found;
+    };
+    assert.match(line('INFO [metrics.cost] прогон cost measured'), /"calls":10,"duplicateLines":2,"unparsed":1,"unattributed":1,"outsideWindow":2/);
+    assert.match(line('WARN [metrics.cost] context left unattributed'), /"agentId":"a-free","reason":"no prefix"/);
+    assert.match(line('WARN [metrics.transcripts] line unparsable'), /"line":8/);
+    assert.match(line('DEBUG [metrics.roles] context attributed {"agentId":"a-exec2"'), /"role":"repair","taskId":"01"/);
   });
 });
 
@@ -316,6 +340,29 @@ test('a run on several models says their units do not convert into each other', 
   const m = measureCost(runState([]), transcripts, NO_GIT);
   assert.deepEqual(m.models.map(entry => entry.model), ['claude-opus-5-5', 'claude-sonnet-5-5']);
   assert.match(render(m), /do not convert into each other/);
+});
+
+test('when no session records the maestro skill, every main session in the window is the orchestrator, and the output says so', async () => {
+  const transcripts = await transcriptsOf(async logDir => {
+    await writeSession(logDir, 'run', [assistantLine({ id: 'msg_1', at: at(1), usage: { input: 10, output: 10 } })]);
+    await writeSession(logDir, 'side', [assistantLine({ id: 'msg_2', at: at(2), usage: { input: 10, output: 10 } })]);
+  });
+  const m = measureCost(runState([]), transcripts, NO_GIT);
+  assert.equal(m.orchestrator.calls, 2);
+  assert.equal(m.sources.callsFromAnotherSession, 0);
+  assert.deepEqual(m.sources.orchestratorSessions, { counted: 2, scope: 'every main session' });
+  assert.match(render(m), /every main session — no session records the maestro skill/);
+});
+
+test('a resumed session counts as the прогон\'s when only its replayed records carry the skill', async () => {
+  const transcripts = await transcriptsOf(async logDir => {
+    const replayed = assistantLine({ id: 'msg_1', at: at(1), skill: 'maestro', usage: { input: 10, output: 10 } });
+    await writeSession(logDir, 'original', [replayed]);
+    await writeSession(logDir, 'resumed', [replayed, assistantLine({ id: 'msg_2', at: at(3), usage: { input: 10, output: 10 } })]);
+  });
+  const m = measureCost(runState([]), transcripts, NO_GIT);
+  assert.equal(m.orchestrator.calls, 2);
+  assert.deepEqual(m.sources.orchestratorSessions, { counted: 2, scope: 'sessions recording maestro' });
 });
 
 test('the arguments are read with their values and refused without them', () => {

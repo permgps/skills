@@ -58,6 +58,14 @@ test('a label with a таск id gives the brief and the id', () => {
   assert.deepEqual(parseDispatchLabel('maestro:executor 03 build the engine'), { roleKey: 'executor', taskId: '03' });
 });
 
+test('punctuation after the таск id is not part of the id', () => {
+  for (const label of ['maestro:executor 03: build the engine', 'maestro:executor 03, retry', 'maestro:executor 03.', 'maestro:executor 03;']) {
+    assert.deepEqual(parseDispatchLabel(label), { roleKey: 'executor', taskId: '03' }, label);
+  }
+  assert.deepEqual(parseDispatchLabel('maestro:reviewer AR-1'), { roleKey: 'reviewer', taskId: 'AR-1' });
+  assert.deepEqual(parseDispatchLabel('maestro:reviewer — wave 2'), { roleKey: 'reviewer', taskId: null });
+});
+
 test('a label without a таск id gives the brief and no id', () => {
   assert.deepEqual(parseDispatchLabel('maestro:standards-reader'), { roleKey: 'standards-reader', taskId: null });
   assert.deepEqual(parseDispatchLabel('maestro:probe'), { roleKey: 'probe', taskId: null });

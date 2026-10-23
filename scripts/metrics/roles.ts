@@ -61,8 +61,10 @@ export type DispatchLabel =
   | { unattributed: UnattributedReason; roleKey?: string };
 
 // Anchored and without nested quantifiers, so a long description costs one
-// linear scan; `roles.test.ts` times it on 200 KB.
-const LABEL_PATTERN = /^maestro:([a-z0-9-]+)(?:\s+(\S+))?/;
+// linear scan; `roles.test.ts` times it on 200 KB. The таск id stops at the
+// first character an id never holds, so `maestro:executor 03: build` names
+// `03`, not `03:`.
+const LABEL_PATTERN = /^maestro:([a-z0-9-]+)(?:\s+([A-Za-z0-9][A-Za-z0-9_-]*))?/;
 
 /**
  * The role key and таск id a description carries, or why it carries none.

@@ -180,7 +180,14 @@ test('the host versions seen are reported, the mapped one among them', async () 
       assistantLine({ id: 'msg_1', at: '2026-10-23T10:00:01Z', usage: USAGE }),
       assistantLine({ id: 'msg_2', at: '2026-10-23T10:00:02Z', usage: USAGE, version: '9.9.9' }),
     ]);
-    assert.deepEqual((await readTranscripts(logDir)).hostVersions, [MAPPED_HOST_VERSION, '9.9.9'].sort());
+    const lines: string[] = [];
+    const original = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: string | Uint8Array): boolean => { lines.push(String(chunk)); return true; }) as typeof process.stderr.write;
+    let transcripts: Transcripts;
+    try { transcripts = await readTranscripts(logDir); } finally { process.stderr.write = original; }
+    assert.deepEqual(transcripts.hostVersions, [MAPPED_HOST_VERSION, '9.9.9'].sort());
+    const warnings = lines.filter(line => line.startsWith('WARN [metrics.transcripts] host version differs'));
+    assert.deepEqual(warnings.map(line => /"version":"([^"]+)"/.exec(line)?.[1]), ['9.9.9']);
   });
 });
 
