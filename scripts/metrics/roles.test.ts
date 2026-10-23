@@ -5,11 +5,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { cleanCell, parseTables } from '../validate/spec-integrity.ts';
-import { PROBE_KEY, ROLE_OF_KEY, parseDispatchLabel, roleOf } from './roles.ts';
+import { DISPATCH_PREFIX, PROBE_KEY, ROLE_OF_KEY, parseDispatchLabel, roleOf } from './roles.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const PROMPTS = path.join(ROOT, 'skills/maestro/prompts');
 const DIALS = path.join(ROOT, 'docs/spec/dials.md');
+const SKILL = path.join(ROOT, 'skills/maestro/SKILL.md');
 
 const shippedKeys = async (): Promise<string[]> =>
   (await readdir(PROMPTS)).filter(name => name.endsWith('.md')).map(name => name.slice(0, -'.md'.length));
@@ -43,6 +44,14 @@ test('every brief in the dials tier table has a role', async () => {
     .map(brief => brief.slice(0, -'.md'.length));
   assert.ok(briefs.length > 0);
   assert.deepEqual(briefs.filter(brief => !Object.hasOwn(ROLE_OF_KEY, brief)), []);
+});
+
+test('SKILL.md and the dials specification state the label the measurement reads', async () => {
+  for (const file of [SKILL, DIALS]) {
+    const body = await readFile(file, 'utf8');
+    assert.ok(body.includes(`\`${DISPATCH_PREFIX}<brief>\``), `${file} does not name the label shape`);
+    assert.ok(body.includes(`\`${DISPATCH_PREFIX}${PROBE_KEY}\``), `${file} does not name the probe label`);
+  }
 });
 
 test('a label with a таск id gives the brief and the id', () => {

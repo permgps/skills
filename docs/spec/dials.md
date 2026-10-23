@@ -275,6 +275,16 @@ at that model's default effort.
 - Which tier a таск is built on is the plan's mark, `tasks[].model`
   ([`phases.md`](phases.md) › Plan); G3 holds the mechanical half of it.
 
+**Each dispatch says which brief it hands over.** Where the host's dispatch
+call takes a `description`, it opens with `maestro:<brief>` — the brief's file
+name without `.md`, `maestro:probe` for the probe — then the таск's id when the
+dispatch serves one: `maestro:executor 03`, `maestro:reviewer 03`,
+`maestro:task-reader`. The label changes nothing in the прогон. It is what lets
+the repository's cost measurement (`npm run metrics:cost`) attribute each
+subagent context to a role from the host's own log, instead of guessing from
+free text. A host whose dispatch call has no `description` keeps its own naming;
+Codex's `task_name` is not bent to carry it.
+
 ### Fixed For The Прогон
 
 The models are fixed at the dials phase and the tier of each таск at the cut.

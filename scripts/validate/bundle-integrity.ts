@@ -844,7 +844,9 @@ export const UPDATE_ANCHORS: readonly Anchor[] = [
  * Matched literally for the reason `MEMORY_ANCHORS` is. The plan marks each
  * таск and G3 holds the producer and skeleton rule mechanically; the phases
  * that dispatch pass the tier; preflight pins the models through the helper;
- * the reviewer judges risk whatever the mark says; the отчёт counts the tiers.
+ * the reviewer judges risk whatever the mark says; the отчёт counts the tiers;
+ * and each dispatch is labelled with its brief, the label the repository's cost
+ * measurement attributes a subagent context by (`scripts/metrics/roles.ts`).
  * Which brief runs on which tier is held by `npm run readers`, and the token
  * rule by `npm run dials`, not here.
  */
@@ -857,6 +859,8 @@ export const MODEL_ANCHORS: readonly Anchor[] = [
     why: 'the skeleton rule is mechanical only while the skeleton has a definition a machine can apply' },
   { file: 'SKILL.md', literal: 'A judge never runs `standard`',
     why: 'the resident rule every dispatching phase applies; a gate rests on its judge being no weaker' },
+  { file: 'SKILL.md', literal: 'open it with `maestro:<brief>`',
+    why: 'the label metrics:cost attributes a subagent\'s cost by; without it every context is unattributed' },
   { file: 'phases/0-preflight.md', literal: '--config-models',
     why: 'the one helper-owned change to the user\'s config; a hand-merged edit is the ritual it removes' },
   { file: 'phases/3-spec.md', literal: 'on the `standard` model',
