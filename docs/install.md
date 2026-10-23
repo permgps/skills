@@ -52,7 +52,7 @@ the target, without replacing the populated run directory:
     shared/log.mts
     shared/owned-block.mts
     publication.mts, relocation.mts, register.mts, legacy.mts, dashboard.mts, server.mts, opener.mts
-    config.mts, memory.mts, existing-code.mts, update-check.mts, progress.mts, history.mts, commits-check.mts
+    config.mts, memory.mts, existing-code.mts, update-check.mts, progress.mts, history.mts, commits-check.mts, landing.mts
     execution-return.mts, plan-units.mts, technical-research.mts, repair-dispatch.mts, evidence-import.mts
     openspec.mts, answers.mts
   dashboard.html

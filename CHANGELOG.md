@@ -14,6 +14,20 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **One event, one turn.** A landing now takes two messages instead of one per
+  step. The first holds the commit, made by pathspec over the таск's paths, and
+  `sync.mts --publish <candidate> --land <NN>`. The second holds the `running`
+  publish and the next executors' launches. `--land` reads the sha from
+  `HEAD` and refuses a commit whose subject names another таск, whose
+  `Maestro-Run:` or `Requirements:` trailer is not this таск's, or that left
+  anything in the таск's paths uncommitted. Only then does it append the sha
+  before validation, so the orchestrator never copies it by hand. The repair
+  phase lands the same way. A rejected `running` publish whose launches
+  already went out is reconciled first and never left silent. All of this needs
+  the host to run the calls of one message in order. That is a new degrading
+  capability, `ordered tool calls`, probed on the fan-out probe. Without it,
+  each step is its own message. No contract bump, and `SKILL.md` is
+  unchanged.
 - **The cut is sized by the volume of change.** The plan phase now opens with
   an estimate of the changed lines, tests included, and cuts one таск up to
   about 3,000 — a figure marked as borrowed until our own runs measure it —

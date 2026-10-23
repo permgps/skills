@@ -912,7 +912,8 @@ MAESTRO_SYNC_DEBUG=1 node .maestro/sync.mts  # diagnostics on stderr
 `--no-open` can still start or reuse the local dashboard server; it suppresses
 opening a browser. `MAESTRO_SYNC_NO_OPEN` in the environment does the same, and
 `LOG_LEVEL=DEBUG` also turns diagnostics on. `--validate` and `--project` are
-read-only checks that print JSON; `--publish`, `--serve`, `--memory-read`,
+read-only checks that print JSON; `--publish` (with `--land <NN>` when it records
+a таск's commit), `--serve`, `--memory-read`,
 `--memory-write`, `--config-models`, `--update-check`, `--commits-check`,
 `--openspec-index`, `--returns-check`, `--repair-dispatch`, `--import-evidence`, `--plan-units`, `--plan-render` and `--plan-coverage` are
 what the orchestrator
@@ -1020,6 +1021,7 @@ names anything missing and what it costs before the first stage:
 | context isolation | the run stops — G2 and G4 cannot be honest without it |
 | version control | no commits; review reads the working tree instead of a diff, and says so |
 | browser automation | affected UI checks stay unavailable and their requirements incomplete |
+| ordered tool calls | each step of a landing is its own message: commit, publish, then launch; nothing is skipped |
 | Node.js 22.18+ with type stripping | preflight stops and names the prerequisite |
 
 ## The Language It Speaks

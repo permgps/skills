@@ -2227,7 +2227,7 @@ is a cost we have not measured.
     - The ceiling stays borrowed until a real прогон's `estimatedLines` is
       measured against its changed lines. No прогон has yet run under the rule.
 
-- [ ] **One Event, One Turn** — let the orchestrator handle what one event
+- [x] **One Event, One Turn** — let the orchestrator handle what one event
   needs in a single turn instead of one turn per step, since every turn
   re-reads its whole resident context.
   - **Start only after** the measurement item reports orchestrator calls per
@@ -2273,6 +2273,67 @@ is a cost we have not measured.
     landed таск before and after on comparable прогоны.
   - **Cost:** one helper option and a paragraph in the build phase. Turns are
     saved on every landing of every run.
+  - **Closed 2026-10-23, ahead of its start condition, by the user's decision.**
+    The count of orchestrator calls per landed таск on a real прогон is still
+    pending (`docs/parity-verification.md` › *Cost Measurement*). The user chose
+    to build first. The check the helper makes is worth keeping even if the
+    saving turns out small. The "before" figure stays obtainable from a прогон
+    at `b2c6400`.
+    - **Settled with the user:**
+      - **One helper option.** `sync.mts --publish <candidate> --land <NN>`
+        runs in `tools/runtime/landing.mts`, inside the publication lock,
+        after the waits are kept and before validation. It reads `HEAD` and
+        checks it in order:
+        - the таск is `review` in the candidate;
+        - the subject opens with its id;
+        - `Maestro-Run:` and `Requirements:` are given once each and are
+          this run's and this таск's, in id order;
+        - the sha is in no `lostCommits` and no other таск's `commits`;
+        - nothing in the таск's `zone` and `files` is left uncommitted,
+          untracked files included.
+
+        Only then does it append the sha. The same `HEAD` landed again appends
+        nothing. A refusal names its rule and writes nothing. Git unable to
+        answer exits 2. `runName` moved into `history.mts`, so the resume
+        check and the landing spell the run one way. No contract bump.
+      - **Two messages per landing.** The first holds the `D##` rows, the
+        commit by pathspec and `--publish --land`. The second holds the
+        `running` publish, the launches and the progress line. The return
+        check, the evidence import and the worktree merge each keep their own
+        message. The phase says *message*, never *turn*.
+      - **Reconcile first.** A rejected `running` publish whose launches
+        already went out is handled before anything else. A launch the
+        validator refuses has its return discarded and is relaunched once
+        legal; that relaunch is not a retry. It is logged as WARN `build`
+        `launch outran publish` and stated in one chat line.
+      - **The repair phase lands the same way.**
+      - **`ordered tool calls` is a degrading capability.** It is probed on
+        the fan-out probe: a shell call writes a token after a 20-second delay,
+        and the subagent sent after it in the same message reads it. On Codex
+        and dsh it rides on their recipes' own file-reading probe. Without it,
+        every step is its own message.
+    - **Held by:**
+      - `landing-sync.test.ts`, 32 tests through the copied helper on a real
+        repository: the four roadmap cases, every refusal beside its legal
+        inputs, the order proof, and a 200 KB subject;
+      - `npm run hosts`, with a removal test for each of the capability's two
+        markers;
+      - `LANDING_ANCHORS`, 9 literals with a removal test per anchor.
+    - `SKILL.md` and the resident ratchet are unchanged. 2358 tests pass.
+    - **The probe on Claude Code 2.1.309 answered *ordered*:** the shell
+      finished writing at 10:59:32Z, and the subagent read the token at
+      10:59:35Z. Recorded in `docs/parity-verification.md` › *One Event, One
+      Turn*.
+    - **What no check holds:**
+      - whether a host really ran the calls of a message in order on a given
+        прогон, beyond what the probe saw;
+      - whether a message really held what the rule says;
+      - the probe's blind spot: a concurrent host whose subagent reads slower
+        than the delay.
+    - **Pending:** orchestrator calls per landed таск before and after, on
+      comparable прогоны through `npm run metrics:cost`. If landing messages
+      turn out to be a small share, that number is recorded and the helper's
+      check stays.
 
 **Considered and declined in the same reading**, recorded so it is not
 re-litigated:
@@ -2311,6 +2372,7 @@ re-litigated:
 
 | Milestone | Date |
 |-----------|------|
+| One Event, One Turn | 2026-10-23 |
 | The Cut Is Sized By The Volume Of Change | 2026-10-23 |
 | A Run's Cost Is Measured From The Host's Own Log | 2026-10-23 |
 | OpenSpec Requirements Are Read, And A Closed Run Exports What It Verified | 2026-10-18 |
