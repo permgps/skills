@@ -34,6 +34,7 @@ Answer these capabilities by observation rather than by belief about the product
 | Can you write outside `.maestro/`? | the project code has to reach disk somehow |
 | Can the user watch the прогон change? | the page renders **and** a stage clock moved after a state write — the two halves you can check yourself. `sync.mts` opens it and reports what it did; a host where the opener refuses is a host where the answer is no |
 | Can you choose the model a subagent runs on? | the subagent tool's schema lists the models it accepts — where each host lists them is in the dials phase; a host with no such list degrades to the session's model |
+| Do the tool calls of one message run in the order sent? | the fan-out probe, sent after a delayed shell write in the same message, returns what the shell wrote — never the host's documentation |
 | Can a task execute browser checks? | an existing browser/tool loads the integrated local app, sends real pointer/keyboard input, inspects visible geometry, and captures evidence without taking over the user's dashboard pane |
 
 If you cannot answer one of them, it is a **no** for this прогон. A capability
@@ -56,10 +57,12 @@ says so in its first word.
 | writing project files | file writes | **stop.** There is nowhere to build |
 | a page that follows the state | — | the прогон runs and the отчёт is unaffected. Say the view is a still picture, name the file, and stop promising a live one |
 | a model per subagent | model per subagent | the models question is not asked and every субагент runs on the session's model; say so in the announcement, and the отчёт's models line still counts the tiers the plan marked |
+| tool calls of one message run in the order sent | ordered tool calls | every step is its own message: the commit, then `--publish --land`, then the `running` publish, then the launches. More messages per landing; `--land` still verifies `HEAD`, and nothing is skipped |
 | browser execution for a required UI check | browser verification | record the tool limitation; the affected check is unavailable and its obligation remains incomplete. Continue unrelated checks without installing a browser or manufacturing a pass |
 
-Two of those are stops and they are not negotiable. The rest narrow the wave,
-which a plan under the volume ceiling does anyway.
+Two of those are stops and they are not negotiable. The rest narrow the прогон
+without stopping it: a narrower wave, which a plan under the volume ceiling has
+anyway, a tier or a check fewer, or more messages per landing.
 
 ## Recording It
 

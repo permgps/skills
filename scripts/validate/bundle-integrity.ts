@@ -1090,6 +1090,42 @@ export const TRACE_ANCHORS: readonly Anchor[] = [
 ];
 
 /**
+ * The literal text that lands a таск in one message and starts the next in the
+ * one after.
+ *
+ * The publish that records a landing needs the commit's sha, and `--land`
+ * reads it from `HEAD` after checking it against the таск, so the commit and
+ * the publish can share a message. Only the prose calls it and only the prose
+ * says which steps may share a message, so a phase that loses either fails
+ * silently: the orchestrator copies shas by hand again, or merges a step whose
+ * output decides the next one into the same message.
+ *
+ * No anchor stands for whether a host really ran the calls in order — the
+ * preflight probe answers that per прогон — or whether a message really held
+ * what the rule says.
+ */
+export const LANDING_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/5-build.md', literal: 'node .maestro/sync.mts --publish <candidate> --land <NN>',
+    why: 'the whole call: without --land the publish carries a sha nobody checked, or none' },
+  { file: 'phases/5-build.md', literal: 'Never copy the sha by hand',
+    why: 'a sha copied out of git commit\'s output can name the previous таск\'s commit' },
+  { file: 'phases/5-build.md', literal: 'git add --',
+    why: 'a commit by pathspec does not take a file nobody added, and --land refuses what it left behind' },
+  { file: 'phases/5-build.md', literal: 'What Shares A Message',
+    why: 'the rule for which steps go out together is what saves the messages' },
+  { file: 'phases/5-build.md', literal: 'the merge keeps its own message',
+    why: 'a merge\'s output decides whether anything is committed; merged with the commit, a conflict would land' },
+  { file: 'phases/5-build.md', literal: 'launch outran publish',
+    why: 'a rejected running publish after the launches went out is reconciled first, never left silent' },
+  { file: 'phases/5-build.md', literal: 'earlier in the same message',
+    why: 'running goes in before the executor goes out, and in one message that means first' },
+  { file: 'phases/8-repair.md', literal: '--land <NN>',
+    why: 'a repair commit is appended to commits the same way, or the two phases that commit таски work two ways' },
+  { file: 'phases/0-preflight.md', literal: 'rides on the same probe',
+    why: 'ordered tool calls are established by trying them, on every host, never read off its name' },
+];
+
+/**
  * The literal text that makes a resumed прогон check its commits are still there.
  *
  * A reset, a rebase or a checkout between sessions takes a таск's commit off
@@ -1667,6 +1703,12 @@ export async function checkBundle(
   // Only a bundle with a memory phase closes a прогон with a commit; Scout has none.
   if (byFile.has('phases/9-memory.md')) {
     for (const v of missingAnchors(byFile, TRACE_ANCHORS, 'trace')) add(v.check, v.file, v.line, v.message);
+  }
+
+  // --- a landing goes out in one message and is verified by the helper --------
+  // Only a bundle with a memory phase lands commits; Scout has none.
+  if (byFile.has('phases/9-memory.md')) {
+    for (const v of missingAnchors(byFile, LANDING_ANCHORS, 'landing')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- a resumed прогон checks its commits are still there --------------------

@@ -21,6 +21,7 @@ parallelism, isolation and convenience — not correctness, and never silently.
 | version control | one commit per finished таск with its `Maestro-Run:` and `Requirements:` trailers, the history the review phase reads, and the closing commit preflight finds the last closure by | yes | the прогон runs and says in the announcement that it cannot commit; the review phase reads the working tree instead of a diff, and says that it did; the memory run makes no closing commit and says so once; a resume's commit check has no history to read, reports `unavailable`, and resets nothing |
 | model per subagent | the models dial | yes | the models question is not asked, every субагент runs on the session's model, and the announcement says so |
 | browser verification | real pointer/keyboard and rendered-state checks on the integrated local app | yes | affected required UI checks are unavailable and their requirements incomplete; unrelated checks continue, but completion cannot be claimed |
+| ordered tool calls | landing a таск and starting the next in two messages, the steps of each sent together in order ([`phases.md`](phases.md), *What Shares A Message*) | yes | every step is its own message: the commit, then `--publish --land`, then the `running` publish, then the launches. More messages per landing; `--land` still verifies `HEAD`, and nothing is skipped |
 
 Two of those rows are absolute and the rest are adjustments. A host that cannot
 withhold a document from a reader is a host that cannot run the two gates the
@@ -33,6 +34,14 @@ first end-to-end прогон committed happily and could not raise a worktree, 
 host whose documentation lists both. A capability read off the host's name is a
 capability discovered missing halfway through a wave, which is the one point at
 which it costs something.
+
+**Ordered tool calls are established the same way, on the fan-out probe.** In one
+message, a shell call writes a marker file under the system temporary directory
+after a 20-second delay, and the fan-out probe's subagent, sent after it, is
+asked for that file's content. The content the shell wrote means the calls ran
+in order; an absent or unreadable file, or no answer, is a **no**. Its blind
+spot: a host that ran the two side by side, with a subagent that took longer
+than the delay to read, passes.
 
 A degradation therefore has two homes and they are checked against each other:
 preflight establishes the capability, and the phase that spends it says what
@@ -65,11 +74,14 @@ place it can be recorded cheaply.
 
 | Host | Status |
 |---|---|
-| Claude Code | supported. The capability set above is what v1 was written against, with one measured exception: **worktree isolation is unavailable when the session began outside a git repository**, because the host settles that question at session start and a later `git init` does not reopen it. Committing is unaffected |
+| Claude Code | supported. The capability set above is what v1 was written against, with one measured exception: **worktree isolation is unavailable when the session began outside a git repository**, because the host settles that question at session start and a later `git init` does not reopen it. Committing is unaffected. Ordered tool calls are expected: the harness runs a call that changes state alone, in the order sent, before the calls after it — and the preflight probe still settles it per прогон |
 | Codex CLI | **unverified** — partial runs have been attempted; no complete successful brief-to-report run is established |
 | Codex app | **unverified** — requires separate discovery and complete-run evidence; CLI evidence does not establish app support |
 | Gemini CLI | **unverified** — the bundle installs, and no прогон has been run on it. It has no model per subagent: a subagent's model is fixed in its definition file or `settings.json`, so the models dial degrades there |
 | DeepSeek Harness (dsh) | **unverified** — mapped from its repository documentation (`deepseek-ai/deepseek-harness`, read 2026-10-20, a developer preview that announces breaking changes); the bundle has not been installed there and no прогон has been run on it. Two degradations are expected by default: the models dial, because subagent model selection is off unless the session enables it, and worktree isolation whenever its sandbox refuses the coordinator's own `git worktree` |
+
+On every host but Claude Code, ordered tool calls are not established until the
+preflight probe answers; nothing in a host's documentation settles them.
 
 A row moves from *unverified* to *supported* when a прогон has been run on that
 host from бриф to отчёт, and its degradations have been written into the table

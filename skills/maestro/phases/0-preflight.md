@@ -72,7 +72,19 @@ a model other than the one requested, say so in one chat line, and carry
 state's `debt.assumptions` (step 4). On a host whose subagent tool carries no
 model list the dials already degraded: nothing is requested, nothing compared.
 
-**The dashboard is a fifth**: whether the user can watch the прогон depends on
+<!-- maestro:probes:ordered-tool-calls -->
+**A fifth, ordered tool calls, rides on the same probe.** Send the fan-out
+probe in one message after a shell call that waits 20 seconds and then writes
+a token you choose into a file under the system temporary directory, and ask
+the subagent, as its trivial question, for that file's content. The token back
+means the host ran the calls of one message in the order sent, which the build
+phase spends to land a таск and start the next in fewer messages. An absent or
+unreadable file, or no answer, is a **no**. Remove the file afterwards. Its
+blind spot: a host that ran the two side by side, with a subagent slower than
+the delay to read, passes. On Codex and dsh the recipe's own probe already
+sends its child a file to read; write that file this way.
+
+**The dashboard is a sixth**: whether the user can watch the прогон depends on
 the viewer, not the host, and it is established in step 5 by looking.
 
 Record browser verification capability separately from the dashboard viewer:

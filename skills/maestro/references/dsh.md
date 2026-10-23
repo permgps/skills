@@ -61,6 +61,9 @@ composition can rename a tool or bind it to another provider.
    the affected gates pending.
 3. Write a disposable file holding a token you never put into the chat, then
    send one `subagent` child only a trivial question and that absolute path.
+   Write that file from a shell call sent first in the same message, after a
+   20-second wait: the token back also establishes ordered tool calls
+   (preflight step 1b); an absent file is a no.
    Require it to read the path with explicit cwd, return the token, and say what
    it knows of this conversation. Match the child id `subagent` returned to the
    completion notice and compare the token. A child that repeats this

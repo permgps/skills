@@ -49,6 +49,9 @@ namespace, argument or tool exists because another client exposed it.
    Without one, stop independent operations and leave affected gates pending.
 3. Send one child only a trivial probe question and a disposable absolute input
    path. Require it to read that path with explicit cwd and return the token.
+   Write that file from a shell call sent first in the same message, after a
+   20-second wait: the token back also establishes ordered tool calls
+   (preflight step 1b); an absent file is a no.
    Match the actual spawn identity to the final returned identity and compare
    the token. Record the actual call/return handles, not a name you invented.
    The child's assertion that it is isolated cannot prove unseen host context.

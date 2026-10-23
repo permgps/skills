@@ -207,8 +207,10 @@ For each таск that returns done, in this order:
     recorded rather than reconciled: `interfaces.md` has one writer and it is not
     this phase. Each row names the таск it came from — `D## — from таск NN —
     <fact>` — because step 4 hands a dependent its blockers' rows by that name.
-2. **Merge its worktree back**, if it had one.
-3. **Commit**, one commit per finished таск — yours, never the executor's, whose
+2. **Merge its worktree back**, if it had one. The merge keeps its own message:
+   its output decides whether there is anything to commit, and a conflict is
+   reported against the plan, never committed.
+3. **Commit and land it**, one commit per finished таск — yours, never the executor's, whose
    `commit:` only names the HEAD it worked on. A прогон survives a compaction and
    a crash by what is committed, and the review phase judges each таск against
    the diff of its own commit.
@@ -224,14 +226,39 @@ For each таск that returns done, in this order:
 
    Таск numbers and requirement ids restart every прогон, so the trailers are
    what ties a change in the history back to its требование and its run.
+
+   Commit by pathspec over the таск's `zone` and `files`, and publish the
+   candidate that records it in the same message, in this order:
+
+   ```sh
+   git add -- <the таск's paths>
+   git commit -m "<id> <title>" --trailer "Maestro-Run: <dir>" --trailer "Requirements: <ids>" -- <the таск's paths>
+   node .maestro/sync.mts --publish <candidate> --land <NN>
+   ```
+
+   The candidate already carries the таск `review` (step 4), its `files`,
+   `tests` and `finishedAt`. **Never copy the sha by hand:** `--land` reads
+   `HEAD`, checks that the subject opens with the таск's id, that both trailers
+   are this run's and this таск's, and that nothing in the таск's paths was left
+   out of the commit, and only then appends the sha to `commits`. A commit that
+   failed leaves a `HEAD` it refuses, so the commit's output need not be read
+   before the publish. Log INFO `build` `landed` with `{ taskId, sha }`.
+
+   A refusal names its rule, and the same command is never sent again
+   unchanged. `land-dirty` means a path was left out: add it, make a second
+   commit, and land again. `land-subject`, `land-run` or `land-requirements`
+   means the commit itself is wrong for this таск: say so in one line and hand
+   out no work in its paths until it is put right.
    <!-- maestro:degrades:version-control -->
    Where preflight found no version control, there is nothing to commit: say so
    once, and tell the review phase it will be reading the working tree rather
-   than one таск's diff. The прогон continues and every gate still runs.
-4. **Mark it `review`** in the run state — the таск is committed, not
-   accepted. `done` is written by the review phase, which has not run yet;
-   writing it here would mean the same word described a checked таск in one
-   place and an unchecked one in another.
+   than one таск's diff. There is no `--land` either: the plain `--publish`
+   carries the таск to `review`. The прогон continues and every gate still
+   runs.
+4. **Mark it `review`** in the candidate the landing publishes — the таск is
+   committed, not accepted. `done` is written by the review phase, which has
+   not run yet; writing it here would mean the same word described a checked
+   таск in one place and an unchecked one in another.
 
 **Before launching the next wave, check the panel is still there.** If anything
 in the wave's output mentions a user-visible page opened, or the `sync.mts`
@@ -243,8 +270,9 @@ rest inherit the rule from `SKILL.md` and need nothing here.
 Then take whatever became launchable and go back to step 3.
 
 **Write each transition into `tasks[]` as it happens**, not in a batch at the
-end. `running` and `startedAt` go in **before** the executor goes out; `files`,
-`tests`, the commit appended to `commits` and `finishedAt` when it returns. `retries`, `repairs` and
+end. `running` and `startedAt` go in **before** the executor goes out, earlier in the same
+message; `files`, `tests` and `finishedAt` when it returns, with the commit that
+`--land` appends to `commits`. `retries`, `repairs` and
 `handoffs` are incremented when they are spent. A таск left `queued` while its
 executor is flying makes the screen a lie, and one left `running` through its
 whole review does the same thing more quietly.
@@ -273,6 +301,41 @@ output pass is a finding, not an oracle change.
 A таск that comes back wrong and cannot be rescued by its retries is `failed`.
 Leaving it `queued` or `running` reports work that is not happening; the one
 door it opens is `not-done`, in the repair phase.
+
+### What Shares A Message
+
+Every message you send re-reads the whole of what is resident, so a landing
+taken one step per message pays that read once per step. Steps that do not
+decide each other share a message, sent in order:
+
+- **Message A, the landing:** the `D##` rows, `git add`, the commit and
+  `--publish <candidate> --land <NN>`, as step 3 says.
+- **Message B, the start:** the `running` publish first, then the executor
+  launches, then the one-line progress line when a wave closed. Whether a
+  launch is legal depends on the landing's result, so A and B never share a
+  message. The progress line goes out in B, never in a message of its own.
+
+**A step whose output decides the next step keeps its own message:** the return
+check, the evidence import, and the merge keeps its own message when the wave
+was wider than one таск. This is a count of messages, not of turns: a turn
+still ends only at a stop or at the end of the run.
+
+**A rejected publish in a message whose launches already went out is the first
+thing the next message handles, before anything else.** Read the refusal,
+correct the candidate and publish it again with the launched таски `running`,
+since they are. When the refusal is about the launch itself — a blocker not
+finished, a file a running таск owns — that executor's return is never imported,
+and the таск is launched again once the launch is legal; that relaunch is not a
+retry, and `retries` does not move. Log WARN `build` `launch outran publish`
+with `{ taskIds, violations, legal }` and say it in one line, for example
+«публикация `running` отклонена после запуска T03: блокер T01 ещё не на ревью —
+возврат T03 не принимаю, перезапущу после T01». It is never left silent.
+
+<!-- maestro:degrades:ordered-tool-calls -->
+**Where preflight found no ordered tool calls, every step is its own message:**
+the commit, then `--publish --land`, then the `running` publish, then the
+launches. `--land` still verifies `HEAD`, and nothing is skipped. Say once
+that landings take more messages on this host; that is the whole cost.
 
 ## When It Does Not Go That Way
 

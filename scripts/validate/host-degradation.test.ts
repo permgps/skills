@@ -344,6 +344,25 @@ test('losing the model-per-subagent probe from preflight is the one finding', as
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
+for (const [file, marker, check, message] of [
+  ['0-preflight.md', '<!-- maestro:probes:ordered-tool-calls -->\n', 'probes', /"ordered tool calls" degrades, but no phase file establishes it/],
+  ['5-build.md', '<!-- maestro:degrades:ordered-tool-calls -->\n', 'degradations', /"ordered tool calls" degrades, but no phase file says what that costs/],
+] as const) {
+  test(`losing the ordered-tool-calls marker from ${file} is the one finding`, async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'ordered-calls-'));
+    try {
+      await cp('skills/maestro', path.join(root, 'bundle'), { recursive: true });
+      const target = path.join(root, 'bundle', 'phases', file);
+      const text = await readFile(target, 'utf8');
+      assert.ok(text.includes(marker), `the shipped ${file} carries ${marker.trim()}`);
+      await writeFile(target, text.replace(marker, ''));
+      const found = await checkHostDegradation({ specDir: 'docs/spec', bundleDir: path.join(root, 'bundle') });
+      assert.deepEqual(found.map(v => v.check), [check]);
+      assert.match(found[0]!.message, message);
+    } finally { await rm(root, { recursive: true, force: true }); }
+  });
+}
+
 async function dshViolations(edits: readonly (readonly [file: string, before: string, after: string])[]): Promise<Violation[]> {
   const root = await mkdtemp(path.join(tmpdir(), 'dsh-runtime-'));
   try {
