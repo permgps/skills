@@ -7,8 +7,9 @@
 //
 // - **transcripts** — the host's record of each model call: usage, time, and
 //   the context it ran in (`transcripts.ts`);
-// - **state** — the run window, the closed waits, the таски and their commits,
-//   and whether a review blocked (`readState`);
+// - **state** — the run window, the closed waits, the таски, their commits and
+//   the plan's volume estimate for each, and whether a review blocked
+//   (`readState`);
 // - **git** — the lines each таск's commits changed (`changed-lines.ts`).
 //
 // A subagent context is attributed by the `maestro:<brief> [NN]` label its

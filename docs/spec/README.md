@@ -235,6 +235,16 @@ records. Expected outcomes stay outside those inputs. Fresh reader runs exercise
 the shipped prompts; they are separate from `npm run check`, which holds the
 declared boundaries and anchors rather than judging semantic relevance.
 
+OpenSpec scenarios live in `scripts/validate/fixtures/openspec/scenarios.mts`.
+Its `prepareOpenSpecProject(root)` writes a disposable project by hand, with
+approved specs, an earlier Maestro change, a foreign proposal and an archived
+change; nothing in it is copied from OpenSpec (D1). Expected outcomes stay
+outside what any reader is handed. Fresh-context runs exercise the briefing
+rule, the existing-code reader and the OpenSpec writer, and they are recorded
+in `docs/parity-verification.md` › *OpenSpec Interoperability*.
+Under `npm run check`, `scripts/openspec/openspec.test.ts` reads the same
+project's OpenSpec index and holds it to the fixture's expected outcome.
+
 It reads both the `Given` and `Withheld` columns against named tables in each
 reader brief. It also holds who is handed `codebase.md`: the G3 consistency and
 conditional G2 architecture rows must give it, every other row must withhold it, `executor.md` names it in its
@@ -421,6 +431,18 @@ closing/reopening relocation, a second run and the repository's real package
 metadata. `npm run readers` holds research withholding even when both sides of
 a declaration drift together; bundle mutation tests hold conditional dispatch
 and freshness at spec, plan, build and repair.
+
+Volume-sized cut scenarios live in
+`scripts/validate/fixtures/volume-cut/scenarios.mts`. Its
+`prepareVolumeScenarios(root)` writes each scenario's `spec.md`, and
+`codebase.md` where the project has code, into a disposable directory. The
+three scenarios are an 18-edit list under the ceiling, a build of about 7,000
+lines, and two neighbours with a README. The per-item estimates and the
+expected cut stay outside those inputs. Fresh readers apply the plan phase's
+step 2 to them and to the recorded прогоны, and the readings are recorded in
+`docs/parity-verification.md` › *Volume-Sized Cut*. `npm run check` holds only
+that each scenario is the case it claims to be; whether a reader cut it well
+is judgement.
 
 Synthetic source scenarios live in
 `scripts/validate/fixtures/technical-research/scenarios.mts`. Fresh-context
