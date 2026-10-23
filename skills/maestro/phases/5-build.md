@@ -93,8 +93,9 @@ plan's, fixed at the cut; the frontier is still yours, recomputed every time a
 | two or more | one git worktree per таск, merged back as each finishes |
 
 Isolation is a property of the wave, not of the таск. A wave of one has no
-second writer to be protected from, and a tiny project is one таск carrying the
-whole spec — putting it in its own tree charges a merge for nothing.
+second writer to be protected from, and a build under the volume ceiling is
+one таск carrying the whole spec — putting it in its own tree charges a merge
+for nothing.
 
 <!-- maestro:degrades:worktree-isolation -->
 <!-- maestro:degrades:subagent-fan-out -->

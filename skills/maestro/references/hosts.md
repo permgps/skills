@@ -59,7 +59,7 @@ says so in its first word.
 | browser execution for a required UI check | browser verification | record the tool limitation; the affected check is unavailable and its obligation remains incomplete. Continue unrelated checks without installing a browser or manufacturing a pass |
 
 Two of those are stops and they are not negotiable. The rest narrow the wave,
-which a tiny project's plan does anyway.
+which a plan under the volume ceiling does anyway.
 
 ## Recording It
 

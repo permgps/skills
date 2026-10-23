@@ -251,6 +251,34 @@ test('--plan-coverage: covered exits 0, a skipped unit exits 1, bad arguments ex
   } finally { await target.dispose(); }
 });
 
+// These two pin what the parser already does, so the observation format the
+// plan-consistency brief prescribes cannot drift away from it unnoticed: a thin
+// таск is an observation on an `ok` line, never a finding, and a line that
+// carries an observation without a verdict covers nothing.
+test('a thin-таск observation on an ok line is covered and counts no finding', async () => {
+  const target = await project();
+  try {
+    target.run('--plan-render');
+    await target.write('rc.txt',
+      'T02: ok — observation: thin — natural neighbour T03, both edit the README\nT03: ok\nseam GET /api/search: ok\n');
+    const covered = target.run('--plan-coverage', 'consistency', path.join(target.plan, 'rc.txt'));
+    assert.equal(covered.code, 0, JSON.stringify(covered));
+    assert.equal(covered['findings'], 0);
+    assert.deepEqual(covered['missing'], []);
+  } finally { await target.dispose(); }
+});
+
+test('an observation with no verdict leaves its таск unread', async () => {
+  const target = await project();
+  try {
+    target.run('--plan-render');
+    await target.write('rc.txt', 'T02: observation: thin — natural neighbour T03\nT03: ok\nseam GET /api/search: ok\n');
+    const incomplete = target.run('--plan-coverage', 'consistency', path.join(target.plan, 'rc.txt'));
+    assert.equal(incomplete.code, 1, JSON.stringify(incomplete));
+    assert.deepEqual(incomplete['missing'], ['T02']);
+  } finally { await target.dispose(); }
+});
+
 test('a later round asks a reader only about the units that changed', async () => {
   const target = await project();
   try {

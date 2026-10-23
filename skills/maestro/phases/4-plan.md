@@ -55,15 +55,39 @@ no executor or gate reader receives research/ or producer research notes.
 
 ### 2. Size the work
 
-| Project size | Signal | Таски | Wave width |
-|---|---|---|---|
-| tiny | one file, one behavior, no new boundary | 1 — the whole spec, uncut | 1 |
-| small | one module, no new external dependency | 2–4 | 2 |
-| medium | several modules, or one new integration | 5–10 | 3 |
-| large | new subsystem, or a data model others depend on | 10–20 | 3, widened only when the dependency graph allows |
+**The volume estimate comes first.** Before any таск is cut, estimate the
+changed lines, tests included, that each surface or each edit will carry. Read
+it from `spec.md` and, in existing code, from `codebase.md`, then sum it. Each
+таск's share of the sum becomes its `estimatedLines` in step 7. Once the cut is
+settled, log INFO `plan` `volume` with `{ estimate, ceiling, tasks }`.
+
+**The ceiling is about 3,000 changed lines**, one executor's whole job, and it
+is borrowed: no прогон of ours has measured it yet. It is revised once our own
+executors' peak context has been measured against the lines they changed, and
+the revision is recorded where this figure stands.
+
+| Volume (changed lines, tests included) | Таски | Wave width |
+|---|---|---|
+| up to the ceiling | 1 — the whole spec, uncut | 1 |
+| above the ceiling | about one per ceiling's worth, rounded up | 2–3, widened only when the dependency graph allows |
+| above 12 times the ceiling | more than 12, with the reason named to the user | 3, widened only when the dependency graph allows |
 
 **These numbers are a first guess, never a target.** A plan cut to land inside a
 band has optimised for the band instead of for the person who asked.
+
+- **Up to the ceiling, one таск.** One executor carries every relevant
+  criterion in its own file. A list of edits in existing code usually belongs
+  here, however many files it touches: the files are many, the change is small.
+- **Above the ceiling, about one таск per ceiling's worth.** The three rules
+  below outrank the count, and so do the four preferences. Expand, migrate,
+  contract stays a chain of three even when each step is small.
+- **The merge pass merges by volume.** Neighbours that together stay under the
+  ceiling are merged, even when they could run side by side. Parallel width is
+  a reason to split only above the ceiling. A README or a self-check page is
+  never a таск of its own: it belongs to the таск whose behaviour it describes
+  or checks.
+- **A count above 12 needs a reason.** Step 8 names it, as it names a declined
+  preference. It adds no stop and no cap.
 
 Three rules decide the cut, and they outrank the table:
 
@@ -115,8 +139,8 @@ reason goes.
 - **Project conventions written once.** Step 3 opens `interfaces.md` with them,
   so no executor rediscovers the test command on its own.
 
-A tiny project produces **one** таск carrying every relevant spec criterion in
-its own file — one, not none. The executor is not given `spec.md` separately.
+A build under the ceiling produces **one** таск carrying every relevant spec
+criterion in its own file — one, not none. The executor is not given `spec.md` separately.
 Somebody is handed the work either way, and the unit one executor is handed is a
 таск. Cutting one требование into three таски to look thorough costs three
 contexts and three reviews to build what one executor finishes in one pass.
@@ -316,8 +340,8 @@ Required integrated checks depend on the tasks that provide their application
 surface, transitively through `blockedBy`. Two таски that share a path in
 their files or zone are ordered, one blocking the other; G3 refuses an
 unordered pair. Preserve `NN` task IDs, `blockedBy`, stable waves, and file zones.
-Size tasks around observable surfaces and independent ownership, without a
-fixed line-count limit.
+Size tasks by the volume estimate of step 2 first, then around observable
+surfaces and independent ownership.
 
 A task file that assumes context the executor does not have is the defect this
 phase produces most often. Read each one back as if you had never seen the spec.
@@ -459,6 +483,16 @@ out only when some unit, fact or `interfaces.md` changed. Facts sections are
 generated copies of `shared.md`: identical copies in two task files are not a
 collision.
 
+**A thin таск is an observation, never a finding.** The reader may append one
+to a таск's `ok` line — `T04: ok — observation: thin — natural neighbour T05,
+…` — when the таск carries little work and has a natural neighbour it could
+join without breaking the three rules of step 2. `--plan-coverage` counts the
+line as `ok`, and the reading half still passes. Decide in the same round:
+merge the pair, which changes their units, so the merged таск is read again in
+the next round as any changed unit is; or keep it, and name it with its reason
+in step 8. Log INFO `plan` `thin task merged` or `thin task kept` with
+`{ task, neighbour, reason }`.
+
 The reading half of G3 passes when every return of the last round is covered
 and carries no finding, and `--plan-units` exits 0.
 
@@ -516,8 +550,8 @@ times longer than it needs to, for no reason anybody chose.
    other and the loss is silent.
 
 A wave of one is a normal answer. The таск that lays the shell, the schema and
-the shared primitives is a wave of its own by definition, and a tiny project is
-one таск carrying the whole spec.
+the shared primitives is a wave of its own by definition, and a build under the
+ceiling is one таск carrying the whole spec.
 
 **Do not manufacture parallelism.** Splitting a таск in two so a wave looks wider
 spends two contexts to save one. Waves are *discovered* in the dependency graph,
@@ -557,7 +591,8 @@ whatever the row says, and neither relies on the other.
 
 **The whole `tasks[]` array is written now, when the таски are cut** — not as
 each one starts. Every entry carries its id, title, `status`, `requirementIds`,
-`blockedBy`, `wave`, `zone`, `model`, and the three counters at zero.
+`blockedBy`, `wave`, `zone`, `model`, `estimatedLines`, and the three counters at
+zero.
 
 - `status` is **`queued`**, and that is the only status a cut таск may be
   written with. `pending` is a стадия's word and a гейт's — `0-preflight.md` two
@@ -574,6 +609,11 @@ each one starts. Every entry carries its id, title, `status`, `requirementIds`,
   A contract-7 run writes no `model`, and its task files carry no `Model`
   row: a run reopened under contract 7 is refused every field from 8, and
   each of its субагенты runs on the session's model.
+- `estimatedLines` is the таск's share of the step-2 volume estimate: a whole
+  number of changed lines, tests included, `0` for a таск that writes no
+  product code. Every таск this step writes carries one — the first cut, a
+  таск a late addition brings, and a re-cut after repair or a reopening alike.
+  A таск written before the field existed keeps none, and nothing adds one.
 - `retries`, `repairs` and `handoffs` all start at `0`, and `files` starts empty.
   A counter created halfway through a прогон is a counter somebody increments
   from nothing, and the arithmetic downstream never says so.
@@ -600,6 +640,16 @@ line each, with its reason — «prefactor declined: no existing check covers
 `src/store.ts`». Log INFO `plan` `preference declined` with
 `{ preference, reason, tasks }` for each. Nothing checks the reason; it is for
 the user, and for whoever reads this plan after the прогон.
+
+**The volume estimate is stated in one line**, in every mode, with what the
+user is shown or asked to approve. It gives the estimate, the ceiling marked as
+borrowed, the count of таски, and the trade the cut made: fewer executors,
+reviews and landings, against more wall-clock per таск and less parallel width.
+In the прогон's language, for example: «объём ≈ 1 300 строк вместе с тестами,
+порог ≈ 3 000 (заимствованный) — один таск: меньше параллельности, одно
+ревью». Under it, one line each: a count above 12 with its reason, and every
+thin таск kept with its reason, as step 5 says. Log INFO `plan` `count above
+12` with `{ tasks, estimate, reason }` when the count is above 12.
 
 **Depth has already been spent, and the cut does not spend it again.** `strict`,
 `normal` and `deep` decided how far beneath the бриф `spec.md` reaches; by the
@@ -668,7 +718,7 @@ itself.
 | `.maestro/<dir>/tasks/units.json` | the unit, frame, fact and `interfaces.md` hashes `--plan-units --record` took after the last covered round |
 | `.maestro/<dir>/plan-reads/` | each G3 reader return of each round, as `r<round>-<NN>.md` or `r<round>-consistency.md` |
 | `.maestro/<dir>/tasks/NN-<slug>.md` | one file per таск, each self-sufficient |
-| `.maestro/state.js` | `tasks[]` filled whole — ids, `requirementIds`, `blockedBy`, `wave`, `zone`, counters at zero; `G3` recorded as passed |
+| `.maestro/state.js` | `tasks[]` filled whole — ids, `requirementIds`, `blockedBy`, `wave`, `zone`, `estimatedLines`, counters at zero; `G3` recorded as passed |
 
 ## Journey And Control Ownership
 

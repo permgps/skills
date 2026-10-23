@@ -192,6 +192,11 @@ and becomes a second opinion on work it has already seen.
 - A G3 finding from the plan-consistency reader, or a mechanical collision, is a
   coordination defect. It is fixed in the task files or `interfaces.md` before
   any executor is dispatched and never reduces a requirement.
+- A thin таск the plan-consistency reader observes — little work, and a natural
+  neighbour it could join without breaking a cut rule — is an observation on
+  the таск's `ok` line, never a finding, and it cannot fail G3. The plan merges
+  the pair or keeps it and names the reason to the user
+  ([`phases.md`](phases.md) › *Task Granularity*).
 
 ### G4 Cannot Send Its Phase Back
 

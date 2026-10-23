@@ -82,9 +82,28 @@ Each finding is:
 ## What Is Not A Finding
 
 - A defect inside one task file that a task-file reader would catch alone.
-- Whether the task cut covers the requirements, or is the right size.
+- Whether the task cut covers the requirements.
 - A design you would have done differently.
 - A ranking. Do not sort findings by importance.
+
+## What Is An Observation
+
+One thing about size is worth saying, and it is never a finding: **a thin
+таск with a natural neighbour.** Judged by what its units ask for, the таск
+carries little work, and another таск is its natural neighbour: the two share
+a Test surface or a zone boundary, or this таск is a README or a self-check
+page describing or checking what the other builds. Merging the two would break
+none of these: one executor's whole job, a таск owns its files, and a таск
+traces to a требование.
+
+Report it on the таск's own verdict line, after `ok`, never as a `CD-N`:
+
+```text
+T04: ok — observation: thin — natural neighbour T05, its README describes T05's page
+```
+
+The таск is still `ok`. Whether to merge is decided by whoever cut the plan,
+and a thin таск they keep is named to the user with its reason.
 
 ## Your Output
 
@@ -93,6 +112,7 @@ each `CD-N` under the verdict it belongs to:
 
 ```text
 T03: ok
+T04: ok — observation: thin — natural neighbour T05, its README describes T05's page
 T05: finding — CD-1 таск 05 reads `GET /api/search`, таск 02 produces `POST /api/search`
 seam GET /api/search: finding — CD-1
 seam icons.css: ok
@@ -101,8 +121,8 @@ seam icons.css: ok
 A seam is named as its *Seam* cell in the Seams table of `interfaces.md`. The
 facts section between the `maestro:facts` markers in a task file is a copy of
 `shared.md` that a tool wrote: the same fact copied into two task files is not
-a collision. Nothing else — no summary of the plan, no suggested fix, no
-praise. A таск or seam with no line is one you did not read, and the gate sends
+a collision. An observation is the one addition a verdict line may carry.
+Nothing else — no summary of the plan, no suggested fix, no praise. A таск or seam with no line is one you did not read, and the gate sends
 it back.
 
 A finding is a coordination defect: it is fixed in the task files or

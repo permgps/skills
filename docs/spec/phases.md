@@ -484,16 +484,50 @@ the same write.
 
 ## Task Granularity
 
-The plan phase cuts таски. These numbers are a first guess, never a target: a
-plan cut to land inside a band has optimised for the band instead of for the
-person who asked.
+The plan phase cuts таски, and it sizes them by **the volume of change**, not by
+the kind of product. Before any таск is cut it estimates the changed lines,
+tests included, that each surface or edit will carry — from the specification
+and, in existing code, from `codebase.md` — and sums them. Each таск's share is
+recorded as `tasks[].estimatedLines`, and the sum is stated to the user in one
+line at the end of the phase, with the trade the cut made.
 
-| Project size | Signal | Таски | Wave width |
-|---|---|---|---|
-| tiny | one file, one behavior, no new boundary | 1 — the whole spec, uncut | 1 |
-| small | one module, no new external dependency | 2–4 | 2 |
-| medium | several modules, or one new integration | 5–10 | 3 |
-| large | new subsystem, or a data model others depend on | 10–20 | 3, widened only when the dependency graph allows |
+**The ceiling is about 3,000 changed lines**, the work one executor carries
+whole. The figure is borrowed: no run of ours has measured it. It is re-derived
+once our own executors' peak context has been measured against the lines they
+changed (`npm run metrics:cost`), and the revision is recorded here.
+
+These numbers are a first guess, never a target: a plan cut to land inside a
+band has optimised for the band instead of for the person who asked.
+
+| Volume (changed lines, tests included) | Таски | Wave width |
+|---|---|---|
+| up to the ceiling | 1 — the whole spec, uncut | 1 |
+| above the ceiling | about one per ceiling's worth, rounded up | 2–3, widened only when the dependency graph allows |
+| above 12 times the ceiling | more than 12, with the reason named to the user | 3, widened only when the dependency graph allows |
+
+- **Up to the ceiling, one таск.** A list of edits in existing code usually
+  belongs here however many files it touches: the files are many, the change
+  is small.
+- **Above it, about one таск per ceiling's worth**, with the rules and
+  preferences below outranking the count. Expand, migrate, contract stays a
+  chain of three even when each step is small.
+- **The merge pass merges by volume.** Neighbours that together stay under the
+  ceiling are merged even when they could run side by side; parallel width is
+  a reason to split only above the ceiling. A README or a self-check page is
+  never a таск of its own: it belongs to the таск whose behaviour it describes
+  or checks.
+- **A count above 12 needs a reason**, named to the user as a declined
+  preference is. It adds no stop and no cap.
+
+The plan-consistency reader may observe a **thin таск** — little work, and a
+natural neighbour it could join without breaking a rule below. That is an
+observation on the таск's `ok` line, never a finding: the plan merges the pair,
+or keeps it and names the reason to the user.
+
+The trade is deliberate. A build under the ceiling pays one cold start, one G3
+reading, one landing and one review instead of one per thin таск, and gives up
+parallel width and some wall-clock per таск. The recorded multi-таск runs this
+was weighed against cut 1,276–2,689 changed lines into five or six таски each.
 
 Three rules decide the cut, and they outrank the table:
 
@@ -538,8 +572,8 @@ is named with its reason in what the user is shown at the end of the phase.
 - **Project conventions written once.** `interfaces.md` opens with them, so no
   executor rediscovers the commands.
 
-A tiny project produces **one** таск carrying the whole spec, and that is a valid
-plan. Cutting one requirement into three таски to look thorough costs three
+A build under the ceiling produces **one** таск carrying the whole spec, and that
+is a valid plan. Cutting one requirement into three таски to look thorough costs three
 contexts and three reviews to build what one executor would have finished in one
 pass.
 
@@ -764,7 +798,7 @@ rewritten mid-прогон also moves rows between groups on screen, which a use
 no way to know the numbers changed reads as the прогон losing its own plan.
 
 The *Wave width* column above is a consequence of the cut, not a ceiling on it.
-It says how wide the waves of a well-cut plan of that size tend to be; it does
+It says how wide the waves of a well-cut plan of that volume tend to be; it does
 not cap what this rule computes. A plan whose graph allows eight таски at once
 runs eight — and if that is wrong, it is wrong in the cut, where it can still be
 fixed against the требования.
@@ -772,9 +806,9 @@ fixed against the требования.
 ### Isolation
 
 **A wave wider than one таск runs with each таск in its own git worktree.** A
-wave of one does not: it has no second writer to be protected from, and a tiny
-project is one таск carrying the whole spec, which would then pay a merge for
-nothing. Isolation is a property of the wave, not of the таск.
+wave of one does not: it has no second writer to be protected from, and a build
+under the volume ceiling is one таск carrying the whole spec, which would then
+pay a merge for nothing. Isolation is a property of the wave, not of the таск.
 
 Each worktree is merged back when its таск finishes, and the next wave starts
 only from the merged result. **A merge conflict between two таски of one wave is

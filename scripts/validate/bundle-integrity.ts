@@ -499,6 +499,54 @@ export const CUT_ANCHORS: readonly Anchor[] = [
 ];
 
 /**
+ * The literal text that carries «the cut is sized by the volume of change».
+ *
+ * Matched literally for the reason `MEMORY_ANCHORS` is. The plan phase opens
+ * its sizing step with a volume estimate, holds one таск up to a ceiling it
+ * marks as borrowed, merges neighbours by volume, never gives a README or a
+ * self-check page a таск of its own, keeps expand, migrate, contract a chain of
+ * three, records each таск's share as `estimatedLines`, and states the estimate
+ * to the user in one line; the plan-consistency reader may observe a thin таск,
+ * which the plan merges or keeps with a reason. The specification carries the
+ * same volume table, and a test in `bundle-integrity.test.ts` holds the two
+ * tables equal row for row, because this check reads the bundle alone. Whether
+ * an estimate is accurate, whether a merge was right, and whether a kept thin
+ * таск's reason is true are the plan's and the reader's judgement, so no anchor
+ * stands for them; `npm run metrics:cost` sets the estimate beside the outcome
+ * after the run.
+ */
+export const VOLUME_ANCHORS: readonly Anchor[] = [
+  { file: 'phases/4-plan.md', literal: 'The volume estimate comes first',
+    why: 'a cut sized by the kind of product splits a small build into many thin таски' },
+  { file: 'phases/4-plan.md', literal: 'about 3,000 changed lines',
+    why: 'the ceiling is the one number the cut is sized against' },
+  { file: 'phases/4-plan.md', literal: 'it is borrowed: no прогон of ours has measured it yet',
+    why: 'a borrowed figure presented as our own would never be re-derived' },
+  { file: 'phases/4-plan.md', literal: 'Up to the ceiling, one таск',
+    why: 'every thin таск pays a cold start, a G3 reading, a landing and a review' },
+  { file: 'phases/4-plan.md', literal: 'stays a chain of three even when each step is small',
+    why: 'merging by volume must not undo the ordering a many-file change needs' },
+  { file: 'phases/4-plan.md', literal: 'Parallel width is a reason to split only above the ceiling',
+    why: 'width bought below the ceiling costs more contexts than it saves' },
+  { file: 'phases/4-plan.md', literal: 'A README or a self-check page is never a таск of its own',
+    why: 'four recorded таски were a README of 19–40 lines, each with its own executor and reviewer' },
+  { file: 'phases/4-plan.md', literal: 'A count above 12 needs a reason',
+    why: 'a large count is allowed, but never unexplained' },
+  { file: 'phases/4-plan.md', literal: '`estimatedLines`',
+    why: 'an estimate the state does not keep cannot be compared with what the таск changed' },
+  { file: 'phases/4-plan.md', literal: 'The volume estimate is stated in one line',
+    why: 'the user sees the trade the cut made: fewer reviews, less width' },
+  { file: 'phases/4-plan.md', literal: 'A thin таск is an observation, never a finding',
+    why: 'a size judgement that could fail G3 would turn a preference into a gate' },
+  { file: 'phases/4-plan.md', literal: 'thin task kept',
+    why: 'a thin таск kept without a logged reason is indistinguishable from one overlooked' },
+  { file: 'prompts/plan-consistency-reader.md', literal: 'What Is An Observation',
+    why: 'the reader that sees every task file at once is the one that can notice a thin таск' },
+  { file: 'prompts/plan-consistency-reader.md', literal: 'observation: thin',
+    why: 'the observation rides an ok line, which --plan-coverage counts as no finding' },
+];
+
+/**
  * The literal text that carries «review sees what nobody asked for».
  *
  * Matched literally for the reason `MEMORY_ANCHORS` is. The reviewer tags
@@ -1530,6 +1578,7 @@ export async function checkBundle(
   // Only a bundle with a plan phase cuts таски; Scout has none.
   if (byFile.has('phases/4-plan.md')) {
     for (const v of missingAnchors(byFile, CUT_ANCHORS, 'cut')) add(v.check, v.file, v.line, v.message);
+    for (const v of missingAnchors(byFile, VOLUME_ANCHORS, 'volume')) add(v.check, v.file, v.line, v.message);
   }
 
   // --- review sees what nobody asked for --------------------------------------

@@ -12,6 +12,7 @@ import { FACTS_END, FACTS_START, VERDICT_LINE } from '../../skills/maestro/tools
 import {
   BRIEFING_ANCHORS,
   CUT_ANCHORS,
+  VOLUME_ANCHORS,
   DIAGNOSIS_ANCHORS,
   REFERENCE_ANCHORS,
   REPORT_ANCHORS,
@@ -48,6 +49,7 @@ import {
   type Violation,
 } from './bundle-integrity.ts';
 import { KNOWN_MEMORY_FILES } from '../memory/markers.ts';
+import { parseTables } from './spec-integrity.ts';
 import { checkAnswers, parseAnswers, parseOpenSpecDisposition } from '../gates/answers.ts';
 import { checkExecutionReturns, parseExecutionReturns } from '../gates/execution-return.ts';
 
@@ -950,6 +952,58 @@ test('the build phase losing the hand-over of blockers\' D## rows is reported on
     const violations = (await checkBundle(copy)).filter(v => v.check === 'cut');
     assert.deepEqual(violations.map(v => v.file), [path.join('phases', '5-build.md')]);
   });
+});
+
+// --- the cut is sized by the volume of change ---------------------------------
+
+test('every volume anchor names a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.ok(VOLUME_ANCHORS.length > 0, 'VOLUME_ANCHORS holds no literal');
+  await withShippedCopy(async copy => {
+    for (const anchor of VOLUME_ANCHORS) {
+      const body = await readFile(path.join(copy, anchor.file), 'utf8');
+      assert.ok(body.replace(/\s+/g, ' ').includes(anchor.literal), `${anchor.file}: ${anchor.literal}`);
+    }
+    assert.deepEqual((await checkBundle(copy)).filter(v => v.check === 'volume'), []);
+  });
+});
+
+/** One literal per file that carries the volume rule, removed one at a time. */
+const VOLUME_LITERALS: readonly [string, string][] = [
+  ['phases/4-plan.md', 'A README or a self-check page is never a таск of its own'],
+  ['prompts/plan-consistency-reader.md', 'observation: thin'],
+];
+
+test('a file that loses a volume literal is reported on that file alone', async () => {
+  for (const [file, literal] of VOLUME_LITERALS) {
+    await withShippedCopy(async copy => {
+      const target = path.join(copy, ...file.split('/'));
+      const body = (await readFile(target, 'utf8')).replace(/\s+/g, ' ');
+      assert.ok(body.includes(literal), `${file} does not carry "${literal}"`);
+      await writeFile(target, body.split(literal).join('removed'), 'utf8');
+      const found = (await checkBundle(copy)).filter(v => v.check === 'volume');
+      assert.deepEqual(found.map(v => v.file), [path.join(...file.split('/'))], literal);
+    });
+  }
+});
+
+/** The volume table of a Markdown file, as plain rows without their line numbers. */
+function volumeTable(markdown: string): Array<Record<string, string | number>> {
+  const tables = parseTables(markdown).filter(table => table.columns[0] === 'Volume (changed lines, tests included)');
+  assert.equal(tables.length, 1, 'expected exactly one volume table');
+  return tables[0]!.rows.map(({ __line: _line, ...cells }) => cells);
+}
+
+test('the plan phase and the specification carry the same volume table and the same ceiling', async () => {
+  const plan = await readFile(fileURLToPath(new URL('../../skills/maestro/phases/4-plan.md', import.meta.url)), 'utf8');
+  const spec = await readFile(fileURLToPath(new URL('../../docs/spec/phases.md', import.meta.url)), 'utf8');
+  assert.deepEqual(volumeTable(plan), volumeTable(spec));
+  for (const [name, body] of [['phases/4-plan.md', plan], ['docs/spec/phases.md', spec]] as const) {
+    assert.ok(body.replace(/\s+/g, ' ').includes('about 3,000 changed lines'), `${name} does not state the ceiling`);
+  }
+  // The comparison has to be able to fail: one changed cell is a disagreement.
+  const drifted = spec.replace('| up to the ceiling | 1 — the whole spec, uncut | 1 |', '| up to the ceiling | 1–2 | 1 |');
+  assert.notEqual(drifted, spec);
+  assert.notDeepEqual(volumeTable(plan), volumeTable(drifted));
 });
 
 // --- review sees what nobody asked for ----------------------------------------
