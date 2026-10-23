@@ -694,6 +694,56 @@ node --test scripts/metrics/roles.test.ts scripts/metrics/transcripts.test.ts sc
 npm run metrics:cost -- <project> --out <file>
 ```
 
+## Volume-Sized Cut — 2026-10-23
+
+The plan phase's step 2 sizes the cut by an estimate of changed lines, tests
+included, against a borrowed ceiling of about 3,000. The cut is judgement, so it
+is checked by fresh readings rather than a script. Each reader was a fresh
+Claude Code 2.1.309 subagent (Opus 5.5). It was handed steps 2 and 8 of the
+shipped `phases/4-plan.md` and one `spec.md`, plus `codebase.md` where the
+project had code, and nothing else.
+
+The scenarios come from `scripts/validate/fixtures/volume-cut/scenarios.mts`.
+The recorded прогоны are the four multi-таск runs in `../test2/.maestro/`, 18
+таски in all. Their specs predate `codebase.md`, so they were read from the spec
+alone. The actual figure for a recorded run is insertions plus deletions over
+its first-build таск commits (`git show --numstat`); repair commits are given
+separately.
+
+| Case | Reader's estimate | Actual (git) or author's estimate | Cut | Expected | Verdict |
+|---|---|---|---|---|---|
+| `edit-list` (18 edits, 12 files) | ≈ 390 | 1,270 (author) | 1 таск, wave 1 | 1 таск, no worktree, one review | as expected |
+| `seven-thousand` | ≈ 7,300 | 7,000 (author) | 3 таски, waves 1 → 2 (two wide) | about three | as expected |
+| `neighbours` | ≈ 635 | 820 (author) | 1 таск; export merged, README inside | 1 таск, no width split | as expected |
+| `tic-tac-toe` (5 таски then) | ≈ 990 | 1,873 | 1 таск | 1 таск | as expected |
+| `run-2026-08-20` (2 таски then) | ≈ 300 | 483 (+338 repair) | 1 таск | 1 таск | as expected |
+| `board-sizes` (5 таски then) | ≈ 700 | 1,276 (+87 repair) | 1 таск | 1 таск | as expected |
+| `cube-3d` (6 таски then) | ≈ 1,500 (upper reading ≈ 2,000) | 2,689 | 1 таск | 1 таск | as expected |
+
+Every reader named the rule that decided the count. The table row was first; the
+merge pass and the README rule kept READMEs and self-check pages inside their
+таски. Every reader also wrote a step-8 line in the shape the phase gives. The
+`seven-thousand` reader named one declined preference, the thin path, with a
+reason, and cut one таск at 3,150, a little above the ceiling. The rule allows
+that: one таск per ceiling's worth, rounded, is about a count, not a cap per
+таск.
+
+**What the readings expose.** Every estimate of a recorded прогон came in at
+0.3–0.6 of what git counted. The direction is safe today, because all four runs
+sit under the ceiling either way. But the ceiling is compared with an estimate
+that runs low, so a build near it can be cut as one таск when its real volume is
+well over. That is the case the measurement is for. `tasks[].estimatedLines`
+against `metrics:cost`'s changed lines gives the ratio per run, and the ceiling,
+or the way it is compared, is revised from that.
+
+| Check | Result |
+|---|---|
+| the first real прогон under the rule records its `estimatedLines` against `metrics:cost`'s changed lines | pending: no прогон has run under the rule |
+
+```sh
+node --test scripts/validate/fixtures/volume-cut/scenarios.test.mts
+```
+
 ## See Also
 
 - [Installation and development checks](install.md)
