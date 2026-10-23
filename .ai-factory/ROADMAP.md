@@ -2028,10 +2028,244 @@ what it does not. D1 is amended above to allow naming the format.
     writer brief are read only when OpenSpec is present and the run closed
     with an outcome that exports.
 
+### Not From A Прогон: A Sixth Outside Reading — 2026-10-23
+
+Items from a sixth outside reading, made on 2026-10-23. It covers every change
+published since the fifth reading in the skill this one was rewritten from.
+Five commits landed between 2026-10-12 and 2026-10-21. Leaving out a version
+bump, they make four changes. Executors are sized by the volume of code
+instead of the kind of product. Point review moves after the commit and covers
+a narrower risk list. The orchestrator handles each event in one message. The
+source's cost tool counted each model call once instead of once per log line.
+The same label and the same rules apply as above: nothing is copied, each item
+is re-derived from our own specification, and the source is named nowhere, so
+D1 holds. The filter of the second reading still applies.
+
+This reading has evidence of our own behind it, which the earlier ones mostly
+did not. The four multi-таск прогоны in `../test2` committed **18 таски of
+16–811 changed lines each** (`git show --numstat`, insertions plus deletions).
+The largest *whole run* came to 2,689 lines. Four of those таски were a
+README of 19–40 lines, and each one got its own executor, its own landing and
+its own reviewer. The source's measurements point the same way from the other
+end. Executors that wrote about 2,600 lines each reached 300–420K of context
+in a large existing codebase. A list of 18 edits, about 1,300 lines, finished
+in one plain context in about an hour. The figures are the source's, and they
+are labelled that way wherever they appear below.
+
+Order: measurement first, because it is cheap, ships nothing, and is the only
+way to replace the borrowed figures in the other two items with our own. The
+second item does not wait for it. The third item does, because its whole case
+is a cost we have not measured.
+
+- [x] **A Run's Cost Is Measured From The Host's Own Log** — make our own
+  numbers available on tokens, model calls and context size per role, so the
+  next decisions about sizing and review rest on measurement rather than a
+  reading.
+  - **Gap:** `scripts/metrics` reads `state.js` and nothing else by design, so
+    it sees no tokens. The Open Item *What review costs is not measured* and the
+    revisit condition of the declined *review only foundation and risky таски*
+    both wait on numbers nothing here produces. The sizing item below borrows its
+    ceiling for the same reason. The source's own cost tool also shows how easy
+    this is to get wrong. The host writes one model call as several transcript
+    lines, for thinking, text and each tool call, all carrying the same usage. A
+    sum over lines overstated every total about 1.8–1.9×.
+  - **Scope:** a separate repository command, for example
+    `npm run metrics:cost -- <project-dir> [--run <dir>]`, under
+    `scripts/metrics/`. It is never shipped in a bundle and never run by a
+    прогон. `measure.ts` keeps its state-only rule; the new module reads three
+    sources and says which one each number came from:
+    1. **The host's transcripts** for the project, main session and subagents.
+       Claude Code is the first host. Others answer «not supported» until their
+       format is mapped, never a partial number.
+    2. **The run's `state.js`**, for the run window, the таски and `waits[]`.
+       Time inside a recorded wait counts as idle, so a pause the user spent
+       thinking is never counted as work.
+    3. **Git**, for changed lines per таск over its `commits`. The
+       `Maestro-Run:` trailer identifies the run.
+  - **Counting rule:** one model call is one unique message id. Its usage is
+    taken once, from the last record of that id. Normalized units weight output,
+    cache write, cache read and uncached input by the host's price ratios, and
+    are labelled as ratios, not money. A transcript line the tool cannot parse
+    is counted and reported, never skipped silently.
+  - **Attribution:** every subagent context is assigned a role: orchestrator,
+    executor, reviewer, standards reader, gate readers, repair, acceptance,
+    other. The plan must settle whether that comes from a stable role prefix
+    in the dispatch description, which is one bundle line per dispatching
+    phase, or from the existing descriptions as they are. Either way, a context
+    the tool cannot attribute is reported as unattributed and never guessed.
+  - **Output:** each role's share of the total. Orchestrator calls, in total and
+    per landed таск. Per executor: calls, peak context, cache rewrites after a
+    cold gap, and its таск's changed lines. Per review: its cost, and whether it
+    blocked, read from the review file. Active and idle time. Aggregates only:
+    no message text, tool input or file content is printed, and nothing is
+    written outside the output path the user names.
+  - **Acceptance evidence:** hand-written transcript fixtures. One call spread
+    over three lines with identical usage must count once. The set also covers
+    a subagent transcript, an unattributable context, a session outside the run
+    window, an unparsable line and a missing log directory. They run under
+    `npm run check`. One manual measurement of a real прогон is recorded with
+    its date and host version. The format is the host's and unversioned, so that
+    record goes stale, and it says so.
+  - **Cost:** repository tooling only. The bundle changes by at most the
+    dispatch-description prefix.
+  - **Closed 2026-10-23**, by the user's decision, before the real-прогон
+    measurement: that record is pending in `docs/parity-verification.md` ›
+    *Cost Measurement*, and a gap it finds is fixed then. Settled in the plan:
+    attribution is the prefix `maestro:<brief> [NN]`, one sentence on an
+    existing `SKILL.md` line; a таск's later executor contexts count as repair,
+    since the state has no repair stage to time them against. Whether a review
+    blocked is read from the state's reviewer defects, not from the review file,
+    which is prose. The cache-read ratio is per model, so units are a ratio to
+    each model's own input price and the output says when models are mixed. The
+    reader's run over this repository's own transcripts found 2.03 lines per
+    call.
+
+- [ ] **The Cut Is Sized By The Volume Of Change** — stop a small build from
+  being cut into many thin таски, each paying a cold start, a G3 reading, a
+  landing and a reviewer for a few dozen lines.
+  - **Gap:** step 2 of `phases/4-plan.md` sizes by a structural signal: one
+    file, one module, several modules, a new subsystem. Its bands run 1, 2–4,
+    5–10 and 10–20 таски. The task-file guidance under step 4 says outright
+    that таски are sized «without a fixed line-count limit». So nothing makes
+    the plan estimate how much code a таск actually carries. The recorded прогоны above came to 1,276–2,689 lines for
+    the whole run, cut into five and six таски. In existing code, a list of
+    edits that touches many files but little code reads as «several modules»
+    and lands in the 5–10 band.
+  - **Scope:** step 2 opens with a **volume estimate**. That is changed lines,
+    tests included, per surface or edit, read from the spec and, in existing
+    code, from `codebase.md`. The estimate is stated in one line in step 8's
+    report to the user. Then:
+    - **Up to the ceiling, one таск.** That means one executor with every
+      relevant criterion in its own file, exactly as a tiny project is cut
+      today. A list of edits in existing code usually belongs here, however
+      many files it touches.
+    - **Above it, about one таск per ceiling's worth.** The three rules still
+      outrank the count: one executor's whole job, file ownership, and
+      traceability. So do the four preferences. Expand, migrate, contract stays
+      a chain of three even when each step is small.
+    - **The merge pass merges by volume.** Neighbours that together stay under
+      the ceiling are merged, even when they could run side by side. Parallel
+      width is a reason to split only above the ceiling. A README or a
+      self-check page is never a таск of its own: it belongs to the таск whose
+      behaviour it describes or checks.
+    - **The table is re-expressed in volume.** A count above 12 needs a reason
+      recorded in step 8, as a declined preference does. It adds no stop and
+      no hard cap.
+  - **The ceiling:** it starts at about 3,000 changed lines. That figure is
+    borrowed, and the phase text and the item's closure record must label it
+    as borrowed. Once the measurement item above exists, the ceiling is
+    re-derived from our own executor peak context against changed lines, and
+    the revision is recorded.
+  - **The plan must settle:** whether the estimate is kept in an optional
+    `tasks[].estimatedLines`, so the measurement compares estimate to outcome.
+    Following the `existingCode` precedent, an optional field the dashboard
+    does not render needs no contract bump. It must also settle whether the
+    plan-consistency reader reports a thin таск with a natural neighbour as an
+    observation, never a blocker.
+  - **Limits:** this adds no new stop, dial or gate. The context handoff stays
+    for an executor that runs out of context anyway. A single таск's review
+    remains the review of the whole build, as it is for a tiny project today.
+    The models dial picks the tier by the rule it already has.
+  - **Acceptance evidence:**
+    - Fixtures: an 18-item edit list across 12 files, under the ceiling, gives
+      one таск, no worktree and one review. A spec estimated at about 7,000
+      lines gives about three таски. Two neighbours that would share a wave
+      but together stay under the ceiling are merged.
+    - Fresh-context readings of the four recorded прогоны' specs through the
+      new step 2 cut each of them into one таск. The cut is judgement, so the
+      check is a fresh reading and not a script.
+    - `npm run bundle` anchors hold the step-2 text, and G3 still refuses an
+      unordered pair that shares a file. The first real прогон under the rule
+      records its estimate against its actual changed lines.
+  - **Cost:** fewer executors, reviews and landings per run. The price is more
+    wall-clock per таск and less parallel width on mid-sized builds. That trade
+    is the point of the item, and it is stated to the user in step 8's line.
+
+- [ ] **One Event, One Turn** — let the orchestrator handle what one event
+  needs in a single turn instead of one turn per step, since every turn
+  re-reads its whole resident context.
+  - **Start only after** the measurement item reports orchestrator calls per
+    landed таск on a real прогон. If landing turns turn out to be a small share,
+    close this item as not worth it and record the number.
+  - **Gap:** a returning таск runs through numbered steps in `phases/5-build.md`.
+    The return is checked and its evidence imported. `D##` rows are appended,
+    the worktree is merged and the commit is made. Then the state is written as
+    a full candidate and published, and the next таск is published `running`
+    and launched. Nothing says which of these may share a turn. The publish
+    needs the commit's sha in the candidate, which forces a turn boundary
+    between the commit and the publish. The source reports about ten
+    orchestrator calls saved per six-таск run, each at a context near 200K.
+    That number is theirs.
+  - **Scope:**
+    1. **Land in one command.** The plan must choose one of two ways to chain
+       the commit and the publish. One is a helper option, for example
+       `sync.mts --publish <candidate> --land <NN>`. After a commit made by
+       pathspec, it reads `HEAD` and verifies the subject and both trailers
+       against the таск. It then appends the sha to that таск's `commits` in
+       the candidate before validation. The other is a fixed order of the
+       orchestrator's own calls, if that proves enough.
+    2. **Start in one message.** The `running` publish and the executor launches
+       go in the same message, with the publish first.
+    3. **Report in the same message.** The one-line progress report goes out in
+       the message that does the work.
+  - **The plan must settle the failure path:** a rejected publish in a message
+    whose launches already went out. The next turn reconciles that before
+    anything else, and it is never left silent.
+  - **Host dependency:** this relies on the calls in one message running in the
+    order sent. It is declared per host in `docs/spec/hosts.md`. A host where
+    that is not established keeps separate turns, and the degradation has a
+    home in the bundle under `npm run hosts`.
+  - **Limits:** a step whose output decides the next step is never merged with
+    it. The check output is read before the commit, and a return is accepted
+    before its evidence is imported. Validation, S5, the gates and the
+    holder/`updatedAt` checks are unchanged.
+  - **Acceptance evidence:** helper tests cover four cases. The sha is appended
+    once. A `HEAD` whose trailers name another таск or run is refused. A
+    dirty zone is refused. An identical retry is idempotent. `npm run bundle`
+    anchors hold the rule in the phase text, and `npm run hosts` holds the
+    ordering capability. The measurement item compares orchestrator calls per
+    landed таск before and after on comparable прогоны.
+  - **Cost:** one helper option and a paragraph in the build phase. Turns are
+    saved on every landing of every run.
+
+**Considered and declined in the same reading**, recorded so it is not
+re-litigated:
+- **point review only for the foundation and a narrow risk list.** This stays
+  declined, for the third reading's reason. The source's new evidence is that
+  review held each ticket for 15–40 minutes before its commit, and that
+  «touches access rights» marked 12 tickets of 15. Neither applies here. A
+  таск is committed and marked `review` before any reviewer runs
+  (`phases/5-build.md`, step 4), and dependents launch behind a blocker in
+  `review`. So no review holds a commit or a wave. Our five risk categories
+  decide *what* a reviewer checks, not *whether* a таск is reviewed. The revisit
+  condition is unchanged, and the measurement item above makes it checkable.
+- **review after the commit, beside the next wave.** This is already here, for
+  the same reason as above.
+- **one re-review per таск, scoped to the fix, with the rest left to a final
+  review.** A repaired таск here is re-reviewed against the union of its
+  commits. Only the first commit is what its original review was written
+  against (`phases/8-repair.md`, step 5). Contract 6 already bounds repair by
+  defect, by closure forecast and by a total budget only the user raises. A
+  fix-only re-review would stop checking whether a fix broke the таск's other
+  criteria.
+- **telling таски in flight about an interface a blocking fix changed.** No
+  таск is in flight here when a review blocks. The review phase opens only when
+  every таск sits at `review`.
+- **dropping `@` before the memory file in the skill text.** The host expands an
+  `@`-mention in a skill's text the way it does in a user message, so the file
+  would be attached twice. This already holds. `SKILL.md`, `phases/`,
+  `prompts/` and `references/` carry no `@`-mention, as checked on
+  2026-10-23. A validator rule for one absent string is not worth its upkeep;
+  review covers it.
+- **the source's executor-load thresholds** (under 150K «merge», over 450K
+  «split»). They are their numbers. The measurement item reports peak context
+  per executor, and our thresholds come from our own runs.
+
 ## Completed
 
 | Milestone | Date |
 |-----------|------|
+| A Run's Cost Is Measured From The Host's Own Log | 2026-10-23 |
 | OpenSpec Requirements Are Read, And A Closed Run Exports What It Verified | 2026-10-18 |
 | Intermittent Repairs Have Reproducible Evidence | 2026-10-16 |
 | Uncertain External Contracts Are Researched Before They Shape Tasks | 2026-10-16 |
@@ -2191,6 +2425,9 @@ what it does not. D1 is amended above to allow naming the format.
   every таск (third outside reading, 2026-10-09) rests on how phase 6 is built,
   not on numbers. Its revisit condition, «a таск review almost never blocks», can
   be read from the review files of finished прогоны without measuring tokens.
+  **2026-10-23:** *A Run's Cost Is Measured From The Host's Own Log* (sixth
+  outside reading) is the item that produces the numbers. The tool exists
+  (`npm run metrics:cost`); no прогон has been measured with it yet.
 - The Codex and Gemini CLI rows in `docs/spec/hosts.md` read **unverified**: the
   bundle installs on both and no прогон has been run on either. A row moves to
   *supported* when one has, and not when the documentation says a capability
