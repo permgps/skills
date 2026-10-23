@@ -2120,7 +2120,7 @@ is a cost we have not measured.
     reader's run over this repository's own transcripts found 2.03 lines per
     call.
 
-- [ ] **The Cut Is Sized By The Volume Of Change** — stop a small build from
+- [x] **The Cut Is Sized By The Volume Of Change** — stop a small build from
   being cut into many thin таски, each paying a cold start, a G3 reading, a
   landing and a reviewer for a few dozen lines.
   - **Gap:** step 2 of `phases/4-plan.md` sizes by a structural signal: one
@@ -2180,6 +2180,52 @@ is a cost we have not measured.
   - **Cost:** fewer executors, reviews and landings per run. The price is more
     wall-clock per таск and less parallel width on mid-sized builds. That trade
     is the point of the item, and it is stated to the user in step 8's line.
+  - **Closed 2026-10-23.** Step 2 of `phases/4-plan.md` opens with the volume
+    estimate. The ceiling is «about 3,000 changed lines», and the phase text and
+    `docs/spec/phases.md` › *Task Granularity* both mark it as borrowed. The
+    volume table has three rows: up to the ceiling, above it, and above 12
+    times it. The merge pass merges by volume, a README or a self-check page
+    travels with the таск it describes, and more than 12 таски need a reason.
+    Step 8 states the estimate and the trade in one line. `SKILL.md` and the
+    resident ratchet are unchanged.
+    - **Settled with the user:**
+      - The estimate is kept in the optional `tasks[].estimatedLines`, a whole
+        number of 0 or more, written by step 7 for every таск it writes.
+        `CONTRACT_VERSION` stays `10`, as it did for `existingCode`.
+        `metrics:cost` prints the estimate beside each executor's changed lines,
+        and one run line compares the two. Each таск is counted once there, and
+        a таск estimated at zero is named and kept out of the ratio.
+      - The plan-consistency reader reports a thin таск as an observation on its
+        `ok` line, never a finding, so it cannot fail G3. The plan merges the
+        pair or keeps it, naming the reason in step 8. The prompt's «or is the
+        right size» line moved into a new *What Is An Observation* section.
+        `VERDICT_LINE` already read the line as `ok`, so the runtime did not
+        change.
+    - **Held by:**
+      - the state validator, refusing anything but a whole number at publish,
+        with the legal values and an unchanged contract-6 to contract-10 state
+        tested beside it;
+      - `VOLUME_ANCHORS`, 14 literals with a removal test per file;
+      - a test holding the spec's and the phase's volume tables equal row for
+        row, shown failing on one changed cell;
+      - two `--plan-coverage` tests pinning the observation format;
+      - four `metrics:cost` tests;
+      - the scenario fixtures in `scripts/validate/fixtures/volume-cut/`.
+      - 2313 tests pass.
+    - **The fresh readings** are recorded in `docs/parity-verification.md` ›
+      *Volume-Sized Cut*. Seven readers covered three scenarios and the four
+      recorded прогоны, and every cut matched: one таск for each run, and three
+      for the 7,000-line scenario. The readings also showed that every estimate
+      of a recorded run came in at 0.3–0.6 of what git counted. The direction
+      is safe while those runs sit under the ceiling. But the ceiling is
+      compared against an estimate that runs low, so this is the first thing the
+      estimate-to-outcome comparison has to settle.
+    - **What no check holds:**
+      - whether an estimate is accurate;
+      - whether a merge or a kept thin таск was right;
+      - whether a reason for more than 12 таски is true.
+    - The ceiling stays borrowed until a real прогон's `estimatedLines` is
+      measured against its changed lines. No прогон has yet run under the rule.
 
 - [ ] **One Event, One Turn** — let the orchestrator handle what one event
   needs in a single turn instead of one turn per step, since every turn
@@ -2265,6 +2311,7 @@ re-litigated:
 
 | Milestone | Date |
 |-----------|------|
+| The Cut Is Sized By The Volume Of Change | 2026-10-23 |
 | A Run's Cost Is Measured From The Host's Own Log | 2026-10-23 |
 | OpenSpec Requirements Are Read, And A Closed Run Exports What It Verified | 2026-10-18 |
 | Intermittent Repairs Have Reproducible Evidence | 2026-10-16 |

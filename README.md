@@ -427,7 +427,7 @@ What each phase must do is in [the phases specification](docs/spec/phases.md).
 | 1 | Manifest (*Требования* / Requirements) | `brief.md`, `manifest.md` | your words numbered `R01…`, with the original under each line when the languages differ — confirm or correct |
 | 2 | Briefing (*Брифинг* / Briefing) | `answers.md`, `reference.md` | one numbered block of forks, at most two rounds |
 | 3 | Specification (*Спецификация* / Specification) | `codebase.md` in a project with code, `spec.md` | approval in `manual` only |
-| 4 | Plan (*План* / Plan) | `tasks/`, `interfaces.md`, `shared.md`, `plan-reads/` | approval in `manual`; a notice elsewhere |
+| 4 | Plan (*План* / Plan) | `tasks/`, `interfaces.md`, `shared.md`, `plan-reads/` | approval in `manual`; a notice elsewhere, with one line on the build's estimated volume |
 | 5 | Build (*Разработка* / Development) | project code, `discovered-interfaces.md` | the dashboard's waves filling in; nothing to answer unless an S4 action comes up |
 | 6 | Review (*Ревью* / Review) | `reviews/` | nothing to answer |
 | 7 | Acceptance (*Приёмка* / Acceptance) | `report.md` | the outcome, the отчёт, and a block of questions to forward |
@@ -440,6 +440,15 @@ register, and an example is inspiration it follows where its task file does not
 decide. G3 refuses a plan that leaves an available visual reference or example
 uncited. «Make it like X» is a requirement, so acceptance checks it; nothing
 else compares the build against X afterwards.
+
+**A small build is one таск.** The plan first estimates how many lines the
+build will change, tests included, and cuts by that volume rather than by the
+kind of product. Up to about 3,000 changed lines the whole spec goes to one
+executor — one landing, one review — even when it touches many files; above
+that it is about one таск per 3,000 lines. A README or a self-check page always
+travels with the таск it describes. The 3,000 is borrowed, not yet measured on
+our own runs, and the plan says so. You see the estimate and the trade in one
+line: fewer reviews and less waiting on landings, less parallel width.
 
 **Your existing code is read once, before the spec.** Preflight checks whether
 the project already holds code; Maestro's own files, the host's skill installs,
@@ -1170,7 +1179,7 @@ development dependencies are `typescript` and `@types/node`.
 | `npm run test` | every `*.test.ts`, including the copied-runtime integration tests and the README reference check |
 | `npm run link` / `npm run unlink` | link the checkout into the local agent directories |
 | `npm run metrics` | measure a finished run: `npm run metrics -- [<dir>] [--json]`, default `.maestro`; reads only `state.js`; counts таски, restarts and repairs per model tier; exit `0` measured, `2` unreadable |
-| `npm run metrics:cost` | measure what a run cost from the host's own log: `npm run metrics:cost -- <project> [--run <state>] [--log-dir <dir>] [--json] [--out <file>]`; reads Claude Code transcripts, `state.js` and git; prints each role's share, orchestrator calls per landed таск, executor peak context and changed lines, and whether each review blocked; units are price ratios, not money; exit `0` measured, `2` unreadable or unsupported host |
+| `npm run metrics:cost` | measure what a run cost from the host's own log: `npm run metrics:cost -- <project> [--run <state>] [--log-dir <dir>] [--json] [--out <file>]`; reads Claude Code transcripts, `state.js` and git; prints each role's share, orchestrator calls per landed таск, executor peak context and changed lines beside the plan's estimate, and whether each review blocked; units are price ratios, not money; exit `0` measured, `2` unreadable or unsupported host |
 | `npm run parity:browser` | the real-Chrome pointer suite; exit `2` when no browser is available |
 | `npm run parity:workflow` | an isolated Codex CLI evaluation |
 | `npm run parity:workflow:prepare` | prepare that evaluation without running it |

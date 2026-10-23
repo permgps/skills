@@ -14,6 +14,18 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **The cut is sized by the volume of change.** The plan phase now opens with
+  an estimate of the changed lines, tests included, and cuts one таск up to
+  about 3,000 — a figure marked as borrowed until our own runs measure it —
+  and about one таск per 3,000 above that, with the three cut rules and four
+  preferences still outranking the count. Neighbours that together stay under
+  the ceiling are merged; a README or a self-check page is never a таск of its
+  own; more than 12 таски need a stated reason. The user sees the estimate and
+  the trade in one line. Each таск's share is kept as the optional
+  `tasks[].estimatedLines`, with no contract bump, and `npm run metrics:cost`
+  prints it beside the таск's changed lines. The plan-consistency reader may
+  observe a thin таск on its `ok` line; it never fails G3. `SKILL.md` is
+  unchanged.
 - **A run's cost is measured from the host's own log.** `npm run metrics:cost --
   <project>` reads Claude Code's transcripts with the run's `state.js` and git,
   and prints each role's share of the run, orchestrator calls per landed таск,

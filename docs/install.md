@@ -648,7 +648,9 @@ a retrospective for whoever maintains Maestro. It is not part of
 own log: Claude Code's transcripts under
 `~/.claude/projects/<project path with every non-alphanumeric character as ->`
 (or `$CLAUDE_CONFIG_DIR`, or `--log-dir`), joined with the run's `state.js` and
-with git. It prints aggregates only and writes nothing except to `--out`. Claude
+with git. Beside each executor's changed lines it prints the plan's estimate
+for that таск (`tasks[].estimatedLines`), and one line compares the two over
+the run. It prints aggregates only and writes nothing except to `--out`. Claude
 Code deletes transcripts after `cleanupPeriodDays`, 30 days by default, so
 measure a run within that. Other hosts answer `not supported`. It is not part of
 `npm run check` either; its tests are.
