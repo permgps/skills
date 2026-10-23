@@ -763,9 +763,9 @@ below are measured, they are recorded here either way.
 | Check | Result |
 |---|---|
 | the ordered-calls probe on Claude Code 2.1.309 (Opus 5.5 session, git 2.39.5): one message, a shell call writing a token after a 20 s delay, then an Explore subagent on Haiku asked for the file | **ordered.** The shell finished writing at 10:59:32Z, the subagent read the token at 10:59:35Z, after the write and not 20 s before it. The subagent tool returns at once and runs in the background, so the launch went out after the shell call had returned |
-| `--land` through the copied helper on a real repository | 32 tests in `landing-sync.test.ts`: the roadmap's four cases (appended once, another таск's or run's `HEAD` refused, a dirty zone refused, an identical retry idempotent), every refusal beside its legal inputs, the order proof and a 200 KB subject |
+| `--land` through the copied helper on a real repository | 34 tests in `landing-sync.test.ts`: the build phase's own commit command over a zone never created, the roadmap's four cases (appended once, another таск's or run's `HEAD` refused, a dirty zone refused, an identical retry idempotent), every refusal beside its legal inputs, the order proof and a 200 KB subject |
 | the capability's two homes | `npm run hosts` OK. A removal test drops each of the two markers, the preflight probe and the build phase's degradation, and expects exactly one finding for it |
-| the phase text | `npm run bundle` OK, with `LANDING_ANCHORS` holding 9 literals, each with a removal test |
+| the phase text | `npm run bundle` OK, with `LANDING_ANCHORS` holding 11 literals, each with a removal test |
 | orchestrator calls per landed таск, before (a прогон at `b2c6400`) and after (a comparable прогон at the closing commit), through `npm run metrics:cost` | pending: no прогон has run on either side |
 | a host other than Claude Code answering the probe | pending: no прогон has run on Codex, Gemini CLI or dsh |
 

@@ -1105,8 +1105,12 @@ export const TRACE_ANCHORS: readonly Anchor[] = [
  * what the rule says.
  */
 export const LANDING_ANCHORS: readonly Anchor[] = [
-  { file: 'phases/5-build.md', literal: 'node .maestro/sync.mts --publish <candidate> --land <NN>',
-    why: 'the whole call: without --land the publish carries a sha nobody checked, or none' },
+  { file: 'phases/5-build.md', literal: "node .maestro/sync.mts --publish <candidate> --land <NN> --expect '<last-updatedAt>' --holder '<token>'",
+    why: 'the whole call, flags included: without --land the publish carries a sha nobody checked, and without --expect and --holder it is refused' },
+  { file: 'phases/5-build.md', literal: "never over its `zone`",
+    why: 'git add and git commit fail on a zone path the таск never created, and the landing never happens' },
+  { file: 'phases/5-build.md', literal: 'A таск whose return delivered no file has no commit',
+    why: 'a verification-only таск has nothing to commit, and --land would refuse it' },
   { file: 'phases/5-build.md', literal: 'Never copy the sha by hand',
     why: 'a sha copied out of git commit\'s output can name the previous таск\'s commit' },
   { file: 'phases/5-build.md', literal: 'git add --',

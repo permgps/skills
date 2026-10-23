@@ -1679,8 +1679,8 @@ for (const anchor of TRACE_ANCHORS) {
 
 // --- a landing goes out in one message and is verified by the helper ----------
 
-test('the landing anchors are nine, each in a file the shipped bundle has, and the bundle carries them all', async () => {
-  assert.equal(LANDING_ANCHORS.length, 9);
+test('the landing anchors are eleven, each in a file the shipped bundle has, and the bundle carries them all', async () => {
+  assert.equal(LANDING_ANCHORS.length, 11);
   await withShippedCopy(async copy => {
     for (const anchor of LANDING_ANCHORS) {
       const body = await readFile(path.join(copy, anchor.file), 'utf8');

@@ -227,28 +227,36 @@ For each таск that returns done, in this order:
    Таск numbers and requirement ids restart every прогон, so the trailers are
    what ties a change in the history back to its требование and its run.
 
-   Commit by pathspec over the таск's `zone` and `files`, and publish the
-   candidate that records it in the same message, in this order:
+   Commit by pathspec over the таск's `files` — the paths its return
+   delivered, which exist or were deleted — never over its `zone`: a zone is
+   planned ownership, and `git add` and `git commit` fail on a zone path the
+   таск never created. Publish the candidate that records it in the same
+   message, in this order:
 
    ```sh
-   git add -- <the таск's paths>
-   git commit -m "<id> <title>" --trailer "Maestro-Run: <dir>" --trailer "Requirements: <ids>" -- <the таск's paths>
-   node .maestro/sync.mts --publish <candidate> --land <NN>
+   git add -- <the таск's files>
+   git commit -m "<id> <title>" --trailer "Maestro-Run: <dir>" --trailer "Requirements: <ids>" -- <the таск's files>
+   node .maestro/sync.mts --publish <candidate> --land <NN> --expect '<last-updatedAt>' --holder '<token>'
    ```
 
    The candidate already carries the таск `review` (step 4), its `files`,
    `tests` and `finishedAt`. **Never copy the sha by hand:** `--land` reads
    `HEAD`, checks that the subject opens with the таск's id, that both trailers
-   are this run's and this таск's, and that nothing in the таск's paths was left
-   out of the commit, and only then appends the sha to `commits`. A commit that
+   are this run's and this таск's, and that nothing in the таск's `zone` or
+   `files` was left out of the commit, and only then appends the sha to
+   `commits`. A commit that
    failed leaves a `HEAD` it refuses, so the commit's output need not be read
    before the publish. Log INFO `build` `landed` with `{ taskId, sha }`.
 
    A refusal names its rule, and the same command is never sent again
-   unchanged. `land-dirty` means a path was left out: add it, make a second
-   commit, and land again. `land-subject`, `land-run` or `land-requirements`
+   unchanged. `land-dirty` means a path was left out: add it to the таск's
+   `files`, make a second commit, and land again. `land-subject`, `land-run` or `land-requirements`
    means the commit itself is wrong for this таск: say so in one line and hand
    out no work in its paths until it is put right.
+
+   **A таск whose return delivered no file has no commit.** A
+   verification-only таск that only ran checks is the usual case: publish it at
+   `review` without `--land`, and its `commits` stays as it was.
    <!-- maestro:degrades:version-control -->
    Where preflight found no version control, there is nothing to commit: say so
    once, and tell the review phase it will be reading the working tree rather

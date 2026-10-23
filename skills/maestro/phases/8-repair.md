@@ -318,7 +318,7 @@ The repair commit carries the same two trailers as the таск's first commit,
 later reader of the history finds the repair under the same требование.
 
 **It lands the way Разработка step 3 lands a таск:** commit by pathspec over the
-таск's paths, then `node .maestro/sync.mts --publish <candidate> --land <NN>` in
+таск's `files`, never its zone, then `node .maestro/sync.mts --publish <candidate> --land <NN>` in
 the same message, with the таск back at `review` in the candidate. The helper
 reads the sha from `HEAD` and appends it after the first one; you never copy it.
 `land-stale-head` means `HEAD` is still a commit the таск already has: the repair

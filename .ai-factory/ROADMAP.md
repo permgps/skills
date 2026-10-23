@@ -2297,7 +2297,9 @@ is a cost we have not measured.
         answer exits 2. `runName` moved into `history.mts`, so the resume
         check and the landing spell the run one way. No contract bump.
       - **Two messages per landing.** The first holds the `D##` rows, the
-        commit by pathspec and `--publish --land`. The second holds the
+        commit by pathspec over the таск's `files` (never its `zone`, since git
+        refuses a path the таск never created) and `--publish --land`. A таск
+        whose return delivered no file has no commit and lands without it. The second holds the
         `running` publish, the launches and the progress line. The return
         check, the evidence import and the worktree merge each keep their own
         message. The phase says *message*, never *turn*.
@@ -2313,13 +2315,13 @@ is a cost we have not measured.
         and dsh it rides on their recipes' own file-reading probe. Without it,
         every step is its own message.
     - **Held by:**
-      - `landing-sync.test.ts`, 32 tests through the copied helper on a real
-        repository: the four roadmap cases, every refusal beside its legal
+      - `landing-sync.test.ts`, 34 tests through the copied helper on a real
+        repository: the build phase's own commit command, the four roadmap cases, every refusal beside its legal
         inputs, the order proof, and a 200 KB subject;
       - `npm run hosts`, with a removal test for each of the capability's two
         markers;
-      - `LANDING_ANCHORS`, 9 literals with a removal test per anchor.
-    - `SKILL.md` and the resident ratchet are unchanged. 2358 tests pass.
+      - `LANDING_ANCHORS`, 11 literals with a removal test per anchor.
+    - `SKILL.md` and the resident ratchet are unchanged. 2362 tests pass.
     - **The probe on Claude Code 2.1.309 answered *ordered*:** the shell
       finished writing at 10:59:32Z, and the subagent read the token at
       10:59:35Z. Recorded in `docs/parity-verification.md` › *One Event, One

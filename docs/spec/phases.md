@@ -930,17 +930,20 @@ to", on a прогон's own commits and on the user's alike. The closing commit
 (see *Memory*) carries `Maestro-Run:` alone.
 
 **The orchestrator never copies a sha into `commits`.** A таск commit and a
-repair commit are made by pathspec over the таск's `zone` and `files`, after a
-`git add` of the same paths, and the state that records them is published with
-`--land <NN>` (see [`state-contract.md`](state-contract.md)). The helper reads
+repair commit are made by pathspec over the таск's `files`, after a `git add` of
+the same paths, and never over its `zone`: a zone is planned ownership, and git
+refuses a pathspec the таск never created. The state that records them is
+published with `--land <NN>` (see [`state-contract.md`](state-contract.md)). The helper reads
 `HEAD` and checks it against the таск before it appends the sha: the subject
 opens with the таск's id, `Maestro-Run:` names this run, `Requirements:` lists
 the таск's ids in id order, and nothing in the таск's paths is left
 uncommitted. The subject's spelling past the id is not fixed; the recorded
 прогоны wrote `T01: …` and `T01 (repair): …`, and both land. A failed commit
 leaves a `HEAD` the check refuses, so nothing is published as landed that did
-not land. Where preflight found no version control there is no commit and no
-`--land`; the plain publish carries the таск to `review`.
+not land. A таск whose return delivered no file — a verification-only таск that
+only ran checks — has no commit, and is published at `review` without `--land`.
+Where preflight found no version control there is no commit and no `--land`;
+the plain publish carries the таск to `review`.
 
 ### What Shares A Message
 

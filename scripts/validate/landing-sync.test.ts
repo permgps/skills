@@ -279,6 +279,8 @@ test('a dirty file outside the zone and a dirty .maestro/ are not the таск\'
   try {
     const sha = target.commit();
     writeFileSync(path.join(target.root, 'notes.txt'), 'the user\'s own work\n');
+    // .maestro/ is untracked in this repository, so state.js and the run folder are dirty throughout.
+    assert.match(target.git('status', '--porcelain', '--untracked-files=all'), /^\?\? \.maestro\//m);
     const { outcome } = await landed(target, reviewing([], 20), reviewing([], 21));
     assert.equal(outcome.code, 0, outcome.stderr);
     assert.deepEqual(await publishedCommits(target), [sha]);
@@ -343,6 +345,35 @@ test('a zone path that climbs out of the project is refused before git sees it',
   try {
     target.commit();
     const change = { zone: ['src/menu', '../elsewhere'] };
+    await refused(target, reviewing([], 20, change), reviewing([], 21, change), 'land-path');
+  } finally { await target.dispose(); }
+});
+
+test('the build phase\'s own commit command lands: by pathspec over files, trailers by --trailer, a zone directory never created', needsGit, async () => {
+  const target = await project();
+  try {
+    target.commit({ subject: '00 base', file: 'README.md' });
+    // The user's own staged work, which a commit by pathspec must leave staged.
+    writeFileSync(path.join(target.root, 'notes.txt'), 'the user\'s own work\n');
+    target.git('add', 'notes.txt');
+    mkdirSync(path.join(target.root, 'src'), { recursive: true });
+    writeFileSync(path.join(target.root, 'src/menu.js'), 'export const menu = true;\n');
+    // Exactly the three lines of phases/5-build.md step 3; the zone src/menu does not exist.
+    target.git('add', '--', 'src/menu.js');
+    target.git('commit', '-q', '-m', '01 Implement menu', '--trailer', `Maestro-Run: ${RUN}`, '--trailer', 'Requirements: R01', '--', 'src/menu.js');
+    const sha = target.git('rev-parse', 'HEAD').trim();
+    const { outcome } = await landed(target, reviewing([], 20), reviewing([], 21));
+    assert.equal(outcome.code, 0, JSON.stringify(outcome));
+    assert.deepEqual(await publishedCommits(target), [sha]);
+    assert.match(target.git('status', '--porcelain'), /^A  notes\.txt$/m, 'the user\'s staged file stays out of the таск commit');
+  } finally { await target.dispose(); }
+});
+
+test('an absolute zone path is refused before git sees it', needsGit, async () => {
+  const target = await project();
+  try {
+    target.commit();
+    const change = { zone: ['/etc'] };
     await refused(target, reviewing([], 20, change), reviewing([], 21, change), 'land-path');
   } finally { await target.dispose(); }
 });
