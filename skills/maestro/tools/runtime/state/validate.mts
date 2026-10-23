@@ -802,6 +802,17 @@ export function validateState(value: unknown, options: { historical?: boolean } 
         });
       }
 
+      // The plan's estimate is compared with what git says the таск changed,
+      // so it must be a count the comparison can divide by. Zero is legal: a
+      // verification-only таск is expected to change no product code. Checked
+      // at every version, because the field is optional at every version.
+      const estimate = entry['estimatedLines'];
+      if (estimate !== undefined && (typeof estimate !== 'number' || !Number.isInteger(estimate) || estimate < 0)) {
+        add(`${at}.estimatedLines`,
+          'estimatedLines must be a whole number of changed lines, tests included, 0 or more — '
+          + `got ${JSON.stringify(estimate)}; write the plan's step-2 estimate for this таск, or leave the field out`);
+      }
+
       if (atLeastV2) {
         // The wave is a layer, and a layer starts at one. A таск carrying zero
         // is a таск the plan phase never placed.

@@ -842,6 +842,17 @@ export interface TaskEntry {
    * every таск on the session's model.
    */
   model?: ModelTier;
+  /**
+   * The changed lines, tests included, the plan expected this таск to carry:
+   * its share of the volume estimate step 2 of the plan phase opens with,
+   * written once at the cut. Absent means not estimated — a run that began
+   * before the field, or a таск added without one. Read by `metrics:cost`
+   * beside the lines git says the таск changed, and by no screen.
+   *
+   * Optional at every version: it widens no value set and the dashboard does
+   * not render it, so `CONTRACT_VERSION` did not move for it.
+   */
+  estimatedLines?: number;
   /** What the таск delivered, as paths. */
   files?: string[];
   startedAt?: string;

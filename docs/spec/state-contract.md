@@ -26,7 +26,7 @@ See [`verification.md`](verification.md) for the entity graph and result rules.
 | `dialChanges[]` | list of `{ dial, from, to, atPhase }`; `dial` is `mode` \| `depth`, and `polish` too below contract 8 | preflight | dashboard |
 | `stages[]` | list of `{ id, status, startedAt?, finishedAt?, note? }` | preflight | dashboard |
 | `currentStage` | stage id | preflight | dashboard |
-| `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], model, retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[], lostCommits?[] }` | plan | dashboard |
+| `tasks[]` | list of `{ id, title, requirementIds[], status, blockedBy[], wave, zone[], model, estimatedLines?, retries, repairs, handoffs, files[], startedAt?, finishedAt?, tests?, commits[], lostCommits?[] }` | plan | dashboard |
 | `requirements[]` | list of `{ id, status, reason?, title? }` | manifest | dashboard |
 | `gates[]` | list of `{ id, status, findings[] }`, each finding a string | preflight | dashboard |
 | `lifecycle` | `active` \| `closed` in contracts 4–10 | preflight | dashboard |
@@ -209,6 +209,16 @@ leaves `lostCommits`; and a таск going from `review`, `done` or `repair` bac
 to `queued` in a write that adds nothing to its `lostCommits` — a lost commit
 is the only thing that sends a finished таск back. A repair attempt's
 `commit` may be in either list. See [`phases.md`](phases.md) › *Recovery*.
+
+**`tasks[].estimatedLines` is the plan's volume estimate for one таск**: the
+changed lines, tests included, that the таск was expected to carry when it was
+cut, as a whole number of 0 or more. The plan phase writes it once, with the
+таск, as its share of the estimate the sizing step opens with
+([`phases.md`](phases.md) › *Task Granularity*). Absent means not estimated: a
+run that began before the field, or a таск added without one. `npm run
+metrics:cost` prints it beside the lines git says the таск changed, which is how
+the borrowed ceiling is later re-derived from runs of our own; no screen reads
+it. Anything other than a whole number of 0 or more is refused.
 
 **The whole `tasks[]` array is written when the таски are cut**, every entry
 `queued`, with its `blockedBy`, `wave`, `zone`, and the three counters at zero.
@@ -620,6 +630,8 @@ set, and the dashboard does not render it. A contract-7, 8 or 9 run may carry it
 because its keys need only a contract-7 run directory. **`tasks[].lostCommits`
 arrived the same way and raised nothing**: optional at every version, it widens
 no value set, and the dashboard ignores it — a reset таск shows as `queued`.
+**`tasks[].estimatedLines` arrived the same way and raised nothing**: optional
+at every version, it widens no value set, and the dashboard does not render it.
 
 **Version 9** widens the value set `awaiting.kind` and adds two optional
 fields, `awaiting.note` and `waits`. The value set is what raises it: a

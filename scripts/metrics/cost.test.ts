@@ -391,3 +391,61 @@ test('a real recorded contract-2 state is refused exactly as measure refuses it'
     await rm(empty, { recursive: true, force: true });
   }
 });
+
+// --- the plan's volume estimate beside what git says changed -----------------
+
+const changedBy = (lines: Record<string, number>): GitFacts => ({
+  changed: new Map(Object.entries(lines).map(([id, count]) => [id, { lines: count, binaryFiles: 0, unreadable: [] }])),
+  runCommits: 'not recorded',
+});
+
+/** An executor and a repair executor on таск 01: two contexts, one таск. */
+const executorAndRepair = () => transcriptsOf(async logDir => {
+  await writeSession(logDir, 'run', [assistantLine({ id: 'msg_o', at: at(1), usage: { input: 10, output: 10 } })]);
+  await writeSubagent(logDir, 'run', 'a-exec', [assistantLine({ id: 'msg_e', at: at(2), sidechain: true, agentId: 'a-exec', usage: { input: 10, output: 10 } })], 'maestro:executor 01');
+  await writeSubagent(logDir, 'run', 'a-fix', [assistantLine({ id: 'msg_f', at: at(9), sidechain: true, agentId: 'a-fix', usage: { input: 10, output: 10 } })], 'maestro:executor 01');
+});
+
+test('a таск carrying an estimate prints it beside its changed lines, and the run line gives the ratio', async () => {
+  const state = runState([]);
+  state.tasks[0] = { ...state.tasks[0]!, estimatedLines: 900 };
+  const m = measureCost(state, await executorAndRepair(), changedBy({ '01': 840 }));
+  assert.deepEqual(m.executors.map(entry => [entry.role, entry.changedLines, entry.estimatedLines]),
+    [['executor', 840, 900], ['repair', 840, 900]]);
+  assert.ok(m.estimate !== 'not recorded');
+  assert.deepEqual({ ...m.estimate, ratio: m.estimate.ratio?.toFixed(3) },
+    { tasks: 1, estimated: 900, changed: 840, ratio: (840 / 900).toFixed(3), zeroEstimated: [] });
+  const text = render(m);
+  assert.match(text, /840 lines, estimated 900/);
+  assert.match(text, /estimate vs changed\s+900 estimated, 840 changed, ratio 0\.93 over 1 таск/);
+});
+
+test('a таск with an executor and a repair context enters the estimate once', async () => {
+  const state = runState([]);
+  state.tasks[0] = { ...state.tasks[0]!, estimatedLines: 300 };
+  const m = measureCost(state, await executorAndRepair(), changedBy({ '01': 600 }));
+  assert.equal(m.executors.length, 2);
+  assert.ok(m.estimate !== 'not recorded');
+  assert.deepEqual([m.estimate.tasks, m.estimate.estimated, m.estimate.changed], [1, 300, 600]);
+});
+
+test('a state with no estimate says so, and never prints an estimate of zero', async () => {
+  const m = measureCost(runState([]), await executorAndRepair(), changedBy({ '01': 840 }));
+  assert.deepEqual(m.executors.map(entry => entry.estimatedLines), ['not recorded', 'not recorded']);
+  assert.equal(m.estimate, 'not recorded');
+  const text = render(m);
+  assert.match(text, /estimated: not recorded/);
+  assert.match(text, /estimate vs changed\s+— \(no таск carries an estimate\)/);
+  assert.doesNotMatch(text, /estimated 0/);
+});
+
+test('a таск estimated at zero is named and left out of the ratio, so the ratio never divides by zero', async () => {
+  const state = runState([]);
+  state.tasks[0] = { ...state.tasks[0]!, estimatedLines: 0 };
+  const m = measureCost(state, await executorAndRepair(), changedBy({ '01': 120 }));
+  assert.ok(m.estimate !== 'not recorded');
+  assert.deepEqual(m.estimate, { tasks: 0, estimated: 0, changed: 0, ratio: null, zeroEstimated: ['01'] });
+  const text = render(m);
+  assert.match(text, /ratio — over 0 таск/);
+  assert.match(text, /estimated at zero\s+01/);
+});

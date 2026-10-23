@@ -90,7 +90,25 @@ export interface ExecutorCost {
   coldRewrites: ColdRewrite[];
   /** The таск's changed lines over every commit it recorded. */
   changedLines: number | NotRecorded;
+  /** The plan's estimate for the таск (`tasks[].estimatedLines`); `not recorded` when it carries none. */
+  estimatedLines: number | NotRecorded;
   unreadableCommits: number;
+}
+
+/**
+ * The plan's volume estimate against what git says the таски changed, each таск
+ * counted once however many executor and repair contexts it had. Only таски
+ * carrying both numbers enter it. A таск estimated at zero lines is named and
+ * left out of the ratio: zero is a legal estimate for a verification-only таск,
+ * and dividing by it would turn one таск into an infinite ratio for the run.
+ */
+export interface EstimateFigure {
+  tasks: number;
+  estimated: number;
+  changed: number;
+  /** `changed / estimated`, or null when every compared таск was estimated at zero. */
+  ratio: number | null;
+  zeroEstimated: string[];
 }
 
 export interface ReviewCost {
@@ -145,6 +163,8 @@ export interface CostMeasurement {
   reviews: ReviewCost[];
   unattributed: UnattributedCost[];
   runCommits: { total: number; recordedByTasks: number } | NotRecorded;
+  /** `not recorded` when no таск carries both an estimate and changed lines. */
+  estimate: EstimateFigure | NotRecorded;
 }
 
 export interface GitFacts {
@@ -320,6 +340,7 @@ export function measureCost(state: RunState, transcripts: Transcripts, git: GitF
         peakContext: Math.max(...entry.calls.map(call => call.contextTokens)),
         coldRewrites: coldRewrites(entry.calls),
         changedLines: changed === undefined ? NOT_RECORDED : changed.lines,
+        estimatedLines: estimateOf(state, entry.taskId),
         unreadableCommits: changed?.unreadable.length ?? 0,
       };
     });
@@ -348,6 +369,8 @@ export function measureCost(state: RunState, transcripts: Transcripts, git: GitF
   const runCommitsFigure = listed === NOT_RECORDED || 'unavailable' in listed
     ? NOT_RECORDED
     : { total: listed.shas.length, recordedByTasks: listed.shas.filter(sha => [...recorded].some(own => sha.startsWith(own))).length };
+
+  const estimate = estimateFigure(state, git);
 
   let dir = state.slug;
   try { dir = runDirName(state); } catch { log.warn('cost', 'run directory unresolved; naming the run by its slug', { runId: state.runId }); }
@@ -393,12 +416,41 @@ export function measureCost(state: RunState, transcripts: Transcripts, git: GitF
     reviews,
     unattributed,
     runCommits: runCommitsFigure,
+    estimate,
   };
   log.info('cost', 'прогон cost measured', {
     runId: state.runId, contexts: attributed.length, calls: allCalls.length, duplicateLines: transcripts.duplicateLines,
     unparsed: transcripts.unparsed.length, unattributed: unattributed.length, outsideWindow: callsOutsideWindow,
+    estimatedTasks: estimate === NOT_RECORDED ? 0 : estimate.tasks,
+    estimateRatio: estimate === NOT_RECORDED ? null : estimate.ratio,
   });
   return measurement;
+}
+
+/** The таск's estimate as the plan wrote it, or `not recorded`. */
+function estimateOf(state: RunState, taskId: string | undefined): number | NotRecorded {
+  const task = taskId === undefined ? undefined : state.tasks.find(entry => entry.id === taskId);
+  return task?.estimatedLines ?? NOT_RECORDED;
+}
+
+/** Sum the estimate and the changed lines over таски carrying both, once per таск. */
+function estimateFigure(state: RunState, git: GitFacts): EstimateFigure | NotRecorded {
+  const figure: EstimateFigure = { tasks: 0, estimated: 0, changed: 0, ratio: null, zeroEstimated: [] };
+  for (const task of state.tasks) {
+    const changed = git.changed.get(task.id);
+    log.debug('cost', 'estimate', { taskId: task.id, estimatedLines: task.estimatedLines ?? null, changedLines: changed?.lines ?? null });
+    if (task.estimatedLines === undefined || changed === undefined) continue;
+    if (task.estimatedLines === 0) {
+      figure.zeroEstimated.push(task.id);
+      continue;
+    }
+    figure.tasks += 1;
+    figure.estimated += task.estimatedLines;
+    figure.changed += changed.lines;
+  }
+  if (figure.tasks === 0 && figure.zeroEstimated.length === 0) return NOT_RECORDED;
+  figure.ratio = figure.estimated > 0 ? figure.changed / figure.estimated : null;
+  return figure;
 }
 
 const integer = (value: number): string => String(Math.round(value));
@@ -454,10 +506,20 @@ export function render(m: CostMeasurement): string {
   if (m.executors.length === 0) lines.push('    none attributed');
   for (const entry of m.executors) {
     const changed = entry.changedLines === NOT_RECORDED ? 'not recorded' : `${entry.changedLines} lines`;
+    const estimated = entry.estimatedLines === NOT_RECORDED ? 'estimated: not recorded' : `estimated ${entry.estimatedLines}`;
     const unreadable = entry.unreadableCommits > 0 ? `, ${entry.unreadableCommits} commit(s) unreadable` : '';
     const gaps = entry.coldRewrites.map(rewrite => formatSpan(rewrite.gapMs)).join(', ');
     lines.push(`    ${entry.taskId.padEnd(10)}${entry.role.padEnd(10)}${entry.calls} calls, peak context ${entry.peakContext}, `
-      + `${entry.coldRewrites.length} cold rewrite(s)${gaps === '' ? '' : ` after ${gaps}`}, ${integer(entry.units)} units, ${changed}${unreadable}`);
+      + `${entry.coldRewrites.length} cold rewrite(s)${gaps === '' ? '' : ` after ${gaps}`}, ${integer(entry.units)} units, ${changed}, ${estimated}${unreadable}`);
+  }
+
+  lines.push('', '  plan estimate (state; changed lines from git)');
+  if (m.estimate === NOT_RECORDED) {
+    row('  estimate vs changed', '— (no таск carries an estimate)');
+  } else {
+    const ratio = m.estimate.ratio === null ? 'ratio —' : `ratio ${m.estimate.ratio.toFixed(2)}`;
+    row('  estimate vs changed', `${m.estimate.estimated} estimated, ${m.estimate.changed} changed, ${ratio} over ${m.estimate.tasks} таск(и)`);
+    if (m.estimate.zeroEstimated.length > 0) row('  estimated at zero', m.estimate.zeroEstimated.join(', '));
   }
 
   lines.push('', '  reviews (transcripts; blocked from state)');

@@ -1406,6 +1406,31 @@ test('a sha declared lost twice is refused', () => {
   assert.deepEqual(fields(violations), ['tasks[0].lostCommits[1]']);
 });
 
+// --- estimatedLines: the plan's volume estimate for one таск -------------------
+
+test('a state with no estimatedLines is accepted at every contract, because runs published before the field carry none', () => {
+  for (const state of [baseline(), contract6State(), contract7State(), contract8State(), contract9State(), contract10State(), activeContract10State()]) {
+    assert.equal(state.tasks.some(task => 'estimatedLines' in task), false);
+    assert.deepEqual(validateState(state), []);
+  }
+});
+
+test('an estimate of zero, a small one, one at the ceiling and one far above it are all accepted', () => {
+  for (const estimatedLines of [0, 120, 3000, 40000]) {
+    const state = activeContract10State();
+    state.tasks[0] = { ...state.tasks[0]!, estimatedLines };
+    assert.deepEqual(validateState(state), [], String(estimatedLines));
+  }
+});
+
+test('an estimate that is not a whole number of lines is refused by its field, and the message says what to write', () => {
+  for (const estimatedLines of [-1, 12.5, '300', null, Number.NaN]) {
+    const violations = validateState(withPatch({ tasks: [{ ...baseline().tasks[0], estimatedLines }] }));
+    assert.deepEqual(fields(violations), ['tasks[0].estimatedLines'], String(estimatedLines));
+    assert.match(violations[0]!.message, /whole number of changed lines, tests included.*step-2 estimate.*or leave the field out/);
+  }
+});
+
 /** An active contract-10 run with a second таск, so a reset can name a dependent. */
 function resumed(first: Partial<RunState['tasks'][number]>, second: Partial<RunState['tasks'][number]> = {}): RunState {
   const state = activeContract10State();

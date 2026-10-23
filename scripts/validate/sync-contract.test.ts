@@ -632,6 +632,31 @@ test('version-4 invalid first candidate exposes diagnostics without publishing a
     }
   });
 
+test('a candidate carrying the plan\'s volume estimate publishes, and a negative estimate is refused at publish', async () => {
+    const target = await session(null);
+    try {
+      await addV4Captures(target.root);
+      const candidate = path.join(target.root, 'candidate.json');
+      const refused = verifiedState();
+      refused.tasks[0]!.estimatedLines = -1;
+      await writeFile(candidate, JSON.stringify(refused));
+      const rejected = await target.run({}, ['--publish', candidate, '--no-open']);
+      assert.equal(rejected.status, 1, rejected.out);
+      assert.equal(jsonResult(rejected)['status'], 'rejected');
+      assert.match(rejected.out, /estimatedLines must be a whole number/);
+      await assert.rejects(readFile(path.join(target.root, 'state.js'), 'utf8'));
+
+      const estimated = verifiedState();
+      estimated.tasks[0]!.estimatedLines = 900;
+      await writeFile(candidate, JSON.stringify(estimated));
+      const published = await target.run({}, ['--publish', candidate, '--no-open']);
+      assert.equal(published.status, 0, published.out);
+      assert.match(await readFile(path.join(target.root, 'state.js'), 'utf8'), /"estimatedLines": 900/);
+    } finally {
+      await target.dispose();
+    }
+  });
+
 test('version-4 publication refuses a changed capture and keeps its prior coherent state', async () => {
     const target = await session(null);
     try {
