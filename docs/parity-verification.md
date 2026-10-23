@@ -676,6 +676,24 @@ node --test scripts/memory/markers.test.ts scripts/validate/memory-sync.test.ts 
 npm run check
 ```
 
+## Cost Measurement — 2026-10-23
+
+`npm run metrics:cost` reads the host's transcripts, and their format is the
+host's and unversioned. The reader was mapped against Claude Code 2.1.309; every
+record below is tied to the version it was read under and goes stale when the
+host changes its format. The tool prints the versions it read and warns on one it
+was not mapped against.
+
+| Check | Result |
+|---|---|
+| `readTranscripts` over this repository's own Claude Code transcripts (not a прогон; aggregates only) | 212 contexts (130 sessions, 82 subagents), 9,098 calls from 18,486 assistant lines: 2.03 lines per call, which a per-line sum would have counted; 0 unparsed lines; 1 synthetic record; every subagent's `description` found in its `meta.json`; 8 host versions |
+| a прогон measured end to end (date, host version, project, run dir, role shares, orchestrator calls per landed таск) | pending: no прогон with labelled dispatches has run since the label was added, and the host had already deleted the transcripts of earlier прогоны (`cleanupPeriodDays`, 30 days) |
+
+```sh
+node --test scripts/metrics/roles.test.ts scripts/metrics/transcripts.test.ts scripts/metrics/changed-lines.test.ts scripts/metrics/cost.test.ts
+npm run metrics:cost -- <project> --out <file>
+```
+
 ## See Also
 
 - [Installation and development checks](install.md)

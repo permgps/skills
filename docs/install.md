@@ -644,6 +644,15 @@ npm run check     # everything below, in this order
 a retrospective for whoever maintains Maestro. It is not part of
 `npm run check`, because this repository contains no run for it to measure.
 
+`npm run metrics:cost -- <project>` measures what a run cost from the host's
+own log: Claude Code's transcripts under
+`~/.claude/projects/<project path with every non-alphanumeric character as ->`
+(or `$CLAUDE_CONFIG_DIR`, or `--log-dir`), joined with the run's `state.js` and
+with git. It prints aggregates only and writes nothing except to `--out`. Claude
+Code deletes transcripts after `cleanupPeriodDays`, 30 days by default, so
+measure a run within that. Other hosts answer `not supported`. It is not part of
+`npm run check` either; its tests are.
+
 Individual checks are documented in [the specification README](spec/README.md).
 The [parity verification record](parity-verification.md) names the separate
 browser and workflow prerequisites and the current execution limits.

@@ -326,6 +326,42 @@ prints `not recorded`. Only structured fields are read: a `counterexample` or
 a `diagnosis` is prose, and grouping prose by resemblance would make the
 retrospective an opinion.
 
+## Measuring What A Прогон Cost
+
+```bash
+node scripts/metrics/cost.ts <project>   # or: npm run metrics:cost -- <project>
+node scripts/metrics/cost.ts <project> --run <state> --log-dir <dir> --json --out <file>
+```
+
+`measure.ts` keeps its rule; this is its sibling and reads three sources, each
+named in the output: the host's transcripts (Claude Code only; any other
+`--host` exits `2`), the run's `state.js`, and git.
+
+- **One model call is one unique message id** across every transcript file.
+  The host writes a call as a line per content block, each carrying the same
+  usage, and a resumed session replays earlier records into its new file, so a
+  sum over lines overstates every total.
+- **Units** weight each call's usage by its model's price ratios to that
+  model's own uncached input: cache writes 1.25 (5-minute) and 2 (1-hour),
+  output 5, cache reads 0.1 except on models priced lower. They are ratios, not
+  money, and a run on several models says its units do not convert.
+- **Roles** come from the dispatch label [`dials.md`](dials.md) › *Who Runs On
+  Which Tier* sets, `maestro:<brief> [NN]`. A таск's later executor contexts
+  count as repair; a context handoff is counted as repair too. A context without
+  a readable label is reported as unattributed with the reason, never guessed.
+  The orchestrator is the main session inside the run window, less calls the
+  host attributes to another skill.
+- **The window** runs from `startedAt` to `finishedAt`, or `updatedAt` while
+  the run is open; idle time is the closed `waits` (contract 9 on), and before
+  that it is `not recorded`.
+- **Whether a review blocked** is read from the version-3 verification record:
+  a defect on that таск whose root finding came from the reviewer. The review
+  file is prose and is not parsed.
+
+No message text, tool input or dispatch description is printed. Exit codes are
+`0` measured and `2` the arguments, host, state or transcripts could not be
+read.
+
 ## Running The Gates
 
 ```bash

@@ -14,6 +14,15 @@ number that claimed more than that would be claiming it falsely.
 
 ## Unreleased
 
+- **A run's cost is measured from the host's own log.** `npm run metrics:cost --
+  <project>` reads Claude Code's transcripts with the run's `state.js` and git,
+  and prints each role's share of the run, orchestrator calls per landed таск,
+  per executor its peak context, cold cache rewrites and changed lines, and
+  whether each review blocked. One call is one unique message id, so the
+  several lines the host writes per call are counted once. Units are price
+  ratios, not money. To attribute a subagent, each dispatch's `description`
+  now opens with `maestro:<brief>` and the таск's id. Repository tooling only:
+  the bundle changes by that one sentence.
 - **DeepSeek Harness (dsh) is a mapped, unverified host.** `dsh` is a fourth
   host id. Install with `-a universal` into `.agents/skills/maestro`, the
   directory dsh discovers, and start with `/maestro`; dsh honours

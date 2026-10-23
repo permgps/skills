@@ -1145,7 +1145,7 @@ and [`docs/parity-verification.md`](docs/parity-verification.md).
 | `docs/spec/` | Maestro's behavior specification — what the phases must do, and the authority when a phase file disagrees |
 | `docs/spec/scout/` | Scout's, kept separate because they are separate skills and no sentence may have two homes |
 | `docs/` | the documentation pages listed in the [Documentation Map](#documentation-map) |
-| `scripts/` | this repository's own tooling: validators, the state contract, the gate checks, the metrics tool |
+| `scripts/` | this repository's own tooling: validators, the state contract, the gate checks, the metrics and cost tools |
 | `CHANGELOG.md` | every tagged release and what it shipped, newest first |
 
 Repository tooling is TypeScript run directly by Node's type stripping; the only
@@ -1170,6 +1170,7 @@ development dependencies are `typescript` and `@types/node`.
 | `npm run test` | every `*.test.ts`, including the copied-runtime integration tests and the README reference check |
 | `npm run link` / `npm run unlink` | link the checkout into the local agent directories |
 | `npm run metrics` | measure a finished run: `npm run metrics -- [<dir>] [--json]`, default `.maestro`; reads only `state.js`; counts таски, restarts and repairs per model tier; exit `0` measured, `2` unreadable |
+| `npm run metrics:cost` | measure what a run cost from the host's own log: `npm run metrics:cost -- <project> [--run <state>] [--log-dir <dir>] [--json] [--out <file>]`; reads Claude Code transcripts, `state.js` and git; prints each role's share, orchestrator calls per landed таск, executor peak context and changed lines, and whether each review blocked; units are price ratios, not money; exit `0` measured, `2` unreadable or unsupported host |
 | `npm run parity:browser` | the real-Chrome pointer suite; exit `2` when no browser is available |
 | `npm run parity:workflow` | an isolated Codex CLI evaluation |
 | `npm run parity:workflow:prepare` | prepare that evaluation without running it |
