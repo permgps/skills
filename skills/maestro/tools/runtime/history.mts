@@ -17,6 +17,7 @@
 import { execFile } from 'node:child_process';
 
 import { createLogger } from './shared/log.mts';
+import { WIP_SUFFIX } from './state/paths.mts';
 
 const log = createLogger('history');
 
@@ -70,6 +71,16 @@ export const CLOSING_SUBJECT_PREFIX = 'maestro: close ';
 
 export const closingSubject = (dir: string): string => CLOSING_SUBJECT_PREFIX + dir;
 
+/**
+ * The run as its commits' `Maestro-Run:` trailer names it: the directory
+ * without `--wip`, or the slug before contract 7. The resume check and the
+ * landing check both compare a trailer with it, so one function spells it.
+ */
+export function runName(state: Record<string, unknown>): string {
+  const dir = typeof state['dir'] === 'string' ? state['dir'] : String(state['slug'] ?? '');
+  return dir.endsWith(WIP_SUFFIX) ? dir.slice(0, -WIP_SUFFIX.length) : dir;
+}
+
 export type HistoryBasis = 'commit' | 'closing-commit' | 'date';
 
 export interface CommitsSince {
@@ -98,7 +109,8 @@ export interface CommitsSince {
 export const SHA_PATTERN = /^[0-9a-f]{7,64}$/;
 
 const RECORD = '\x1e';
-const FIELD = '\x1f';
+/** The field separator of every `--format` read here; a subject cannot carry it. */
+export const FIELD = '\x1f';
 
 /** One commit record of `log --name-only`: its fields, then the paths it touched. */
 function parseLog(stdout: string): { commits: CommitLine[]; paths: string[] } {

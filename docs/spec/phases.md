@@ -929,6 +929,56 @@ whose requirement it changes, or the last closed run when it changes none.
 to", on a прогон's own commits and on the user's alike. The closing commit
 (see *Memory*) carries `Maestro-Run:` alone.
 
+**The orchestrator never copies a sha into `commits`.** A таск commit and a
+repair commit are made by pathspec over the таск's `zone` and `files`, after a
+`git add` of the same paths, and the state that records them is published with
+`--land <NN>` (see [`state-contract.md`](state-contract.md)). The helper reads
+`HEAD` and checks it against the таск before it appends the sha: the subject
+opens with the таск's id, `Maestro-Run:` names this run, `Requirements:` lists
+the таск's ids in id order, and nothing in the таск's paths is left
+uncommitted. The subject's spelling past the id is not fixed; the recorded
+прогоны wrote `T01: …` and `T01 (repair): …`, and both land. A failed commit
+leaves a `HEAD` the check refuses, so nothing is published as landed that did
+not land. Where preflight found no version control there is no commit and no
+`--land`; the plain publish carries the таск to `review`.
+
+### What Shares A Message
+
+Every message the orchestrator sends re-reads its whole resident context, so a
+landing taken one step per message costs a context read per step. Steps that do
+not decide each other share a message, in the order sent:
+
+- **The landing:** the `D##` rows, the `git add` and the commit by pathspec, and
+  `--publish <candidate> --land <NN>` with the таск already `review` in the
+  candidate. The commit's output need not be read first, because `--land`
+  verifies `HEAD` itself.
+- **The start, in the next message:** the `running` publish first, then the
+  executor launches, then the one-line progress line when a wave closed. A
+  launch's legality depends on the landing's result, so the two never share a
+  message.
+
+**A step whose output decides the next step keeps its own message.** That is the
+return check, the evidence import, and the worktree merge when the wave was
+wider than one таск: a conflict is reported against the plan, never committed.
+Validation, S5, the gates and the holder and `updatedAt` checks are unchanged.
+
+This is a count of messages, not of turns. A turn still ends only at a stop or
+at the end of the run.
+
+**A rejected publish in a message whose launches already went out is the first
+thing the next message handles.** The candidate is corrected and published
+again with the launched таски `running`, since they are. When the refusal is
+about the launch itself — a blocker not finished, a file another running таск
+owns — that executor's return is never imported, and the таск is launched again
+once the launch is legal. That relaunch is not a retry: `retries` does not move.
+It is said in one chat line and logged; it is never left silent.
+
+All of this depends on the host running the calls of one message in the order
+sent. That is the `ordered tool calls` capability in [`hosts.md`](hosts.md),
+established by trying it. A host without it sends each step as its own message:
+the commit, then `--publish --land`, then the `running` publish, then the
+launches. `--land` still verifies `HEAD`.
+
 ### Handoff
 
 A таск that runs out of context before it is done leaves

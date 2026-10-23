@@ -20,6 +20,7 @@ import { STATE_FILE, WIP_SUFFIX, parseRunDir, runDirName } from './state/paths.m
 import { relocateRunDir, restoreRunDir, type Relocation } from './relocation.mts';
 import { upsertRegister } from './register.mts';
 import { headCommit } from './history.mts';
+import { landCandidate } from './landing.mts';
 import { PROGRESS_FILE, buildProgress, clip, fixesReadAtPreflight, parseProgress, type ProgressItem } from './progress.mts';
 import {
   MAESTRO_CHANGE_PREFIX, archivedExports, archivedItems, closureForks, exportForClosure, openSpecProgressItems,
@@ -257,6 +258,14 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
   const action = args[0];
   const file = args[1];
   if (!file) return { code: 2, result: { status: 'unreadable', reason: 'candidate path is required' } };
+  const land = option(args, '--land');
+  if (args.includes('--land')) {
+    // A landing reads HEAD into the state it publishes; a check that writes
+    // nothing has no state to put the sha in, so it is refused, not ignored.
+    if (action !== '--publish') return { code: 2, result: { status: 'unreadable', reason: '--land applies to --publish only' } };
+    if (!land || land.startsWith('--')) return { code: 2, result: { status: 'unreadable', reason: '--land needs the id of the таск HEAD landed, e.g. --land 03' } };
+    log.debug('publish', 'land requested', { taskId: land });
+  }
   let candidate: unknown;
   try { candidate = await loadCandidate(file); }
   catch {
@@ -285,9 +294,22 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
       refusedWaits.push(...waits.violations);
     }
   }
+  // The landing goes before validation, like the waits: the sha it appends is
+  // part of the state the validator and the transition rules must judge.
+  let landed: { taskId: string; sha: string; appended: boolean } | null = null;
+  const refusedLanding: StateViolation[] = [];
+  if (land !== undefined && isRecord(candidate)) {
+    const outcome = await landCandidate(candidate as unknown as RunState, land, path.dirname(dir));
+    if (outcome.kind === 'unavailable') return { code: 2, result: { status: 'unreadable', reason: outcome.reason } };
+    if (outcome.kind === 'refused') refusedLanding.push(...outcome.violations);
+    else {
+      candidate = outcome.state;
+      landed = { taskId: land, sha: outcome.sha, appended: outcome.appended };
+    }
+  }
   // Publication checks evidence only after a relocation, which needs the
   // transition checks first; the read-only actions check it straight away.
-  const errors = [...refusedWaits, ...await candidateViolations(candidate, dir, {
+  const errors = [...refusedWaits, ...refusedLanding, ...await candidateViolations(candidate, dir, {
     evidence: action !== '--publish', historical: action !== '--validate',
   })];
   const state = candidate as RunState;
@@ -419,7 +441,7 @@ async function candidateModeLocked(args: string[], dir: string, viewer: Viewer,
     else log.info('waits', 'wait closed', facts);
   }
   return { code: 0, result: { status: 'published', revision: state.updatedAt, path: target, url, projection: summary,
-    ...(waitClosed ? { waitClosed: { by: waitClosed.by, since: waitClosed.since, until: waitClosed.until } } : {}),
+    ...(waitClosed ? { waitClosed: { by: waitClosed.by, since: waitClosed.since, until: waitClosed.until } } : {}), ...(landed ? { landed } : {}),
     ...(relocation ? { relocated: relocation } : {}), ...(register ? { register } : {}), ...(progress ? { progress } : {}), ...(openspec ? { openspec } : {}),
     ...(succession && previous ? { succeeded: { runId: previous.runId, kept: path.relative(dir, kept ?? '') } } : {}) } };
 }

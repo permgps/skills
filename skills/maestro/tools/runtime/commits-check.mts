@@ -19,9 +19,8 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { ancestry, branchesContaining, findRewrittenCommit, headCommit } from './history.mts';
+import { ancestry, branchesContaining, findRewrittenCommit, headCommit, runName } from './history.mts';
 import { createLogger } from './shared/log.mts';
-import { WIP_SUFFIX } from './state/paths.mts';
 import { extractStateLiteral } from './state/read.mts';
 
 const log = createLogger('commits');
@@ -54,12 +53,6 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
-
-/** The run as its commits' `Maestro-Run:` trailer names it: the directory without `--wip`, or the slug before contract 7. */
-function runName(state: Record<string, unknown>): string {
-  const dir = typeof state['dir'] === 'string' ? state['dir'] : String(state['slug'] ?? '');
-  return dir.endsWith(WIP_SUFFIX) ? dir.slice(0, -WIP_SUFFIX.length) : dir;
-}
 
 /**
  * `--commits-check`: one JSON result. Exit 0 when nothing is lost or git could

@@ -838,6 +838,39 @@ exit codes.
   - Exit 2: no readable `state.js` beside the helper (`{ error }`).
   - Canonical module: `tools/runtime/commits-check.mts`, over the bounded
     calls in `tools/runtime/history.mts`.
+- `--publish <candidate> --land <NN>` is a strict publish that first records
+  the commit таск `NN` just landed in. Inside the publication lock, after the
+  closed waits are kept and before the candidate is validated, it reads `HEAD`
+  of the project root and checks it against таск `NN` of the candidate, in this
+  order, the first failure refusing:
+  - the таск exists (`land-unknown-task`) and is `review` in the candidate
+    (`land-not-review`): a landed таск is committed, not accepted;
+  - the subject's first token is the таск's id, followed by the end of the
+    subject, a space, a colon or `(` (`land-subject`);
+  - `Maestro-Run:` is given once and equals the run name, `dir` without `--wip`
+    or `slug` before contract 7 (`land-run`);
+  - `Requirements:` is given once and lists the таск's `requirementIds` in id
+    order, numbers compared as numbers (`land-requirements`);
+  - the sha is in no таск's `lostCommits` (`land-lost`) and in no other таск's
+    `commits` (`land-other-task`). When it is already the таск's last commit
+    nothing is appended; when it is an earlier one, no new commit was made
+    (`land-stale-head`);
+  - the таск names a `zone` or `files` (`land-no-paths`), each a
+    project-relative path (`land-path`), and `git status` over them, `.maestro/`
+    excluded, untracked files included, prints nothing (`land-dirty`, naming up
+    to 20 paths and their count).
+
+  Then the sha is appended to that таск's `commits` and the candidate is judged
+  as it will be written. The candidate file is not rewritten. The result carries
+  `landed: { taskId, sha, appended }`, `appended` false when the candidate
+  already carried the sha.
+  - Exit 1: a refusal, as `{ field: "tasks[<i>].commits", message }` whose
+    message opens with the rule; nothing is written.
+  - Exit 2: `--land` on `--validate` or `--project`, `--land` without an id, or
+    git unable to answer (`{ status: "unreadable", reason }`); nothing is
+    written.
+  - Canonical module: `tools/runtime/landing.mts`, over the bounded calls in
+    `tools/runtime/history.mts`.
 - `--plan-units [--record]` reads the run directory `state.js` names: its
   `tasks/NN-*.md`, `shared.md` (absent means no facts) and `interfaces.md`. It
   reports `{ result: "listed", tasks, facts, changed, violations, restated }`.
@@ -920,7 +953,7 @@ exit codes.
     `scripts/gates/execution-return.ts` is its facade and keeps the
     repository CLI.
 
-Strict `--publish <candidate> [--expect <revision>] [--holder <token>]`
+Strict `--publish <candidate> [--expect <revision>] [--holder <token>] [--land <NN>]`
 requires a matching expected revision whenever state exists, checks both prior
 and candidate holders, refuses unreadable or invalid history, and validates
 immutable records and confined evidence/input hashes. Object key order does not
