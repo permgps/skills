@@ -744,6 +744,37 @@ or the way it is compared, is revised from that.
 node --test scripts/validate/fixtures/volume-cut/scenarios.test.mts
 ```
 
+## One Event, One Turn — 2026-10-23
+
+A landing now takes two messages. The first holds the commit by pathspec and
+`--publish <candidate> --land <NN>`, which reads the sha from `HEAD` after
+checking it against the таск. The second holds the `running` publish and the
+launches. Both depend on the host running the calls of one message in the order
+sent, so that is a degrading capability, `ordered tool calls`, probed on the
+fan-out probe.
+
+**The start condition was waived.** The roadmap item was to wait for a real
+прогон's count of orchestrator calls per landed таск. That count is still
+pending under *Cost Measurement* above, and the user chose on 2026-10-23 to
+build the item first. The helper's check of `HEAD` against the таск is worth
+keeping even if the saving turns out small. When the before-and-after figures
+below are measured, they are recorded here either way.
+
+| Check | Result |
+|---|---|
+| the ordered-calls probe on Claude Code 2.1.309 (Opus 5.5 session, git 2.39.5): one message, a shell call writing a token after a 20 s delay, then an Explore subagent on Haiku asked for the file | **ordered.** The shell finished writing at 10:59:32Z, the subagent read the token at 10:59:35Z, after the write and not 20 s before it. The subagent tool returns at once and runs in the background, so the launch went out after the shell call had returned |
+| `--land` through the copied helper on a real repository | 32 tests in `landing-sync.test.ts`: the roadmap's four cases (appended once, another таск's or run's `HEAD` refused, a dirty zone refused, an identical retry idempotent), every refusal beside its legal inputs, the order proof and a 200 KB subject |
+| the capability's two homes | `npm run hosts` OK. A removal test drops each of the two markers, the preflight probe and the build phase's degradation, and expects exactly one finding for it |
+| the phase text | `npm run bundle` OK, with `LANDING_ANCHORS` holding 9 literals, each with a removal test |
+| orchestrator calls per landed таск, before (a прогон at `b2c6400`) and after (a comparable прогон at the closing commit), through `npm run metrics:cost` | pending: no прогон has run on either side |
+| a host other than Claude Code answering the probe | pending: no прогон has run on Codex, Gemini CLI or dsh |
+
+```sh
+node --test scripts/validate/landing-sync.test.ts
+npm run hosts
+npm run bundle
+```
+
 ## See Also
 
 - [Installation and development checks](install.md)
