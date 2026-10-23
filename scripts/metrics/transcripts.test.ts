@@ -51,18 +51,23 @@ test('one call written over three lines with identical usage counts once, where 
   });
 });
 
-test('the same call replayed into a resumed session\'s file counts once and stays with the first session', async () => {
-  await withLogDir(async logDir => {
-    const call = assistantLine({ id: 'msg_1', at: '2026-10-23T10:00:01Z', usage: USAGE });
-    await writeSession(logDir, 'a-original', [call]);
-    await writeSession(logDir, 'b-resumed', [call, assistantLine({ id: 'msg_2', at: '2026-10-23T11:00:00Z', usage: USAGE })]);
-    const transcripts = await readTranscripts(logDir);
+// Session files are named by uuid, so the original may sort either side of the
+// session that resumed it; both orders are held.
+for (const [original, resumed] of [['a-original', 'b-resumed'], ['z-original', 'a-resumed']] as const) {
+  test(`the same call replayed into a resumed session's file counts once and stays with the session that made it (${original}, ${resumed})`, async () => {
+    await withLogDir(async logDir => {
+      // The host copies a replayed record whole: same message id, same timestamp.
+      const call = assistantLine({ id: 'msg_1', at: '2026-10-23T10:00:01Z', usage: USAGE });
+      await writeSession(logDir, original, [call]);
+      await writeSession(logDir, resumed, [call, assistantLine({ id: 'msg_2', at: '2026-10-23T11:00:00Z', usage: USAGE })]);
+      const transcripts = await readTranscripts(logDir);
 
-    assert.equal(callCount(transcripts), 2);
-    assert.deepEqual(only(transcripts, context => context.sessionId === 'a-original').calls.map(c => c.messageId), ['msg_1']);
-    assert.deepEqual(only(transcripts, context => context.sessionId === 'b-resumed').calls.map(c => c.messageId), ['msg_2']);
+      assert.equal(callCount(transcripts), 2);
+      assert.deepEqual(only(transcripts, context => context.sessionId === original).calls.map(c => c.messageId), ['msg_1']);
+      assert.deepEqual(only(transcripts, context => context.sessionId === resumed).calls.map(c => c.messageId), ['msg_2']);
+    });
   });
-});
+}
 
 test('a call\'s usage is taken from its last record when its lines differ', async () => {
   await withLogDir(async logDir => {

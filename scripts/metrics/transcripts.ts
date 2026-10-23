@@ -10,9 +10,11 @@
 //   content block — thinking, text, each tool call — and every one of them
 //   carries the same usage. Summing lines overstates every total, so a call is
 //   one unique `message.id`, its usage taken from its last record.
-// - **A resumed session replays earlier records into its new file.** The
-//   dedupe therefore runs across every file read, and a call stays with the
-//   context where it was first seen.
+// - **A resumed session replays earlier records into its new file**, whole:
+//   same message id, same timestamp. The dedupe therefore runs across every
+//   file read, and main sessions are read in the order they ended, so a
+//   replayed call stays with the session that made it — a resumed session holds
+//   every record of the one it resumed and ends later.
 // - **The host deletes transcripts** older than its `cleanupPeriodDays`
 //   setting, 30 days by default. A прогон older than that cannot be measured.
 //
@@ -197,14 +199,30 @@ interface FileJob {
 
 const exists = async (target: string): Promise<boolean> => stat(target).then(() => true, () => false);
 
-/** Every transcript file under the log directory, main sessions first, in name order. */
+/** The time of a file's last timestamped record, or `+∞` when it has none. */
+async function lastRecordAt(file: string): Promise<number> {
+  const lines = (await readFile(file, 'utf8')).split('\n');
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    let record: unknown;
+    try { record = JSON.parse(lines[index] as string); } catch { continue; }
+    const at = isObject(record) ? text(record['timestamp']) : undefined;
+    if (at !== undefined && !Number.isNaN(Date.parse(at))) return Date.parse(at);
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Every transcript file under the log directory: main sessions first, in the
+ * order they ended (then by name), then subagents in name order.
+ */
 async function listFiles(logDir: string): Promise<FileJob[]> {
   const entries = await readdir(logDir, { withFileTypes: true });
-  const mains: FileJob[] = [];
+  const mains: Array<FileJob & { endedAt: number }> = [];
   const subagents: FileJob[] = [];
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (entry.isFile() && entry.name.endsWith('.jsonl')) {
-      mains.push({ file: path.join(logDir, entry.name), kind: 'main', sessionId: entry.name.slice(0, -'.jsonl'.length) });
+      const file = path.join(logDir, entry.name);
+      mains.push({ file, kind: 'main', sessionId: entry.name.slice(0, -'.jsonl'.length), endedAt: await lastRecordAt(file) });
       continue;
     }
     if (!entry.isDirectory()) continue;
@@ -220,6 +238,10 @@ async function listFiles(logDir: string): Promise<FileJob[]> {
       });
     }
   }
+  // The sort is stable, so sessions that ended at the same moment keep name
+  // order; `|| 0` does the same for two with no timestamp at all (∞ − ∞).
+  mains.sort((a, b) => a.endedAt - b.endedAt || 0);
+  log.debug('transcripts', 'main sessions ordered by their last record', { sessions: mains.length });
   return [...mains, ...subagents];
 }
 
